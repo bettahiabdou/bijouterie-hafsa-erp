@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - Bijouterie Hafsa ERP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex items-center justify-center">
+    <div class="w-full max-w-md">
+        <!-- Card -->
+        <div class="bg-white rounded-lg shadow-2xl p-8">
+            <!-- Logo -->
+            <div class="text-center mb-8">
+                <div class="inline-block bg-yellow-500 text-white px-6 py-3 rounded-lg font-bold text-2xl mb-4">
+                    <i class="fas fa-gem mr-2"></i> HF
+                </div>
+                <h1 class="text-3xl font-bold text-gray-900">Bijouterie Hafsa</h1>
+                <p class="text-gray-600 text-sm mt-2">Système de Gestion d'Entreprise</p>
+            </div>
+
+            <!-- Form -->
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+
+                <!-- Messages -->
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="p-4 rounded-lg {% if message.tags == 'error' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                            <p class="text-sm">{{ message }}</p>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <!-- Form Errors -->
+                {% if form.non_field_errors %}
+                    <div class="p-4 rounded-lg bg-red-100 text-red-800">
+                        {% for error in form.non_field_errors %}
+                            <p class="text-sm">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <!-- Username -->
+                <div>
+                    <label for="id_username" class="block text-sm font-medium text-gray-700 mb-2">
+                        Nom d'utilisateur
+                    </label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-3 text-gray-400">
+                            <i class="fas fa-user"></i>
+                        </span>
+                        <input type="text" name="username" id="id_username" required
+                            class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                            placeholder="Entrez votre nom d'utilisateur">
+                    </div>
+                    {% if form.username.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.username.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label for="id_password" class="block text-sm font-medium text-gray-700 mb-2">
+                        Mot de passe
+                    </label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-3 text-gray-400">
+                            <i class="fas fa-lock"></i>
+                        </span>
+                        <input type="password" name="password" id="id_password" required
+                            class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                            placeholder="Entrez votre mot de passe">
+                    </div>
+                    {% if form.password.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.password.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Remember Me -->
+                <div class="flex items-center">
+                    <input type="checkbox" name="remember_me" id="remember_me" class="rounded">
+                    <label for="remember_me" class="ml-2 text-sm text-gray-700">
+                        Se souvenir de moi
+                    </label>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Se Connecter
+                </button>
+            </form>
+
+            <!-- Footer -->
+            <div class="mt-6 pt-6 border-t border-gray-200 text-center text-sm text-gray-600">
+                <p>
+                    Oubliez votre mot de passe?
+                    <a href="#" class="text-yellow-600 hover:text-yellow-700 font-medium">Réinitialiser ici</a>
+                </p>
+            </div>
+
+            <!-- Info Box -->
+            <div class="mt-6 p-4 bg-blue-50 rounded-lg text-sm text-blue-800">
+                <p><i class="fas fa-info-circle mr-2"></i> Pour accéder au système, utilisez vos identifiants fournis par l'administrateur.</p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 text-gray-400 text-sm">
+            <p>&copy; 2024 Bijouterie Hafsa. Tous droits réservés.</p>
+        </div>
+    </div>
+</body>
+</html>
