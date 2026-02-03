@@ -32,6 +32,7 @@ urlpatterns = [
 
     # App URLs
     path('products/', include('products.urls')),
+    path('sales/', include('sales.urls')),
 ]
 
 if settings.DEBUG:
