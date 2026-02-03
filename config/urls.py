@@ -31,7 +31,7 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
 
     # App URLs
-    # Add app-specific URLs here as we create them
+    path('products/', include('products.urls')),
 ]
 
 if settings.DEBUG:

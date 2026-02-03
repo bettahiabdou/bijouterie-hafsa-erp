@@ -1,3 +1,277 @@
-from django.shortcuts import render
+"""
+Product management views for Bijouterie Hafsa ERP
+"""
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib import messages
+from django.db.models import Q, Count, Sum, F
+from django.core.paginator import Paginator
+from django.views.decorators.http import require_http_methods
+from .models import Product, ProductImage, ProductStone
+from settings_app.models import ProductCategory, MetalType, MetalPurity
+from users.models import ActivityLog
 
-# Create your views here.
+
+@login_required(login_url='login')
+def product_list(request):
+    """List all products with filtering and search"""
+    products = Product.objects.select_related(
+        'category', 'metal_type', 'metal_purity'
+    ).prefetch_related('images')
+
+    # Search
+    search_query = request.GET.get('search', '')
+    if search_query:
+        products = products.filter(
+            Q(reference__icontains=search_query) |
+            Q(name__icontains=search_query) |
+            Q(name_ar__icontains=search_query) |
+            Q(barcode__icontains=search_query)
+        )
+
+    # Filter by status
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        products = products.filter(status=status_filter)
+
+    # Filter by category
+    category_filter = request.GET.get('category', '')
+    if category_filter:
+        products = products.filter(category_id=category_filter)
+
+    # Filter by metal type
+    metal_filter = request.GET.get('metal', '')
+    if metal_filter:
+        products = products.filter(metal_type_id=metal_filter)
+
+    # Sort
+    sort_by = request.GET.get('sort', '-created_at')
+    try:
+        products = products.order_by(sort_by)
+    except:
+        products = products.order_by('-created_at')
+
+    # Pagination
+    paginator = Paginator(products, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    # Statistics
+    stats = {
+        'total': Product.objects.count(),
+        'available': Product.objects.filter(status='available').count(),
+        'sold': Product.objects.filter(status='sold').count(),
+        'in_repair': Product.objects.filter(status='in_repair').count(),
+    }
+
+    context = {
+        'page_obj': page_obj,
+        'products': page_obj.object_list,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'category_filter': category_filter,
+        'metal_filter': metal_filter,
+        'sort_by': sort_by,
+        'categories': ProductCategory.objects.all(),
+        'metals': MetalType.objects.filter(is_active=True),
+        'stats': stats,
+        'statuses': Product.Status.choices,
+    }
+
+    return render(request, 'products/product_list.html', context)
+
+
+@login_required(login_url='login')
+def product_detail(request, reference):
+    """Display product details"""
+    product = get_object_or_404(
+        Product.objects.select_related(
+            'category', 'metal_type', 'metal_purity'
+        ).prefetch_related('images', 'stones'),
+        reference=reference
+    )
+
+    # Log view activity
+    ActivityLog.objects.create(
+        user=request.user,
+        action=ActivityLog.ActionType.VIEW,
+        model_name='Product',
+        object_id=str(product.id),
+        object_repr=product.reference,
+        ip_address=get_client_ip(request)
+    )
+
+    context = {
+        'product': product,
+        'images': product.images.all(),
+        'stones': product.stones.all(),
+    }
+
+    return render(request, 'products/product_detail.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["GET", "POST"])
+def product_create(request):
+    """Create a new product"""
+    if not request.user.can_manage_stock:
+        messages.error(request, 'Vous n\'avez pas la permission d\'ajouter des produits.')
+        return redirect('product_list')
+
+    if request.method == 'POST':
+        try:
+            product = Product.objects.create(
+                reference=request.POST.get('reference'),
+                name=request.POST.get('name'),
+                name_ar=request.POST.get('name_ar', ''),
+                description=request.POST.get('description', ''),
+                product_type=request.POST.get('product_type', 'finished'),
+                category_id=request.POST.get('category'),
+                metal_type_id=request.POST.get('metal_type'),
+                metal_purity_id=request.POST.get('metal_purity'),
+                gross_weight=request.POST.get('gross_weight', 0),
+                net_weight=request.POST.get('net_weight', 0),
+                purchase_price_per_gram=request.POST.get('purchase_price_per_gram', 0),
+                selling_price=request.POST.get('selling_price', 0),
+                minimum_price=request.POST.get('minimum_price', 0),
+                status='available',
+                created_by=request.user,
+            )
+
+            # Log activity
+            ActivityLog.objects.create(
+                user=request.user,
+                action=ActivityLog.ActionType.CREATE,
+                model_name='Product',
+                object_id=str(product.id),
+                object_repr=product.reference,
+                ip_address=get_client_ip(request)
+            )
+
+            messages.success(request, f'Produit "{product.name}" créé avec succès.')
+            return redirect('product_detail', reference=product.reference)
+
+        except Exception as e:
+            messages.error(request, f'Erreur lors de la création: {str(e)}')
+
+    context = {
+        'categories': ProductCategory.objects.all(),
+        'metals': MetalType.objects.filter(is_active=True),
+        'purities': MetalPurity.objects.filter(is_active=True),
+        'product_types': Product.ProductType.choices,
+    }
+
+    return render(request, 'products/product_form.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["GET", "POST"])
+def product_edit(request, reference):
+    """Edit an existing product"""
+    product = get_object_or_404(Product, reference=reference)
+
+    if not request.user.can_manage_stock:
+        messages.error(request, 'Vous n\'avez pas la permission de modifier les produits.')
+        return redirect('product_detail', reference=reference)
+
+    if request.method == 'POST':
+        try:
+            product.name = request.POST.get('name', product.name)
+            product.name_ar = request.POST.get('name_ar', product.name_ar)
+            product.description = request.POST.get('description', product.description)
+            product.gross_weight = request.POST.get('gross_weight', product.gross_weight)
+            product.net_weight = request.POST.get('net_weight', product.net_weight)
+            product.purchase_price_per_gram = request.POST.get('purchase_price_per_gram', product.purchase_price_per_gram)
+            product.selling_price = request.POST.get('selling_price', product.selling_price)
+            product.minimum_price = request.POST.get('minimum_price', product.minimum_price)
+            product.status = request.POST.get('status', product.status)
+
+            if request.POST.get('metal_type'):
+                product.metal_type_id = request.POST.get('metal_type')
+            if request.POST.get('metal_purity'):
+                product.metal_purity_id = request.POST.get('metal_purity')
+
+            product.save()
+
+            # Log activity
+            ActivityLog.objects.create(
+                user=request.user,
+                action=ActivityLog.ActionType.UPDATE,
+                model_name='Product',
+                object_id=str(product.id),
+                object_repr=product.reference,
+                ip_address=get_client_ip(request)
+            )
+
+            messages.success(request, f'Produit "{product.name}" modifié avec succès.')
+            return redirect('product_detail', reference=product.reference)
+
+        except Exception as e:
+            messages.error(request, f'Erreur lors de la modification: {str(e)}')
+
+    context = {
+        'product': product,
+        'categories': ProductCategory.objects.all(),
+        'metals': MetalType.objects.filter(is_active=True),
+        'purities': MetalPurity.objects.filter(is_active=True),
+        'product_types': Product.ProductType.choices,
+        'statuses': Product.Status.choices,
+    }
+
+    return render(request, 'products/product_form.html', context)
+
+
+@login_required(login_url='login')
+def inventory_dashboard(request):
+    """Display inventory statistics and alerts"""
+    if not request.user.can_manage_stock and not request.user.is_staff:
+        messages.error(request, 'Vous n\'avez pas accès à ce tableau de bord.')
+        return redirect('dashboard')
+
+    # Overall statistics
+    total_products = Product.objects.count()
+    available_products = Product.objects.filter(status='available').count()
+    sold_products = Product.objects.filter(status='sold').count()
+    in_repair_products = Product.objects.filter(status='in_repair').count()
+
+    # Value calculations
+    total_value = Product.objects.aggregate(
+        total=Sum(F('selling_price'))
+    )['total'] or 0
+
+    # Status breakdown
+    status_breakdown = Product.objects.values('status').annotate(count=Count('id')).order_by('status')
+
+    # Metal breakdown
+    metal_breakdown = Product.objects.values('metal_type__name').annotate(
+        count=Count('id'),
+        total_weight=Sum('gross_weight')
+    ).order_by('-count')[:10]
+
+    # Low stock items (minimum price below selling price indicates low stock)
+    low_stock_items = Product.objects.filter(
+        status='available'
+    ).order_by('gross_weight')[:20]
+
+    context = {
+        'total_products': total_products,
+        'available_products': available_products,
+        'sold_products': sold_products,
+        'in_repair_products': in_repair_products,
+        'total_value': total_value,
+        'status_breakdown': list(status_breakdown),
+        'metal_breakdown': list(metal_breakdown),
+        'low_stock_items': low_stock_items,
+    }
+
+    return render(request, 'products/inventory_dashboard.html', context)
+
+
+def get_client_ip(request):
+    """Get client IP address from request"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip

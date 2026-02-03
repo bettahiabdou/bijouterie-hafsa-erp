@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if product %}Modifier{% else %}Créer{% endif %} Produit - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span>/</span>
+    <a href="{% url 'products:list' %}">Produits</a>
+    <span>/</span>
+    <span>{% if product %}{{ product.reference }}{% else %}Nouveau{% endif %}</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">
+                {% if product %}Modifier Produit{% else %}Créer Nouveau Produit{% endif %}
+            </h1>
+            {% if product %}
+                <p class="text-gray-600 mt-1">{{ product.reference }}</p>
+            {% endif %}
+        </div>
+        <a href="{% if product %}{% url 'products:detail' product.reference %}{% else %}{% url 'products:list' %}{% endif %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+            <i class="fas fa-arrow-left mr-2"></i> Annuler
+        </a>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <form method="post" class="bg-white rounded-lg shadow-md p-6">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="mb-6 p-4 bg-red-100 text-red-800 rounded-lg">
+                {% for error in form.non_field_errors %}
+                    <p>{{ error }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Basic Information -->
+            <div class="lg:col-span-2">
+                <h2 class="text-lg font-bold text-gray-900 mb-4">Informations de Base</h2>
+            </div>
+
+            <!-- Reference (read-only if editing) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Référence *</label>
+                <input type="text" name="reference" value="{% if product %}{{ product.reference }}{% endif %}"
+                    {% if product %}readonly class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg"{% else %}required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"{% endif %}>
+                <p class="text-xs text-gray-500 mt-1">Identifiant unique du produit</p>
+            </div>
+
+            <!-- Type -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Type *</label>
+                <select name="product_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {% for value, label in product_types %}
+                        <option value="{{ value }}" {% if product.product_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Nom FR -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Nom (Français) *</label>
+                <input type="text" name="name" value="{% if product %}{{ product.name }}{% endif %}" required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Nom AR -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Nom (Arabe)</label>
+                <input type="text" name="name_ar" value="{% if product %}{{ product.name_ar }}{% endif %}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" dir="rtl">
+            </div>
+
+            <!-- Category -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Catégorie *</label>
+                <select name="category" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Sélectionner une catégorie</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}" {% if product.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Description -->
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea name="description" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">{% if product %}{{ product.description }}{% endif %}</textarea>
+            </div>
+
+            <!-- Metals & Purity -->
+            <h2 class="text-lg font-bold text-gray-900 mb-4 lg:col-span-2">Métaux & Pureté</h2>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Type de Métal</label>
+                <select name="metal_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Non spécifié</option>
+                    {% for metal in metals %}
+                        <option value="{{ metal.id }}" {% if product.metal_type_id == metal.id %}selected{% endif %}>{{ metal.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Pureté</label>
+                <select name="metal_purity" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Non spécifiée</option>
+                    {% for purity in purities %}
+                        <option value="{{ purity.id }}" {% if product.metal_purity_id == purity.id %}selected{% endif %}>{{ purity.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Weight -->
+            <h2 class="text-lg font-bold text-gray-900 mb-4 lg:col-span-2">Poids</h2>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Poids Brut (g) *</label>
+                <input type="number" name="gross_weight" value="{% if product %}{{ product.gross_weight }}{% else %}0{% endif %}"
+                    step="0.001" min="0" required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Poids Net (g)</label>
+                <input type="number" name="net_weight" value="{% if product %}{{ product.net_weight }}{% else %}0{% endif %}"
+                    step="0.001" min="0"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Pricing -->
+            <h2 class="text-lg font-bold text-gray-900 mb-4 lg:col-span-2">Tarification</h2>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Prix d'Achat/g (DH) *</label>
+                <input type="number" name="purchase_price_per_gram" value="{% if product %}{{ product.purchase_price_per_gram }}{% else %}0{% endif %}"
+                    step="0.01" min="0" required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Coût Total (DH)</label>
+                <input type="number" name="total_cost" value="{% if product %}{{ product.total_cost }}{% else %}0{% endif %}"
+                    step="0.01" min="0" readonly
+                    class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg">
+                <p class="text-xs text-gray-500 mt-1">Calculé automatiquement</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Prix de Vente (DH) *</label>
+                <input type="number" name="selling_price" value="{% if product %}{{ product.selling_price }}{% else %}0{% endif %}"
+                    step="0.01" min="0" required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Prix Minimum (DH)</label>
+                <input type="number" name="minimum_price" value="{% if product %}{{ product.minimum_price }}{% else %}0{% endif %}"
+                    step="0.01" min="0"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Status (if editing) -->
+            {% if product %}
+                <h2 class="text-lg font-bold text-gray-900 mb-4 lg:col-span-2">Statut</h2>
+
+                <div class="lg:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
+                    <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        {% for value, label in statuses %}
+                            <option value="{{ value }}" {% if product.status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Form Actions -->
+        <div class="mt-8 flex gap-4">
+            <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center">
+                <i class="fas fa-save mr-2"></i>
+                {% if product %}Mettre à Jour{% else %}Créer{% endif %}
+            </button>
+            <a href="{% if product %}{% url 'products:detail' product.reference %}{% else %}{% url 'products:list' %}{% endif %}"
+                class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg">
+                Annuler
+            </a>
+        </div>
+    </form>
+{% endblock %}

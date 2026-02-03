@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Tableau de Bord Inventaire - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span>/</span>
+    <a href="{% url 'products:list' %}">Produits</a>
+    <span>/</span>
+    <span>Inventaire</span>
+{% endblock %}
+
+{% block page_header %}
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Tableau de Bord Inventaire</h1>
+        <p class="text-gray-600 mt-1">Vue d'ensemble du stock et des statistiques</p>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+            <p class="text-gray-600 text-sm font-medium">Total Produits</p>
+            <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_products }}</p>
+            <p class="text-xs text-gray-400 mt-1">Pièces</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
+            <p class="text-gray-600 text-sm font-medium">Disponible</p>
+            <p class="text-3xl font-bold text-green-600 mt-2">{{ available_products }}</p>
+            <p class="text-xs text-gray-400 mt-1">Prêt à vendre</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
+            <p class="text-gray-600 text-sm font-medium">En Réparation</p>
+            <p class="text-3xl font-bold text-yellow-600 mt-2">{{ in_repair_products }}</p>
+            <p class="text-xs text-gray-400 mt-1">En atelier</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-500">
+            <p class="text-gray-600 text-sm font-medium">Vendu</p>
+            <p class="text-3xl font-bold text-gray-600 mt-2">{{ sold_products }}</p>
+            <p class="text-xs text-gray-400 mt-1">Archives</p>
+        </div>
+    </div>
+
+    <!-- Value Card -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8 border-l-4 border-yellow-500">
+        <h3 class="text-lg font-bold text-gray-900">Valeur Total du Stock</h3>
+        <p class="text-4xl font-bold text-yellow-600 mt-2">{{ total_value|floatformat:0 }} DH</p>
+        <p class="text-sm text-gray-600 mt-2">Prix de vente estimé de tous les produits disponibles</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Status Breakdown -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Répartition par Statut</h3>
+            <div class="space-y-3">
+                {% for item in status_breakdown %}
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-700">{{ item.status|title }}</span>
+                        <div class="flex items-center gap-2">
+                            <div class="w-32 bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: {% widthratio item.count total_products 100 %}%"></div>
+                            </div>
+                            <span class="font-bold text-gray-900 w-8 text-right">{{ item.count }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Metal Breakdown -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Top 10 Métaux</h3>
+            <div class="space-y-2">
+                {% for item in metal_breakdown %}
+                    <div class="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+                        <span class="text-gray-700">{{ item.metal_type__name }}</span>
+                        <div class="text-right">
+                            <p class="font-bold text-gray-900">{{ item.count }} pcs</p>
+                            <p class="text-xs text-gray-600">{{ item.total_weight|floatformat:1 }} g</p>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="text-gray-500 text-center py-4">Aucune donnée</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Low Stock Items -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4">Articles Légers (20 premiers)</h3>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-gray-600 font-medium">Référence</th>
+                        <th class="px-4 py-3 text-left text-gray-600 font-medium">Nom</th>
+                        <th class="px-4 py-3 text-left text-gray-600 font-medium">Catégorie</th>
+                        <th class="px-4 py-3 text-left text-gray-600 font-medium">Poids</th>
+                        <th class="px-4 py-3 text-left text-gray-600 font-medium">Prix</th>
+                        <th class="px-4 py-3 text-center text-gray-600 font-medium">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for item in low_stock_items %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 font-mono font-bold text-blue-600">{{ item.reference }}</td>
+                            <td class="px-4 py-3 text-gray-900">{{ item.name }}</td>
+                            <td class="px-4 py-3 text-gray-600">{{ item.category.name }}</td>
+                            <td class="px-4 py-3 text-gray-600">{{ item.gross_weight }} g</td>
+                            <td class="px-4 py-3 font-bold text-gray-900">{{ item.selling_price }} DH</td>
+                            <td class="px-4 py-3 text-center">
+                                <a href="{% url 'products:detail' item.reference %}" class="text-blue-600 hover:text-blue-900">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                                Aucun article trouvé
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
