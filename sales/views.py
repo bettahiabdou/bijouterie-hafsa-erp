@@ -15,6 +15,7 @@ from products.models import Product
 from clients.models import Client
 from quotes.models import Quote
 from users.models import ActivityLog
+from settings_app.models import PaymentMethod
 
 
 @login_required(login_url='login')
@@ -796,3 +797,13 @@ def invoice_delivery(request, reference):
     }
 
     return render(request, 'sales/invoice_delivery.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["GET"])
+def get_payment_methods(request):
+    """API endpoint to get payment methods with requires_reference info"""
+    payment_methods = PaymentMethod.objects.filter(is_active=True).values('id', 'name', 'requires_reference')
+    return JsonResponse({
+        'payment_methods': list(payment_methods)
+    })

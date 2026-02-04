@@ -20,6 +20,9 @@ urlpatterns = [
     path('invoices/<str:reference>/add-item/', views.add_invoice_item, name='add_item'),
     path('invoices/delete-item/', views.delete_invoice_item, name='delete_item'),
 
+    # API endpoints
+    path('api/payment-methods/', views.get_payment_methods, name='get_payment_methods'),
+
     # Quote to Invoice conversion
     path('quotes/<int:quote_id>/to-invoice/', views.quote_to_invoice, name='quote_to_invoice'),
 
