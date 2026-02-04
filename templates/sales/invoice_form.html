@@ -558,20 +558,26 @@
             };
 
             // Add items to form before submit
-            const form = document.querySelector('form');
-            form.addEventListener('submit', function(e) {
+            const forms = document.querySelectorAll('form');
+            const mainForm = forms[0]; // Get the main form (not the modal form)
+
+            mainForm.addEventListener('submit', function(e) {
+                console.log('Main form submit event triggered');
+
+                // Add items as hidden inputs
                 if (invoiceItems.length > 0) {
-                    // Create hidden inputs for articles
-                    const container = document.createElement('div');
+                    console.log('Adding', invoiceItems.length, 'items to form');
                     invoiceItems.forEach((item, index) => {
                         const input = document.createElement('input');
                         input.type = 'hidden';
                         input.name = `items[${index}]`;
                         input.value = JSON.stringify(item);
-                        container.appendChild(input);
+                        mainForm.appendChild(input);
                     });
-                    form.appendChild(container);
                 }
+
+                console.log('Form submitting with', invoiceItems.length, 'items');
+                // Allow natural form submission
             });
         });
     </script>
