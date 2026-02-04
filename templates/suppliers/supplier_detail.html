@@ -1,0 +1,546 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ supplier.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .detail-container {
+        display: flex;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .detail-wrapper {
+        width: 100%;
+        max-width: 1000px;
+    }
+
+    .detail-header {
+        background: white;
+        border-radius: 8px;
+        padding: 32px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+    }
+
+    .detail-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 20px;
+    }
+
+    .detail-header-title h1 {
+        font-size: 2.2em;
+        font-weight: bold;
+        color: #111827;
+        margin: 0;
+    }
+
+    .detail-header-title .subtitle {
+        color: #6b7280;
+        font-size: 1em;
+        font-weight: normal;
+        margin-top: 4px;
+    }
+
+    .detail-badges {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: 500;
+    }
+
+    .badge-type {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
+
+    .badge-active {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+
+    .badge-inactive {
+        background-color: #fee2e2;
+        color: #7f1d1d;
+    }
+
+    .detail-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .btn-action {
+        padding: 8px 16px;
+        border-radius: 6px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 500;
+        transition: all 0.2s;
+        font-size: 0.9em;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-primary {
+        background-color: #2563eb;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: #1d4ed8;
+    }
+
+    .btn-secondary {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
+
+    .btn-secondary:hover {
+        background-color: #d1d5db;
+    }
+
+    .btn-danger {
+        background-color: #ef4444;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background-color: #dc2626;
+    }
+
+    .detail-card {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+    }
+
+    .card-title {
+        font-size: 1.2em;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #f3f4f6;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .info-label {
+        font-weight: 600;
+        color: #374151;
+        font-size: 0.9em;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .info-value {
+        color: #111827;
+        font-size: 1em;
+        word-break: break-word;
+    }
+
+    .info-value.empty {
+        color: #9ca3af;
+        font-style: italic;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .detail-table thead {
+        background-color: #f3f4f6;
+        border-bottom: 2px solid #d1d5db;
+    }
+
+    .detail-table th {
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        font-size: 0.9em;
+    }
+
+    .detail-table td {
+        padding: 12px;
+        border-bottom: 1px solid #e5e7eb;
+        color: #111827;
+    }
+
+    .detail-table tbody tr:hover {
+        background-color: #f9fafb;
+    }
+
+    .currency {
+        font-family: monospace;
+        font-weight: 500;
+    }
+
+    .date {
+        font-size: 0.9em;
+        color: #6b7280;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 40px;
+        color: #9ca3af;
+    }
+
+    .no-data i {
+        font-size: 2.5em;
+        margin-bottom: 12px;
+        color: #d1d5db;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .summary-box {
+        padding: 16px;
+        border-radius: 6px;
+        text-align: center;
+        border: 1px solid #e5e7eb;
+    }
+
+    .summary-box.highlight {
+        background-color: #f0fdf4;
+        border-color: #bbf7d0;
+    }
+
+    .summary-label {
+        font-weight: 500;
+        color: #6b7280;
+        font-size: 0.9em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .summary-value {
+        font-size: 1.8em;
+        font-weight: bold;
+        color: #111827;
+    }
+
+    .summary-value.currency {
+        font-family: monospace;
+    }
+
+    @media (max-width: 768px) {
+        .detail-header {
+            padding: 20px;
+        }
+
+        .detail-header-top {
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .detail-actions {
+            width: 100%;
+        }
+
+        .btn-action {
+            flex: 1;
+            justify-content: center;
+        }
+
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .detail-table {
+            font-size: 0.9em;
+        }
+
+        .detail-table th,
+        .detail-table td {
+            padding: 8px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-container">
+    <div class="detail-wrapper">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mb-6 p-4 {% if message.tags %}bg-{{ message.tags }}-100 text-{{ message.tags }}-800{% else %}bg-blue-100 text-blue-800{% endif %} rounded-lg">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Header Card -->
+        <div class="detail-header">
+            <div class="detail-header-top">
+                <div class="detail-header-title">
+                    <h1>{{ supplier.name }}</h1>
+                    {% if supplier.name_ar %}
+                        <div class="subtitle">{{ supplier.name_ar }}</div>
+                    {% endif %}
+                    <div class="detail-badges">
+                        <span class="badge badge-type">{{ supplier.get_supplier_type_display }}</span>
+                        <span class="badge {% if supplier.is_active %}badge-active{% else %}badge-inactive{% endif %}">
+                            {% if supplier.is_active %}Actif{% else %}Inactif{% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="detail-actions">
+                    <a href="{% url 'suppliers:edit' code=supplier.code %}" class="btn-action btn-primary">
+                        <i class="fas fa-edit"></i> Éditer
+                    </a>
+                    <a href="{% url 'suppliers:delete' code=supplier.code %}" class="btn-action btn-danger">
+                        <i class="fas fa-trash"></i> Supprimer
+                    </a>
+                    <a href="{% url 'suppliers:list' %}" class="btn-action btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </a>
+                </div>
+            </div>
+
+            <!-- Basic Information -->
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label"><i class="fas fa-barcode"></i> Code</span>
+                    <span class="info-value">{{ supplier.code }}</span>
+                </div>
+
+                {% if supplier.contact_person %}
+                    <div class="info-item">
+                        <span class="info-label"><i class="fas fa-user"></i> Contact</span>
+                        <span class="info-value">{{ supplier.contact_person }}</span>
+                    </div>
+                {% endif %}
+
+                {% if supplier.phone %}
+                    <div class="info-item">
+                        <span class="info-label"><i class="fas fa-phone"></i> Téléphone</span>
+                        <span class="info-value"><a href="tel:{{ supplier.phone }}" style="color: #2563eb; text-decoration: none;">{{ supplier.phone }}</a></span>
+                    </div>
+                {% endif %}
+
+                {% if supplier.phone_2 %}
+                    <div class="info-item">
+                        <span class="info-label"><i class="fas fa-phone"></i> Téléphone 2</span>
+                        <span class="info-value"><a href="tel:{{ supplier.phone_2 }}" style="color: #2563eb; text-decoration: none;">{{ supplier.phone_2 }}</a></span>
+                    </div>
+                {% endif %}
+
+                {% if supplier.email %}
+                    <div class="info-item">
+                        <span class="info-label"><i class="fas fa-envelope"></i> Email</span>
+                        <span class="info-value"><a href="mailto:{{ supplier.email }}" style="color: #2563eb; text-decoration: none;">{{ supplier.email }}</a></span>
+                    </div>
+                {% endif %}
+
+                {% if supplier.city %}
+                    <div class="info-item">
+                        <span class="info-label"><i class="fas fa-map-marker-alt"></i> Ville</span>
+                        <span class="info-value">{{ supplier.city }}</span>
+                    </div>
+                {% endif %}
+
+                {% if supplier.specialty %}
+                    <div class="info-item">
+                        <span class="info-label"><i class="fas fa-star"></i> Spécialité</span>
+                        <span class="info-value">{{ supplier.specialty }}</span>
+                    </div>
+                {% endif %}
+
+                {% if supplier.credit_limit %}
+                    <div class="info-item">
+                        <span class="info-label"><i class="fas fa-credit-card"></i> Limite de Crédit</span>
+                        <span class="info-value currency">{{ supplier.credit_limit|floatformat:2 }} DH</span>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Summary Section -->
+        <div class="detail-card">
+            <h2 class="card-title"><i class="fas fa-chart-bar"></i> Résumé Financier</h2>
+            <div class="summary-grid">
+                <div class="summary-box highlight">
+                    <div class="summary-label">Total Achats</div>
+                    <div class="summary-value currency">{{ total_purchases|floatformat:2 }} DH</div>
+                </div>
+                <div class="summary-box highlight">
+                    <div class="summary-label">Total Paiements</div>
+                    <div class="summary-value currency">{{ total_payments|floatformat:2 }} DH</div>
+                </div>
+                <div class="summary-box">
+                    <div class="summary-label">Solde</div>
+                    <div class="summary-value currency" style="{% if balance > 0 %}color: #dc2626;{% else %}color: #059669;{% endif %}">
+                        {{ balance|floatformat:2 }} DH
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Purchases Section -->
+        <div class="detail-card">
+            <h2 class="card-title"><i class="fas fa-file-invoice"></i> Derniers Achats ({{ purchases|length }})</h2>
+            {% if purchases %}
+                <div class="table-container">
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Date</th>
+                                <th>Montant (DH)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for purchase in purchases %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'purchases:invoice_detail' reference=purchase.reference %}" style="color: #2563eb; text-decoration: none;">
+                                            {{ purchase.reference }}
+                                        </a>
+                                    </td>
+                                    <td class="date">{{ purchase.created_at|date:"d/m/Y H:i" }}</td>
+                                    <td class="currency">{{ purchase.total_amount|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="no-data">
+                    <i class="fas fa-inbox"></i>
+                    <p>Aucun achat enregistré</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Consignments Section -->
+        <div class="detail-card">
+            <h2 class="card-title"><i class="fas fa-boxes"></i> Consignations ({{ consignments|length }})</h2>
+            {% if consignments %}
+                <div class="table-container">
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Date</th>
+                                <th>Montant (DH)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for consignment in consignments %}
+                                <tr>
+                                    <td>{{ consignment.reference }}</td>
+                                    <td class="date">{{ consignment.created_at|date:"d/m/Y H:i" }}</td>
+                                    <td class="currency">{{ consignment.total_amount|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="no-data">
+                    <i class="fas fa-inbox"></i>
+                    <p>Aucune consignation enregistrée</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Payments Section -->
+        <div class="detail-card">
+            <h2 class="card-title"><i class="fas fa-coins"></i> Derniers Paiements ({{ payments|length }})</h2>
+            {% if payments %}
+                <div class="table-container">
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Date</th>
+                                <th>Montant (DH)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for payment in payments %}
+                                <tr>
+                                    <td>{{ payment.reference }}</td>
+                                    <td class="date">{{ payment.payment_date|date:"d/m/Y" }}</td>
+                                    <td class="currency">{{ payment.amount|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="no-data">
+                    <i class="fas fa-inbox"></i>
+                    <p>Aucun paiement enregistré</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Bank Accounts Section -->
+        {% if bank_accounts %}
+            <div class="detail-card">
+                <h2 class="card-title"><i class="fas fa-university"></i> Comptes Bancaires</h2>
+                <div class="info-grid">
+                    {% for account in bank_accounts %}
+                        <div style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 6px;">
+                            <div class="info-label">{{ account.bank_name }}</div>
+                            <div class="info-value">{{ account.account_number }}</div>
+                            {% if account.is_default %}
+                                <span class="badge badge-active" style="margin-top: 8px;">Compte Par Défaut</span>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

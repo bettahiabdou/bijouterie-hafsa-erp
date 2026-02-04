@@ -1,0 +1,413 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Fournisseurs{% endblock %}
+
+{% block extra_css %}
+<style>
+    .supplier-card {
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        border: 1px solid #e5e7eb;
+        transition: box-shadow 0.2s;
+    }
+
+    .supplier-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .supplier-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 12px;
+    }
+
+    .supplier-name {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #111827;
+        text-decoration: none;
+    }
+
+    .supplier-name:hover {
+        color: #2563eb;
+    }
+
+    .supplier-type-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: 500;
+    }
+
+    .supplier-type-material { background-color: #dbeafe; color: #1e40af; }
+    .supplier-type-artisan { background-color: #fce7f3; color: #831843; }
+    .supplier-type-other { background-color: #f3f4f6; color: #374151; }
+
+    .supplier-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+
+    .info-item {
+        font-size: 0.9em;
+        color: #6b7280;
+    }
+
+    .info-label {
+        font-weight: 600;
+        color: #374151;
+        display: block;
+    }
+
+    .info-value {
+        color: #111827;
+    }
+
+    .supplier-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
+    .btn-small {
+        padding: 6px 12px;
+        font-size: 0.85em;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.2s;
+    }
+
+    .btn-primary-small {
+        background-color: #2563eb;
+        color: white;
+    }
+
+    .btn-primary-small:hover {
+        background-color: #1d4ed8;
+    }
+
+    .btn-secondary-small {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
+
+    .btn-secondary-small:hover {
+        background-color: #d1d5db;
+    }
+
+    .btn-danger-small {
+        background-color: #ef4444;
+        color: white;
+    }
+
+    .btn-danger-small:hover {
+        background-color: #dc2626;
+    }
+
+    .active-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: 500;
+    }
+
+    .active-true {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+
+    .active-false {
+        background-color: #fee2e2;
+        color: #7f1d1d;
+    }
+
+    .filter-section {
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 20px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .filter-group label {
+        font-weight: 600;
+        margin-bottom: 6px;
+        color: #374151;
+        font-size: 0.9em;
+    }
+
+    .filter-group select,
+    .filter-group input {
+        padding: 8px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+    }
+
+    .filter-actions button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 4px;
+        margin-top: 24px;
+    }
+
+    .pagination a, .pagination span {
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        text-decoration: none;
+        color: #374151;
+        font-size: 0.9em;
+    }
+
+    .pagination a:hover {
+        background-color: #f3f4f6;
+    }
+
+    .pagination .current {
+        background-color: #2563eb;
+        color: white;
+        border-color: #2563eb;
+    }
+
+    .no-results {
+        text-align: center;
+        padding: 40px;
+        color: #6b7280;
+    }
+
+    .no-results i {
+        font-size: 3em;
+        color: #d1d5db;
+        margin-bottom: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Fournisseurs</h1>
+            <p class="text-gray-600 mt-2">Gérez vos fournisseurs et leurs informations</p>
+        </div>
+        <a href="{% url 'suppliers:create' %}" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center">
+            <i class="fas fa-plus mr-2"></i> Nouveau Fournisseur
+        </a>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-6 p-4 {% if message.tags %}bg-{{ message.tags }}-100 text-{{ message.tags }}-800{% else %}bg-blue-100 text-blue-800{% endif %} rounded-lg">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <form method="get" class="filter-grid">
+            <div class="filter-group">
+                <label for="search">Rechercher</label>
+                <input type="text" id="search" name="search" placeholder="Nom, code, email..." value="{{ search_query }}" class="w-full">
+            </div>
+
+            <div class="filter-group">
+                <label for="type">Type</label>
+                <select id="type" name="type" class="w-full">
+                    <option value="">-- Tous les types --</option>
+                    {% for value, label in supplier_types %}
+                        <option value="{{ value }}" {% if value == current_type %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="city">Ville</label>
+                <select id="city" name="city" class="w-full">
+                    <option value="">-- Toutes les villes --</option>
+                    {% for city in cities %}
+                        <option value="{{ city }}" {% if city == current_city %}selected{% endif %}>{{ city }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="active">Statut</label>
+                <select id="active" name="active" class="w-full">
+                    <option value="">-- Tous les statuts --</option>
+                    <option value="true" {% if current_active == 'true' %}selected{% endif %}>Actif</option>
+                    <option value="false" {% if current_active == 'false' %}selected{% endif %}>Inactif</option>
+                </select>
+            </div>
+
+            <div class="filter-actions">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white">
+                    <i class="fas fa-search mr-2"></i> Filtrer
+                </button>
+                <a href="{% url 'suppliers:list' %}" class="bg-gray-400 hover:bg-gray-500 text-white" style="padding: 8px 16px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center;">
+                    <i class="fas fa-redo mr-2"></i> Réinitialiser
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Suppliers List -->
+    {% if suppliers %}
+        <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+            <strong>{{ page_obj.paginator.count }}</strong> fournisseur(s) trouvé(s)
+        </div>
+
+        <div>
+            {% for supplier in suppliers %}
+                <div class="supplier-card">
+                    <div class="supplier-header">
+                        <div>
+                            <a href="{% url 'suppliers:detail' code=supplier.code %}" class="supplier-name">
+                                {{ supplier.name }}
+                            </a>
+                            {% if supplier.name_ar %}
+                                <div class="text-sm text-gray-500 mt-1">{{ supplier.name_ar }}</div>
+                            {% endif %}
+                            <div class="mt-2">
+                                <span class="supplier-type-badge supplier-type-{{ supplier.supplier_type }}">
+                                    {{ supplier.get_supplier_type_display }}
+                                </span>
+                                <span class="active-badge active-{{ supplier.is_active|lower }}">
+                                    {% if supplier.is_active %}Actif{% else %}Inactif{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="supplier-info">
+                        {% if supplier.phone %}
+                            <div class="info-item">
+                                <span class="info-label"><i class="fas fa-phone mr-2"></i>Téléphone</span>
+                                <span class="info-value">{{ supplier.phone }}</span>
+                            </div>
+                        {% endif %}
+
+                        {% if supplier.email %}
+                            <div class="info-item">
+                                <span class="info-label"><i class="fas fa-envelope mr-2"></i>Email</span>
+                                <span class="info-value">{{ supplier.email }}</span>
+                            </div>
+                        {% endif %}
+
+                        {% if supplier.city %}
+                            <div class="info-item">
+                                <span class="info-label"><i class="fas fa-map-marker-alt mr-2"></i>Ville</span>
+                                <span class="info-value">{{ supplier.city }}</span>
+                            </div>
+                        {% endif %}
+
+                        <div class="info-item">
+                            <span class="info-label"><i class="fas fa-file-invoice mr-2"></i>Achats</span>
+                            <span class="info-value">{{ supplier.purchase_count }}</span>
+                        </div>
+
+                        <div class="info-item">
+                            <span class="info-label"><i class="fas fa-coins mr-2"></i>Paiements</span>
+                            <span class="info-value">{{ supplier.payment_count }}</span>
+                        </div>
+                    </div>
+
+                    <div class="supplier-actions">
+                        <a href="{% url 'suppliers:detail' code=supplier.code %}" class="btn-small btn-primary-small">
+                            <i class="fas fa-eye"></i> Détails
+                        </a>
+                        <a href="{% url 'suppliers:edit' code=supplier.code %}" class="btn-small btn-secondary-small">
+                            <i class="fas fa-edit"></i> Éditer
+                        </a>
+                        <a href="{% url 'suppliers:delete' code=supplier.code %}" class="btn-small btn-danger-small">
+                            <i class="fas fa-trash"></i> Supprimer
+                        </a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                    <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}">
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}">
+                        <i class="fas fa-angle-left"></i>
+                    </a>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="current">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}">
+                            {{ num }}
+                        </a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}">
+                        <i class="fas fa-angle-right"></i>
+                    </a>
+                    <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}">
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="no-results">
+            <i class="fas fa-inbox"></i>
+            <h3 class="text-xl font-semibold text-gray-900">Aucun fournisseur trouvé</h3>
+            <p class="mt-2">Commencez par créer un nouveau fournisseur</p>
+            <a href="{% url 'suppliers:create' %}" class="inline-block mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">
+                <i class="fas fa-plus mr-2"></i> Créer un fournisseur
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,433 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if supplier %}Éditer - {{ supplier.name }}{% else %}Nouveau Fournisseur{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-container {
+        display: flex;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .form-wrapper {
+        width: 100%;
+        max-width: 800px;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 8px;
+        padding: 32px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+    }
+
+    .form-header {
+        margin-bottom: 32px;
+        border-bottom: 2px solid #e5e7eb;
+        padding-bottom: 16px;
+    }
+
+    .form-header h1 {
+        font-size: 2em;
+        font-weight: bold;
+        color: #111827;
+        margin-bottom: 8px;
+    }
+
+    .form-header p {
+        color: #6b7280;
+        font-size: 0.95em;
+    }
+
+    .form-section {
+        margin-bottom: 32px;
+    }
+
+    .form-section-title {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .form-row.full {
+        grid-template-columns: 1fr;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-group label {
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #374151;
+        font-size: 0.95em;
+    }
+
+    .form-group label .required {
+        color: #ef4444;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.95em;
+        font-family: inherit;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .form-group textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .form-group small {
+        margin-top: 4px;
+        color: #6b7280;
+        font-size: 0.85em;
+    }
+
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .checkbox-group label {
+        margin: 0;
+        cursor: pointer;
+        font-weight: 500;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .btn {
+        padding: 10px 24px;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+        font-size: 0.95em;
+    }
+
+    .btn-primary {
+        background-color: #2563eb;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: #1d4ed8;
+    }
+
+    .btn-secondary {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
+
+    .btn-secondary:hover {
+        background-color: #d1d5db;
+    }
+
+    .error-message {
+        color: #dc2626;
+        font-size: 0.9em;
+        margin-top: 4px;
+    }
+
+    .code-display {
+        padding: 12px;
+        background-color: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-family: monospace;
+        color: #374151;
+        font-weight: 500;
+    }
+
+    .alert {
+        padding: 16px;
+        border-radius: 6px;
+        margin-bottom: 24px;
+    }
+
+    .alert-error {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+
+    .alert-success {
+        background-color: #dcfce7;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+
+    @media (max-width: 768px) {
+        .form-card {
+            padding: 20px;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+
+        .btn {
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="form-wrapper">
+        <!-- Header -->
+        <div class="form-header">
+            <h1>{% if supplier %}Éditer Fournisseur{% else %}Nouveau Fournisseur{% endif %}</h1>
+            <p>{% if supplier %}Modifiez les informations du fournisseur{% else %}Créez un nouveau fournisseur dans le système{% endif %}</p>
+        </div>
+
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}error{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Form -->
+        <form method="post" class="form-card">
+            {% csrf_token %}
+
+            <!-- Basic Information Section -->
+            <div class="form-section">
+                <h2 class="form-section-title"><i class="fas fa-info-circle mr-2"></i>Informations de Base</h2>
+
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Code Fournisseur</label>
+                        {% if supplier %}
+                            <div class="code-display">{{ supplier.code }}</div>
+                            <small>Code généré automatiquement - Non modifiable</small>
+                        {% else %}
+                            <div class="code-display">Sera généré automatiquement</div>
+                            <small>Format: SUP-YYYYMMDD-####</small>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nom du Fournisseur <span class="required">*</span></label>
+                        <input type="text" name="name" value="{{ supplier.name|default:form_data.name }}" required
+                            placeholder="Nom du fournisseur" maxlength="200">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Nom en Arabe</label>
+                        <input type="text" name="name_ar" value="{{ supplier.name_ar|default:form_data.name_ar }}"
+                            placeholder="الاسم بالعربية" maxlength="200">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Type de Fournisseur</label>
+                        <select name="supplier_type">
+                            {% for value, label in supplier_types %}
+                                <option value="{{ value }}" {% if supplier.supplier_type|default:form_data.supplier_type == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Personne de Contact</label>
+                        <input type="text" name="contact_person" value="{{ supplier.contact_person|default:form_data.contact_person }}"
+                            placeholder="Nom du contact" maxlength="200">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Information Section -->
+            <div class="form-section">
+                <h2 class="form-section-title"><i class="fas fa-phone mr-2"></i>Informations de Contact</h2>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Téléphone Principal</label>
+                        <input type="tel" name="phone" value="{{ supplier.phone|default:form_data.phone }}"
+                            placeholder="+212..." maxlength="20">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Téléphone Secondaire</label>
+                        <input type="tel" name="phone_2" value="{{ supplier.phone_2|default:form_data.phone_2 }}"
+                            placeholder="+212..." maxlength="20">
+                    </div>
+                </div>
+
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email" value="{{ supplier.email|default:form_data.email }}"
+                            placeholder="email@example.com" maxlength="200">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Address Section -->
+            <div class="form-section">
+                <h2 class="form-section-title"><i class="fas fa-map-marker-alt mr-2"></i>Adresse</h2>
+
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Adresse</label>
+                        <textarea name="address" placeholder="Adresse complète">{{ supplier.address|default:form_data.address }}</textarea>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Ville</label>
+                        <input type="text" name="city" value="{{ supplier.city|default:form_data.city }}"
+                            placeholder="Ville" maxlength="100">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Business Information Section -->
+            <div class="form-section">
+                <h2 class="form-section-title"><i class="fas fa-briefcase mr-2"></i>Informations Commerciales</h2>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ICE (Identifiant Commun Entreprise)</label>
+                        <input type="text" name="ice" value="{{ supplier.ice|default:form_data.ice }}"
+                            placeholder="ICE" maxlength="20">
+                        <small>Numéro d'identification fiscale</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>RC (Registre de Commerce)</label>
+                        <input type="text" name="rc" value="{{ supplier.rc|default:form_data.rc }}"
+                            placeholder="RC" maxlength="20">
+                        <small>Numéro du registre de commerce</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Spécialité</label>
+                        <input type="text" name="specialty" value="{{ supplier.specialty|default:form_data.specialty }}"
+                            placeholder="Spécialité (ex: Or, Argent, Artisan)" maxlength="200">
+                        <small>Domaine de spécialisation du fournisseur</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Limite de Crédit (DH)</label>
+                        <input type="number" name="credit_limit" value="{{ supplier.credit_limit|default:form_data.credit_limit|default:'0' }}"
+                            step="0.01" min="0" placeholder="0.00">
+                        <small>Montant maximum de crédit autorisé</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Conditions de Paiement</label>
+                        <input type="text" name="payment_terms" value="{{ supplier.payment_terms|default:form_data.payment_terms }}"
+                            placeholder="Ex: Net 30, Comptant" maxlength="200">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Information Section -->
+            <div class="form-section">
+                <h2 class="form-section-title"><i class="fas fa-notes-medical mr-2"></i>Informations Supplémentaires</h2>
+
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea name="notes" placeholder="Notes ou remarques sur le fournisseur">{{ supplier.notes|default:form_data.notes }}</textarea>
+                        <small>Informations supplémentaires ou remarques</small>
+                    </div>
+                </div>
+
+                {% if supplier %}
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Statut</label>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="is_active" name="is_active" value="on"
+                                    {% if supplier.is_active %}checked{% endif %}>
+                                <label for="is_active">Fournisseur Actif</label>
+                            </div>
+                            <small>Décochez pour désactiver ce fournisseur</small>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    {% if supplier %}Enregistrer les Modifications{% else %}Créer le Fournisseur{% endif %}
+                </button>
+                <a href="{% if supplier %}{% url 'suppliers:detail' code=supplier.code %}{% else %}{% url 'suppliers:list' %}{% endif %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Annuler
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
