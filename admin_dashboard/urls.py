@@ -22,7 +22,13 @@ urlpatterns = [
     # System Configuration
     path('configuration/', views.system_configuration, name='configuration'),
 
-    # Metal Type Configuration
+    # Generic Configuration CRUD Routes (DRY Implementation)
+    # Supports all 15+ configuration model types dynamically
+    path('config/<str:config_type>/create/', views.ConfigurationCreateView.as_view(), name='config_create'),
+    path('config/<str:config_type>/<int:pk>/edit/', views.ConfigurationUpdateView.as_view(), name='config_edit'),
+    path('config/<str:config_type>/<int:pk>/delete/', views.ConfigurationDeleteView.as_view(), name='config_delete'),
+
+    # Legacy Metal Type Configuration (backward compatibility)
     path('metal-types/create/', views.metal_type_create, name='metal_type_create'),
     path('metal-types/<int:pk>/edit/', views.metal_type_edit, name='metal_type_edit'),
     path('metal-types/<int:pk>/delete/', views.metal_type_delete, name='metal_type_delete'),

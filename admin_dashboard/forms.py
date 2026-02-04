@@ -1,14 +1,22 @@
 """
 Forms for Admin Dashboard
+
+Note: Configuration model forms are now dynamically generated in views.py
+via the generate_model_form() function for comprehensive DRY coverage of all
+15+ configuration types. This file now only contains specialized forms like
+UserManagementForm that require custom validation or behavior.
 """
 
 from django import forms
 from users.models import User
-from settings_app.models import MetalType, PaymentMethod, ProductCategory, BankAccount
 
 
 class UserManagementForm(forms.ModelForm):
-    """Form for creating and editing users"""
+    """Form for creating and editing users
+
+    Custom form with password management and user-specific validation.
+    Not suitable for dynamic generation due to special password handling.
+    """
 
     password = forms.CharField(
         widget=forms.PasswordInput(attrs={
@@ -87,99 +95,3 @@ class UserManagementForm(forms.ModelForm):
             user.save()
 
         return user
-
-
-class MetalTypeForm(forms.ModelForm):
-    """Form for creating and editing metal types"""
-
-    class Meta:
-        model = MetalType
-        fields = ['name', 'symbol', 'description']
-        widgets = {
-            'name': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Nom du type de métal'
-            }),
-            'symbol': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Symbole (ex: OR, AG)',
-                'maxlength': '10'
-            }),
-            'description': forms.Textarea(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Description',
-                'rows': 3
-            }),
-        }
-
-
-class PaymentMethodForm(forms.ModelForm):
-    """Form for creating and editing payment methods"""
-
-    class Meta:
-        model = PaymentMethod
-        fields = ['name', 'is_active']
-        widgets = {
-            'name': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Nom du mode de paiement'
-            }),
-            'is_active': forms.CheckboxInput(attrs={
-                'class': 'w-4 h-4 rounded'
-            }),
-        }
-
-
-class ProductCategoryForm(forms.ModelForm):
-    """Form for creating and editing product categories"""
-
-    class Meta:
-        model = ProductCategory
-        fields = ['name', 'description']
-        widgets = {
-            'name': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Nom de la catégorie'
-            }),
-            'description': forms.Textarea(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Description',
-                'rows': 3
-            }),
-        }
-
-
-class BankAccountForm(forms.ModelForm):
-    """Form for creating and editing bank accounts"""
-
-    class Meta:
-        model = BankAccount
-        fields = ['bank_name', 'account_name', 'account_number', 'rib', 'swift', 'is_active', 'is_default']
-        widgets = {
-            'bank_name': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Nom de la banque'
-            }),
-            'account_name': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Nom du compte'
-            }),
-            'account_number': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Numéro de compte'
-            }),
-            'rib': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'RIB'
-            }),
-            'swift': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Code SWIFT'
-            }),
-            'is_active': forms.CheckboxInput(attrs={
-                'class': 'w-4 h-4 rounded'
-            }),
-            'is_default': forms.CheckboxInput(attrs={
-                'class': 'w-4 h-4 rounded'
-            }),
-        }

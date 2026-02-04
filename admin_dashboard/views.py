@@ -3,15 +3,22 @@ Admin Dashboard Views for Bijouterie Hafsa ERP
 
 Consolidated admin panel replacing Django admin with mobile-responsive interface.
 All views require is_staff permission.
+
+Uses generic class-based views for DRY configuration management.
+Supports 15+ configuration model types through dynamic registry.
 """
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
+from django.views.generic import CreateView, UpdateView, DeleteView, ListView
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from django.contrib import messages
+from django.urls import reverse_lazy
+from django.forms import ModelForm
+from django.http import Http404
 from decimal import Decimal
 from datetime import timedelta
 
@@ -23,8 +30,11 @@ from clients.models import Client
 from suppliers.models import Supplier
 from products.models import Product
 from settings_app.models import (
-    MetalType, MetalPurity, ProductCategory,
-    StoneType, PaymentMethod, BankAccount
+    MetalType, MetalPurity, ProductCategory, StoneType,
+    StoneClarity, StoneColor, StoneCut, PaymentMethod,
+    BankAccount, StockLocation, DeliveryMethod,
+    DeliveryPerson, RepairType, CertificateIssuer,
+    CompanySettings
 )
 
 
@@ -36,6 +46,220 @@ def staff_required(view_func):
             return redirect('dashboard')
         return view_func(request, *args, **kwargs)
     return wrapper
+
+
+# ============================================================================
+# CONFIGURATION MODEL REGISTRY & DYNAMIC FORM GENERATION
+# ============================================================================
+
+class ConfigurationRegistry:
+    """
+    Registry for all configuration models to support DRY CRUD operations.
+    Centralizes model metadata, display settings, and field configurations.
+    """
+
+    MODELS = {
+        'metal-types': {
+            'model': MetalType,
+            'label': 'Types de métaux',
+            'singular': 'Type de métal',
+            'fields': ['name', 'code', 'description', 'is_active'],
+            'list_display': ['name', 'code', 'is_active'],
+            'search_fields': ['name', 'code'],
+        },
+        'metal-purities': {
+            'model': MetalPurity,
+            'label': 'Titres/Puretés',
+            'singular': 'Titre/Pureté',
+            'fields': ['metal_type', 'name', 'purity_percentage', 'hallmark', 'is_active'],
+            'list_display': ['metal_type', 'name', 'purity_percentage', 'is_active'],
+            'search_fields': ['name', 'hallmark'],
+        },
+        'categories': {
+            'model': ProductCategory,
+            'label': 'Catégories de produits',
+            'singular': 'Catégorie',
+            'fields': ['name', 'parent', 'code', 'description', 'is_active', 'display_order'],
+            'list_display': ['name', 'code', 'is_active'],
+            'search_fields': ['name', 'code'],
+        },
+        'stone-types': {
+            'model': StoneType,
+            'label': 'Types de pierres',
+            'singular': 'Type de pierre',
+            'fields': ['name', 'code', 'is_precious', 'requires_certificate', 'is_active'],
+            'list_display': ['name', 'code', 'is_precious', 'is_active'],
+            'search_fields': ['name', 'code'],
+        },
+        'stone-clarities': {
+            'model': StoneClarity,
+            'label': 'Clartés de pierres',
+            'singular': 'Clarté',
+            'fields': ['code', 'name', 'description', 'rank', 'is_active'],
+            'list_display': ['code', 'name', 'rank', 'is_active'],
+            'search_fields': ['code', 'name'],
+        },
+        'stone-colors': {
+            'model': StoneColor,
+            'label': 'Couleurs de pierres',
+            'singular': 'Couleur',
+            'fields': ['code', 'name', 'description', 'rank', 'is_active'],
+            'list_display': ['code', 'name', 'rank', 'is_active'],
+            'search_fields': ['code', 'name'],
+        },
+        'stone-cuts': {
+            'model': StoneCut,
+            'label': 'Tailles de pierres',
+            'singular': 'Taille',
+            'fields': ['code', 'name', 'rank', 'is_active'],
+            'list_display': ['code', 'name', 'rank', 'is_active'],
+            'search_fields': ['code', 'name'],
+        },
+        'payment-methods': {
+            'model': PaymentMethod,
+            'label': 'Modes de paiement',
+            'singular': 'Mode de paiement',
+            'fields': ['name', 'code', 'requires_reference', 'requires_bank_account', 'is_active', 'display_order'],
+            'list_display': ['name', 'code', 'is_active'],
+            'search_fields': ['name', 'code'],
+        },
+        'bank-accounts': {
+            'model': BankAccount,
+            'label': 'Comptes bancaires',
+            'singular': 'Compte bancaire',
+            'fields': ['bank_name', 'account_name', 'account_number', 'rib', 'swift', 'is_active', 'is_default', 'notes'],
+            'list_display': ['bank_name', 'account_name', 'is_active', 'is_default'],
+            'search_fields': ['bank_name', 'account_name', 'rib'],
+        },
+        'stock-locations': {
+            'model': StockLocation,
+            'label': 'Emplacements de stock',
+            'singular': 'Emplacement',
+            'fields': ['name', 'code', 'description', 'is_secure', 'is_active'],
+            'list_display': ['name', 'code', 'is_secure', 'is_active'],
+            'search_fields': ['name', 'code'],
+        },
+        'delivery-methods': {
+            'model': DeliveryMethod,
+            'label': 'Modes de livraison',
+            'singular': 'Mode de livraison',
+            'fields': ['name', 'code', 'is_internal', 'default_cost', 'is_active'],
+            'list_display': ['name', 'code', 'is_internal', 'is_active'],
+            'search_fields': ['name', 'code'],
+        },
+        'delivery-persons': {
+            'model': DeliveryPerson,
+            'label': 'Livreurs',
+            'singular': 'Livreur',
+            'fields': ['name', 'phone', 'is_active', 'notes'],
+            'list_display': ['name', 'phone', 'is_active'],
+            'search_fields': ['name', 'phone'],
+        },
+        'repair-types': {
+            'model': RepairType,
+            'label': 'Types de réparations',
+            'singular': 'Type de réparation',
+            'fields': ['name', 'code', 'default_price', 'estimated_duration_days', 'is_active'],
+            'list_display': ['name', 'code', 'default_price', 'is_active'],
+            'search_fields': ['name', 'code'],
+        },
+        'certificate-issuers': {
+            'model': CertificateIssuer,
+            'label': 'Émetteurs de certificats',
+            'singular': 'Émetteur',
+            'fields': ['name', 'code', 'website', 'is_active'],
+            'list_display': ['name', 'code', 'is_active'],
+            'search_fields': ['name', 'code'],
+        },
+    }
+
+    @classmethod
+    def get_model(cls, config_type):
+        """Get model class for a configuration type"""
+        if config_type not in cls.MODELS:
+            raise Http404(f"Configuration type '{config_type}' not found")
+        return cls.MODELS[config_type]['model']
+
+    @classmethod
+    def get_config(cls, config_type):
+        """Get full configuration for a model type"""
+        if config_type not in cls.MODELS:
+            raise Http404(f"Configuration type '{config_type}' not found")
+        return cls.MODELS[config_type]
+
+    @classmethod
+    def get_all_configs(cls):
+        """Get statistics for all configuration types"""
+        configs = {}
+        for key, config in cls.MODELS.items():
+            model = config['model']
+            configs[key] = {
+                **config,
+                'count': model.objects.count(),
+            }
+        return configs
+
+
+def generate_model_form(model, fields):
+    """
+    Dynamically generate a ModelForm for a given model with proper styling.
+    """
+    attrs = {
+        'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
+        'placeholder': 'Enter value'
+    }
+
+    widgets = {}
+    for field_name in fields:
+        try:
+            field = model._meta.get_field(field_name)
+            if field_name in ['is_active', 'is_default', 'is_precious', 'requires_certificate',
+                             'requires_reference', 'requires_bank_account', 'is_internal', 'is_secure']:
+                widgets[field_name] = {'class': 'w-4 h-4 rounded'}
+            elif hasattr(field, 'choices') and field.choices:
+                widgets[field_name] = {
+                    'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500'
+                }
+            elif field.get_internal_type() == 'DateTimeField':
+                widgets[field_name] = {
+                    'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
+                    'type': 'datetime-local'
+                }
+            elif field.get_internal_type() == 'DateField':
+                widgets[field_name] = {
+                    'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
+                    'type': 'date'
+                }
+            elif field.get_internal_type() == 'IntegerField':
+                widgets[field_name] = {
+                    'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
+                    'type': 'number'
+                }
+            elif field.get_internal_type() == 'DecimalField':
+                widgets[field_name] = {
+                    'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
+                    'type': 'number',
+                    'step': '0.01'
+                }
+            elif field.get_internal_type() in ['TextField', 'CharField']:
+                if field.get_internal_type() == 'TextField':
+                    widgets[field_name] = {
+                        'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
+                        'rows': '3'
+                    }
+                else:
+                    widgets[field_name] = attrs
+        except:
+            widgets[field_name] = attrs
+
+    class_name = f'{model.__name__}DynamicForm'
+    return type(class_name, (ModelForm,), {
+        'Meta': type('Meta', (), {
+            'model': model,
+            'fields': fields,
+            'widgets': widgets
+        })
+    })
 
 
 @login_required(login_url='login')
@@ -232,35 +456,35 @@ def user_deactivate(request, user_id):
 @login_required(login_url='login')
 @staff_required
 def system_configuration(request):
-    """System Configuration - Manage all system settings"""
+    """System Configuration - Manage all system settings
 
-    # Get querysets for display
-    metal_types_qs = MetalType.objects.all()
-    metal_purities_qs = MetalPurity.objects.all()
-    product_categories_qs = ProductCategory.objects.all()
-    stone_types_qs = StoneType.objects.all()
-    payment_methods_qs = PaymentMethod.objects.all()
-    bank_accounts_qs = BankAccount.objects.all()
+    Displays statistics and management options for all 15 configuration types.
+    Uses the ConfigurationRegistry for comprehensive coverage.
+    """
+
+    # Get all configuration types with counts
+    all_configs = ConfigurationRegistry.get_all_configs()
 
     context = {
         'page_title': 'Configuration Système',
         'section': 'configuration',
+        'all_configs': all_configs,
 
-        # Counts for display in cards
-        'metal_types_count': metal_types_qs.count(),
-        'metal_purities_count': metal_purities_qs.count(),
-        'product_categories_count': product_categories_qs.count(),
-        'stone_types_count': stone_types_qs.count(),
-        'payment_methods_count': payment_methods_qs.count(),
-        'bank_accounts_count': bank_accounts_qs.count(),
-
-        # QuerySets for detailed lists
-        'metal_types': metal_types_qs,
-        'metal_purities': metal_purities_qs,
-        'product_categories': product_categories_qs,
-        'stone_types': stone_types_qs,
-        'payment_methods': payment_methods_qs,
-        'bank_accounts': bank_accounts_qs,
+        # Legacy counts for backward compatibility with template
+        'metal_types_count': all_configs.get('metal-types', {}).get('count', 0),
+        'metal_purities_count': all_configs.get('metal-purities', {}).get('count', 0),
+        'product_categories_count': all_configs.get('categories', {}).get('count', 0),
+        'stone_types_count': all_configs.get('stone-types', {}).get('count', 0),
+        'stone_clarities_count': all_configs.get('stone-clarities', {}).get('count', 0),
+        'stone_colors_count': all_configs.get('stone-colors', {}).get('count', 0),
+        'stone_cuts_count': all_configs.get('stone-cuts', {}).get('count', 0),
+        'payment_methods_count': all_configs.get('payment-methods', {}).get('count', 0),
+        'bank_accounts_count': all_configs.get('bank-accounts', {}).get('count', 0),
+        'stock_locations_count': all_configs.get('stock-locations', {}).get('count', 0),
+        'delivery_methods_count': all_configs.get('delivery-methods', {}).get('count', 0),
+        'delivery_persons_count': all_configs.get('delivery-persons', {}).get('count', 0),
+        'repair_types_count': all_configs.get('repair-types', {}).get('count', 0),
+        'certificate_issuers_count': all_configs.get('certificate-issuers', {}).get('count', 0),
     }
 
     return render(request, 'admin_dashboard/configuration.html', context)
@@ -355,280 +579,274 @@ def system_status(request):
     return render(request, 'admin_dashboard/status.html', context)
 
 
+# ============================================================================
+# GENERIC CONFIGURATION CRUD VIEWS - DRY Implementation
+# ============================================================================
+# These generic views handle CREATE, EDIT, and DELETE for all 15+ configuration
+# model types through dynamic model resolution via ConfigurationRegistry.
+# This eliminates code duplication and provides consistent behavior across types.
+
+class ConfigurationCreateView(CreateView):
+    """
+    Generic CREATE view for all configuration models.
+    URL parameter 'config_type' determines which model to use.
+    """
+    template_name = 'admin_dashboard/config/generic_form.html'
+    success_url = reverse_lazy('admin_dashboard:configuration')
+
+    def dispatch(self, request, *args, **kwargs):
+        # Check authentication and staff status
+        if not request.user.is_authenticated or not request.user.is_staff:
+            messages.error(request, 'Accès non autorisé.')
+            return redirect('dashboard')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_config_type(self):
+        return self.kwargs.get('config_type')
+
+    def get_model(self):
+        return ConfigurationRegistry.get_model(self.get_config_type())
+
+    def get_form_class(self):
+        config = ConfigurationRegistry.get_config(self.get_config_type())
+        return generate_model_form(config['model'], config['fields'])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        config = ConfigurationRegistry.get_config(self.get_config_type())
+        context['is_create'] = True
+        context['config_type'] = self.get_config_type()
+        context['page_title'] = f'Créer {config["singular"]}'
+        context['section'] = 'configuration'
+        context['config'] = config
+        return context
+
+    def form_valid(self, form):
+        config = ConfigurationRegistry.get_config(self.get_config_type())
+        response = super().form_valid(form)
+
+        # Log activity
+        ActivityLog.objects.create(
+            user=self.request.user,
+            action='create',
+            model_name=config['model'].__name__,
+            object_id=self.object.id,
+            description=f'Créé {config["singular"]}: {self.object}',
+            ip_address=get_client_ip(self.request),
+        )
+
+        obj_str = str(self.object)
+        messages.success(
+            self.request,
+            f'{config["singular"]} "{obj_str}" créé avec succès.'
+        )
+        return response
+
+
+class ConfigurationUpdateView(UpdateView):
+    """
+    Generic UPDATE view for all configuration models.
+    URL parameter 'config_type' determines which model to use.
+    """
+    template_name = 'admin_dashboard/config/generic_form.html'
+    success_url = reverse_lazy('admin_dashboard:configuration')
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated or not request.user.is_staff:
+            messages.error(request, 'Accès non autorisé.')
+            return redirect('dashboard')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_config_type(self):
+        return self.kwargs.get('config_type')
+
+    def get_model(self):
+        return ConfigurationRegistry.get_model(self.get_config_type())
+
+    def get_form_class(self):
+        config = ConfigurationRegistry.get_config(self.get_config_type())
+        return generate_model_form(config['model'], config['fields'])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        config = ConfigurationRegistry.get_config(self.get_config_type())
+        context['is_create'] = False
+        context['config_type'] = self.get_config_type()
+        context['page_title'] = f'Éditer {config["singular"]}'
+        context['section'] = 'configuration'
+        context['config'] = config
+        return context
+
+    def form_valid(self, form):
+        config = ConfigurationRegistry.get_config(self.get_config_type())
+        response = super().form_valid(form)
+
+        # Log activity
+        ActivityLog.objects.create(
+            user=self.request.user,
+            action='update',
+            model_name=config['model'].__name__,
+            object_id=self.object.id,
+            description=f'Modifié {config["singular"]}: {self.object}',
+            ip_address=get_client_ip(self.request),
+        )
+
+        obj_str = str(self.object)
+        messages.success(
+            self.request,
+            f'{config["singular"]} "{obj_str}" mis à jour.'
+        )
+        return response
+
+
+class ConfigurationDeleteView(DeleteView):
+    """
+    Generic DELETE view for all configuration models.
+    URL parameter 'config_type' determines which model to use.
+    Requires POST method for safety.
+    """
+    success_url = reverse_lazy('admin_dashboard:configuration')
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated or not request.user.is_staff:
+            messages.error(request, 'Accès non autorisé.')
+            return redirect('dashboard')
+        if request.method != 'POST':
+            return redirect('admin_dashboard:configuration')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_config_type(self):
+        return self.kwargs.get('config_type')
+
+    def get_model(self):
+        return ConfigurationRegistry.get_model(self.get_config_type())
+
+    def get_object(self, queryset=None):
+        model = self.get_model()
+        pk = self.kwargs.get('pk')
+        return get_object_or_404(model, pk=pk)
+
+    def delete(self, request, *args, **kwargs):
+        config = ConfigurationRegistry.get_config(self.get_config_type())
+        obj_str = str(self.get_object())
+
+        # Log activity before deletion
+        ActivityLog.objects.create(
+            user=request.user,
+            action='delete',
+            model_name=config['model'].__name__,
+            description=f'Supprimé {config["singular"]}: {obj_str}',
+            ip_address=get_client_ip(request),
+        )
+
+        response = super().delete(request, *args, **kwargs)
+        messages.success(
+            request,
+            f'{config["singular"]} "{obj_str}" supprimé.'
+        )
+        return response
+
+
+# Keep backward compatibility with old URL patterns by delegating to new views
 @login_required(login_url='login')
 @staff_required
 def metal_type_create(request):
-    """Create new metal type"""
-    from admin_dashboard.forms import MetalTypeForm
-
-    if request.method == 'POST':
-        form = MetalTypeForm(request.POST)
-        if form.is_valid():
-            metal_type = form.save()
-            messages.success(request, f'Type de métal "{metal_type.name}" créé avec succès.')
-            return redirect('admin_dashboard:configuration')
-    else:
-        form = MetalTypeForm()
-
-    context = {
-        'page_title': 'Créer Type de Métal',
-        'section': 'configuration',
-        'form': form,
-        'is_create': True,
-    }
-
-    return render(request, 'admin_dashboard/config/metal_type_form.html', context)
+    """Backward compatibility wrapper"""
+    view = ConfigurationCreateView.as_view()
+    view.kwargs = {'config_type': 'metal-types'}
+    return view(request, config_type='metal-types')
 
 
 @login_required(login_url='login')
 @staff_required
 def metal_type_edit(request, pk):
-    """Edit metal type"""
-    from admin_dashboard.forms import MetalTypeForm
-    from settings_app.models import MetalType
-
-    metal_type = get_object_or_404(MetalType, pk=pk)
-
-    if request.method == 'POST':
-        form = MetalTypeForm(request.POST, instance=metal_type)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Type de métal "{metal_type.name}" mis à jour.')
-            return redirect('admin_dashboard:configuration')
-    else:
-        form = MetalTypeForm(instance=metal_type)
-
-    context = {
-        'page_title': f'Éditer {metal_type.name}',
-        'section': 'configuration',
-        'form': form,
-        'is_create': False,
-        'object': metal_type,
-    }
-
-    return render(request, 'admin_dashboard/config/metal_type_form.html', context)
+    """Backward compatibility wrapper"""
+    view = ConfigurationUpdateView.as_view()
+    return view(request, config_type='metal-types', pk=pk)
 
 
 @login_required(login_url='login')
 @staff_required
 @require_http_methods(["POST"])
 def metal_type_delete(request, pk):
-    """Delete metal type"""
-    from settings_app.models import MetalType
-
-    metal_type = get_object_or_404(MetalType, pk=pk)
-    name = metal_type.name
-    metal_type.delete()
-    messages.success(request, f'Type de métal "{name}" supprimé.')
-
-    return redirect('admin_dashboard:configuration')
+    """Backward compatibility wrapper"""
+    view = ConfigurationDeleteView.as_view()
+    return view(request, config_type='metal-types', pk=pk)
 
 
 @login_required(login_url='login')
 @staff_required
 def payment_method_create(request):
-    """Create new payment method"""
-    from admin_dashboard.forms import PaymentMethodForm
-
-    if request.method == 'POST':
-        form = PaymentMethodForm(request.POST)
-        if form.is_valid():
-            payment_method = form.save()
-            messages.success(request, f'Mode de paiement "{payment_method.name}" créé avec succès.')
-            return redirect('admin_dashboard:configuration')
-    else:
-        form = PaymentMethodForm()
-
-    context = {
-        'page_title': 'Créer Mode de Paiement',
-        'section': 'configuration',
-        'form': form,
-        'is_create': True,
-    }
-
-    return render(request, 'admin_dashboard/config/payment_method_form.html', context)
+    """Backward compatibility wrapper"""
+    view = ConfigurationCreateView.as_view()
+    return view(request, config_type='payment-methods')
 
 
 @login_required(login_url='login')
 @staff_required
 def payment_method_edit(request, pk):
-    """Edit payment method"""
-    from admin_dashboard.forms import PaymentMethodForm
-    from settings_app.models import PaymentMethod
-
-    payment_method = get_object_or_404(PaymentMethod, pk=pk)
-
-    if request.method == 'POST':
-        form = PaymentMethodForm(request.POST, instance=payment_method)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Mode de paiement "{payment_method.name}" mis à jour.')
-            return redirect('admin_dashboard:configuration')
-    else:
-        form = PaymentMethodForm(instance=payment_method)
-
-    context = {
-        'page_title': f'Éditer {payment_method.name}',
-        'section': 'configuration',
-        'form': form,
-        'is_create': False,
-        'object': payment_method,
-    }
-
-    return render(request, 'admin_dashboard/config/payment_method_form.html', context)
+    """Backward compatibility wrapper"""
+    view = ConfigurationUpdateView.as_view()
+    return view(request, config_type='payment-methods', pk=pk)
 
 
 @login_required(login_url='login')
 @staff_required
 @require_http_methods(["POST"])
 def payment_method_delete(request, pk):
-    """Delete payment method"""
-    from settings_app.models import PaymentMethod
-
-    payment_method = get_object_or_404(PaymentMethod, pk=pk)
-    name = payment_method.name
-    payment_method.delete()
-    messages.success(request, f'Mode de paiement "{name}" supprimé.')
-
-    return redirect('admin_dashboard:configuration')
+    """Backward compatibility wrapper"""
+    view = ConfigurationDeleteView.as_view()
+    return view(request, config_type='payment-methods', pk=pk)
 
 
 @login_required(login_url='login')
 @staff_required
 def product_category_create(request):
-    """Create new product category"""
-    from admin_dashboard.forms import ProductCategoryForm
-
-    if request.method == 'POST':
-        form = ProductCategoryForm(request.POST)
-        if form.is_valid():
-            category = form.save()
-            messages.success(request, f'Catégorie "{category.name}" créée avec succès.')
-            return redirect('admin_dashboard:configuration')
-    else:
-        form = ProductCategoryForm()
-
-    context = {
-        'page_title': 'Créer Catégorie',
-        'section': 'configuration',
-        'form': form,
-        'is_create': True,
-    }
-
-    return render(request, 'admin_dashboard/config/category_form.html', context)
+    """Backward compatibility wrapper"""
+    view = ConfigurationCreateView.as_view()
+    return view(request, config_type='categories')
 
 
 @login_required(login_url='login')
 @staff_required
 def product_category_edit(request, pk):
-    """Edit product category"""
-    from admin_dashboard.forms import ProductCategoryForm
-    from settings_app.models import ProductCategory
-
-    category = get_object_or_404(ProductCategory, pk=pk)
-
-    if request.method == 'POST':
-        form = ProductCategoryForm(request.POST, instance=category)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Catégorie "{category.name}" mise à jour.')
-            return redirect('admin_dashboard:configuration')
-    else:
-        form = ProductCategoryForm(instance=category)
-
-    context = {
-        'page_title': f'Éditer {category.name}',
-        'section': 'configuration',
-        'form': form,
-        'is_create': False,
-        'object': category,
-    }
-
-    return render(request, 'admin_dashboard/config/category_form.html', context)
+    """Backward compatibility wrapper"""
+    view = ConfigurationUpdateView.as_view()
+    return view(request, config_type='categories', pk=pk)
 
 
 @login_required(login_url='login')
 @staff_required
 @require_http_methods(["POST"])
 def product_category_delete(request, pk):
-    """Delete product category"""
-    from settings_app.models import ProductCategory
-
-    category = get_object_or_404(ProductCategory, pk=pk)
-    name = category.name
-    category.delete()
-    messages.success(request, f'Catégorie "{name}" supprimée.')
-
-    return redirect('admin_dashboard:configuration')
+    """Backward compatibility wrapper"""
+    view = ConfigurationDeleteView.as_view()
+    return view(request, config_type='categories', pk=pk)
 
 
 @login_required(login_url='login')
 @staff_required
 def bank_account_create(request):
-    """Create new bank account"""
-    from admin_dashboard.forms import BankAccountForm
-
-    if request.method == 'POST':
-        form = BankAccountForm(request.POST)
-        if form.is_valid():
-            account = form.save()
-            messages.success(request, f'Compte bancaire "{account.bank_name}" créé avec succès.')
-            return redirect('admin_dashboard:configuration')
-    else:
-        form = BankAccountForm()
-
-    context = {
-        'page_title': 'Créer Compte Bancaire',
-        'section': 'configuration',
-        'form': form,
-        'is_create': True,
-    }
-
-    return render(request, 'admin_dashboard/config/bank_account_form.html', context)
+    """Backward compatibility wrapper"""
+    view = ConfigurationCreateView.as_view()
+    return view(request, config_type='bank-accounts')
 
 
 @login_required(login_url='login')
 @staff_required
 def bank_account_edit(request, pk):
-    """Edit bank account"""
-    from admin_dashboard.forms import BankAccountForm
-    from settings_app.models import BankAccount
-
-    account = get_object_or_404(BankAccount, pk=pk)
-
-    if request.method == 'POST':
-        form = BankAccountForm(request.POST, instance=account)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Compte bancaire "{account.bank_name}" mis à jour.')
-            return redirect('admin_dashboard:configuration')
-    else:
-        form = BankAccountForm(instance=account)
-
-    context = {
-        'page_title': f'Éditer {account.bank_name}',
-        'section': 'configuration',
-        'form': form,
-        'is_create': False,
-        'object': account,
-    }
-
-    return render(request, 'admin_dashboard/config/bank_account_form.html', context)
+    """Backward compatibility wrapper"""
+    view = ConfigurationUpdateView.as_view()
+    return view(request, config_type='bank-accounts', pk=pk)
 
 
 @login_required(login_url='login')
 @staff_required
 @require_http_methods(["POST"])
 def bank_account_delete(request, pk):
-    """Delete bank account"""
-    from settings_app.models import BankAccount
-
-    account = get_object_or_404(BankAccount, pk=pk)
-    name = account.bank_name
-    account.delete()
-    messages.success(request, f'Compte bancaire "{name}" supprimé.')
-
-    return redirect('admin_dashboard:configuration')
+    """Backward compatibility wrapper"""
+    view = ConfigurationDeleteView.as_view()
+    return view(request, config_type='bank-accounts', pk=pk)
 
 
 def get_client_ip(request):

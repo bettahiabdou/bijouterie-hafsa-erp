@@ -4,237 +4,97 @@
 <div class="space-y-6">
     <div>
         <h1 class="text-3xl font-bold text-gray-900">Configuration Système</h1>
-        <p class="text-gray-600 mt-2">Gérez toutes les configurations du système</p>
+        <p class="text-gray-600 mt-2">Gérez toutes les 15 types de configurations du système</p>
     </div>
 
-    <!-- Configuration Sections -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Metal Types -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Types de Métaux</h3>
-                <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">{{ metal_types_count }}</span>
+    <!-- Summary Cards Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for config_key, config in all_configs.items %}
+        <div class="bg-white rounded-lg shadow p-4 hover:shadow-md transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm">{{ config.label }}</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ config.count }}</p>
+                </div>
+                <div class="text-3xl text-blue-200 opacity-50">
+                    <i class="fas fa-cog"></i>
+                </div>
             </div>
-            <p class="text-gray-600 text-sm">{{ metal_types_count }} types de métaux configurés</p>
         </div>
-
-        <!-- Metal Purities -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Titres/Puretés</h3>
-                <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">{{ metal_purities_count }}</span>
-            </div>
-            <p class="text-gray-600 text-sm">{{ metal_purities_count }} titres de pureté</p>
-        </div>
-
-        <!-- Product Categories -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Catégories de Produits</h3>
-                <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">{{ product_categories_count }}</span>
-            </div>
-            <p class="text-gray-600 text-sm">{{ product_categories_count }} catégories</p>
-        </div>
-
-        <!-- Stone Types -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Types de Pierres</h3>
-                <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">{{ stone_types_count }}</span>
-            </div>
-            <p class="text-gray-600 text-sm">Types de pierres disponibles</p>
-        </div>
-
-        <!-- Payment Methods -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Modes de Paiement</h3>
-                <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">{{ payment_methods_count }}</span>
-            </div>
-            <p class="text-gray-600 text-sm">{{ payment_methods_count }} modes disponibles</p>
-        </div>
-
-        <!-- Bank Accounts -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Comptes Bancaires</h3>
-                <span class="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm">{{ bank_accounts_count }}</span>
-            </div>
-            <p class="text-gray-600 text-sm">{{ bank_accounts_count }} comptes configurés</p>
-        </div>
+        {% endfor %}
     </div>
 
-    <!-- Detailed Configuration List -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Metal Types Details -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-900">Types de Métaux</h3>
-                <a href="{% url 'admin_dashboard:metal_type_create' %}" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
-                    <i class="fas fa-plus mr-1"></i> Ajouter
+    <!-- Detailed Configuration Sections -->
+    <div class="space-y-4">
+        {% for config_key, config in all_configs.items %}
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">{{ config.label }}</h3>
+                    <p class="text-sm text-gray-600 mt-1">{{ config.count }} élément{{ config.count|pluralize }}</p>
+                </div>
+                <a href="{% url 'admin_dashboard:config_create' config_key %}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Ajouter
                 </a>
             </div>
-            <div class="divide-y">
-                {% for metal_type in metal_types %}
-                <div class="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
-                    <div>
-                        <span class="text-gray-900 font-medium">{{ metal_type.name }}</span>
-                        <span class="text-gray-600 text-sm ml-3">{{ metal_type.symbol }}</span>
-                    </div>
-                    <div class="space-x-2">
-                        <a href="{% url 'admin_dashboard:metal_type_edit' metal_type.pk %}" class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 inline-block">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        <form method="POST" action="{% url 'admin_dashboard:metal_type_delete' metal_type.pk %}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr?');">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-                {% empty %}
-                <div class="px-6 py-4 text-center text-gray-500">
-                    <p>Aucun type de métal</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
 
-        <!-- Payment Methods Details -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-900">Modes de Paiement</h3>
-                <a href="{% url 'admin_dashboard:payment_method_create' %}" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
-                    <i class="fas fa-plus mr-1"></i> Ajouter
-                </a>
-            </div>
-            <div class="divide-y">
-                {% for method in payment_methods %}
-                <div class="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
-                    <div>
-                        <span class="text-gray-900 font-medium">{{ method.name }}</span>
-                        {% if method.is_active %}
-                        <span class="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs rounded ml-2">Actif</span>
-                        {% else %}
-                        <span class="inline-block px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded ml-2">Inactif</span>
-                        {% endif %}
-                    </div>
-                    <div class="space-x-2">
-                        <a href="{% url 'admin_dashboard:payment_method_edit' method.pk %}" class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 inline-block">
-                            <i class="fas fa-edit"></i>
+            <!-- Items List -->
+            <div class="divide-y max-h-64 overflow-y-auto">
+                {% with items=config.model.objects.all %}
+                    {% if items %}
+                        {% for item in items %}
+                        <div class="px-6 py-3 flex items-center justify-between hover:bg-gray-50 transition">
+                            <div class="flex-1">
+                                <p class="text-gray-900 font-medium">{{ item }}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <a href="{% url 'admin_dashboard:config_edit' config_key item.pk %}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm transition inline-flex items-center gap-1">
+                                    <i class="fas fa-edit fa-sm"></i> Éditer
+                                </a>
+                                <form method="POST" action="{% url 'admin_dashboard:config_delete' config_key item.pk %}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet élément?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition inline-flex items-center gap-1">
+                                        <i class="fas fa-trash fa-sm"></i> Supprimer
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <div class="px-6 py-8 text-center text-gray-500">
+                        <p><i class="fas fa-inbox text-3xl text-gray-300 mb-2 block"></i></p>
+                        <p>Aucun élément pour l'instant</p>
+                        <a href="{% url 'admin_dashboard:config_create' config_key %}" class="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-block">
+                            → Créer le premier
                         </a>
-                        <form method="POST" action="{% url 'admin_dashboard:payment_method_delete' method.pk %}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr?');">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </form>
                     </div>
-                </div>
-                {% empty %}
-                <div class="px-6 py-4 text-center text-gray-500">
-                    <p>Aucun mode de paiement</p>
-                </div>
-                {% endfor %}
+                    {% endif %}
+                {% endwith %}
             </div>
         </div>
-
-        <!-- Product Categories Details -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-900">Catégories de Produits</h3>
-                <a href="{% url 'admin_dashboard:category_create' %}" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
-                    <i class="fas fa-plus mr-1"></i> Ajouter
-                </a>
-            </div>
-            <div class="divide-y">
-                {% for category in product_categories %}
-                <div class="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
-                    <span class="text-gray-900 font-medium">{{ category.name }}</span>
-                    <div class="space-x-2">
-                        <a href="{% url 'admin_dashboard:category_edit' category.pk %}" class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 inline-block">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        <form method="POST" action="{% url 'admin_dashboard:category_delete' category.pk %}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr?');">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-                {% empty %}
-                <div class="px-6 py-4 text-center text-gray-500">
-                    <p>Aucune catégorie</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Bank Accounts Details -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-900">Comptes Bancaires</h3>
-                <a href="{% url 'admin_dashboard:bank_account_create' %}" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
-                    <i class="fas fa-plus mr-1"></i> Ajouter
-                </a>
-            </div>
-            <div class="divide-y">
-                {% for account in bank_accounts %}
-                <div class="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
-                    <div>
-                        <p class="text-gray-900 font-medium">{{ account.bank_name }}</p>
-                        <p class="text-gray-600 text-sm">{{ account.account_name }}</p>
-                        {% if account.is_default %}
-                        <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded mt-1">Par défaut</span>
-                        {% endif %}
-                    </div>
-                    <div class="space-x-2">
-                        <a href="{% url 'admin_dashboard:bank_account_edit' account.pk %}" class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 inline-block">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        <form method="POST" action="{% url 'admin_dashboard:bank_account_delete' account.pk %}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr?');">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-                {% empty %}
-                <div class="px-6 py-4 text-center text-gray-500">
-                    <p>Aucun compte bancaire</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
+        {% endfor %}
     </div>
 
     <!-- Info Alert -->
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p class="text-blue-800 text-sm">
-            <i class="fas fa-info-circle mr-2"></i>
-            Les configurations système sont affichées ici. Pour ajouter ou modifier les configurations, veuillez contacter un administrateur système.
-        </p>
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
+        <div class="flex-shrink-0">
+            <i class="fas fa-info-circle text-blue-600 text-lg mt-0.5"></i>
+        </div>
+        <div>
+            <h3 class="text-blue-900 font-semibold">Système de Configuration Unifié</h3>
+            <p class="text-blue-800 text-sm mt-1">
+                Toutes les configurations système sont centralisées ici. Ce tableau de bord remplace le système Django Admin ancien et offre une interface mobile-responsive pour gérer les 15 types de configurations différentes.
+            </p>
+        </div>
     </div>
 </div>
 
 <style>
-    .bg-blue-100 { background-color: #dbeafe; }
-    .text-blue-800 { color: #1e40af; }
-    .bg-green-100 { background-color: #dcfce7; }
-    .text-green-800 { color: #166534; }
-    .bg-purple-100 { background-color: #e9d5ff; }
-    .text-purple-800 { color: #6b21a8; }
-    .bg-yellow-100 { background-color: #fef3c7; }
-    .text-yellow-800 { color: #92400e; }
-    .bg-orange-100 { background-color: #fed7aa; }
-    .text-orange-800 { color: #92400e; }
-    .bg-gray-100 { background-color: #f3f4f6; }
-    .text-gray-800 { color: #1f2937; }
-    .bg-blue-50 { background-color: #eff6ff; }
-    .text-blue-800 { color: #1e40af; }
-    .border-blue-200 { border-color: #bfdbfe; }
+    .max-h-64 {
+        max-height: 256px;
+    }
+    .overflow-y-auto {
+        overflow-y: auto;
+    }
 </style>
 {% endblock %}
