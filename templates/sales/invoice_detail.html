@@ -122,7 +122,13 @@
                             {% if invoice.status == 'unpaid' %}bg-red-100 text-red-800
                             {% elif invoice.status == 'partial' %}bg-yellow-100 text-yellow-800
                             {% elif invoice.status == 'paid' %}bg-green-100 text-green-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {% else %}bg-gray-100 text-gray-800{% endif %}"
+                           {% if invoice.status == 'unpaid' %}aria-label="Statut: Non payée"
+                           {% elif invoice.status == 'partial' %}aria-label="Statut: Partiellement payée"
+                           {% elif invoice.status == 'paid' %}aria-label="Statut: Payée"{% endif %}>
+                            {% if invoice.status == 'unpaid' %}<i class="fas fa-circle-xmark mr-1"></i>
+                            {% elif invoice.status == 'partial' %}<i class="fas fa-hourglass-half mr-1"></i>
+                            {% elif invoice.status == 'paid' %}<i class="fas fa-circle-check mr-1"></i>{% endif %}
                             {{ invoice.get_status_display }}
                         </span>
                     </div>

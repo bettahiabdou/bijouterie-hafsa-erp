@@ -128,13 +128,23 @@
                                     {% if invoice.status == 'unpaid' %}bg-red-100 text-red-800
                                     {% elif invoice.status == 'partial' %}bg-yellow-100 text-yellow-800
                                     {% elif invoice.status == 'paid' %}bg-green-100 text-green-800
-                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}"
+                                   {% if invoice.status == 'unpaid' %}aria-label="Statut: Non payée"
+                                   {% elif invoice.status == 'partial' %}aria-label="Statut: Partiellement payée"
+                                   {% elif invoice.status == 'paid' %}aria-label="Statut: Payée"{% endif %}>
+                                    {% if invoice.status == 'unpaid' %}<i class="fas fa-circle-xmark mr-1"></i>
+                                    {% elif invoice.status == 'partial' %}<i class="fas fa-hourglass-half mr-1"></i>
+                                    {% elif invoice.status == 'paid' %}<i class="fas fa-circle-check mr-1"></i>{% endif %}
                                     {{ invoice.get_status_display }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-center">
-                                <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-eye"></i>
+                                <a href="{% url 'sales:invoice_detail' invoice.reference %}"
+                                   aria-label="Voir les détails de la facture {{ invoice.reference }}"
+                                   title="Voir les détails"
+                                   class="text-blue-600 hover:text-blue-900 inline-flex items-center gap-1">
+                                    <i class="fas fa-eye" aria-hidden="true"></i>
+                                    <span class="sr-only">Voir</span>
                                 </a>
                             </td>
                         </tr>
