@@ -204,6 +204,7 @@ def generate_model_form(model, fields):
     """
     Dynamically generate a ModelForm for a given model with proper styling.
     Uses proper Django widget instances instead of dictionaries.
+    Handles ForeignKey and other relationship fields.
     """
     from django import forms
 
@@ -220,6 +221,10 @@ def generate_model_form(model, fields):
             if field_name in ['is_active', 'is_default', 'is_precious', 'requires_certificate',
                              'requires_reference', 'requires_bank_account', 'is_internal', 'is_secure']:
                 widgets[field_name] = forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded'})
+
+            # ForeignKey and ManyToOne fields (Relationships)
+            elif field.get_internal_type() in ['ForeignKey', 'OneToOneField']:
+                widgets[field_name] = forms.Select(attrs=base_attrs)
 
             # Choice fields (Select dropdowns)
             elif hasattr(field, 'choices') and field.choices:
@@ -665,6 +670,7 @@ class ConfigurationUpdateView(UpdateView):
     """
     template_name = 'admin_dashboard/config/generic_form.html'
     success_url = reverse_lazy('admin_dashboard:configuration')
+    pk_url_kwarg = 'pk'
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated or not request.user.is_staff:
@@ -677,6 +683,11 @@ class ConfigurationUpdateView(UpdateView):
 
     def get_model(self):
         return ConfigurationRegistry.get_model(self.get_config_type())
+
+    def get_queryset(self):
+        """Return queryset for the current config model"""
+        model = self.get_model()
+        return model.objects.all()
 
     def get_form_class(self):
         config = ConfigurationRegistry.get_config(self.get_config_type())
