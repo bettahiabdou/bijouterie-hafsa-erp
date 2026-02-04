@@ -219,6 +219,26 @@ def product_create(request):
 
             bank_account_id = request.POST.get('bank_account')
 
+            # Convert string form inputs to proper types
+            try:
+                gross_weight = float(request.POST.get('gross_weight', 0) or 0)
+                net_weight = float(request.POST.get('net_weight', 0) or 0)
+                purchase_price_per_gram = float(request.POST.get('purchase_price_per_gram', 0) or 0)
+                minimum_price = float(request.POST.get('minimum_price', 0) or 0)
+                labor_cost = float(request.POST.get('labor_cost', 0) or 0)
+                stone_cost = float(request.POST.get('stone_cost', 0) or 0)
+                other_cost = float(request.POST.get('other_cost', 0) or 0)
+                margin_value = float(request.POST.get('margin_value', 25) or 25)
+            except (ValueError, TypeError) as e:
+                messages.error(request, f'Erreur dans les valeurs numériques: {str(e)}')
+                return render(request, 'products/product_form.html', {
+                    'categories': ProductCategory.objects.all(),
+                    'metals': MetalType.objects.filter(is_active=True),
+                    'purities': MetalPurity.objects.filter(is_active=True),
+                    'bank_accounts': BankAccount.objects.filter(is_active=True),
+                    'product_types': Product.ProductType.choices,
+                })
+
             # Create product instance (don't save yet)
             product = Product(
                 name=request.POST.get('name'),
@@ -228,15 +248,15 @@ def product_create(request):
                 category_id=request.POST.get('category'),
                 metal_type_id=request.POST.get('metal_type') or None,
                 metal_purity_id=request.POST.get('metal_purity') or None,
-                gross_weight=request.POST.get('gross_weight', 0) or 0,
-                net_weight=request.POST.get('net_weight', 0) or 0,
-                purchase_price_per_gram=request.POST.get('purchase_price_per_gram', 0) or 0,
-                minimum_price=request.POST.get('minimum_price', 0) or 0,
-                labor_cost=request.POST.get('labor_cost', 0) or 0,
-                stone_cost=request.POST.get('stone_cost', 0) or 0,
-                other_cost=request.POST.get('other_cost', 0) or 0,
+                gross_weight=gross_weight,
+                net_weight=net_weight,
+                purchase_price_per_gram=purchase_price_per_gram,
+                minimum_price=minimum_price,
+                labor_cost=labor_cost,
+                stone_cost=stone_cost,
+                other_cost=other_cost,
                 margin_type=request.POST.get('margin_type', 'percentage'),
-                margin_value=request.POST.get('margin_value', 25) or 25,
+                margin_value=margin_value,
                 bank_account_id=bank_account_id if bank_account_id else None,
                 status='available',
                 created_by=request.user,
