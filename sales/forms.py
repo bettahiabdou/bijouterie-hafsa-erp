@@ -17,14 +17,17 @@ class SaleInvoiceForm(forms.ModelForm):
     class Meta:
         model = SaleInvoice
         fields = [
-            'client', 'payment_method',
-            'tax_rate', 'notes'
+            'client', 'payment_method', 'bank_account',
+            'tax_rate', 'notes', 'payment_reference'
         ]
         widgets = {
             'client': forms.Select(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
             }),
             'payment_method': forms.Select(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+            }),
+            'bank_account': forms.Select(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
             }),
             'tax_rate': forms.NumberInput(attrs={
@@ -34,6 +37,10 @@ class SaleInvoiceForm(forms.ModelForm):
                 'max': '100',
                 'value': '0',
                 'placeholder': '0.00'
+            }),
+            'payment_reference': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+                'placeholder': 'N° de chèque, référence virement, n° de carte...'
             }),
             'notes': forms.Textarea(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none',
@@ -52,7 +59,7 @@ class SaleInvoiceForm(forms.ModelForm):
 
         # Make optional fields actually optional
         optional_fields = [
-            'payment_method', 'tax_rate', 'notes'
+            'payment_method', 'bank_account', 'tax_rate', 'notes', 'payment_reference'
         ]
         for field_name in optional_fields:
             if field_name in self.fields:
