@@ -150,7 +150,8 @@ def batch_product_create(request):
 
                     selling_price = float(product_selling_prices[i]) if i < len(product_selling_prices) else 0
 
-                    product = Product.objects.create(
+                    # Create product instance (don't save yet)
+                    product = Product(
                         name=f"Produit Lot {i+1}",
                         product_type=product_type,
                         category_id=category_id,
@@ -168,6 +169,8 @@ def batch_product_create(request):
                         status='available',
                         created_by=request.user,
                     )
+                    # Save product - triggers auto-generation and calculations
+                    product.save()
 
                     # Log activity
                     ActivityLog.objects.create(
@@ -211,29 +214,36 @@ def product_create(request):
 
     if request.method == 'POST':
         try:
+            import logging
+            logger = logging.getLogger(__name__)
+
             bank_account_id = request.POST.get('bank_account')
-            # Create product without reference - will be auto-generated in save()
-            product = Product.objects.create(
+
+            # Create product instance (don't save yet)
+            product = Product(
                 name=request.POST.get('name'),
                 name_ar=request.POST.get('name_ar', ''),
                 description=request.POST.get('description', ''),
                 product_type=request.POST.get('product_type', 'finished'),
                 category_id=request.POST.get('category'),
-                metal_type_id=request.POST.get('metal_type'),
-                metal_purity_id=request.POST.get('metal_purity'),
-                gross_weight=request.POST.get('gross_weight', 0),
-                net_weight=request.POST.get('net_weight', 0),
-                purchase_price_per_gram=request.POST.get('purchase_price_per_gram', 0),
-                minimum_price=request.POST.get('minimum_price', 0),
-                labor_cost=request.POST.get('labor_cost', 0),
-                stone_cost=request.POST.get('stone_cost', 0),
-                other_cost=request.POST.get('other_cost', 0),
+                metal_type_id=request.POST.get('metal_type') or None,
+                metal_purity_id=request.POST.get('metal_purity') or None,
+                gross_weight=request.POST.get('gross_weight', 0) or 0,
+                net_weight=request.POST.get('net_weight', 0) or 0,
+                purchase_price_per_gram=request.POST.get('purchase_price_per_gram', 0) or 0,
+                minimum_price=request.POST.get('minimum_price', 0) or 0,
+                labor_cost=request.POST.get('labor_cost', 0) or 0,
+                stone_cost=request.POST.get('stone_cost', 0) or 0,
+                other_cost=request.POST.get('other_cost', 0) or 0,
                 margin_type=request.POST.get('margin_type', 'percentage'),
-                margin_value=request.POST.get('margin_value', 25),
+                margin_value=request.POST.get('margin_value', 25) or 25,
                 bank_account_id=bank_account_id if bank_account_id else None,
                 status='available',
                 created_by=request.user,
             )
+
+            # Save product - this triggers auto-generation and calculations in save() method
+            product.save()
 
             # Log activity
             ActivityLog.objects.create(
@@ -249,6 +259,9 @@ def product_create(request):
             return redirect('product_detail', reference=product.reference)
 
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f'Error creating product: {str(e)}')
             messages.error(request, f'Erreur lors de la création: {str(e)}')
 
     context = {
