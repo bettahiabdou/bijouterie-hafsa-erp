@@ -465,6 +465,10 @@ def system_configuration(request):
     # Get all configuration types with counts
     all_configs = ConfigurationRegistry.get_all_configs()
 
+    # Add querysets to each config for template iteration
+    for config_key, config in all_configs.items():
+        config['items'] = config['model'].objects.all()
+
     context = {
         'page_title': 'Configuration Système',
         'section': 'configuration',
