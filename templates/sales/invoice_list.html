@@ -111,7 +111,11 @@
                                 <a href="{% url 'sales:invoice_detail' invoice.reference %}">{{ invoice.reference }}</a>
                             </td>
                             <td class="px-6 py-4 text-gray-900">
-                                {{ invoice.client.first_name }} {{ invoice.client.last_name }}
+                                {% if invoice.client %}
+                                    {{ invoice.client.first_name }} {{ invoice.client.last_name }}
+                                {% else %}
+                                    <span class="text-gray-400 italic">Vente sans client (Walk-in)</span>
+                                {% endif %}
                             </td>
                             <td class="px-6 py-4 font-bold">{{ invoice.total_amount }} DH</td>
                             <td class="px-6 py-4">{{ invoice.amount_paid }} DH</td>

@@ -128,10 +128,10 @@ def quote_create(request):
         # Log activity
         ActivityLog.objects.create(
             user=request.user,
-            action_type=ActivityLog.ActionType.CREATE,
-            object_type='Quote',
-            object_id=quote.id,
-            description=f'Created quote {quote.reference}',
+            action=ActivityLog.ActionType.CREATE,
+            model_name='Quote',
+            object_id=str(quote.id),
+            object_repr=quote.reference,
             ip_address=get_client_ip(request)
         )
 
@@ -158,10 +158,10 @@ def quote_detail(request, reference):
     # Log view
     ActivityLog.objects.create(
         user=request.user,
-        action_type=ActivityLog.ActionType.VIEW,
-        object_type='Quote',
-        object_id=quote.id,
-        description=f'Viewed quote {quote.reference}',
+        action=ActivityLog.ActionType.VIEW,
+        model_name='Quote',
+        object_id=str(quote.id),
+        object_repr=quote.reference,
         ip_address=get_client_ip(request)
     )
 
@@ -181,10 +181,10 @@ def quote_detail(request, reference):
 
             ActivityLog.objects.create(
                 user=request.user,
-                action_type=ActivityLog.ActionType.UPDATE,
-                object_type='Quote',
-                object_id=quote.id,
-                description=f'Updated quote {quote.reference} status to {quote.get_status_display()}',
+                action=ActivityLog.ActionType.UPDATE,
+                model_name='Quote',
+                object_id=str(quote.id),
+                object_repr=f'{quote.reference} - {quote.get_status_display()}',
                 ip_address=get_client_ip(request)
             )
 

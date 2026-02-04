@@ -15,9 +15,11 @@ class SaleInvoice(models.Model):
     """
 
     class Status(models.TextChoices):
+        DRAFT = 'draft', _('Brouillon')
         UNPAID = 'unpaid', _('Non payée')
         PARTIAL_PAID = 'partial', _('Partiellement payée')
         PAID = 'paid', _('Payée')
+        CANCELLED = 'cancelled', _('Annulée')
 
     class SaleType(models.TextChoices):
         REGULAR = 'regular', _('Vente normale')
