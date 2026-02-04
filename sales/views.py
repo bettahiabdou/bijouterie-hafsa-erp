@@ -504,6 +504,192 @@ def invoice_create(request):
 
 
 @login_required(login_url='login')
+def bulk_invoice_create(request):
+    """Create multiple invoices at once (bulk sales)
+
+    Since sales invoices don't have common fields (each client/product is different),
+    we create a table-based form where each row is a complete invoice with:
+    - Client selection (optional for walk-in sales)
+    - Product selection
+    - Quantity
+    - Selling price (can override product default)
+    - Payment method & reference (optional, for partial/full payment at creation)
+    """
+    if request.method == 'POST':
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Extract invoice rows from form
+            client_ids = request.POST.getlist('client_id')
+            product_ids = request.POST.getlist('product_id')
+            quantities = request.POST.getlist('quantity')
+            selling_prices = request.POST.getlist('selling_price')
+            payment_methods = request.POST.getlist('payment_method')
+            payment_references = request.POST.getlist('payment_reference')
+            amount_paids = request.POST.getlist('amount_paid')
+            bank_accounts = request.POST.getlist('bank_account')
+
+            created_count = 0
+            failed_rows = []
+
+            for i, product_id_str in enumerate(product_ids):
+                try:
+                    # Skip empty rows
+                    if not product_id_str:
+                        continue
+
+                    product_id = int(product_id_str)
+                    product = Product.objects.get(id=product_id)
+
+                    # Get quantity
+                    quantity_str = quantities[i] if i < len(quantities) else '1'
+                    quantity = Decimal(quantity_str) if quantity_str else Decimal(1)
+
+                    if quantity <= 0:
+                        failed_rows.append((i + 1, 'Quantité doit être positive'))
+                        continue
+
+                    # Generate invoice reference
+                    reference = generate_invoice_reference()
+
+                    # Get client (optional for walk-in sales)
+                    client_id = client_ids[i] if i < len(client_ids) and client_ids[i] else None
+                    client = Client.objects.get(id=client_id) if client_id else None
+
+                    # Get selling price (use product default or override)
+                    selling_price = product.selling_price
+                    if i < len(selling_prices) and selling_prices[i].strip():
+                        try:
+                            selling_price = Decimal(selling_prices[i])
+                        except (ValueError, InvalidOperation):
+                            pass
+
+                    # Calculate subtotal (both Decimal now, so multiplication works)
+                    subtotal = selling_price * quantity
+
+                    # Create invoice
+                    invoice = SaleInvoice.objects.create(
+                        reference=reference,
+                        date=timezone.now().date(),
+                        client=client,
+                        seller=request.user,
+                        status=SaleInvoice.Status.UNPAID,
+                        subtotal=subtotal,
+                        total_amount=subtotal,
+                        amount_paid=Decimal(0),
+                    )
+
+                    # Add product item to invoice (subtotal calculated in model)
+                    SaleInvoiceItem.objects.create(
+                        invoice=invoice,
+                        product=product,
+                        quantity=quantity,
+                        unit_price=selling_price,
+                    )
+
+                    # Handle payment method & reference if provided
+                    if i < len(payment_methods) and payment_methods[i]:
+                        payment_method_id = payment_methods[i]
+                        payment_reference = payment_references[i] if i < len(payment_references) else ''
+                        bank_account_id = bank_accounts[i] if i < len(bank_accounts) and bank_accounts[i] else None
+
+                        try:
+                            payment_method = PaymentMethod.objects.get(id=payment_method_id)
+                            invoice.payment_method = payment_method
+                            invoice.payment_reference = payment_reference
+
+                            # Set bank account for virement bancaire payments
+                            if bank_account_id:
+                                try:
+                                    bank_account = BankAccount.objects.get(id=bank_account_id)
+                                    invoice.bank_account = bank_account
+                                except BankAccount.DoesNotExist:
+                                    pass
+
+                            invoice.save(update_fields=['payment_method', 'payment_reference', 'bank_account'])
+                        except PaymentMethod.DoesNotExist:
+                            pass
+
+                    # Handle amount paid if provided (for partial/full payment at creation)
+                    if i < len(amount_paids) and amount_paids[i].strip():
+                        try:
+                            amount_paid = Decimal(amount_paids[i])
+                            if amount_paid > 0:
+                                invoice.amount_paid = amount_paid
+
+                                # Update status based on amount paid
+                                if amount_paid >= invoice.total_amount:
+                                    invoice.status = SaleInvoice.Status.PAID
+                                elif amount_paid > 0:
+                                    invoice.status = SaleInvoice.Status.PARTIAL_PAID
+
+                                invoice.save(update_fields=['amount_paid', 'status'])
+
+                                # Log payment activity
+                                ActivityLog.objects.create(
+                                    user=request.user,
+                                    action=ActivityLog.ActionType.CREATE,
+                                    model_name='Payment',
+                                    object_id=str(invoice.id),
+                                    object_repr=f'Paiement {amount_paid} DH - {invoice.reference}',
+                                    ip_address=get_client_ip(request)
+                                )
+                        except (ValueError, InvalidOperation):
+                            pass
+
+                    # Log invoice creation
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.CREATE,
+                        model_name='SaleInvoice',
+                        object_id=str(invoice.id),
+                        object_repr=invoice.reference,
+                        ip_address=get_client_ip(request)
+                    )
+
+                    created_count += 1
+
+                except Product.DoesNotExist:
+                    failed_rows.append((i + 1, 'Produit non trouvé'))
+                    logger.warning(f'Product not found for bulk invoice at row {i + 1}')
+                    continue
+                except (ValueError, TypeError) as e:
+                    failed_rows.append((i + 1, str(e)))
+                    logger.warning(f'Failed to create bulk invoice at row {i + 1}: {str(e)}')
+                    continue
+                except Exception as e:
+                    failed_rows.append((i + 1, str(e)))
+                    logger.exception(f'Unexpected error creating bulk invoice at row {i + 1}')
+                    continue
+
+            # Provide success/warning feedback
+            if created_count > 0:
+                messages.success(request, f'{created_count} facture(s) créée(s) avec succès.')
+
+            if failed_rows:
+                error_details = '; '.join([f"Ligne {row}: {error}" for row, error in failed_rows])
+                messages.warning(request, f'Certaines lignes n\'ont pas pu être créées: {error_details}')
+
+            return redirect('sales:invoice_list')
+
+        except Exception as e:
+            logger.exception(f'Error in bulk invoice creation: {str(e)}')
+            messages.error(request, f'Erreur lors de la création en lot: {str(e)}')
+
+    # Get context data
+    from clients.models import Client
+    context = {
+        'clients': Client.objects.filter(is_active=True),
+        'products': Product.objects.filter(status='available'),
+        'payment_methods': PaymentMethod.objects.filter(is_active=True),
+        'bank_accounts': BankAccount.objects.filter(is_active=True),
+    }
+
+    return render(request, 'sales/bulk_invoice_form.html', context)
+
+
+@login_required(login_url='login')
 def invoice_detail_view(request, reference):
     """Display detailed invoice with payment options"""
     invoice = get_object_or_404(

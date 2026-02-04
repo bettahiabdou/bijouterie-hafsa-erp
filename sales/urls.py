@@ -10,6 +10,7 @@ urlpatterns = [
     # Invoices
     path('invoices/', views.invoice_list, name='invoice_list'),
     path('invoices/create/', views.invoice_create, name='invoice_create'),
+    path('invoices/bulk-create/', views.bulk_invoice_create, name='bulk_create'),
     path('invoices/<str:reference>/', views.invoice_detail, name='invoice_detail'),
     path('invoices/<str:reference>/edit/', views.invoice_edit, name='invoice_edit'),
     path('invoices/<str:reference>/delete/', views.invoice_delete, name='invoice_delete'),

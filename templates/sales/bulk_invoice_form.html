@@ -1,0 +1,487 @@
+{% extends 'base.html' %}
+
+{% block title %}Créer Factures en Lot - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span>/</span>
+    <a href="{% url 'sales:invoice_list' %}">Factures</a>
+    <span>/</span>
+    <span>Créer en Lot</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Créer Factures en Lot</h1>
+            <p class="text-gray-600 mt-1">Ajouter plusieurs factures à la fois</p>
+        </div>
+        <a href="{% url 'sales:invoice_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+            <i class="fas fa-arrow-left mr-2"></i> Annuler
+        </a>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="batch-form-container">
+        <!-- Main Form -->
+        <div class="batch-form-wrapper">
+            <form method="post" class="bg-white rounded-lg shadow-md p-6">
+                {% csrf_token %}
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="mb-6 p-4 {% if message.tags %}bg-{{ message.tags }}-100 text-{{ message.tags }}-800{% else %}bg-blue-100 text-blue-800{% endif %} rounded-lg">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <div>
+                    <!-- Information Section -->
+                    <div class="batch-form-section">
+                        <h2 class="text-lg font-bold text-gray-900 mb-4">Information</h2>
+                        <p class="text-sm text-gray-600 mb-6">Puisque chaque facture de vente a des clients et produits différents, chaque ligne du tableau ci-dessous représente une facture complète avec :</p>
+                        <ul class="list-disc list-inside text-sm text-gray-600 space-y-2 mb-6">
+                            <li>Sélection du client (optionnel pour les ventes sans client/walk-in)</li>
+                            <li>Sélection du produit et quantité</li>
+                            <li>Méthode de paiement et référence (optionnels)</li>
+                            <li>Montant payé à la création (optionnel, pour paiement partiel/total à la création)</li>
+                        </ul>
+                    </div>
+
+                    <!-- Dynamic Invoice Entry - Table Format -->
+                    <div class="batch-form-section">
+                        <h2 class="text-lg font-bold text-gray-900 mb-4">Factures à Créer</h2>
+                        <p class="text-sm text-gray-600 mb-4">Remplissez le tableau ci-dessous avec les factures. Chaque facture recevra une référence unique générée automatiquement.</p>
+
+                        <div class="overflow-x-auto">
+                            <table class="batch-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 30px;"></th>
+                                        <th>Client *</th>
+                                        <th>Produit *</th>
+                                        <th>Quantité *</th>
+                                        <th>Prix Vente (DH)</th>
+                                        <th>Méthode Paiement</th>
+                                        <th>Montant Payé (DH)</th>
+                                        <th style="width: 50px;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invoices_list">
+                                    <!-- Template row (will be cloned for new rows) -->
+                                    <tr class="invoice_item">
+                                        <td>
+                                            <button type="button" class="expand-toggle" title="Afficher détails" style="background: none; border: none; cursor: pointer; font-size: 1.2em;">▼</button>
+                                        </td>
+                                        <td>
+                                            <select name="client_id" class="client_id w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                                <option value="">-- Vente sans client (Walk-in) --</option>
+                                                {% for client in clients %}
+                                                    <option value="{{ client.id }}">{{ client.first_name }} {{ client.last_name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select name="product_id" class="product_id w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required>
+                                                <option value="">-- Sélectionner un produit --</option>
+                                                {% for product in products %}
+                                                    <option value="{{ product.id }}" data-price="{{ product.selling_price }}">{{ product.reference }} - {{ product.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" name="quantity" class="quantity w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                step="0.01" min="0.01" value="1" required>
+                                        </td>
+                                        <td>
+                                            <input type="number" name="selling_price" class="selling_price w-full px-2 py-1 bg-orange-50 border border-orange-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                step="0.01" min="0" placeholder="Auto">
+                                        </td>
+                                        <td>
+                                            <select name="payment_method" class="payment_method w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                                <option value="">-- Aucune --</option>
+                                                {% for method in payment_methods %}
+                                                    <option value="{{ method.id }}" data-name="{{ method.name|lower }}">{{ method.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" name="amount_paid" class="amount_paid w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                step="0.01" min="0" placeholder="0.00">
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <button type="button" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm remove_invoice" style="display:none;" title="Supprimer">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <!-- Detail row template (hidden by default) -->
+                                    <tr class="detail-row" style="display: none;">
+                                        <td colspan="8">
+                                            <div class="detail-content">
+                                                <div class="detail-field">
+                                                    <label>Référence de Paiement *</label>
+                                                    <input type="text" name="payment_reference" class="payment_reference w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                        placeholder="N° chèque, référence virement, n° de carte, etc.">
+                                                    <p class="text-xs text-gray-500 mt-1">Requis pour: virement bancaire, chèque, carte bancaire, paiement mobile</p>
+                                                </div>
+                                                <div class="detail-field bank-account-field" style="display: none;">
+                                                    <label>Compte Bancaire (Virement)</label>
+                                                    <select name="bank_account" class="bank_account w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                                        <option value="">-- Sélectionner un compte --</option>
+                                                        {% for bank in bank_accounts %}
+                                                            <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_number }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <p class="text-xs text-gray-500 mt-1">Compte bancaire pour le virement</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <button type="button" id="add_invoice_btn" class="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center text-sm">
+                            <i class="fas fa-plus mr-2"></i> Ajouter une Ligne
+                        </button>
+                    </div>
+
+                    <!-- Summary -->
+                    <div class="batch-form-section mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <h3 class="font-bold text-blue-900 mb-2">Résumé</h3>
+                        <p class="text-sm text-blue-800">
+                            <strong id="total_invoices">1</strong> facture(s) à créer
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="mt-8 flex gap-4 justify-start">
+                    <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center">
+                        <i class="fas fa-save mr-2"></i> Créer les Factures
+                    </button>
+                    <a href="{% url 'sales:invoice_list' %}" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg">
+                        Annuler
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Help Section (Below Form) -->
+    <div class="batch-form-container mt-6">
+        <div class="batch-form-wrapper">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Aide et Conseils</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-600">
+                    <div>
+                        <h4 class="font-bold text-gray-900 mb-2">Champs Obligatoires</h4>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>Client (optionnel - vente sans client)</li>
+                            <li>Produit (doit être disponible)</li>
+                            <li>Quantité (doit être positive)</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-900 mb-2">Champs Optionnels</h4>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>Prix Vente (utilise le prix du produit par défaut)</li>
+                            <li>Méthode Paiement & Référence</li>
+                            <li>Montant Payé (crée facture partiellement/totalement payée)</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-900 mb-2">Références Générées Automatiquement</h4>
+                        <p>Chaque facture reçoit une référence unique au format INV-YYYYMMDD-XXXX générée automatiquement lors de la création.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-900 mb-2">Statut de la Facture</h4>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>Défaut: Non payée</li>
+                            <li>Si montant payé = total: Payée</li>
+                            <li>Si montant payé > 0 et < total: Partiellement payée</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .batch-form-container {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .batch-form-wrapper {
+            width: 100%;
+            max-width: 1400px;
+        }
+
+        .batch-form-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .batch-form-section:last-child {
+            border-bottom: none;
+        }
+
+        .batch-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .batch-table th {
+            background-color: #f3f4f6;
+            border: 1px solid #d1d5db;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .batch-table td {
+            border: 1px solid #d1d5db;
+            padding: 10px;
+        }
+
+        .batch-table tbody tr:hover {
+            background-color: #f9fafb;
+        }
+
+        .batch-table select,
+        .batch-table input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+
+        .batch-table select:focus,
+        .batch-table input:focus {
+            outline: none;
+            ring: 2px;
+            ring-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        .detail-row {
+            background-color: #f9fafb;
+        }
+
+        .detail-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            background-color: #f3f4f6;
+            border-radius: 6px;
+        }
+
+        .detail-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .detail-field label {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+            font-size: 0.875rem;
+        }
+
+        .detail-field input,
+        .detail-field select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-family: inherit;
+        }
+
+        .detail-field input:focus,
+        .detail-field select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .detail-field p {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 6px;
+        }
+
+        .bank-account-field {
+            flex-direction: column;
+        }
+    </style>
+
+    <script>
+        const templateRow = document.querySelector('.invoice_item');
+        const invoicesList = document.getElementById('invoices_list');
+        const addInvoiceBtn = document.getElementById('add_invoice_btn');
+        const totalInvoicesEl = document.getElementById('total_invoices');
+
+        // Handle expand/collapse toggle for detail rows
+        function attachExpandToggleHandler(row) {
+            const expandBtn = row.querySelector('.expand-toggle');
+            const detailRow = row.nextElementSibling;
+
+            if (expandBtn && detailRow && detailRow.classList.contains('detail-row')) {
+                expandBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const isHidden = detailRow.style.display === 'none';
+                    detailRow.style.display = isHidden ? 'table-row' : 'none';
+                    this.textContent = isHidden ? '▲' : '▼';
+                });
+            }
+        }
+
+        // Handle conditional bank account field visibility
+        function attachPaymentMethodHandler(row) {
+            const paymentMethodSelect = row.querySelector('.payment_method');
+            const detailRow = row.nextElementSibling;
+
+            if (!paymentMethodSelect || !detailRow) return;
+
+            function updateBankAccountFieldVisibility() {
+                const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
+                const methodName = selectedOption.getAttribute('data-name') || '';
+                const bankAccountField = detailRow.querySelector('.bank-account-field');
+
+                if (bankAccountField) {
+                    // Show bank account field if payment method is virement
+                    bankAccountField.style.display = methodName.includes('virement') ? 'flex' : 'none';
+                }
+            }
+
+            paymentMethodSelect.addEventListener('change', updateBankAccountFieldVisibility);
+            // Initial check
+            updateBankAccountFieldVisibility();
+        }
+
+        // Add new invoice row
+        addInvoiceBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const newRow = templateRow.cloneNode(true);
+            const newDetailRow = templateRow.nextElementSibling.cloneNode(true);
+
+            // Reset values in cloned row
+            newRow.querySelectorAll('input').forEach(input => {
+                input.value = input.name === 'quantity' ? '1' : '';
+            });
+            newRow.querySelectorAll('select').forEach(select => {
+                select.value = '';
+            });
+
+            // Reset values in cloned detail row
+            newDetailRow.querySelectorAll('input').forEach(input => {
+                input.value = '';
+            });
+            newDetailRow.querySelectorAll('select').forEach(select => {
+                select.value = '';
+            });
+            // Hide bank account field by default in new row
+            const newBankAccountField = newDetailRow.querySelector('.bank-account-field');
+            if (newBankAccountField) {
+                newBankAccountField.style.display = 'none';
+            }
+
+            // Show remove button if this isn't the first row
+            const removeBtn = newRow.querySelector('.remove_invoice');
+            if (invoicesList.querySelectorAll('.invoice_item').length > 0) {
+                removeBtn.style.display = 'inline-block';
+            }
+
+            // Add remove button functionality
+            removeBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                newRow.remove();
+                newDetailRow.remove();
+                updateSummary();
+            });
+
+            // Update product price when product selection changes
+            newRow.querySelector('.product_id').addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const price = selectedOption.getAttribute('data-price');
+                const priceInput = newRow.querySelector('.selling_price');
+                if (price && !priceInput.value) {
+                    priceInput.placeholder = `${price}`;
+                }
+            });
+
+            // Attach handlers for expand toggle and payment method
+            attachExpandToggleHandler(newRow);
+            attachPaymentMethodHandler(newRow);
+
+            invoicesList.appendChild(newRow);
+            invoicesList.appendChild(newDetailRow);
+            updateSummary();
+        });
+
+        // Remove button for existing rows
+        document.querySelectorAll('.remove_invoice').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const invoiceRow = this.closest('.invoice_item');
+                const detailRow = invoiceRow.nextElementSibling;
+                invoiceRow.remove();
+                if (detailRow && detailRow.classList.contains('detail-row')) {
+                    detailRow.remove();
+                }
+                updateSummary();
+            });
+        });
+
+        // Show remove button for first row if there are multiple rows
+        function showRemoveButtons() {
+            const rows = invoicesList.querySelectorAll('.invoice_item');
+            rows.forEach((row, index) => {
+                const removeBtn = row.querySelector('.remove_invoice');
+                if (rows.length > 1) {
+                    removeBtn.style.display = 'inline-block';
+                } else {
+                    removeBtn.style.display = 'none';
+                }
+            });
+        }
+
+        // Update summary
+        function updateSummary() {
+            const rows = invoicesList.querySelectorAll('.invoice_item');
+            totalInvoicesEl.textContent = rows.length;
+            showRemoveButtons();
+        }
+
+        // Update product price when product selection changes
+        document.querySelectorAll('.product_id').forEach(select => {
+            select.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const price = selectedOption.getAttribute('data-price');
+                const priceInput = this.closest('.invoice_item').querySelector('.selling_price');
+                if (price && !priceInput.value) {
+                    priceInput.placeholder = `${price}`;
+                }
+            });
+        });
+
+        // Attach handlers to initial rows
+        document.querySelectorAll('.invoice_item').forEach(row => {
+            attachExpandToggleHandler(row);
+            attachPaymentMethodHandler(row);
+        });
+
+        // Initialize summary
+        updateSummary();
+    </script>
+{% endblock %}
