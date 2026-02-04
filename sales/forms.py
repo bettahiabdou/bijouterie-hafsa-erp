@@ -43,6 +43,13 @@ class SaleInvoiceForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Add data attributes to payment method options for dynamic visibility
+        if 'payment_method' in self.fields:
+            self.fields['payment_method'].widget.attrs.update({
+                'id': 'paymentMethodSelect',
+            })
+
         # Make optional fields actually optional
         optional_fields = [
             'payment_method', 'tax_rate', 'notes'
