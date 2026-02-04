@@ -118,6 +118,19 @@
                     </div>
                 </div>
 
+                <!-- Suppliers -->
+                <div class="space-y-2">
+                    <button class="w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 flex items-center justify-between group"
+                        onclick="this.parentElement.querySelector('.submenu').classList.toggle('hidden')">
+                        <span><i class="fas fa-industry mr-3"></i> Fournisseurs</span>
+                        <i class="fas fa-chevron-down group-hover:rotate-180 transition"></i>
+                    </button>
+                    <div class="submenu hidden space-y-1 ml-4">
+                        <a href="{% url 'suppliers:list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Tous les Fournisseurs</a>
+                        <a href="{% url 'suppliers:create' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Nouveau Fournisseur</a>
+                    </div>
+                </div>
+
                 <!-- Sales -->
                 <div class="space-y-2">
                     <button class="w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 flex items-center justify-between group"
