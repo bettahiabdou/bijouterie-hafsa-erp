@@ -123,14 +123,7 @@ def batch_product_create(request):
         logger = logging.getLogger(__name__)
 
         try:
-            # Common parameters
-            category_id = request.POST.get('category')
-            product_type = request.POST.get('product_type', 'finished')
-            metal_type_id = request.POST.get('metal_type')
-            metal_purity_id = request.POST.get('metal_purity')
-            bank_account_id = request.POST.get('bank_account')
-
-            # Unit pricing
+            # Truly common parameters (only pricing and margins are common)
             purchase_price_per_gram = float(request.POST.get('purchase_price_per_gram', 0))
             labor_cost = float(request.POST.get('labor_cost', 0))
             stone_cost = float(request.POST.get('stone_cost', 0))
@@ -140,11 +133,16 @@ def batch_product_create(request):
             margin_type = request.POST.get('margin_type', 'percentage')
             margin_value = float(request.POST.get('margin_value', 25))
 
-            # Product data - Extract all product fields
+            # Product data - Extract all product fields (including per-product fields)
             product_names = request.POST.getlist('product_name')
+            product_categories = request.POST.getlist('product_category')
+            product_types = request.POST.getlist('product_type')
+            product_metals = request.POST.getlist('product_metal_type')
+            product_purities = request.POST.getlist('product_purity')
             product_weights_net = request.POST.getlist('product_weight')
             product_weights_gross = request.POST.getlist('product_gross_weight')
             product_selling_prices = request.POST.getlist('product_selling_price')
+            product_banks = request.POST.getlist('product_bank_account')
 
             created_count = 0
             failed_rows = []
@@ -172,13 +170,20 @@ def batch_product_create(request):
                         except ValueError:
                             pass
 
+                    # Get per-product fields
+                    product_category_id = product_categories[i] if i < len(product_categories) else None
+                    product_product_type = product_types[i] if i < len(product_types) else 'finished'
+                    product_metal_id = product_metals[i] if i < len(product_metals) else None
+                    product_purity_id = product_purities[i] if i < len(product_purities) else None
+                    product_bank_id = product_banks[i] if i < len(product_banks) else None
+
                     # Create product instance (don't save yet)
                     product = Product(
                         name=product_name,
-                        product_type=product_type,
-                        category_id=category_id,
-                        metal_type_id=metal_type_id if metal_type_id else None,
-                        metal_purity_id=metal_purity_id if metal_purity_id else None,
+                        product_type=product_product_type,
+                        category_id=product_category_id,
+                        metal_type_id=product_metal_id if product_metal_id else None,
+                        metal_purity_id=product_purity_id if product_purity_id else None,
                         net_weight=weight_net,
                         gross_weight=weight_gross,
                         purchase_price_per_gram=purchase_price_per_gram,
@@ -187,7 +192,7 @@ def batch_product_create(request):
                         other_cost=other_cost,
                         margin_type=margin_type,
                         margin_value=margin_value,
-                        bank_account_id=bank_account_id if bank_account_id else None,
+                        bank_account_id=product_bank_id if product_bank_id else None,
                         status='available',
                         created_by=request.user,
                     )

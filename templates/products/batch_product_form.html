@@ -37,68 +37,15 @@
                 {% endif %}
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Common Parameters -->
+                    <!-- Common Parameters (Only truly shared fields) -->
                     <div class="lg:col-span-2">
                         <h2 class="text-lg font-bold text-gray-900 mb-4">Paramètres Communs</h2>
-                    </div>
-
-                    <!-- Category -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Catégorie *</label>
-                        <select name="category" id="category" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Sélectionner une catégorie</option>
-                            {% for category in categories %}
-                                <option value="{{ category.id }}">{{ category.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Type -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Type *</label>
-                        <select name="product_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            {% for value, label in product_types %}
-                                <option value="{{ value }}" {% if value == 'finished' %}selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Metal Type -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Type de Métal</label>
-                        <select name="metal_type" id="metal_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Non spécifié</option>
-                            {% for metal in metals %}
-                                <option value="{{ metal.id }}">{{ metal.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Purity -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Pureté</label>
-                        <select name="metal_purity" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Non spécifiée</option>
-                            {% for purity in purities %}
-                                <option value="{{ purity.id }}">{{ purity.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Bank Account -->
-                    <div class="lg:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Compte Bancaire</label>
-                        <select name="bank_account" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Sélectionner un compte</option>
-                            {% for bank in bank_accounts %}
-                                <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_name }}</option>
-                            {% endfor %}
-                        </select>
+                        <p class="text-sm text-gray-600 mb-4">Ces paramètres s'appliquent à tous les produits du lot. Les champs spécifiques à chaque produit (Catégorie, Type, Métal, Pureté, Compte) seront remplis dans le tableau ci-dessous.</p>
                     </div>
 
                     <!-- Pricing -->
                     <div class="lg:col-span-2">
-                        <h2 class="text-lg font-bold text-gray-900 mb-4">Prix Unitaire (par gramme)</h2>
+                        <h3 class="text-base font-bold text-gray-900 mb-3">Prix Unitaire (par gramme)</h3>
                     </div>
 
                     <div>
@@ -160,49 +107,93 @@
                     </div>
 
                     <!-- Dynamic Product Entry - Table Format -->
-                    <div class="lg:col-span-2 overflow-x-auto">
-                        <table class="w-full border-collapse border border-gray-300 rounded-lg">
-                            <thead class="bg-gray-100 sticky top-0">
-                                <tr>
-                                    <th class="border border-gray-300 px-3 py-2 text-left text-sm font-bold text-gray-900 w-24">Produit</th>
-                                    <th class="border border-gray-300 px-3 py-2 text-left text-sm font-bold text-gray-900 w-28">Poids Brut (g)</th>
-                                    <th class="border border-gray-300 px-3 py-2 text-left text-sm font-bold text-gray-900 w-28">Poids Net (g) *</th>
-                                    <th class="border border-gray-300 px-3 py-2 text-left text-sm font-bold text-gray-900 w-32">Coût Total (DH)</th>
-                                    <th class="border border-gray-300 px-3 py-2 text-left text-sm font-bold text-gray-900 w-32">Prix Vente (DH)</th>
-                                    <th class="border border-gray-300 px-3 py-2 text-center text-sm font-bold text-gray-900 w-16">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="products_list">
-                                <!-- Template row (will be cloned for new rows) -->
-                                <tr class="product_item hover:bg-gray-50">
-                                    <td class="border border-gray-300 px-3 py-2">
-                                        <input type="text" name="product_name" class="product_name w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                            placeholder="Produit 1" onchange="calculatePreview()">
-                                    </td>
-                                    <td class="border border-gray-300 px-3 py-2">
-                                        <input type="number" name="product_gross_weight" class="product_gross_weight w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                            step="0.001" min="0" onchange="calculatePreview()" placeholder="0">
-                                    </td>
-                                    <td class="border border-gray-300 px-3 py-2">
-                                        <input type="number" name="product_weight" class="product_weight w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                            step="0.001" min="0" required onchange="calculatePreview()">
-                                    </td>
-                                    <td class="border border-gray-300 px-3 py-2">
-                                        <input type="number" name="product_total_cost" class="product_total_cost w-full px-2 py-1 bg-green-50 border border-green-300 rounded text-sm text-green-700 font-semibold"
-                                            step="0.01" min="0" readonly>
-                                    </td>
-                                    <td class="border border-gray-300 px-3 py-2">
-                                        <input type="number" name="product_selling_price" class="product_selling_price w-full px-2 py-1 bg-orange-50 border border-orange-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                            step="0.01" min="0" onchange="calculatePreview()" placeholder="Auto">
-                                    </td>
-                                    <td class="border border-gray-300 px-3 py-2 text-center">
-                                        <button type="button" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs remove_product" style="display:none;" title="Supprimer cette ligne">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="lg:col-span-2">
+                        <h2 class="text-lg font-bold text-gray-900 mb-4">Produits à Créer</h2>
+                        <p class="text-sm text-gray-600 mb-3">Chaque produit peut avoir des paramètres différents (Catégorie, Type, Métal, Pureté, Compte Bancaire).</p>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full border-collapse border border-gray-300 rounded-lg">
+                                <thead class="bg-gray-100 sticky top-0">
+                                    <tr class="text-xs md:text-sm">
+                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Produit</th>
+                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Catégorie *</th>
+                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Type *</th>
+                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Métal</th>
+                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Pureté</th>
+                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Poids Net (g) *</th>
+                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Coût (DH)</th>
+                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Prix Vente (DH)</th>
+                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Compte</th>
+                                        <th class="border border-gray-300 px-2 py-2 text-center font-bold text-gray-900">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="products_list">
+                                    <!-- Template row (will be cloned for new rows) -->
+                                    <tr class="product_item hover:bg-gray-50 text-xs md:text-sm">
+                                        <td class="border border-gray-300 px-2 py-2">
+                                            <input type="text" name="product_name" class="product_name w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                placeholder="Produit 1" onchange="calculatePreview()">
+                                        </td>
+                                        <td class="border border-gray-300 px-2 py-2">
+                                            <select name="product_category" class="product_category w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" required>
+                                                <option value="">--Sélect--</option>
+                                                {% for category in categories %}
+                                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td class="border border-gray-300 px-2 py-2">
+                                            <select name="product_type" class="product_type w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" required>
+                                                {% for value, label in product_types %}
+                                                    <option value="{{ value }}" {% if value == 'finished' %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td class="border border-gray-300 px-2 py-2">
+                                            <select name="product_metal_type" class="product_metal_type w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                                <option value="">--Aucun--</option>
+                                                {% for metal in metals %}
+                                                    <option value="{{ metal.id }}">{{ metal.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td class="border border-gray-300 px-2 py-2">
+                                            <select name="product_purity" class="product_purity w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                                <option value="">--Aucune--</option>
+                                                {% for purity in purities %}
+                                                    <option value="{{ purity.id }}">{{ purity.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td class="border border-gray-300 px-2 py-2">
+                                            <input type="number" name="product_weight" class="product_weight w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                step="0.001" min="0" required onchange="calculatePreview()">
+                                        </td>
+                                        <td class="border border-gray-300 px-2 py-2">
+                                            <input type="number" name="product_total_cost" class="product_total_cost w-full px-2 py-1 bg-green-50 border border-green-300 rounded text-xs text-green-700 font-semibold"
+                                                step="0.01" min="0" readonly>
+                                        </td>
+                                        <td class="border border-gray-300 px-2 py-2">
+                                            <input type="number" name="product_selling_price" class="product_selling_price w-full px-2 py-1 bg-orange-50 border border-orange-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                step="0.01" min="0" onchange="calculatePreview()" placeholder="Auto">
+                                        </td>
+                                        <td class="border border-gray-300 px-2 py-2">
+                                            <select name="product_bank_account" class="product_bank_account w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                                <option value="">--Aucun--</option>
+                                                {% for bank in bank_accounts %}
+                                                    <option value="{{ bank.id }}">{{ bank.bank_name|truncatechars:15 }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td class="border border-gray-300 px-2 py-2 text-center">
+                                            <button type="button" class="px-1 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs remove_product" style="display:none;" title="Supprimer">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
 
                         <button type="button" id="add_product_btn" class="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center text-sm">
                             <i class="fas fa-plus mr-2"></i> Ajouter une Ligne
