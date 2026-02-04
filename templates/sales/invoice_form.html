@@ -349,6 +349,7 @@
             function updatePaymentRefVisibility() {
                 if (!paymentMethodSelect || !paymentMethodSelect.value) {
                     paymentRefSection.classList.add('hidden');
+                    paymentRefSection.style.display = 'none';
                     return;
                 }
 
@@ -365,8 +366,10 @@
 
                 if (showReference) {
                     paymentRefSection.classList.remove('hidden');
+                    paymentRefSection.style.display = 'block';
                 } else {
                     paymentRefSection.classList.add('hidden');
+                    paymentRefSection.style.display = 'none';
                 }
             }
 
