@@ -130,15 +130,21 @@
                     <h5 class="mb-0">Client</h5>
                 </div>
                 <div class="card-body">
-                    <p class="mb-2">
-                        <strong>{{ invoice.client.full_name }}</strong>
-                    </p>
-                    <p class="mb-0">
-                        <small class="text-muted">
-                            {{ invoice.client.email }}<br>
-                            {{ invoice.client.phone }}
-                        </small>
-                    </p>
+                    {% if invoice.client %}
+                        <p class="mb-2">
+                            <strong>{{ invoice.client.full_name }}</strong>
+                        </p>
+                        <p class="mb-0">
+                            <small class="text-muted">
+                                {{ invoice.client.email }}<br>
+                                {{ invoice.client.phone }}
+                            </small>
+                        </p>
+                    {% else %}
+                        <p class="text-muted">
+                            <em>Pas de client associé (vente anonyme)</em>
+                        </p>
+                    {% endif %}
                 </div>
             </div>
         </div>

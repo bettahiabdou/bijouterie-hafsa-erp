@@ -42,12 +42,15 @@ class SaleInvoice(models.Model):
         default=SaleType.REGULAR
     )
 
-    # Client
+    # Client - Optional (can sell without client record for walk-in sales)
     client = models.ForeignKey(
         'clients.Client',
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name='sale_invoices',
-        verbose_name=_('Client')
+        verbose_name=_('Client'),
+        help_text=_('Client is optional - can record walk-in or anonymous sales')
     )
 
     # Status

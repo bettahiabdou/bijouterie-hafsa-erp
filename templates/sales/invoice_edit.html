@@ -49,8 +49,9 @@
                             </div>
 
                             <div class="form-group mb-3">
-                                <label for="{{ form.client.id_for_label }}" class="form-label">Client <span class="text-danger">*</span></label>
+                                <label for="{{ form.client.id_for_label }}" class="form-label">Client <span class="text-muted">(Optionnel)</span></label>
                                 {{ form.client }}
+                                <small class="form-text text-muted">Laissez vide pour une vente sans client</small>
                                 {% if form.client.errors %}
                                     <div class="invalid-feedback d-block">
                                         {{ form.client.errors.0 }}
@@ -135,7 +136,12 @@
                 <div class="card-body">
                     <p>
                         <strong>Référence:</strong> {{ invoice.reference }}<br>
-                        <strong>Client:</strong> {{ invoice.client.full_name }}<br>
+                        <strong>Client:</strong>
+                        {% if invoice.client %}
+                            {{ invoice.client.full_name }}
+                        {% else %}
+                            <span class="text-muted">(Pas de client)</span>
+                        {% endif %}<br>
                         <strong>Statut:</strong>
                         <span class="badge bg-{% if invoice.status == 'draft' %}warning{% elif invoice.status == 'confirmed' %}info{% elif invoice.status == 'paid' %}success{% else %}secondary{% endif %}">
                             {{ invoice.get_status_display }}

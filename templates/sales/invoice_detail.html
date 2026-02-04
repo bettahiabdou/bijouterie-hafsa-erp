@@ -30,12 +30,18 @@
             <!-- Client Info -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h2 class="text-lg font-bold text-gray-900 mb-4">Informations Client</h2>
-                <div class="space-y-2">
-                    <p class="text-gray-900 font-bold text-lg">{{ invoice.client.first_name }} {{ invoice.client.last_name }}</p>
-                    <p class="text-gray-600">{{ invoice.client.email }}</p>
-                    <p class="text-gray-600">{{ invoice.client.phone }}</p>
-                    <p class="text-gray-600">{{ invoice.client.address }}, {{ invoice.client.city }}</p>
-                </div>
+                {% if invoice.client %}
+                    <div class="space-y-2">
+                        <p class="text-gray-900 font-bold text-lg">{{ invoice.client.first_name }} {{ invoice.client.last_name }}</p>
+                        <p class="text-gray-600">{{ invoice.client.email }}</p>
+                        <p class="text-gray-600">{{ invoice.client.phone }}</p>
+                        <p class="text-gray-600">{{ invoice.client.address }}, {{ invoice.client.city }}</p>
+                    </div>
+                {% else %}
+                    <div class="space-y-2">
+                        <p class="text-gray-500 italic">Pas de client associé (vente anonyme/walk-in)</p>
+                    </div>
+                {% endif %}
             </div>
 
             <!-- Items Table -->

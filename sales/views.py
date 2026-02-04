@@ -211,7 +211,8 @@ def invoice_create(request):
 
                     # PHASE 3: Invalidate client balance cache on new invoice
                     from django.core.cache import cache
-                    cache.delete(f'client_balance_{invoice.client.id}')
+                    if invoice.client:  # Only invalidate if client exists
+                        cache.delete(f'client_balance_{invoice.client.id}')
 
                     # Log activity
                     ActivityLog.objects.create(
@@ -482,9 +483,10 @@ def invoice_delete(request, reference):
             # Use model soft_delete method
             invoice.soft_delete()
 
-            # PHASE 3: Invalidate client balance cache
+            # PHASE 3: Invalidate client balance cache (only if client exists)
             from django.core.cache import cache
-            cache.delete(f'client_balance_{invoice.client.id}')
+            if invoice.client:  # Only invalidate if client exists
+                cache.delete(f'client_balance_{invoice.client.id}')
 
             ActivityLog.objects.create(
                 user=request.user,
