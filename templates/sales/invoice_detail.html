@@ -121,6 +121,8 @@
                         <span class="inline-block px-3 py-1 rounded-full text-sm font-medium
                             {% if invoice.status == 'draft' %}bg-gray-100 text-gray-800
                             {% elif invoice.status == 'confirmed' %}bg-blue-100 text-blue-800
+                            {% elif invoice.status == 'partial' %}bg-yellow-100 text-yellow-800
+                            {% elif invoice.status == 'paid' %}bg-orange-100 text-orange-800
                             {% elif invoice.status == 'delivered' %}bg-green-100 text-green-800
                             {% else %}bg-red-100 text-red-800{% endif %}">
                             {{ invoice.get_status_display }}
@@ -157,7 +159,14 @@
 
             <!-- Payment Info -->
             <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Paiement</h3>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-gray-900">Paiement</h3>
+                    {% if invoice.status != 'paid' and invoice.status != 'delivered' %}
+                        <a href="{% url 'sales:invoice_payment' invoice.reference %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center">
+                            <i class="fas fa-dollar-sign mr-2"></i> Payer
+                        </a>
+                    {% endif %}
+                </div>
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between">
                         <span class="text-gray-600">Payé:</span>
