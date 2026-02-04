@@ -345,23 +345,6 @@
             // ============ PAYMENT REFERENCE CONDITIONAL ============
             const paymentMethodSelect = document.querySelector('select[name="payment_method"]');
             const paymentRefSection = document.getElementById('paymentRefSection');
-            let paymentMethodsCache = {}; // Cache payment method data
-
-            // Fetch payment methods data on page load
-            async function loadPaymentMethodsData() {
-                try {
-                    const response = await fetch('{% url "sales:get_payment_methods" %}');
-                    if (response.ok) {
-                        const data = await response.json();
-                        // Create a map of id -> requires_reference
-                        data.payment_methods.forEach(pm => {
-                            paymentMethodsCache[pm.id] = pm.requires_reference;
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error loading payment methods:', error);
-                }
-            }
 
             function updatePaymentRefVisibility() {
                 if (!paymentMethodSelect || !paymentMethodSelect.value) {
@@ -369,10 +352,18 @@
                     return;
                 }
 
-                const selectedId = paymentMethodSelect.value;
-                const requiresReference = paymentMethodsCache[selectedId] || false;
+                // Get the selected option's text
+                const selectedText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex].text;
 
-                if (requiresReference) {
+                // Define payment methods that DO NOT require reference (only Espèces)
+                const noReferenceNeeded = ['Espèces', 'espece', 'cash'];
+
+                // Show reference field for everything EXCEPT cash/espèces
+                const showReference = !noReferenceNeeded.some(text =>
+                    selectedText.toLowerCase().includes(text.toLowerCase())
+                );
+
+                if (showReference) {
                     paymentRefSection.classList.remove('hidden');
                 } else {
                     paymentRefSection.classList.add('hidden');
@@ -381,10 +372,8 @@
 
             if (paymentMethodSelect) {
                 paymentMethodSelect.addEventListener('change', updatePaymentRefVisibility);
-                // Load payment methods data first, then check visibility
-                loadPaymentMethodsData().then(() => {
-                    setTimeout(updatePaymentRefVisibility, 100);
-                });
+                // Check on page load
+                setTimeout(updatePaymentRefVisibility, 100);
             }
 
             // ============ ARTICLE MANAGEMENT ============
