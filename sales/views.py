@@ -362,6 +362,20 @@ def invoice_create(request):
                 # Calculate totals (with articles if any)
                 invoice.calculate_totals()
 
+                # Handle payment amount if provided during invoice creation
+                amount_paid = form.cleaned_data.get('amount_paid')
+                if amount_paid and amount_paid > 0:
+                    invoice.update_payment(amount_paid)
+                    # Log the payment activity
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.UPDATE,
+                        model_name='SaleInvoice',
+                        object_id=str(invoice.id),
+                        object_repr=f'{invoice.reference} - Payment: {amount_paid} DH',
+                        ip_address=get_client_ip(request)
+                    )
+
                 # PHASE 3: Invalidate client balance cache on new invoice
                 from django.core.cache import cache
                 if invoice.client:  # Only invalidate if client exists
@@ -377,11 +391,19 @@ def invoice_create(request):
                     ip_address=get_client_ip(request)
                 )
 
-                # Message based on whether articles were added
+                # Message based on whether articles were added and payment recorded
+                message = f'Facture "{invoice.reference}" créée'
                 if items_data:
-                    messages.success(request, f'Facture "{invoice.reference}" créée avec {len(items_data)} article(s).')
-                else:
-                    messages.success(request, f'Facture "{invoice.reference}" créée. Vous pouvez ajouter des articles depuis le détail.')
+                    message += f' avec {len(items_data)} article(s)'
+                if amount_paid and amount_paid > 0:
+                    message += f' • Paiement: {amount_paid} DH'
+                    if amount_paid >= invoice.total_amount:
+                        message += ' ✓ PAYÉE EN INTÉGRALITÉ'
+                    else:
+                        remaining = invoice.total_amount - amount_paid
+                        message += f' (Solde: {remaining} DH)'
+                message += '.'
+                messages.success(request, message)
                 return redirect('sales:invoice_detail', reference=invoice.reference)
             else:
                 # Form validation failed

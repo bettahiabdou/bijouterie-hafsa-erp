@@ -14,6 +14,20 @@ from settings_app.models import PaymentMethod, BankAccount, DeliveryMethod, Deli
 class SaleInvoiceForm(forms.ModelForm):
     """Form for creating and editing sale invoices"""
 
+    # Additional field for payment amount during invoice creation
+    amount_paid = forms.DecimalField(
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+            'step': '0.01',
+            'min': '0',
+            'placeholder': '0.00'
+        }),
+        help_text='Montant payé lors de la création (optionnel)'
+    )
+
     class Meta:
         model = SaleInvoice
         fields = [
