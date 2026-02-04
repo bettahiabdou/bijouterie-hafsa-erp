@@ -125,8 +125,12 @@ def invoice_detail(request, reference):
         ip_address=get_client_ip(request)
     )
 
-    # Get all active products for the add item modal
-    products = Product.objects.filter(is_active=True).order_by('name')
+    # Get all products (except sold) for the add item modal
+    # Include available, reserved, in_repair, consigned items, etc.
+    # Exclude only: SOLD, CUSTOM_ORDER
+    products = Product.objects.exclude(
+        status__in=['sold', 'custom_order']
+    ).order_by('name')
 
     context = {
         'invoice': invoice,
