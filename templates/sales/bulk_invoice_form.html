@@ -423,8 +423,13 @@
                 const selectedOption = this.options[this.selectedIndex];
                 const price = selectedOption.getAttribute('data-price');
                 const priceInput = newRow.querySelector('.selling_price');
+                // Set as VALUE (not placeholder) so it's submitted with form
                 if (price && !priceInput.value) {
-                    priceInput.placeholder = `${price}`;
+                    // Convert comma to dot for number input (13875,00 -> 13875.00)
+                    const normalizedPrice = price.replace(',', '.');
+                    priceInput.value = normalizedPrice;
+                    // Also set placeholder for visual clarity
+                    priceInput.placeholder = price;
                 }
             });
 
@@ -479,8 +484,13 @@
                 const selectedOption = this.options[this.selectedIndex];
                 const price = selectedOption.getAttribute('data-price');
                 const priceInput = this.closest('.invoice_item').querySelector('.selling_price');
+                // Set as VALUE (not placeholder) so it's submitted with form
                 if (price && !priceInput.value) {
-                    priceInput.placeholder = `${price}`;
+                    // Convert comma to dot for number input (13875,00 -> 13875.00)
+                    const normalizedPrice = price.replace(',', '.');
+                    priceInput.value = normalizedPrice;
+                    // Also set placeholder for visual clarity
+                    priceInput.placeholder = price;
                 }
             });
         });
