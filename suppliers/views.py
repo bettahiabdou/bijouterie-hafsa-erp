@@ -50,8 +50,8 @@ def supplier_list(request):
 
     # Add related data count
     suppliers = suppliers.annotate(
-        purchase_count=Count('purchaseinvoice'),
-        payment_count=Count('supplierpayment')
+        purchase_count=Count('purchase_invoices'),
+        payment_count=Count('payments')
     )
 
     # Pagination
