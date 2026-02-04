@@ -369,7 +369,12 @@ def invoice_create(request):
                     amount_paid = Decimal('0')
 
                 if amount_paid and amount_paid > 0:
-                    invoice.update_payment(amount_paid)
+                    # SET the amount_paid (not add to it)
+                    invoice.amount_paid = amount_paid
+                    invoice.balance_due = invoice.total_amount - amount_paid
+                    invoice.update_status()
+                    invoice.save(update_fields=['amount_paid', 'balance_due', 'status'])
+
                     # Log the payment activity
                     ActivityLog.objects.create(
                         user=request.user,
