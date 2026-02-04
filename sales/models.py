@@ -163,6 +163,15 @@ class SaleInvoice(models.Model):
         verbose_name=_('Compte bancaire')
     )
 
+    # Payment reference (cheque number, bank transfer ref, card number, etc.)
+    payment_reference = models.CharField(
+        _('Référence de paiement'),
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text=_('N° de chèque, référence virement, n° de carte, etc.')
+    )
+
     # Applied deposit - CRITICAL FIX
     applied_deposit = models.ForeignKey(
         'payments.Deposit',
