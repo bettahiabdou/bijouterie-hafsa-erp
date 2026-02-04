@@ -92,6 +92,23 @@
                         </p>
                     </div>
 
+                    <!-- Conditional Bank Account (for bank transfer only) -->
+                    <div id="bankAccountSection" class="hidden mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Compte Bancaire <span class="text-red-500">*</span>
+                        </label>
+                        <select id="bankAccount" name="bank_account"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- Sélectionnez un compte --</option>
+                            {% for bank in bank_accounts %}
+                                <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_number }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Sélectionnez le compte bancaire pour ce virement
+                        </p>
+                    </div>
+
                     <p class="text-xs text-gray-500 mt-3">
                         <i class="fas fa-info-circle mr-1"></i>
                         Remises appliquées par produit • Livraison configurée après création
@@ -342,28 +359,36 @@
                 });
             }
 
-            // ============ PAYMENT REFERENCE CONDITIONAL ============
+            // ============ PAYMENT REFERENCE & BANK ACCOUNT CONDITIONAL ============
             const paymentMethodSelect = document.querySelector('select[name="payment_method"]');
             const paymentRefSection = document.getElementById('paymentRefSection');
+            const bankAccountSection = document.getElementById('bankAccountSection');
 
-            function updatePaymentRefVisibility() {
+            function updatePaymentFieldsVisibility() {
                 if (!paymentMethodSelect || !paymentMethodSelect.value) {
                     paymentRefSection.classList.add('hidden');
                     paymentRefSection.style.display = 'none';
+                    bankAccountSection.classList.add('hidden');
+                    bankAccountSection.style.display = 'none';
                     return;
                 }
 
                 // Get the selected option's text
                 const selectedText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex].text;
+                const selectedTextLower = selectedText.toLowerCase();
 
                 // Define payment methods that DO NOT require reference (only Espèces)
                 const noReferenceNeeded = ['Espèces', 'espece', 'cash'];
 
                 // Show reference field for everything EXCEPT cash/espèces
                 const showReference = !noReferenceNeeded.some(text =>
-                    selectedText.toLowerCase().includes(text.toLowerCase())
+                    selectedTextLower.includes(text.toLowerCase())
                 );
 
+                // Show bank account field ONLY for Virement Bancaire
+                const isBankTransfer = selectedTextLower.includes('virement');
+
+                // Update payment reference visibility
                 if (showReference) {
                     paymentRefSection.classList.remove('hidden');
                     paymentRefSection.style.display = 'block';
@@ -371,12 +396,21 @@
                     paymentRefSection.classList.add('hidden');
                     paymentRefSection.style.display = 'none';
                 }
+
+                // Update bank account visibility
+                if (isBankTransfer) {
+                    bankAccountSection.classList.remove('hidden');
+                    bankAccountSection.style.display = 'block';
+                } else {
+                    bankAccountSection.classList.add('hidden');
+                    bankAccountSection.style.display = 'none';
+                }
             }
 
             if (paymentMethodSelect) {
-                paymentMethodSelect.addEventListener('change', updatePaymentRefVisibility);
+                paymentMethodSelect.addEventListener('change', updatePaymentFieldsVisibility);
                 // Check on page load
-                setTimeout(updatePaymentRefVisibility, 100);
+                setTimeout(updatePaymentFieldsVisibility, 100);
             }
 
             // ============ ARTICLE MANAGEMENT ============

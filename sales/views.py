@@ -15,7 +15,7 @@ from products.models import Product
 from clients.models import Client
 from quotes.models import Quote
 from users.models import ActivityLog
-from settings_app.models import PaymentMethod
+from settings_app.models import PaymentMethod, BankAccount
 
 
 @login_required(login_url='login')
@@ -405,6 +405,7 @@ def invoice_create(request):
         'products': Product.objects.filter(status='available').select_related(
             'category', 'metal_type', 'metal_purity', 'supplier'
         ),
+        'bank_accounts': BankAccount.objects.filter(is_active=True),
         'sale_types': SaleInvoice.SaleType.choices,
     }
 
