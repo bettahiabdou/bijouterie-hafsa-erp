@@ -138,11 +138,73 @@
 
                 <!-- Items Section -->
                 <div class="border-b border-gray-200 pb-6">
-                    <h2 class="text-lg font-bold text-gray-900 mb-4">Articles</h2>
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <p class="text-blue-700 text-sm">
-                            <i class="fas fa-info-circle mr-2"></i>
-                            <strong>Important:</strong> Les articles peuvent être ajoutés après la création de la facture en cliquant sur "Ajouter un Article" depuis le détail de la facture.
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold text-gray-900">Articles</h2>
+                        <button type="button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center text-sm"
+                                id="addItemBtn">
+                            <i class="fas fa-plus mr-2"></i> Ajouter un Article
+                        </button>
+                    </div>
+
+                    <!-- Items List -->
+                    <div id="itemsContainer" class="space-y-3 mb-4">
+                        <!-- Items will be added here dynamically -->
+                    </div>
+
+                    <!-- Add Item Form (Hidden by default) -->
+                    <div id="addItemSection" class="bg-gray-50 border border-gray-200 rounded-lg p-4 hidden">
+                        <h3 class="font-bold text-gray-900 mb-4">Ajouter un Nouvel Article</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Produit *</label>
+                                <select id="product_id" class="w-full border border-gray-300 rounded px-3 py-2" required>
+                                    <option value="">-- Sélectionnez un produit --</option>
+                                    {% for product in products %}
+                                        <option value="{{ product.id }}" data-price="{{ product.selling_price }}">
+                                            {{ product.reference }} - {{ product.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Quantité *</label>
+                                    <input type="number" id="quantity" class="w-full border border-gray-300 rounded px-3 py-2"
+                                           step="0.001" min="0.001" value="1" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Prix Unitaire (DH) *</label>
+                                    <input type="number" id="unit_price" class="w-full border border-gray-300 rounded px-3 py-2"
+                                           step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Remise (DH)</label>
+                                <input type="number" id="discount_amount" class="w-full border border-gray-300 rounded px-3 py-2"
+                                       step="0.01" min="0" value="0">
+                            </div>
+                            <div class="bg-white p-3 rounded border border-gray-200">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-medium">Total estimé:</span>
+                                    <span class="text-xl font-bold text-green-600" id="estimated_total">0.00</span>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="button" id="confirmItemBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded">
+                                    <i class="fas fa-check mr-2"></i> Ajouter
+                                </button>
+                                <button type="button" id="cancelItemBtn" class="flex-1 bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 rounded">
+                                    Annuler
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="emptyState" class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                        <p class="text-gray-600">
+                            <i class="fas fa-inbox text-2xl mb-2 block"></i>
+                            Aucun article ajouté. Cliquez sur "Ajouter un Article" pour commencer.
                         </p>
                     </div>
                 </div>
@@ -195,9 +257,9 @@
                 <h3 class="text-lg font-bold text-blue-900 mb-3">Aide Rapide</h3>
                 <ul class="space-y-2 text-sm text-blue-800">
                     <li><i class="fas fa-check text-blue-600 mr-2"></i> Remplissez les champs principaux</li>
-                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Les articles s'ajoutent après création</li>
+                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Ajoutez les articles directement ici</li>
                     <li><i class="fas fa-check text-blue-600 mr-2"></i> Tous les champs sauf Client sont optionnels</li>
-                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Cliquez "Nouveau Client" pour en ajouter un vite</li>
+                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Les articles s'ajoutent immédiatement à la facture</li>
                 </ul>
             </div>
 
@@ -258,69 +320,184 @@
     </div>
 
     <script>
-        // Quick Add Client
+        let invoiceItems = [];
+
         document.addEventListener('DOMContentLoaded', function() {
-            const saveBtn = document.getElementById('saveClientBtn');
-            if (!saveBtn) {
-                console.error('Save client button not found');
-                return;
+            // ============ QUICK ADD CLIENT ============
+            const saveClientBtn = document.getElementById('saveClientBtn');
+            if (saveClientBtn) {
+                saveClientBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const form = document.getElementById('quickAddClientForm');
+                    const formData = new FormData(form);
+                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+                    fetch('{% url "clients:quick_create" %}', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': csrfToken
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const selectElement = document.querySelector('select[name="client"]');
+                            if (selectElement) {
+                                const option = document.createElement('option');
+                                option.value = data.client_id;
+                                option.textContent = data.client_name + ' (' + data.client_email + ')';
+                                selectElement.appendChild(option);
+                                selectElement.value = data.client_id;
+                            }
+                            const modalEl = document.getElementById('addClientModal');
+                            const modal = bootstrap.Modal.getInstance(modalEl);
+                            if (modal) modal.hide();
+                            form.reset();
+                            alert('Client ajouté avec succès!');
+                        } else {
+                            alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Erreur: ' + error);
+                    });
+                });
             }
 
-            saveBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                const form = document.getElementById('quickAddClientForm');
-                const formData = new FormData(form);
-                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            // ============ ARTICLE MANAGEMENT ============
+            const addItemBtn = document.getElementById('addItemBtn');
+            const cancelItemBtn = document.getElementById('cancelItemBtn');
+            const confirmItemBtn = document.getElementById('confirmItemBtn');
+            const addItemSection = document.getElementById('addItemSection');
+            const productSelect = document.getElementById('product_id');
+            const quantityInput = document.getElementById('quantity');
+            const unitPriceInput = document.getElementById('unit_price');
+            const discountInput = document.getElementById('discount_amount');
+            const estimatedTotalSpan = document.getElementById('estimated_total');
 
-                console.log('Submitting quick client form...');
+            // Show/hide add item form
+            addItemBtn.addEventListener('click', function() {
+                addItemSection.classList.remove('hidden');
+                productSelect.focus();
+            });
 
-                fetch('{% url "clients:quick_create" %}', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': csrfToken
-                    }
-                })
-                .then(response => {
-                    console.log('Response status:', response.status);
-                    if (!response.ok) {
-                        throw new Error('HTTP error, status = ' + response.status);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Response data:', data);
-                    if (data.success) {
-                        // Add new client to dropdown
-                        const selectElement = document.querySelector('select[name="client"]');
-                        if (selectElement) {
-                            const option = document.createElement('option');
-                            option.value = data.client_id;
-                            option.textContent = data.client_name + ' (' + data.client_email + ')';
-                            selectElement.appendChild(option);
-                            selectElement.value = data.client_id;
-                        }
+            cancelItemBtn.addEventListener('click', function() {
+                addItemSection.classList.add('hidden');
+                resetItemForm();
+            });
 
-                        // Close modal
-                        const modalEl = document.getElementById('addClientModal');
-                        const modal = bootstrap.Modal.getInstance(modalEl);
-                        if (modal) {
-                            modal.hide();
-                        }
+            // Auto-fill price when product selected
+            productSelect.addEventListener('change', function() {
+                if (this.value) {
+                    const option = this.options[this.selectedIndex];
+                    unitPriceInput.value = option.dataset.price || 0;
+                    updateEstimatedTotal();
+                }
+            });
 
-                        // Reset form
-                        form.reset();
+            // Update total on input change
+            [quantityInput, unitPriceInput, discountInput].forEach(input => {
+                input.addEventListener('change', updateEstimatedTotal);
+                input.addEventListener('keyup', updateEstimatedTotal);
+            });
 
-                        // Show success message
-                        alert('Client "' + data.client_name + '" ajouté avec succès!');
-                    } else {
-                        alert('Erreur: ' + (data.error || 'Erreur inconnue'));
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Erreur lors de l\'ajout du client: ' + error);
-                });
+            function updateEstimatedTotal() {
+                const qty = parseFloat(quantityInput.value) || 0;
+                const price = parseFloat(unitPriceInput.value) || 0;
+                const discount = parseFloat(discountInput.value) || 0;
+                const total = Math.max(0, (qty * price) - discount);
+                estimatedTotalSpan.textContent = total.toFixed(2);
+            }
+
+            // Add item to list
+            confirmItemBtn.addEventListener('click', function() {
+                if (!productSelect.value) {
+                    alert('Sélectionnez un produit');
+                    return;
+                }
+                if (!quantityInput.value || parseFloat(quantityInput.value) <= 0) {
+                    alert('Entrez une quantité valide');
+                    return;
+                }
+                if (!unitPriceInput.value || parseFloat(unitPriceInput.value) < 0) {
+                    alert('Entrez un prix valide');
+                    return;
+                }
+
+                const productOption = productSelect.options[productSelect.selectedIndex];
+                const item = {
+                    id: Date.now(),
+                    product_id: productSelect.value,
+                    product_name: productOption.text,
+                    quantity: parseFloat(quantityInput.value),
+                    unit_price: parseFloat(unitPriceInput.value),
+                    discount_amount: parseFloat(discountInput.value) || 0,
+                    total_amount: Math.max(0, (parseFloat(quantityInput.value) * parseFloat(unitPriceInput.value)) - (parseFloat(discountInput.value) || 0))
+                };
+
+                invoiceItems.push(item);
+                renderItems();
+                resetItemForm();
+                addItemSection.classList.add('hidden');
+            });
+
+            function resetItemForm() {
+                productSelect.value = '';
+                quantityInput.value = '1';
+                unitPriceInput.value = '';
+                discountInput.value = '0';
+                estimatedTotalSpan.textContent = '0.00';
+            }
+
+            function renderItems() {
+                const container = document.getElementById('itemsContainer');
+                const emptyState = document.getElementById('emptyState');
+
+                if (invoiceItems.length === 0) {
+                    container.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+
+                emptyState.classList.add('hidden');
+                container.innerHTML = invoiceItems.map((item, index) => `
+                    <div class="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:shadow-md transition">
+                        <div class="flex-1">
+                            <p class="font-bold text-gray-900">${item.product_name}</p>
+                            <p class="text-sm text-gray-600">Qty: ${item.quantity} × ${item.unit_price.toFixed(2)} DH</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold text-green-600">${item.total_amount.toFixed(2)} DH</p>
+                            <button type="button" class="text-red-600 hover:text-red-800 text-sm mt-1" onclick="removeItem(${index})">
+                                <i class="fas fa-trash mr-1"></i> Supprimer
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            window.removeItem = function(index) {
+                invoiceItems.splice(index, 1);
+                renderItems();
+            };
+
+            // Add items to form before submit
+            const form = document.querySelector('form');
+            form.addEventListener('submit', function(e) {
+                if (invoiceItems.length > 0) {
+                    // Create hidden inputs for articles
+                    const container = document.createElement('div');
+                    invoiceItems.forEach((item, index) => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = `items[${index}]`;
+                        input.value = JSON.stringify(item);
+                        container.appendChild(input);
+                    });
+                    form.appendChild(container);
+                }
             });
         });
     </script>

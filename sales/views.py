@@ -329,7 +329,36 @@ def invoice_create(request):
                 invoice.status = SaleInvoice.Status.DRAFT
                 invoice.save()
 
-                # Calculate initial totals (no items yet - they're added after creation)
+                # Process articles submitted with the form
+                items_data = []
+                for key in request.POST:
+                    if key.startswith('items[') and key.endswith(']'):
+                        try:
+                            import json
+                            item_json = request.POST.get(key)
+                            item_data = json.loads(item_json)
+                            items_data.append(item_data)
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+
+                # Create SaleInvoiceItem records for each article
+                for item_data in items_data:
+                    try:
+                        product = Product.objects.get(id=item_data['product_id'])
+                        SaleInvoiceItem.objects.create(
+                            invoice=invoice,
+                            product=product,
+                            quantity=Decimal(str(item_data['quantity'])),
+                            unit_price=Decimal(str(item_data['unit_price'])),
+                            original_price=Decimal(str(item_data['unit_price'])),
+                            discount_amount=Decimal(str(item_data['discount_amount'])),
+                            total_amount=Decimal(str(item_data['total_amount']))
+                        )
+                    except (Product.DoesNotExist, ValueError, KeyError) as e:
+                        print(f'Error creating item: {str(e)}')
+                        continue
+
+                # Calculate totals (with articles if any)
                 invoice.calculate_totals()
 
                 # PHASE 3: Invalidate client balance cache on new invoice
@@ -347,7 +376,11 @@ def invoice_create(request):
                     ip_address=get_client_ip(request)
                 )
 
-                messages.success(request, f'Facture "{invoice.reference}" créée avec succès. Ajoutez maintenant les articles.')
+                # Message based on whether articles were added
+                if items_data:
+                    messages.success(request, f'Facture "{invoice.reference}" créée avec {len(items_data)} article(s).')
+                else:
+                    messages.success(request, f'Facture "{invoice.reference}" créée. Vous pouvez ajouter des articles depuis le détail.')
                 return redirect('sales:invoice_detail', reference=invoice.reference)
             else:
                 # Form validation failed
