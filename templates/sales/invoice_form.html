@@ -615,37 +615,42 @@
             } else {
                 console.log('✓ Main form found:', mainForm.action);
 
-                // Handle form submission with proper event delegation
-                mainForm.addEventListener('submit', function(e) {
-                    console.log('✓✓✓ FORM SUBMIT EVENT FIRED ✓✓✓');
-                    console.log('Event:', e.type);
-                    console.log('✓ Invoice items count:', invoiceItems.length);
+                // Add items before form submission
+                // This needs to happen BEFORE the form tries to validate
+                const submitBtn = mainForm.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.addEventListener('click', function(e) {
+                        console.log('✓ Submit button clicked');
 
-                    // Add items as hidden inputs
-                    if (invoiceItems.length > 0) {
-                        console.log('✓ Adding', invoiceItems.length, 'items to form');
+                        // Add items as hidden inputs BEFORE submit
+                        if (invoiceItems.length > 0) {
+                            console.log('✓ Adding', invoiceItems.length, 'items to form');
 
-                        // Remove any existing item inputs first
-                        mainForm.querySelectorAll('input[name^="items["]').forEach(el => el.remove());
+                            // Remove any existing item inputs first
+                            mainForm.querySelectorAll('input[name^="items["]').forEach(el => el.remove());
 
-                        invoiceItems.forEach((item, index) => {
-                            const input = document.createElement('input');
-                            input.type = 'hidden';
-                            input.name = `items[${index}]`;
-                            input.value = JSON.stringify(item);
-                            mainForm.appendChild(input);
-                            console.log(`  ✓ Item ${index} added:`, item.product_id);
-                        });
-                    }
+                            invoiceItems.forEach((item, index) => {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = `items[${index}]`;
+                                input.value = JSON.stringify(item);
+                                mainForm.appendChild(input);
+                                console.log(`  ✓ Item ${index} added:`, item.product_id);
+                            });
 
-                    console.log('✓ Form ready to submit with', invoiceItems.length, 'items');
-                    console.log('✓ Form action:', mainForm.action);
-                    console.log('✓ Form method:', mainForm.method);
-                    console.log('✓✓✓ ALLOWING FORM TO SUBMIT NATURALLY ✓✓✓');
-                    // Don't prevent default - let the form submit naturally
-                }, false); // Use false for capture phase
+                            console.log('✓ Items added, now submitting form');
+                        }
 
-                console.log('✓ Submit event listener attached successfully');
+                        // Now submit the form
+                        console.log('✓ Submitting form to:', mainForm.action);
+                        mainForm.submit();
+                        console.log('✓ Form.submit() called');
+                    });
+
+                    console.log('✓ Submit button listener attached');
+                }
+
+                console.log('✓ Submit handler ready');
             }
         });
     </script>
