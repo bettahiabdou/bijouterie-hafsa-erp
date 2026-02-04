@@ -67,14 +67,22 @@ class Command(BaseCommand):
         # Stone Clarities
         self.stdout.write('Localizing Stone Clarities...')
         clarity_translations = {
-            'IF': 'IF (Internalement Pur)',
-            'VVS1': 'VVS1 (Très Très Légèrement Inclus)',
-            'VVS2': 'VVS2 (Très Très Légèrement Inclus)',
-            'VS1': 'VS1 (Très Légèrement Inclus)',
-            'VS2': 'VS2 (Très Légèrement Inclus)',
-            'SI1': 'SI1 (Légèrement Inclus)',
-            'SI2': 'SI2 (Légèrement Inclus)',
-            'I1': 'I1 (Inclus)',
+            'IF': 'Internalement Pur (IF)',
+            'Internally Flawless': 'Internalement Pur (IF)',
+            'VVS1': 'Très Très Légèrement Inclus 1 (VVS1)',
+            'Very Very Slightly Included 1': 'Très Très Légèrement Inclus 1 (VVS1)',
+            'VVS2': 'Très Très Légèrement Inclus 2 (VVS2)',
+            'Very Very Slightly Included 2': 'Très Très Légèrement Inclus 2 (VVS2)',
+            'VS1': 'Très Légèrement Inclus 1 (VS1)',
+            'Very Slightly Included 1': 'Très Légèrement Inclus 1 (VS1)',
+            'VS2': 'Très Légèrement Inclus 2 (VS2)',
+            'Very Slightly Included 2': 'Très Légèrement Inclus 2 (VS2)',
+            'SI1': 'Légèrement Inclus 1 (SI1)',
+            'Slightly Included 1': 'Légèrement Inclus 1 (SI1)',
+            'SI2': 'Légèrement Inclus 2 (SI2)',
+            'Slightly Included 2': 'Légèrement Inclus 2 (SI2)',
+            'I1': 'Inclus 1 (I1)',
+            'Included 1': 'Inclus 1 (I1)',
         }
         for english, french in clarity_translations.items():
             StoneClarity.objects.filter(name=french).delete()
@@ -83,17 +91,20 @@ class Command(BaseCommand):
         # Stone Colors
         self.stdout.write('Localizing Stone Colors...')
         color_translations = {
-            'D': 'D (Incolore)',
-            'E': 'E (Incolore)',
-            'F': 'F (Incolore)',
-            'G': 'G (Très Blanc)',
-            'H': 'H (Très Blanc)',
-            'I': 'I (Blanc)',
-            'J': 'J (Blanc)',
-            'K': 'K (Légèrement Teinté)',
-            'L': 'L (Teinté)',
-            'M': 'M (Teinté)',
-            'N-Z': 'N-Z (Très Teinté)',
+            'D': 'Incolore (D)',
+            'Colorless': 'Incolore (D-F)',
+            'E': 'Incolore (E)',
+            'F': 'Incolore (F)',
+            'G': 'Très Blanc (G)',
+            'Near Colorless': 'Très Blanc (G-J)',
+            'H': 'Très Blanc (H)',
+            'I': 'Blanc (I)',
+            'J': 'Blanc (J)',
+            'K': 'Légèrement Teinté (K)',
+            'L': 'Légèrement Teinté (L)',
+            'Faint to Light': 'Teinté (K-M)',
+            'M': 'Teinté (M)',
+            'N-Z': 'Très Teinté (N-Z)',
         }
         for english, french in color_translations.items():
             StoneColor.objects.filter(name=french).delete()
@@ -102,6 +113,11 @@ class Command(BaseCommand):
         # Stone Cuts
         self.stdout.write('Localizing Stone Cuts...')
         cut_translations = {
+            'Excellent': 'Excellent',
+            'Very Good': 'Très Bon',
+            'Good': 'Bon',
+            'Fair': 'Acceptable',
+            'Poor': 'Faible',
             'Round': 'Rond',
             'Princess': 'Princesse',
             'Cushion': 'Coussin',
@@ -146,6 +162,7 @@ class Command(BaseCommand):
         self.stdout.write('Localizing Delivery Methods...')
         delivery_translations = {
             'In-Store Pickup': 'Retrait en magasin',
+            'Store Pickup': 'Retrait en magasin',
             'Home Delivery': 'Livraison à domicile',
             'Express Delivery': 'Livraison express',
             'Courier': 'Coursier',
@@ -167,6 +184,8 @@ class Command(BaseCommand):
             'Metal Repair': 'Réparation du métal',
             'Jewelry Restoration': 'Restauration de bijoux',
             'Engraving': 'Gravure',
+            'Soldering': 'Brasure',
+            'Chain Repair': 'Réparation de chaîne',
         }
         for english, french in repair_translations.items():
             RepairType.objects.filter(name=french).delete()
