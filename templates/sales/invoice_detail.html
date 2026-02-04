@@ -216,10 +216,10 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Prix Unitaire (DH) <span class="text-danger">*</span></label>
+                                    <label class="form-label">Prix Unitaire (DH)</label>
                                     <input type="number" id="unit_price" name="unit_price" class="form-control"
-                                           step="0.01" min="0" required>
-                                    <small class="form-text text-muted">Laissez vide pour utiliser le prix de vente</small>
+                                           step="0.01" min="0" readonly style="background-color: #f5f5f5;">
+                                    <small class="form-text text-muted">Auto-détecté du produit</small>
                                 </div>
                             </div>
                         </div>
@@ -230,10 +230,23 @@
                                    step="0.01" min="0" value="0">
                         </div>
 
-                        <div class="bg-light p-3 rounded">
+                        <div class="bg-light p-3 rounded border">
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between small">
+                                    <span>Sous-total:</span>
+                                    <span><span id="subtotal_display">0.00</span> DH</span>
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between small">
+                                    <span>Remise:</span>
+                                    <span>-<span id="discount_display">0.00</span> DH</span>
+                                </div>
+                            </div>
+                            <hr style="margin: 0.5rem 0;">
                             <div class="d-flex justify-content-between">
-                                <span>Total estimé:</span>
-                                <span class="font-weight-bold"><span id="estimated_total">0</span> DH</span>
+                                <span class="font-weight-bold">Total:</span>
+                                <span class="font-weight-bold text-success"><span id="estimated_total">0.00</span> DH</span>
                             </div>
                         </div>
                     </form>
@@ -259,7 +272,7 @@
             productSelect.addEventListener('change', function() {
                 const selectedOption = this.options[this.selectedIndex];
                 const price = selectedOption.dataset.price || 0;
-                unitPriceInput.value = price;
+                unitPriceInput.value = parseFloat(price).toFixed(2);
                 updateEstimatedTotal();
             });
 
@@ -273,8 +286,12 @@
                 const quantity = parseFloat(quantityInput.value) || 0;
                 const unitPrice = parseFloat(unitPriceInput.value) || 0;
                 const discount = parseFloat(discountInput.value) || 0;
-                const total = (quantity * unitPrice) - discount;
-                estimatedTotalSpan.textContent = Math.max(0, total).toFixed(2);
+                const subtotal = quantity * unitPrice;
+                const total = Math.max(0, subtotal - discount);
+
+                document.getElementById('subtotal_display').textContent = subtotal.toFixed(2);
+                document.getElementById('discount_display').textContent = discount.toFixed(2);
+                estimatedTotalSpan.textContent = total.toFixed(2);
             }
 
             // Save item
@@ -319,7 +336,9 @@
 
                         // Reset form
                         form.reset();
-                        estimatedTotalSpan.textContent = '0';
+                        estimatedTotalSpan.textContent = '0.00';
+                        document.getElementById('subtotal_display').textContent = '0.00';
+                        document.getElementById('discount_display').textContent = '0.00';
 
                         // Show success message
                         alert('Article ajouté avec succès!');

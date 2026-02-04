@@ -330,8 +330,8 @@
 
             function updatePaymentRefVisibility() {
                 const selectedPayment = paymentMethodSelect.value;
-                // Show payment ref for non-cash payments
-                if (selectedPayment && selectedPayment !== 'cash') {
+                // Show payment ref for non-cash, non-espece payments
+                if (selectedPayment && selectedPayment !== 'cash' && selectedPayment !== 'espece') {
                     paymentRefSection.classList.remove('hidden');
                 } else {
                     paymentRefSection.classList.add('hidden');
