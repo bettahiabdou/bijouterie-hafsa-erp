@@ -63,7 +63,7 @@ class ConfigurationRegistry:
             'model': MetalType,
             'label': 'Types de métaux',
             'singular': 'Type de métal',
-            'fields': ['name', 'code', 'description', 'is_active'],
+            'fields': ['name', 'name_ar', 'code', 'is_active'],
             'list_display': ['name', 'code', 'is_active'],
             'search_fields': ['name', 'code'],
         },
