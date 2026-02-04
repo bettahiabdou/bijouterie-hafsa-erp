@@ -271,7 +271,7 @@ def activity_log_view(request):
         activities = activities.filter(user_id=user_id)
 
     if object_type:
-        activities = activities.filter(object_type=object_type)
+        activities = activities.filter(model_name=object_type)
 
     # Date filter
     try:
@@ -285,7 +285,7 @@ def activity_log_view(request):
     available_actions = ActivityLog.objects.values_list('action', flat=True).distinct()
     available_users = User.objects.filter(activity_logs__isnull=False).distinct()
     available_object_types = ActivityLog.objects.values_list(
-        'object_type', flat=True
+        'model_name', flat=True
     ).distinct()
 
     context = {
