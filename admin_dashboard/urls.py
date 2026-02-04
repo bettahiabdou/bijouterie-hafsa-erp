@@ -22,6 +22,26 @@ urlpatterns = [
     # System Configuration
     path('configuration/', views.system_configuration, name='configuration'),
 
+    # Metal Type Configuration
+    path('metal-types/create/', views.metal_type_create, name='metal_type_create'),
+    path('metal-types/<int:pk>/edit/', views.metal_type_edit, name='metal_type_edit'),
+    path('metal-types/<int:pk>/delete/', views.metal_type_delete, name='metal_type_delete'),
+
+    # Payment Method Configuration
+    path('payment-methods/create/', views.payment_method_create, name='payment_method_create'),
+    path('payment-methods/<int:pk>/edit/', views.payment_method_edit, name='payment_method_edit'),
+    path('payment-methods/<int:pk>/delete/', views.payment_method_delete, name='payment_method_delete'),
+
+    # Product Category Configuration
+    path('categories/create/', views.product_category_create, name='category_create'),
+    path('categories/<int:pk>/edit/', views.product_category_edit, name='category_edit'),
+    path('categories/<int:pk>/delete/', views.product_category_delete, name='category_delete'),
+
+    # Bank Account Configuration
+    path('bank-accounts/create/', views.bank_account_create, name='bank_account_create'),
+    path('bank-accounts/<int:pk>/edit/', views.bank_account_edit, name='bank_account_edit'),
+    path('bank-accounts/<int:pk>/delete/', views.bank_account_delete, name='bank_account_delete'),
+
     # Activity Log
     path('activity/', views.activity_log_view, name='activity_log'),
 

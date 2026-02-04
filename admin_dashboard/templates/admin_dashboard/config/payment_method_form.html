@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="mb-6">
+        <a href="{% url 'admin_dashboard:configuration' %}" class="text-blue-600 hover:text-blue-900">
+            <i class="fas fa-arrow-left mr-2"></i> Retour à Configuration
+        </a>
+    </div>
+
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h1 class="text-2xl font-bold text-gray-900">
+                {% if is_create %}
+                    Créer Mode de Paiement
+                {% else %}
+                    Éditer {{ object.name }}
+                {% endif %}
+            </h1>
+        </div>
+
+        <div class="p-6">
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div class="text-red-800">
+                        {% for error in form.non_field_errors %}
+                            <p>{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% for field in form %}
+                    <div>
+                        {{ field.label_tag }}
+                        {% if field.field.widget.input_type == 'checkbox' %}
+                            <input type="checkbox" name="{{ field.name }}" id="{{ field.id_for_label }}" {% if field.value %}checked{% endif %} class="w-4 h-4 rounded">
+                        {% else %}
+                            {{ field }}
+                        {% endif %}
+                        {% if field.errors %}
+                            <div class="text-red-600 text-sm mt-1">
+                                {% for error in field.errors %}
+                                    <p>{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        {% if field.help_text %}
+                            <p class="text-gray-600 text-sm mt-1">{{ field.help_text|safe }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                <div class="flex justify-end gap-3 pt-6">
+                    <a href="{% url 'admin_dashboard:configuration' %}" class="bg-gray-300 text-gray-900 px-6 py-2 rounded-lg hover:bg-gray-400">
+                        Annuler
+                    </a>
+                    <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        {% if is_create %}
+                            Créer
+                        {% else %}
+                            Enregistrer
+                        {% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

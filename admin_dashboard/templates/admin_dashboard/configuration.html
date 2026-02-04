@@ -70,9 +70,9 @@
         <div class="bg-white rounded-lg shadow">
             <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-900">Types de Métaux</h3>
-                <button class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                <a href="{% url 'admin_dashboard:metal_type_create' %}" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
                     <i class="fas fa-plus mr-1"></i> Ajouter
-                </button>
+                </a>
             </div>
             <div class="divide-y">
                 {% for metal_type in metal_types %}
@@ -82,12 +82,15 @@
                         <span class="text-gray-600 text-sm ml-3">{{ metal_type.symbol }}</span>
                     </div>
                     <div class="space-x-2">
-                        <button class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600">
+                        <a href="{% url 'admin_dashboard:metal_type_edit' metal_type.pk %}" class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 inline-block">
                             <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        </a>
+                        <form method="POST" action="{% url 'admin_dashboard:metal_type_delete' metal_type.pk %}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr?');">
+                            {% csrf_token %}
+                            <button type="submit" class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
                     </div>
                 </div>
                 {% empty %}
@@ -102,9 +105,9 @@
         <div class="bg-white rounded-lg shadow">
             <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-900">Modes de Paiement</h3>
-                <button class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                <a href="{% url 'admin_dashboard:payment_method_create' %}" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
                     <i class="fas fa-plus mr-1"></i> Ajouter
-                </button>
+                </a>
             </div>
             <div class="divide-y">
                 {% for method in payment_methods %}
@@ -118,12 +121,15 @@
                         {% endif %}
                     </div>
                     <div class="space-x-2">
-                        <button class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600">
+                        <a href="{% url 'admin_dashboard:payment_method_edit' method.pk %}" class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 inline-block">
                             <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        </a>
+                        <form method="POST" action="{% url 'admin_dashboard:payment_method_delete' method.pk %}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr?');">
+                            {% csrf_token %}
+                            <button type="submit" class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
                     </div>
                 </div>
                 {% empty %}
@@ -138,21 +144,24 @@
         <div class="bg-white rounded-lg shadow">
             <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-900">Catégories de Produits</h3>
-                <button class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                <a href="{% url 'admin_dashboard:category_create' %}" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
                     <i class="fas fa-plus mr-1"></i> Ajouter
-                </button>
+                </a>
             </div>
             <div class="divide-y">
                 {% for category in product_categories %}
                 <div class="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
                     <span class="text-gray-900 font-medium">{{ category.name }}</span>
                     <div class="space-x-2">
-                        <button class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600">
+                        <a href="{% url 'admin_dashboard:category_edit' category.pk %}" class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 inline-block">
                             <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        </a>
+                        <form method="POST" action="{% url 'admin_dashboard:category_delete' category.pk %}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr?');">
+                            {% csrf_token %}
+                            <button type="submit" class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
                     </div>
                 </div>
                 {% empty %}
@@ -167,9 +176,9 @@
         <div class="bg-white rounded-lg shadow">
             <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-900">Comptes Bancaires</h3>
-                <button class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                <a href="{% url 'admin_dashboard:bank_account_create' %}" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
                     <i class="fas fa-plus mr-1"></i> Ajouter
-                </button>
+                </a>
             </div>
             <div class="divide-y">
                 {% for account in bank_accounts %}
@@ -182,12 +191,15 @@
                         {% endif %}
                     </div>
                     <div class="space-x-2">
-                        <button class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600">
+                        <a href="{% url 'admin_dashboard:bank_account_edit' account.pk %}" class="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 inline-block">
                             <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        </a>
+                        <form method="POST" action="{% url 'admin_dashboard:bank_account_delete' account.pk %}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr?');">
+                            {% csrf_token %}
+                            <button type="submit" class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
                     </div>
                 </div>
                 {% empty %}

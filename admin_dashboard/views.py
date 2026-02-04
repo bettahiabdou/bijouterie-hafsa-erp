@@ -355,6 +355,282 @@ def system_status(request):
     return render(request, 'admin_dashboard/status.html', context)
 
 
+@login_required(login_url='login')
+@staff_required
+def metal_type_create(request):
+    """Create new metal type"""
+    from admin_dashboard.forms import MetalTypeForm
+
+    if request.method == 'POST':
+        form = MetalTypeForm(request.POST)
+        if form.is_valid():
+            metal_type = form.save()
+            messages.success(request, f'Type de métal "{metal_type.name}" créé avec succès.')
+            return redirect('admin_dashboard:configuration')
+    else:
+        form = MetalTypeForm()
+
+    context = {
+        'page_title': 'Créer Type de Métal',
+        'section': 'configuration',
+        'form': form,
+        'is_create': True,
+    }
+
+    return render(request, 'admin_dashboard/config/metal_type_form.html', context)
+
+
+@login_required(login_url='login')
+@staff_required
+def metal_type_edit(request, pk):
+    """Edit metal type"""
+    from admin_dashboard.forms import MetalTypeForm
+    from settings_app.models import MetalType
+
+    metal_type = get_object_or_404(MetalType, pk=pk)
+
+    if request.method == 'POST':
+        form = MetalTypeForm(request.POST, instance=metal_type)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Type de métal "{metal_type.name}" mis à jour.')
+            return redirect('admin_dashboard:configuration')
+    else:
+        form = MetalTypeForm(instance=metal_type)
+
+    context = {
+        'page_title': f'Éditer {metal_type.name}',
+        'section': 'configuration',
+        'form': form,
+        'is_create': False,
+        'object': metal_type,
+    }
+
+    return render(request, 'admin_dashboard/config/metal_type_form.html', context)
+
+
+@login_required(login_url='login')
+@staff_required
+@require_http_methods(["POST"])
+def metal_type_delete(request, pk):
+    """Delete metal type"""
+    from settings_app.models import MetalType
+
+    metal_type = get_object_or_404(MetalType, pk=pk)
+    name = metal_type.name
+    metal_type.delete()
+    messages.success(request, f'Type de métal "{name}" supprimé.')
+
+    return redirect('admin_dashboard:configuration')
+
+
+@login_required(login_url='login')
+@staff_required
+def payment_method_create(request):
+    """Create new payment method"""
+    from admin_dashboard.forms import PaymentMethodForm
+
+    if request.method == 'POST':
+        form = PaymentMethodForm(request.POST)
+        if form.is_valid():
+            payment_method = form.save()
+            messages.success(request, f'Mode de paiement "{payment_method.name}" créé avec succès.')
+            return redirect('admin_dashboard:configuration')
+    else:
+        form = PaymentMethodForm()
+
+    context = {
+        'page_title': 'Créer Mode de Paiement',
+        'section': 'configuration',
+        'form': form,
+        'is_create': True,
+    }
+
+    return render(request, 'admin_dashboard/config/payment_method_form.html', context)
+
+
+@login_required(login_url='login')
+@staff_required
+def payment_method_edit(request, pk):
+    """Edit payment method"""
+    from admin_dashboard.forms import PaymentMethodForm
+    from settings_app.models import PaymentMethod
+
+    payment_method = get_object_or_404(PaymentMethod, pk=pk)
+
+    if request.method == 'POST':
+        form = PaymentMethodForm(request.POST, instance=payment_method)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Mode de paiement "{payment_method.name}" mis à jour.')
+            return redirect('admin_dashboard:configuration')
+    else:
+        form = PaymentMethodForm(instance=payment_method)
+
+    context = {
+        'page_title': f'Éditer {payment_method.name}',
+        'section': 'configuration',
+        'form': form,
+        'is_create': False,
+        'object': payment_method,
+    }
+
+    return render(request, 'admin_dashboard/config/payment_method_form.html', context)
+
+
+@login_required(login_url='login')
+@staff_required
+@require_http_methods(["POST"])
+def payment_method_delete(request, pk):
+    """Delete payment method"""
+    from settings_app.models import PaymentMethod
+
+    payment_method = get_object_or_404(PaymentMethod, pk=pk)
+    name = payment_method.name
+    payment_method.delete()
+    messages.success(request, f'Mode de paiement "{name}" supprimé.')
+
+    return redirect('admin_dashboard:configuration')
+
+
+@login_required(login_url='login')
+@staff_required
+def product_category_create(request):
+    """Create new product category"""
+    from admin_dashboard.forms import ProductCategoryForm
+
+    if request.method == 'POST':
+        form = ProductCategoryForm(request.POST)
+        if form.is_valid():
+            category = form.save()
+            messages.success(request, f'Catégorie "{category.name}" créée avec succès.')
+            return redirect('admin_dashboard:configuration')
+    else:
+        form = ProductCategoryForm()
+
+    context = {
+        'page_title': 'Créer Catégorie',
+        'section': 'configuration',
+        'form': form,
+        'is_create': True,
+    }
+
+    return render(request, 'admin_dashboard/config/category_form.html', context)
+
+
+@login_required(login_url='login')
+@staff_required
+def product_category_edit(request, pk):
+    """Edit product category"""
+    from admin_dashboard.forms import ProductCategoryForm
+    from settings_app.models import ProductCategory
+
+    category = get_object_or_404(ProductCategory, pk=pk)
+
+    if request.method == 'POST':
+        form = ProductCategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Catégorie "{category.name}" mise à jour.')
+            return redirect('admin_dashboard:configuration')
+    else:
+        form = ProductCategoryForm(instance=category)
+
+    context = {
+        'page_title': f'Éditer {category.name}',
+        'section': 'configuration',
+        'form': form,
+        'is_create': False,
+        'object': category,
+    }
+
+    return render(request, 'admin_dashboard/config/category_form.html', context)
+
+
+@login_required(login_url='login')
+@staff_required
+@require_http_methods(["POST"])
+def product_category_delete(request, pk):
+    """Delete product category"""
+    from settings_app.models import ProductCategory
+
+    category = get_object_or_404(ProductCategory, pk=pk)
+    name = category.name
+    category.delete()
+    messages.success(request, f'Catégorie "{name}" supprimée.')
+
+    return redirect('admin_dashboard:configuration')
+
+
+@login_required(login_url='login')
+@staff_required
+def bank_account_create(request):
+    """Create new bank account"""
+    from admin_dashboard.forms import BankAccountForm
+
+    if request.method == 'POST':
+        form = BankAccountForm(request.POST)
+        if form.is_valid():
+            account = form.save()
+            messages.success(request, f'Compte bancaire "{account.bank_name}" créé avec succès.')
+            return redirect('admin_dashboard:configuration')
+    else:
+        form = BankAccountForm()
+
+    context = {
+        'page_title': 'Créer Compte Bancaire',
+        'section': 'configuration',
+        'form': form,
+        'is_create': True,
+    }
+
+    return render(request, 'admin_dashboard/config/bank_account_form.html', context)
+
+
+@login_required(login_url='login')
+@staff_required
+def bank_account_edit(request, pk):
+    """Edit bank account"""
+    from admin_dashboard.forms import BankAccountForm
+    from settings_app.models import BankAccount
+
+    account = get_object_or_404(BankAccount, pk=pk)
+
+    if request.method == 'POST':
+        form = BankAccountForm(request.POST, instance=account)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Compte bancaire "{account.bank_name}" mis à jour.')
+            return redirect('admin_dashboard:configuration')
+    else:
+        form = BankAccountForm(instance=account)
+
+    context = {
+        'page_title': f'Éditer {account.bank_name}',
+        'section': 'configuration',
+        'form': form,
+        'is_create': False,
+        'object': account,
+    }
+
+    return render(request, 'admin_dashboard/config/bank_account_form.html', context)
+
+
+@login_required(login_url='login')
+@staff_required
+@require_http_methods(["POST"])
+def bank_account_delete(request, pk):
+    """Delete bank account"""
+    from settings_app.models import BankAccount
+
+    account = get_object_or_404(BankAccount, pk=pk)
+    name = account.bank_name
+    account.delete()
+    messages.success(request, f'Compte bancaire "{name}" supprimé.')
+
+    return redirect('admin_dashboard:configuration')
+
+
 def get_client_ip(request):
     """Get client IP address from request"""
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
