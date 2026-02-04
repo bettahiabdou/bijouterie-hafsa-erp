@@ -18,6 +18,7 @@ class Migration(migrations.Migration):
                 help_text='N° de chèque, référence virement, n° de carte, etc.',
                 max_length=100,
                 null=True,
+                unique=True,
                 verbose_name='Référence de paiement'
             ),
         ),
