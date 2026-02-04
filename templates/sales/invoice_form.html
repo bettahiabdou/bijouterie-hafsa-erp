@@ -615,8 +615,10 @@
             } else {
                 console.log('✓ Main form found:', mainForm.action);
 
+                // Handle form submission with proper event delegation
                 mainForm.addEventListener('submit', function(e) {
-                    console.log('✓ Form submit event triggered');
+                    console.log('✓✓✓ FORM SUBMIT EVENT FIRED ✓✓✓');
+                    console.log('Event:', e.type);
                     console.log('✓ Invoice items count:', invoiceItems.length);
 
                     // Add items as hidden inputs
@@ -639,8 +641,11 @@
                     console.log('✓ Form ready to submit with', invoiceItems.length, 'items');
                     console.log('✓ Form action:', mainForm.action);
                     console.log('✓ Form method:', mainForm.method);
+                    console.log('✓✓✓ ALLOWING FORM TO SUBMIT NATURALLY ✓✓✓');
                     // Don't prevent default - let the form submit naturally
-                });
+                }, false); // Use false for capture phase
+
+                console.log('✓ Submit event listener attached successfully');
             }
         });
     </script>
