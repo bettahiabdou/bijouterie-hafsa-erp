@@ -234,17 +234,33 @@ def user_deactivate(request, user_id):
 def system_configuration(request):
     """System Configuration - Manage all system settings"""
 
+    # Get querysets for display
+    metal_types_qs = MetalType.objects.all()
+    metal_purities_qs = MetalPurity.objects.all()
+    product_categories_qs = ProductCategory.objects.all()
+    stone_types_qs = StoneType.objects.all()
+    payment_methods_qs = PaymentMethod.objects.all()
+    bank_accounts_qs = BankAccount.objects.all()
+
     context = {
         'page_title': 'Configuration Système',
         'section': 'configuration',
 
-        # Settings
-        'metal_types': MetalType.objects.all(),
-        'metal_purities': MetalPurity.objects.all(),
-        'product_categories': ProductCategory.objects.all(),
-        'stone_types': StoneType.objects.all(),
-        'payment_methods': PaymentMethod.objects.all(),
-        'bank_accounts': BankAccount.objects.all(),
+        # Counts for display in cards
+        'metal_types_count': metal_types_qs.count(),
+        'metal_purities_count': metal_purities_qs.count(),
+        'product_categories_count': product_categories_qs.count(),
+        'stone_types_count': stone_types_qs.count(),
+        'payment_methods_count': payment_methods_qs.count(),
+        'bank_accounts_count': bank_accounts_qs.count(),
+
+        # QuerySets for detailed lists
+        'metal_types': metal_types_qs,
+        'metal_purities': metal_purities_qs,
+        'product_categories': product_categories_qs,
+        'stone_types': stone_types_qs,
+        'payment_methods': payment_methods_qs,
+        'bank_accounts': bank_accounts_qs,
     }
 
     return render(request, 'admin_dashboard/configuration.html', context)
