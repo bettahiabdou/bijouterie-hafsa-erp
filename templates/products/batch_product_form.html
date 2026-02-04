@@ -22,9 +22,9 @@
 {% endblock %}
 
 {% block content %}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="batch-form-container">
         <!-- Main Form -->
-        <div class="lg:col-span-2">
+        <div class="batch-form-wrapper">
             <form method="post" class="bg-white rounded-lg shadow-md p-6">
                 {% csrf_token %}
 
@@ -36,159 +36,161 @@
                     {% endfor %}
                 {% endif %}
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
                     <!-- Common Parameters (Only truly shared fields) -->
-                    <div class="lg:col-span-2">
+                    <div class="batch-form-section">
                         <h2 class="text-lg font-bold text-gray-900 mb-4">Paramètres Communs</h2>
-                        <p class="text-sm text-gray-600 mb-4">Ces paramètres s'appliquent à tous les produits du lot. Les champs spécifiques à chaque produit (Catégorie, Type, Métal, Pureté, Compte) seront remplis dans le tableau ci-dessous.</p>
-                    </div>
+                        <p class="text-sm text-gray-600 mb-6">Ces paramètres s'appliquent à tous les produits du lot. Les champs spécifiques à chaque produit (Catégorie, Type, Métal, Pureté, Compte) seront remplis dans le tableau ci-dessous.</p>
 
-                    <!-- Pricing -->
-                    <div class="lg:col-span-2">
-                        <h3 class="text-base font-bold text-gray-900 mb-3">Prix Unitaire (par gramme)</h3>
-                    </div>
+                        <!-- Pricing Section -->
+                        <h3 class="text-base font-bold text-gray-900 mb-4">Prix Unitaire (par gramme)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Prix d'Achat/g (DH) *</label>
+                                <input type="number" id="purchase_price_per_gram" name="purchase_price_per_gram" value="0"
+                                    step="0.01" min="0" required onchange="calculatePreview()"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Prix d'Achat/g (DH) *</label>
-                        <input type="number" id="purchase_price_per_gram" name="purchase_price_per_gram" value="0"
-                            step="0.01" min="0" required onchange="calculatePreview()"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Main d'Œuvre (DH)</label>
+                                <input type="number" id="labor_cost" name="labor_cost" value="0"
+                                    step="0.01" min="0" onchange="calculatePreview()"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Main d'Œuvre (DH)</label>
-                        <input type="number" id="labor_cost" name="labor_cost" value="0"
-                            step="0.01" min="0" onchange="calculatePreview()"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Pierres (DH)</label>
+                                <input type="number" id="stone_cost" name="stone_cost" value="0"
+                                    step="0.01" min="0" onchange="calculatePreview()"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Pierres (DH)</label>
-                        <input type="number" id="stone_cost" name="stone_cost" value="0"
-                            step="0.01" min="0" onchange="calculatePreview()"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Autres Coûts (DH)</label>
-                        <input type="number" id="other_cost" name="other_cost" value="0"
-                            step="0.01" min="0" onchange="calculatePreview()"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <!-- Margin Settings -->
-                    <div class="lg:col-span-2">
-                        <h2 class="text-lg font-bold text-gray-900 mb-4">Marge sur Prix de Vente</h2>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Type de Marge</label>
-                        <select id="margin_type_batch" name="margin_type" onchange="calculatePreview()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="percentage" selected>Pourcentage (%)</option>
-                            <option value="fixed">Montant Fixe (DH)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Valeur de Marge</label>
-                        <div class="flex items-center gap-2">
-                            <input type="number" id="margin_value_batch" name="margin_value" value="25"
-                                step="0.01" min="0" onchange="calculatePreview()"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <span id="margin_unit_batch" class="text-gray-600 font-medium whitespace-nowrap">%</span>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Autres Coûts (DH)</label>
+                                <input type="number" id="other_cost" name="other_cost" value="0"
+                                    step="0.01" min="0" onchange="calculatePreview()"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">Marge à appliquer au coût total de chaque produit</p>
-                    </div>
 
-                    <!-- Products List -->
-                    <div class="lg:col-span-2">
-                        <h2 class="text-lg font-bold text-gray-900 mb-4">Produits à Créer</h2>
-                        <p class="text-sm text-gray-600 mb-3">Remplissez le tableau ci-dessous avec les produits. Les poids et coûts seront calculés automatiquement. Chaque produit recevra une référence unique générée automatiquement.</p>
+                        <!-- Margin Settings -->
+                        <h3 class="text-base font-bold text-gray-900 mb-4">Marge sur Prix de Vente</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Type de Marge</label>
+                                <select id="margin_type_batch" name="margin_type" onchange="calculatePreview()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="percentage" selected>Pourcentage (%)</option>
+                                    <option value="fixed">Montant Fixe (DH)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Valeur de Marge</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="margin_value_batch" name="margin_value" value="25"
+                                        step="0.01" min="0" onchange="calculatePreview()"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <span id="margin_unit_batch" class="text-gray-600 font-medium whitespace-nowrap">%</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Marge à appliquer au coût total de chaque produit</p>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Dynamic Product Entry - Table Format -->
-                    <div class="lg:col-span-2">
+                    <div class="batch-form-section">
                         <h2 class="text-lg font-bold text-gray-900 mb-4">Produits à Créer</h2>
-                        <p class="text-sm text-gray-600 mb-3">Chaque produit peut avoir des paramètres différents (Catégorie, Type, Métal, Pureté, Compte Bancaire).</p>
+                        <p class="text-sm text-gray-600 mb-4">Remplissez le tableau ci-dessous avec les produits. Cliquez sur le ▼ pour voir et modifier les détails supplémentaires (Métal, Pureté, Compte, Coût). Chaque produit recevra une référence unique générée automatiquement.</p>
 
                         <div class="overflow-x-auto">
-                            <table class="w-full border-collapse border border-gray-300 rounded-lg">
-                                <thead class="bg-gray-100 sticky top-0">
-                                    <tr class="text-xs md:text-sm">
-                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Produit</th>
-                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Catégorie *</th>
-                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Type *</th>
-                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Métal</th>
-                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Pureté</th>
-                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Poids Net (g) *</th>
-                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Coût (DH)</th>
-                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Prix Vente (DH)</th>
-                                        <th class="border border-gray-300 px-2 py-2 text-left font-bold text-gray-900">Compte</th>
-                                        <th class="border border-gray-300 px-2 py-2 text-center font-bold text-gray-900">Action</th>
+                            <table class="batch-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 30px;"></th>
+                                        <th>Produit</th>
+                                        <th>Catégorie *</th>
+                                        <th>Type *</th>
+                                        <th>Poids Net (g) *</th>
+                                        <th>Prix Vente (DH)</th>
+                                        <th style="width: 50px;">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody id="products_list">
                                     <!-- Template row (will be cloned for new rows) -->
-                                    <tr class="product_item hover:bg-gray-50 text-xs md:text-sm">
-                                        <td class="border border-gray-300 px-2 py-2">
-                                            <input type="text" name="product_name" class="product_name w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    <tr class="product_item">
+                                        <td>
+                                            <button type="button" class="expand-toggle" title="Afficher détails">▼</button>
+                                        </td>
+                                        <td>
+                                            <input type="text" name="product_name" class="product_name w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                                                 placeholder="Produit 1" onchange="calculatePreview()">
                                         </td>
-                                        <td class="border border-gray-300 px-2 py-2">
-                                            <select name="product_category" class="product_category w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" required>
+                                        <td>
+                                            <select name="product_category" class="product_category w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required>
                                                 <option value="">--Sélect--</option>
                                                 {% for category in categories %}
                                                     <option value="{{ category.id }}">{{ category.name }}</option>
                                                 {% endfor %}
                                             </select>
                                         </td>
-                                        <td class="border border-gray-300 px-2 py-2">
-                                            <select name="product_type" class="product_type w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" required>
+                                        <td>
+                                            <select name="product_type" class="product_type w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required>
                                                 {% for value, label in product_types %}
                                                     <option value="{{ value }}" {% if value == 'finished' %}selected{% endif %}>{{ label }}</option>
                                                 {% endfor %}
                                             </select>
                                         </td>
-                                        <td class="border border-gray-300 px-2 py-2">
-                                            <select name="product_metal_type" class="product_metal_type w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400">
-                                                <option value="">--Aucun--</option>
-                                                {% for metal in metals %}
-                                                    <option value="{{ metal.id }}">{{ metal.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </td>
-                                        <td class="border border-gray-300 px-2 py-2">
-                                            <select name="product_purity" class="product_purity w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400">
-                                                <option value="">--Aucune--</option>
-                                                {% for purity in purities %}
-                                                    <option value="{{ purity.id }}">{{ purity.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </td>
-                                        <td class="border border-gray-300 px-2 py-2">
-                                            <input type="number" name="product_weight" class="product_weight w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                        <td>
+                                            <input type="number" name="product_weight" class="product_weight w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                                                 step="0.001" min="0" required onchange="calculatePreview()">
                                         </td>
-                                        <td class="border border-gray-300 px-2 py-2">
-                                            <input type="number" name="product_total_cost" class="product_total_cost w-full px-2 py-1 bg-green-50 border border-green-300 rounded text-xs text-green-700 font-semibold"
-                                                step="0.01" min="0" readonly>
-                                        </td>
-                                        <td class="border border-gray-300 px-2 py-2">
-                                            <input type="number" name="product_selling_price" class="product_selling_price w-full px-2 py-1 bg-orange-50 border border-orange-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                        <td>
+                                            <input type="number" name="product_selling_price" class="product_selling_price w-full px-2 py-1 bg-orange-50 border border-orange-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                                                 step="0.01" min="0" onchange="calculatePreview()" placeholder="Auto">
                                         </td>
-                                        <td class="border border-gray-300 px-2 py-2">
-                                            <select name="product_bank_account" class="product_bank_account w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400">
-                                                <option value="">--Aucun--</option>
-                                                {% for bank in bank_accounts %}
-                                                    <option value="{{ bank.id }}">{{ bank.bank_name|truncatechars:15 }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </td>
-                                        <td class="border border-gray-300 px-2 py-2 text-center">
-                                            <button type="button" class="px-1 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs remove_product" style="display:none;" title="Supprimer">
+                                        <td style="text-align: center;">
+                                            <button type="button" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm remove_product" style="display:none;" title="Supprimer">
                                                 <i class="fas fa-trash"></i>
                                             </button>
+                                        </td>
+                                    </tr>
+                                    <!-- Detail row template (hidden by default) -->
+                                    <tr class="detail-row" style="display: none;">
+                                        <td colspan="7">
+                                            <div class="detail-content">
+                                                <div class="detail-field">
+                                                    <label>Métal</label>
+                                                    <select name="product_metal_type" class="product_metal_type">
+                                                        <option value="">--Aucun--</option>
+                                                        {% for metal in metals %}
+                                                            <option value="{{ metal.id }}">{{ metal.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="detail-field">
+                                                    <label>Pureté</label>
+                                                    <select name="product_purity" class="product_purity">
+                                                        <option value="">--Aucune--</option>
+                                                        {% for purity in purities %}
+                                                            <option value="{{ purity.id }}">{{ purity.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="detail-field">
+                                                    <label>Compte Bancaire</label>
+                                                    <select name="product_bank_account" class="product_bank_account">
+                                                        <option value="">--Aucun--</option>
+                                                        {% for bank in bank_accounts %}
+                                                            <option value="{{ bank.id }}">{{ bank.bank_name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="detail-field">
+                                                    <label>Coût Total (DH)</label>
+                                                    <input type="number" name="product_total_cost" class="product_total_cost" step="0.01" min="0" readonly style="background-color: #ecfdf5; color: #065f46;">
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -201,7 +203,7 @@
                     </div>
 
                     <!-- Summary -->
-                    <div class="lg:col-span-2 mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div class="batch-form-section mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                         <h3 class="font-bold text-blue-900 mb-2">Résumé</h3>
                         <p class="text-sm text-blue-800">
                             <strong id="total_products">1</strong> produit(s) à créer
@@ -213,7 +215,7 @@
                 </div>
 
                 <!-- Form Actions -->
-                <div class="mt-8 flex gap-4">
+                <div class="mt-8 flex gap-4 justify-start">
                     <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center">
                         <i class="fas fa-save mr-2"></i> Créer les Produits
                     </button>
@@ -223,58 +225,213 @@
                 </div>
             </form>
         </div>
+    </div>
 
-        <!-- Info Panel -->
-        <div class="lg:col-span-1">
-            <div class="bg-white rounded-lg shadow-md p-6 sticky top-24">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Aide</h3>
-                <div class="space-y-4 text-sm text-gray-600">
+    <!-- Help Section (Below Form) -->
+    <div class="batch-form-container mt-6">
+        <div class="batch-form-wrapper">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Aide et Conseils</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-600">
                     <div>
-                        <h4 class="font-bold text-gray-900 mb-1">Paramètres Communs</h4>
+                        <h4 class="font-bold text-gray-900 mb-2">Paramètres Communs</h4>
                         <p>Les paramètres communs s'appliquent à tous les produits de ce lot.</p>
                     </div>
                     <div>
-                        <h4 class="font-bold text-gray-900 mb-1">Coût Automatique</h4>
+                        <h4 class="font-bold text-gray-900 mb-2">Coût Automatique</h4>
                         <p>Le coût total de chaque produit = (Poids × Prix/g) + Main d'œuvre + Pierres + Autres</p>
                     </div>
                     <div>
-                        <h4 class="font-bold text-gray-900 mb-1">Exemple</h4>
+                        <h4 class="font-bold text-gray-900 mb-2">Exemple</h4>
                         <p>Si poids=10g, prix/g=800 DH, main d'œuvre=100 DH:</p>
                         <p class="font-mono text-blue-600">(10 × 800) + 100 = 8100 DH</p>
                     </div>
-                    <div class="pt-4 border-t">
-                        <p class="text-xs text-gray-500">
-                            💡 Vous pouvez modifier le prix de vente pour chaque produit individuellement.
-                        </p>
+                    <div>
+                        <h4 class="font-bold text-gray-900 mb-2">💡 Prix de Vente</h4>
+                        <p>Vous pouvez modifier le prix de vente pour chaque produit individuellement en cliquant sur le détail (▼) du produit.</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <style>
+        /* Centered layout container */
+        .batch-form-container {
+            display: flex;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .batch-form-wrapper {
+            width: 100%;
+            max-width: 1200px;
+            padding: 0 20px;
+        }
+
+        /* Form sections with better spacing */
+        .batch-form-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .batch-form-section:last-child {
+            border-bottom: none;
+        }
+
+        /* Table styling */
+        .batch-table {
+            width: 100%;
+            margin: 20px 0;
+            border-collapse: collapse;
+        }
+
+        .batch-table th,
+        .batch-table td {
+            padding: 12px 8px;
+            text-align: left;
+        }
+
+        .batch-table th {
+            background-color: #f3f4f6;
+            border-bottom: 2px solid #d1d5db;
+            font-weight: 600;
+        }
+
+        .batch-table td {
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .batch-table tbody tr:hover {
+            background-color: #f9fafb;
+        }
+
+        /* Detail row styling */
+        .detail-row {
+            background-color: #f9fafb;
+        }
+
+        .detail-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            background-color: #f9fafb;
+            border-radius: 4px;
+        }
+
+        .detail-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .detail-field label {
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 0.9em;
+            color: #374151;
+        }
+
+        .detail-field input,
+        .detail-field select {
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        /* Expand toggle button */
+        .expand-toggle {
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 4px 8px;
+            font-size: 0.9em;
+            color: #6b7280;
+            hover: color #111827;
+            transition: color 0.2s;
+        }
+
+        .expand-toggle:hover {
+            color: #111827;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .batch-form-wrapper {
+                padding: 0 10px;
+            }
+
+            .detail-content {
+                grid-template-columns: 1fr;
+            }
+
+            .batch-table {
+                font-size: 0.85em;
+            }
+
+            .batch-table th,
+            .batch-table td {
+                padding: 8px 4px;
+            }
+        }
+    </style>
+
     <script>
+        // Setup expand/collapse for detail rows
+        function setupExpandToggle(item) {
+            const toggleBtn = item.querySelector('.expand-toggle');
+            const mainRow = item;
+            const detailRow = mainRow.nextElementSibling;
+
+            if (toggleBtn && detailRow && detailRow.classList.contains('detail-row')) {
+                toggleBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const isHidden = detailRow.style.display === 'none';
+                    detailRow.style.display = isHidden ? 'table-row' : 'none';
+                    toggleBtn.textContent = isHidden ? '▲' : '▼';
+                });
+            }
+        }
+
         // Add product row
         document.getElementById('add_product_btn').addEventListener('click', function(e) {
             e.preventDefault();
             const productsList = document.getElementById('products_list');
-            const newItem = document.querySelector('.product_item').cloneNode(true);
+            const templateRow = document.querySelector('.product_item');
+            const newMainRow = templateRow.cloneNode(true);
+            const templateDetailRow = templateRow.nextElementSibling;
+            const newDetailRow = templateDetailRow.cloneNode(true);
 
-            // Clear values in cloned item
-            newItem.querySelectorAll('input').forEach(input => {
+            // Clear values in cloned items
+            newMainRow.querySelectorAll('input').forEach(input => {
                 input.value = '';
             });
+            newDetailRow.querySelectorAll('input').forEach(input => {
+                input.value = '';
+            });
+            newDetailRow.style.display = 'none';
 
-            // Show remove button if there's more than one item
+            // Append both rows
+            productsList.appendChild(newMainRow);
+            productsList.appendChild(newDetailRow);
+
+            // Setup event listeners
+            attachEventListeners(newMainRow);
+            setupExpandToggle(newMainRow);
             updateRemoveButtons();
-
-            productsList.appendChild(newItem);
-            attachEventListeners(newItem);
             calculatePreview();
         });
 
-        // Remove product row
+        // Remove product row (remove both main and detail rows)
         function removeProduct(btn) {
-            btn.closest('.product_item').remove();
+            const mainRow = btn.closest('.product_item');
+            const detailRow = mainRow.nextElementSibling;
+            mainRow.remove();
+            if (detailRow && detailRow.classList.contains('detail-row')) {
+                detailRow.remove();
+            }
             updateRemoveButtons();
             calculatePreview();
         }
@@ -289,10 +446,20 @@
                 });
             }
 
-            const inputs = item.querySelectorAll('input');
+            // Attach change listeners to inputs and selects
+            const inputs = item.querySelectorAll('input, select');
             inputs.forEach(input => {
                 input.addEventListener('change', calculatePreview);
             });
+
+            // Also attach to detail row fields
+            const detailRow = item.nextElementSibling;
+            if (detailRow && detailRow.classList.contains('detail-row')) {
+                const detailInputs = detailRow.querySelectorAll('input, select');
+                detailInputs.forEach(input => {
+                    input.addEventListener('change', calculatePreview);
+                });
+            }
         }
 
         // Update remove buttons visibility
@@ -333,7 +500,11 @@
                 const metalCost = weight * pricePerGram;
                 const totalCost = metalCost + laborCost + stoneCost + otherCost;
 
-                item.querySelector('.product_total_cost').value = totalCost.toFixed(2);
+                // Update total cost in detail row
+                const detailRow = item.nextElementSibling;
+                if (detailRow && detailRow.classList.contains('detail-row')) {
+                    detailRow.querySelector('.product_total_cost').value = totalCost.toFixed(2);
+                }
 
                 // Calculate selling price based on margin
                 let sellingPriceCalc;
@@ -349,11 +520,11 @@
                 // Only auto-fill if user hasn't entered an override
                 if (!finalPrice.value || finalPrice.value === '') {
                     finalPrice.value = sellingPriceCalc.toFixed(2);
-                    finalPrice.classList.remove('bg-white');
-                    finalPrice.classList.add('bg-orange-50', 'border-orange-300', 'text-orange-700');
+                    finalPrice.classList.remove('bg-white', 'border-blue-300');
+                    finalPrice.classList.add('bg-orange-50', 'border-orange-300');
                 } else {
                     // User has overridden - show white background
-                    finalPrice.classList.remove('bg-orange-50', 'border-orange-300', 'text-orange-700');
+                    finalPrice.classList.remove('bg-orange-50', 'border-orange-300');
                     finalPrice.classList.add('bg-white', 'border-blue-300');
                 }
 
@@ -380,7 +551,12 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            attachEventListeners(document.querySelector('.product_item'));
+            // Setup all product rows
+            document.querySelectorAll('.product_item').forEach(item => {
+                attachEventListeners(item);
+                setupExpandToggle(item);
+            });
+
             updateRemoveButtons();
             calculatePreview();
 
