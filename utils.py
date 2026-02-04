@@ -173,3 +173,94 @@ def generate_old_gold_reference():
     today = timezone.now().date()
     count = OldGoldPurchase.objects.filter(created_at__date=today).count() + 1
     return f'OG-{today.strftime("%Y%m%d")}-{count:04d}'
+
+
+# ============================================================================
+# CONFIGURATION MODEL CODE GENERATION FUNCTIONS
+# ============================================================================
+# These functions generate automatic codes for configuration models
+# Format: PREFIX-YYYYMMDD-#### (date-based sequential)
+
+def generate_metal_type_code():
+    """Generate a unique metal type code: MTL-YYYYMMDD-####"""
+    from settings_app.models import MetalType
+    today = timezone.now().date()
+    count = MetalType.objects.filter(created_at__date=today).count() + 1
+    return f'MTL-{today.strftime("%Y%m%d")}-{count:04d}'
+
+
+def generate_category_code():
+    """Generate a unique product category code: CAT-YYYYMMDD-####"""
+    from settings_app.models import ProductCategory
+    today = timezone.now().date()
+    count = ProductCategory.objects.filter(created_at__date=today).count() + 1
+    return f'CAT-{today.strftime("%Y%m%d")}-{count:04d}'
+
+
+def generate_stone_type_code():
+    """Generate a unique stone type code: STN-YYYYMMDD-####"""
+    from settings_app.models import StoneType
+    today = timezone.now().date()
+    count = StoneType.objects.filter(created_at__date=today).count() + 1
+    return f'STN-{today.strftime("%Y%m%d")}-{count:04d}'
+
+
+def generate_stone_clarity_code():
+    """Generate a unique stone clarity code: CLR-####"""
+    from settings_app.models import StoneClarity
+    count = StoneClarity.objects.count() + 1
+    return f'CLR-{count:04d}'
+
+
+def generate_stone_color_code():
+    """Generate a unique stone color code: COL-####"""
+    from settings_app.models import StoneColor
+    count = StoneColor.objects.count() + 1
+    return f'COL-{count:04d}'
+
+
+def generate_stone_cut_code():
+    """Generate a unique stone cut code: CUT-####"""
+    from settings_app.models import StoneCut
+    count = StoneCut.objects.count() + 1
+    return f'CUT-{count:04d}'
+
+
+def generate_payment_method_code():
+    """Generate a unique payment method code: PMT-YYYYMMDD-####"""
+    from settings_app.models import PaymentMethod
+    today = timezone.now().date()
+    count = PaymentMethod.objects.filter(created_at__date=today).count() + 1
+    return f'PMT-{today.strftime("%Y%m%d")}-{count:04d}'
+
+
+def generate_stock_location_code():
+    """Generate a unique stock location code: LOC-YYYYMMDD-####"""
+    from settings_app.models import StockLocation
+    today = timezone.now().date()
+    count = StockLocation.objects.filter(created_at__date=today).count() + 1
+    return f'LOC-{today.strftime("%Y%m%d")}-{count:04d}'
+
+
+def generate_delivery_method_code():
+    """Generate a unique delivery method code: DEL-YYYYMMDD-####"""
+    from settings_app.models import DeliveryMethod
+    today = timezone.now().date()
+    count = DeliveryMethod.objects.filter(created_at__date=today).count() + 1
+    return f'DEL-{today.strftime("%Y%m%d")}-{count:04d}'
+
+
+def generate_repair_type_code():
+    """Generate a unique repair type code: REP-YYYYMMDD-####"""
+    from settings_app.models import RepairType
+    today = timezone.now().date()
+    count = RepairType.objects.filter(created_at__date=today).count() + 1
+    return f'REP-{today.strftime("%Y%m%d")}-{count:04d}'
+
+
+def generate_certificate_issuer_code():
+    """Generate a unique certificate issuer code: CERT-YYYYMMDD-####"""
+    from settings_app.models import CertificateIssuer
+    today = timezone.now().date()
+    count = CertificateIssuer.objects.filter(created_at__date=today).count() + 1
+    return f'CERT-{today.strftime("%Y%m%d")}-{count:04d}'

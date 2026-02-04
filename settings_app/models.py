@@ -27,6 +27,13 @@ class MetalType(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_metal_type_code
+            self.code = generate_metal_type_code()
+        super().save(*args, **kwargs)
+
 
 class MetalPurity(models.Model):
     """
@@ -96,6 +103,13 @@ class ProductCategory(models.Model):
             return f"{self.parent.name} > {self.name}"
         return self.name
 
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_category_code
+            self.code = generate_category_code()
+        super().save(*args, **kwargs)
+
 
 class StoneType(models.Model):
     """
@@ -124,6 +138,13 @@ class StoneType(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_stone_type_code
+            self.code = generate_stone_type_code()
+        super().save(*args, **kwargs)
+
 
 class StoneClarity(models.Model):
     """
@@ -146,6 +167,13 @@ class StoneClarity(models.Model):
 
     def __str__(self):
         return f"{self.code} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_stone_clarity_code
+            self.code = generate_stone_clarity_code()
+        super().save(*args, **kwargs)
 
 
 class StoneColor(models.Model):
@@ -170,6 +198,13 @@ class StoneColor(models.Model):
     def __str__(self):
         return f"{self.code} - {self.name}"
 
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_stone_color_code
+            self.code = generate_stone_color_code()
+        super().save(*args, **kwargs)
+
 
 class StoneCut(models.Model):
     """
@@ -188,6 +223,13 @@ class StoneCut(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_stone_cut_code
+            self.code = generate_stone_cut_code()
+        super().save(*args, **kwargs)
 
 
 class PaymentMethod(models.Model):
@@ -217,6 +259,13 @@ class PaymentMethod(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_payment_method_code
+            self.code = generate_payment_method_code()
+        super().save(*args, **kwargs)
 
 
 class BankAccount(models.Model):
@@ -304,6 +353,13 @@ class StockLocation(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_stock_location_code
+            self.code = generate_stock_location_code()
+        super().save(*args, **kwargs)
+
 
 class DeliveryMethod(models.Model):
     """
@@ -333,6 +389,13 @@ class DeliveryMethod(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_delivery_method_code
+            self.code = generate_delivery_method_code()
+        super().save(*args, **kwargs)
 
 
 class DeliveryPerson(models.Model):
@@ -382,6 +445,13 @@ class RepairType(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_repair_type_code
+            self.code = generate_repair_type_code()
+        super().save(*args, **kwargs)
+
 
 class CertificateIssuer(models.Model):
     """
@@ -400,6 +470,13 @@ class CertificateIssuer(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_certificate_issuer_code
+            self.code = generate_certificate_issuer_code()
+        super().save(*args, **kwargs)
 
 
 class CompanySettings(models.Model):
