@@ -264,6 +264,16 @@ class Product(models.Model):
         verbose_name=_('Facture d\'achat')
     )
 
+    # Payment info
+    bank_account = models.ForeignKey(
+        'settings_app.BankAccount',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='product_purchases',
+        verbose_name=_('Compte bancaire')
+    )
+
     # Custom order
     is_custom_order = models.BooleanField(
         _('Commande sur mesure'),

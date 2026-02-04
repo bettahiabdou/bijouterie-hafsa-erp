@@ -10,6 +10,7 @@ urlpatterns = [
     # Products
     path('', views.product_list, name='list'),
     path('create/', views.product_create, name='create'),
+    path('batch-create/', views.batch_product_create, name='batch_create'),
     path('<str:reference>/', views.product_detail, name='detail'),
     path('<str:reference>/edit/', views.product_edit, name='edit'),
 

@@ -8,7 +8,7 @@ from django.db.models import Q, Count, Sum, F
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from .models import Product, ProductImage, ProductStone
-from settings_app.models import ProductCategory, MetalType, MetalPurity
+from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount
 from users.models import ActivityLog
 
 
@@ -112,6 +112,92 @@ def product_detail(request, reference):
 
 @login_required(login_url='login')
 @require_http_methods(["GET", "POST"])
+def batch_product_create(request):
+    """Create multiple products at once with shared parameters"""
+    if not request.user.is_staff:
+        messages.error(request, 'Vous n\'avez pas la permission d\'ajouter des produits.')
+        return redirect('products:list')
+
+    if request.method == 'POST':
+        try:
+            # Common parameters
+            category_id = request.POST.get('category')
+            product_type = request.POST.get('product_type', 'finished')
+            metal_type_id = request.POST.get('metal_type')
+            metal_purity_id = request.POST.get('metal_purity')
+            bank_account_id = request.POST.get('bank_account')
+
+            # Unit pricing
+            purchase_price_per_gram = float(request.POST.get('purchase_price_per_gram', 0))
+            labor_cost = float(request.POST.get('labor_cost', 0))
+            stone_cost = float(request.POST.get('stone_cost', 0))
+            other_cost = float(request.POST.get('other_cost', 0))
+
+            # Product data
+            product_weights = request.POST.getlist('product_weight')
+            product_selling_prices = request.POST.getlist('product_selling_price')
+
+            created_count = 0
+            for i, weight_str in enumerate(product_weights):
+                try:
+                    weight = float(weight_str)
+                    if weight <= 0:
+                        continue
+
+                    selling_price = float(product_selling_prices[i]) if i < len(product_selling_prices) else 0
+
+                    product = Product.objects.create(
+                        name=f"Produit Lot {i+1}",
+                        product_type=product_type,
+                        category_id=category_id,
+                        metal_type_id=metal_type_id if metal_type_id else None,
+                        metal_purity_id=metal_purity_id if metal_purity_id else None,
+                        net_weight=weight,
+                        gross_weight=weight,
+                        purchase_price_per_gram=purchase_price_per_gram,
+                        labor_cost=labor_cost,
+                        stone_cost=stone_cost,
+                        other_cost=other_cost,
+                        selling_price=selling_price,
+                        bank_account_id=bank_account_id if bank_account_id else None,
+                        status='available',
+                        created_by=request.user,
+                    )
+
+                    # Log activity
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.CREATE,
+                        model_name='Product',
+                        object_id=str(product.id),
+                        object_repr=product.reference,
+                        ip_address=get_client_ip(request)
+                    )
+
+                    created_count += 1
+
+                except (ValueError, TypeError):
+                    continue
+
+            messages.success(request, f'{created_count} produit(s) créé(s) avec succès.')
+            return redirect('products:list')
+
+        except Exception as e:
+            messages.error(request, f'Erreur lors de la création en lot: {str(e)}')
+
+    context = {
+        'categories': ProductCategory.objects.all(),
+        'metals': MetalType.objects.filter(is_active=True),
+        'purities': MetalPurity.objects.filter(is_active=True),
+        'bank_accounts': BankAccount.objects.filter(is_active=True),
+        'product_types': Product.ProductType.choices,
+    }
+
+    return render(request, 'products/batch_product_form.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["GET", "POST"])
 def product_create(request):
     """Create a new product"""
     if not request.user.is_staff:
@@ -120,6 +206,7 @@ def product_create(request):
 
     if request.method == 'POST':
         try:
+            bank_account_id = request.POST.get('bank_account')
             product = Product.objects.create(
                 reference=request.POST.get('reference'),
                 name=request.POST.get('name'),
@@ -134,6 +221,10 @@ def product_create(request):
                 purchase_price_per_gram=request.POST.get('purchase_price_per_gram', 0),
                 selling_price=request.POST.get('selling_price', 0),
                 minimum_price=request.POST.get('minimum_price', 0),
+                labor_cost=request.POST.get('labor_cost', 0),
+                stone_cost=request.POST.get('stone_cost', 0),
+                other_cost=request.POST.get('other_cost', 0),
+                bank_account_id=bank_account_id if bank_account_id else None,
                 status='available',
                 created_by=request.user,
             )
@@ -158,6 +249,7 @@ def product_create(request):
         'categories': ProductCategory.objects.all(),
         'metals': MetalType.objects.filter(is_active=True),
         'purities': MetalPurity.objects.filter(is_active=True),
+        'bank_accounts': BankAccount.objects.filter(is_active=True),
         'product_types': Product.ProductType.choices,
     }
 
@@ -184,12 +276,17 @@ def product_edit(request, reference):
             product.purchase_price_per_gram = request.POST.get('purchase_price_per_gram', product.purchase_price_per_gram)
             product.selling_price = request.POST.get('selling_price', product.selling_price)
             product.minimum_price = request.POST.get('minimum_price', product.minimum_price)
+            product.labor_cost = request.POST.get('labor_cost', product.labor_cost)
+            product.stone_cost = request.POST.get('stone_cost', product.stone_cost)
+            product.other_cost = request.POST.get('other_cost', product.other_cost)
             product.status = request.POST.get('status', product.status)
 
             if request.POST.get('metal_type'):
                 product.metal_type_id = request.POST.get('metal_type')
             if request.POST.get('metal_purity'):
                 product.metal_purity_id = request.POST.get('metal_purity')
+            if request.POST.get('bank_account'):
+                product.bank_account_id = request.POST.get('bank_account')
 
             product.save()
 
@@ -214,6 +311,7 @@ def product_edit(request, reference):
         'categories': ProductCategory.objects.all(),
         'metals': MetalType.objects.filter(is_active=True),
         'purities': MetalPurity.objects.filter(is_active=True),
+        'bank_accounts': BankAccount.objects.filter(is_active=True),
         'product_types': Product.ProductType.choices,
         'statuses': Product.Status.choices,
     }

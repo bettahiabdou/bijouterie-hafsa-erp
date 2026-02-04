@@ -127,8 +127,8 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Poids Net (g)</label>
-                <input type="number" name="net_weight" value="{% if product %}{{ product.net_weight }}{% else %}0{% endif %}"
-                    step="0.001" min="0"
+                <input type="number" id="net_weight" name="net_weight" value="{% if product %}{{ product.net_weight }}{% else %}0{% endif %}"
+                    step="0.001" min="0" onchange="calculateCosts()"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
 
@@ -137,17 +137,46 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Prix d'Achat/g (DH) *</label>
-                <input type="number" name="purchase_price_per_gram" value="{% if product %}{{ product.purchase_price_per_gram }}{% else %}0{% endif %}"
-                    step="0.01" min="0" required
+                <input type="number" id="purchase_price_per_gram" name="purchase_price_per_gram" value="{% if product %}{{ product.purchase_price_per_gram }}{% else %}0{% endif %}"
+                    step="0.01" min="0" required onchange="calculateCosts()"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Coût Total (DH)</label>
-                <input type="number" name="total_cost" value="{% if product %}{{ product.total_cost }}{% else %}0{% endif %}"
+                <label class="block text-sm font-medium text-gray-700 mb-2">Coût du Métal (DH)</label>
+                <input type="number" id="metal_cost" name="metal_cost" value="{% if product %}{{ product.metal_cost }}{% else %}0{% endif %}"
                     step="0.01" min="0" readonly
-                    class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg">
-                <p class="text-xs text-gray-500 mt-1">Calculé automatiquement</p>
+                    class="w-full px-4 py-2 bg-blue-50 border border-blue-300 rounded-lg text-blue-700 font-semibold">
+                <p class="text-xs text-gray-500 mt-1">Calculé = Poids Net × Prix/g</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Main d'Œuvre (DH)</label>
+                <input type="number" id="labor_cost" name="labor_cost" value="{% if product %}{{ product.labor_cost }}{% else %}0{% endif %}"
+                    step="0.01" min="0" onchange="calculateCosts()"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Coût des Pierres (DH)</label>
+                <input type="number" id="stone_cost" name="stone_cost" value="{% if product %}{{ product.stone_cost }}{% else %}0{% endif %}"
+                    step="0.01" min="0" onchange="calculateCosts()"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Autres Coûts (DH)</label>
+                <input type="number" id="other_cost" name="other_cost" value="{% if product %}{{ product.other_cost }}{% else %}0{% endif %}"
+                    step="0.01" min="0" onchange="calculateCosts()"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Coût Total (DH)</label>
+                <input type="number" id="total_cost" name="total_cost" value="{% if product %}{{ product.total_cost }}{% else %}0{% endif %}"
+                    step="0.01" min="0" readonly
+                    class="w-full px-4 py-2 bg-green-50 border border-green-300 rounded-lg text-green-700 font-bold text-lg">
+                <p class="text-xs text-gray-500 mt-1">Calculé automatiquement = Coût Métal + Main d'œuvre + Pierres + Autres</p>
             </div>
 
             <div>
@@ -162,6 +191,25 @@
                 <input type="number" name="minimum_price" value="{% if product %}{{ product.minimum_price }}{% else %}0{% endif %}"
                     step="0.01" min="0"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Bank Account -->
+            <div class="lg:col-span-2">
+                <h2 class="text-lg font-bold text-gray-900 mb-4">Paiement</h2>
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Compte Bancaire</label>
+                <select name="bank_account" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Sélectionner un compte</option>
+                    {% load static %}
+                    {% for bank_account in bank_accounts %}
+                        <option value="{{ bank_account.id }}" {% if product.bank_account_id == bank_account.id %}selected{% endif %}>
+                            {{ bank_account.bank_name }} - {{ bank_account.account_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Compte à partir duquel ce produit a été acheté</p>
             </div>
 
             <!-- Status (if editing) -->
@@ -191,4 +239,28 @@
             </a>
         </div>
     </form>
+
+    <script>
+        // Auto-calculate costs when form values change
+        function calculateCosts() {
+            const netWeight = parseFloat(document.getElementById('net_weight').value) || 0;
+            const pricePerGram = parseFloat(document.getElementById('purchase_price_per_gram').value) || 0;
+            const laborCost = parseFloat(document.getElementById('labor_cost').value) || 0;
+            const stoneCost = parseFloat(document.getElementById('stone_cost').value) || 0;
+            const otherCost = parseFloat(document.getElementById('other_cost').value) || 0;
+
+            // Calculate metal cost
+            const metalCost = netWeight * pricePerGram;
+            document.getElementById('metal_cost').value = metalCost.toFixed(2);
+
+            // Calculate total cost
+            const totalCost = metalCost + laborCost + stoneCost + otherCost;
+            document.getElementById('total_cost').value = totalCost.toFixed(2);
+        }
+
+        // Calculate costs on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            calculateCosts();
+        });
+    </script>
 {% endblock %}
