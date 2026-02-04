@@ -101,8 +101,8 @@ class SaleInvoiceForm(forms.ModelForm):
         if tax_rate and (tax_rate < 0 or tax_rate > 100):
             raise ValidationError('Le taux TVA doit être entre 0 et 100%.')
 
-        # Validate client credit limit
-        if client and client.is_over_credit_limit():
+        # Validate client credit limit (is_over_credit_limit is a property, not a method)
+        if client and client.is_over_credit_limit:
             raise ValidationError(
                 f'Le client {client.full_name} a dépassé sa limite de crédit.'
             )
