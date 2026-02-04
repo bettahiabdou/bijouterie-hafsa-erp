@@ -166,6 +166,7 @@ class SaleInvoice(models.Model):
         max_length=100,
         null=True,
         blank=True,
+        unique=True,
         help_text=_('N° de chèque, référence virement, n° de carte, etc.')
     )
 
