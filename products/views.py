@@ -210,7 +210,7 @@ def product_create(request):
     """Create a new product"""
     if not request.user.is_staff:
         messages.error(request, 'Vous n\'avez pas la permission d\'ajouter des produits.')
-        return redirect('product_list')
+        return redirect('products:list')
 
     if request.method == 'POST':
         try:
@@ -276,7 +276,7 @@ def product_create(request):
             )
 
             messages.success(request, f'Produit "{product.name}" créé avec succès.')
-            return redirect('product_detail', reference=product.reference)
+            return redirect('products:detail', reference=product.reference)
 
         except Exception as e:
             import logging
@@ -303,7 +303,7 @@ def product_edit(request, reference):
 
     if not request.user.is_staff:
         messages.error(request, 'Vous n\'avez pas la permission de modifier les produits.')
-        return redirect('product_detail', reference=reference)
+        return redirect('products:detail', reference=reference)
 
     if request.method == 'POST':
         try:
@@ -341,7 +341,7 @@ def product_edit(request, reference):
             )
 
             messages.success(request, f'Produit "{product.name}" modifié avec succès.')
-            return redirect('product_detail', reference=product.reference)
+            return redirect('products:detail', reference=product.reference)
 
         except Exception as e:
             messages.error(request, f'Erreur lors de la modification: {str(e)}')
