@@ -203,54 +203,65 @@ class ConfigurationRegistry:
 def generate_model_form(model, fields):
     """
     Dynamically generate a ModelForm for a given model with proper styling.
+    Uses proper Django widget instances instead of dictionaries.
     """
-    attrs = {
+    from django import forms
+
+    base_attrs = {
         'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-        'placeholder': 'Enter value'
     }
 
     widgets = {}
     for field_name in fields:
         try:
             field = model._meta.get_field(field_name)
+
+            # Boolean/Checkbox fields
             if field_name in ['is_active', 'is_default', 'is_precious', 'requires_certificate',
                              'requires_reference', 'requires_bank_account', 'is_internal', 'is_secure']:
-                widgets[field_name] = {'class': 'w-4 h-4 rounded'}
+                widgets[field_name] = forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded'})
+
+            # Choice fields (Select dropdowns)
             elif hasattr(field, 'choices') and field.choices:
-                widgets[field_name] = {
-                    'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500'
-                }
+                widgets[field_name] = forms.Select(attrs=base_attrs)
+
+            # DateTime fields
             elif field.get_internal_type() == 'DateTimeField':
-                widgets[field_name] = {
-                    'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                    'type': 'datetime-local'
-                }
+                widgets[field_name] = forms.DateTimeInput(
+                    attrs={**base_attrs, 'type': 'datetime-local'},
+                    format='%Y-%m-%dT%H:%M'
+                )
+
+            # Date fields
             elif field.get_internal_type() == 'DateField':
-                widgets[field_name] = {
-                    'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                    'type': 'date'
-                }
+                widgets[field_name] = forms.DateInput(
+                    attrs={**base_attrs, 'type': 'date'},
+                    format='%Y-%m-%d'
+                )
+
+            # Integer fields
             elif field.get_internal_type() == 'IntegerField':
-                widgets[field_name] = {
-                    'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                    'type': 'number'
-                }
+                widgets[field_name] = forms.NumberInput(attrs={**base_attrs, 'type': 'number'})
+
+            # Decimal/Float fields
             elif field.get_internal_type() == 'DecimalField':
-                widgets[field_name] = {
-                    'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                    'type': 'number',
-                    'step': '0.01'
-                }
-            elif field.get_internal_type() in ['TextField', 'CharField']:
-                if field.get_internal_type() == 'TextField':
-                    widgets[field_name] = {
-                        'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                        'rows': '3'
-                    }
-                else:
-                    widgets[field_name] = attrs
-        except:
-            widgets[field_name] = attrs
+                widgets[field_name] = forms.NumberInput(
+                    attrs={**base_attrs, 'type': 'number', 'step': '0.01'}
+                )
+
+            # Text areas (large text)
+            elif field.get_internal_type() == 'TextField':
+                widgets[field_name] = forms.Textarea(
+                    attrs={**base_attrs, 'rows': '3'}
+                )
+
+            # Default: Text input
+            else:
+                widgets[field_name] = forms.TextInput(attrs=base_attrs)
+
+        except Exception:
+            # Fallback to TextInput for any unhandled field types
+            widgets[field_name] = forms.TextInput(attrs=base_attrs)
 
     class_name = f'{model.__name__}DynamicForm'
     return type(class_name, (ModelForm,), {
