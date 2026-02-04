@@ -529,6 +529,7 @@ def bulk_invoice_create(request):
             payment_references = request.POST.getlist('payment_reference')
             amount_paids = request.POST.getlist('amount_paid')
             bank_accounts = request.POST.getlist('bank_account')
+            discount_amounts = request.POST.getlist('discount_amount')
 
             created_count = 0
             failed_rows = []
@@ -568,6 +569,19 @@ def bulk_invoice_create(request):
                     # Calculate subtotal (both Decimal now, so multiplication works)
                     subtotal = selling_price * quantity
 
+                    # Get discount amount if provided
+                    discount_amount = Decimal(0)
+                    if i < len(discount_amounts) and discount_amounts[i].strip():
+                        try:
+                            discount_amount = Decimal(discount_amounts[i])
+                            if discount_amount < 0:
+                                discount_amount = Decimal(0)
+                        except (ValueError, InvalidOperation):
+                            discount_amount = Decimal(0)
+
+                    # Calculate total after discount
+                    total_amount = subtotal - discount_amount
+
                     # Create invoice
                     invoice = SaleInvoice.objects.create(
                         reference=reference,
@@ -576,7 +590,8 @@ def bulk_invoice_create(request):
                         seller=request.user,
                         status=SaleInvoice.Status.UNPAID,
                         subtotal=subtotal,
-                        total_amount=subtotal,
+                        discount_amount=discount_amount,
+                        total_amount=total_amount,
                         amount_paid=Decimal(0),
                     )
 
@@ -586,6 +601,7 @@ def bulk_invoice_create(request):
                         product=product,
                         quantity=quantity,
                         unit_price=selling_price,
+                        discount_amount=discount_amount,
                     )
 
                     # Handle payment method & reference if provided
