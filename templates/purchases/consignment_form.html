@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Créer Consignation - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span>/</span>
+    <a href="{% url 'purchases:consignment_list' %}">Consignations</a>
+    <span>/</span>
+    <span>Nouvelle</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-gray-900">Créer Consignation</h1>
+        <a href="{% url 'purchases:consignment_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+            <i class="fas fa-arrow-left mr-2"></i> Annuler
+        </a>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <form method="post" class="bg-white rounded-lg shadow-md p-6">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Fournisseur *</label>
+                <select name="supplier" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Sélectionner un fournisseur</option>
+                    {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Commission (%)</label>
+                <input type="number" name="commission_percent" value="0" step="0.01" min="0" max="100"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Date de Réception *</label>
+                <input type="date" name="date_received" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Date Limite de Retour</label>
+                <input type="date" name="return_deadline" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <textarea name="notes" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+        </div>
+
+        <div class="mt-8 flex gap-4">
+            <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">
+                <i class="fas fa-save mr-2"></i> Créer
+            </button>
+            <a href="{% url 'purchases:consignment_list' %}" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg">
+                Annuler
+            </a>
+        </div>
+    </form>
+{% endblock %}

@@ -27,7 +27,7 @@ def login_view(request):
             # Log activity
             ActivityLog.objects.create(
                 user=user,
-                action=ActivityLog.ActionType.LOGIN,
+                action='login',
                 ip_address=get_client_ip(request)
             )
 
@@ -48,7 +48,7 @@ def logout_view(request):
     # Log activity
     ActivityLog.objects.create(
         user=user,
-        action=ActivityLog.ActionType.LOGOUT,
+        action='logout',
         ip_address=get_client_ip(request)
     )
 

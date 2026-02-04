@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Tableau de Bord Réparations - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span>/</span>
+    <a href="{% url 'repairs:repair_list' %}">Réparations</a>
+    <span>/</span>
+    <span>Tableau de Bord</span>
+{% endblock %}
+
+{% block page_header %}
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Tableau de Bord Réparations</h1>
+        <p class="text-gray-600 mt-1">Vue d'ensemble des réparations en cours</p>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+            <p class="text-gray-600 text-sm font-medium">Total Réparations</p>
+            <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.total }}</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
+            <p class="text-gray-600 text-sm font-medium">En Cours</p>
+            <p class="text-3xl font-bold text-yellow-600 mt-2">{{ stats.in_progress }}</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
+            <p class="text-gray-600 text-sm font-medium">Terminées</p>
+            <p class="text-3xl font-bold text-green-600 mt-2">{{ stats.completed }}</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
+            <p class="text-gray-600 text-sm font-medium">En Retard</p>
+            <p class="text-3xl font-bold text-red-600 mt-2">{{ stats.overdue }}</p>
+        </div>
+    </div>
+
+    <!-- Financial Summary -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Sommaire Financier</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Coût Total:</span>
+                    <span class="font-bold text-gray-900">{{ stats.total_cost|floatformat:0 }} DH</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Coût Moyen:</span>
+                    <span class="font-bold text-gray-900">{{ stats.avg_cost|floatformat:0 }} DH</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Distribution par Statut</h3>
+            <div class="space-y-2">
+                <div class="flex justify-between text-sm">
+                    <span>Reçues: {{ stats.received }}</span>
+                    <span>Évaluées: {{ stats.assessing }}</span>
+                    <span>Approuvées: {{ stats.approved }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span>Livrées: {{ stats.delivered }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- By Type and Priority -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Top 10 Types de Réparation</h3>
+            <div class="space-y-2">
+                {% for item in by_type %}
+                    <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                        <span class="text-gray-700">{{ item.repair_type__name }}</span>
+                        <div class="text-right">
+                            <p class="font-bold text-gray-900">{{ item.count }} pcs</p>
+                            <p class="text-xs text-gray-600">{{ item.total_cost|floatformat:0 }} DH</p>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="text-gray-500 text-center py-4">Aucune donnée</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Distribution par Priorité</h3>
+            <div class="space-y-3">
+                {% for item in by_priority %}
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-700 flex-1">
+                            {% if item.priority == 'low' %}
+                                <span class="inline-block px-2 py-1 rounded text-xs bg-green-100 text-green-800">Faible</span>
+                            {% elif item.priority == 'medium' %}
+                                <span class="inline-block px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-800">Moyen</span>
+                            {% elif item.priority == 'high' %}
+                                <span class="inline-block px-2 py-1 rounded text-xs bg-orange-100 text-orange-800">Élevé</span>
+                            {% elif item.priority == 'urgent' %}
+                                <span class="inline-block px-2 py-1 rounded text-xs bg-red-100 text-red-800">Urgent</span>
+                            {% endif %}
+                        </span>
+                        <p class="font-bold text-gray-900">{{ item.count }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent and Overdue -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Réparations Récentes</h3>
+            <div class="space-y-2">
+                {% for repair in recent_repairs %}
+                    <a href="{% url 'repairs:repair_detail' repair.reference %}" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded">
+                        <div>
+                            <p class="font-bold text-blue-600">{{ repair.reference }}</p>
+                            <p class="text-xs text-gray-600">{{ repair.client.first_name }} {{ repair.client.last_name }}</p>
+                        </div>
+                        <span class="text-xs font-medium text-gray-600">{{ repair.received_date|date:"d/m" }}</span>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4 text-red-600">⚠️ Réparations en Retard</h3>
+            <div class="space-y-2">
+                {% for repair in overdue_repairs %}
+                    <a href="{% url 'repairs:repair_detail' repair.reference %}" class="flex items-center justify-between p-3 bg-red-50 hover:bg-red-100 rounded">
+                        <div>
+                            <p class="font-bold text-red-600">{{ repair.reference }}</p>
+                            <p class="text-xs text-gray-600">{{ repair.repair_type.name }}</p>
+                        </div>
+                        <span class="text-xs font-bold text-red-600">{{ repair.estimated_completion_date|date:"d/m" }}</span>
+                    </a>
+                {% empty %}
+                    <p class="text-gray-500 text-center py-4">Aucune réparation en retard</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

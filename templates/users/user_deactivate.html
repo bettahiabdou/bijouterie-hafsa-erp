@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block title %}Désactiver Utilisateur - Bijouterie Hafsa ERP{% endblock %}
+{% block breadcrumb %}<span>/</span><a href="{% url 'users:user_list' %}">Utilisateurs</a><span>/</span><span>Désactiver</span>{% endblock %}
+{% block page_header %}<h1 class="text-3xl font-bold text-gray-900">Désactiver Utilisateur</h1>{% endblock %}
+{% block content %}<div class="bg-red-50 border border-red-200 rounded-lg p-6 max-w-2xl"><p class="text-red-800 mb-4">Êtes-vous sûr de vouloir désactiver <strong>{{ user.get_full_name }}</strong> ?</p><p class="text-red-700 text-sm mb-6">Cet utilisateur ne sera plus en mesure de se connecter à l'application.</p><form method="post" class="flex gap-4"><button type="submit" class="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg"><i class="fas fa-check mr-2"></i> Désactiver</button><a href="{% url 'users:user_list' %}" class="px-6 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold rounded-lg">Annuler</a></form></div>{% endblock %}

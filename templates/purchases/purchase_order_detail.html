@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ order.reference }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span>/</span>
+    <a href="{% url 'purchases:purchase_order_list' %}">Bons de Commande</a>
+    <span>/</span>
+    <span>{{ order.reference }}</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">{{ order.reference }}</h1>
+            <p class="text-gray-600 mt-1">{{ order.date|date:"d F Y" }}</p>
+        </div>
+        <div class="space-x-2">
+            <a href="{% url 'purchases:purchase_order_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                <i class="fas fa-arrow-left mr-2"></i> Retour
+            </a>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Supplier Info -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-lg font-bold text-gray-900 mb-4">Informations Fournisseur</h2>
+                <div class="space-y-2">
+                    <p class="text-gray-900 font-bold text-lg">{{ order.supplier.name }}</p>
+                    <p class="text-gray-600">{{ order.supplier.email }}</p>
+                    <p class="text-gray-600">{{ order.supplier.phone }}</p>
+                    <p class="text-gray-600">{{ order.supplier.address }}, {{ order.supplier.city }}</p>
+                </div>
+            </div>
+
+            <!-- Items Table -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-lg font-bold text-gray-900 mb-4">Articles</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-2 text-left">Description</th>
+                                <th class="px-4 py-2 text-right">Quantité</th>
+                                <th class="px-4 py-2 text-right">Prix Estimé/g</th>
+                                <th class="px-4 py-2 text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            {% for item in items %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-2">{{ item.description }}</td>
+                                    <td class="px-4 py-2 text-right">{{ item.quantity }}</td>
+                                    <td class="px-4 py-2 text-right">{{ item.estimated_price_per_gram }} DH</td>
+                                    <td class="px-4 py-2 text-right font-bold">{{ item.total_amount }} DH</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Status -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Statut</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Statut:</span>
+                        <span class="inline-block px-3 py-1 rounded-full text-sm font-medium
+                            {% if order.status == 'draft' %}bg-gray-100 text-gray-800
+                            {% elif order.status == 'pending' %}bg-yellow-100 text-yellow-800
+                            {% elif order.status == 'approved' %}bg-green-100 text-green-800
+                            {% elif order.status == 'received' %}bg-blue-100 text-blue-800
+                            {% elif order.status == 'cancelled' %}bg-red-100 text-red-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ order.get_status_display }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Type:</span>
+                        <span class="font-medium">{{ order.get_order_type_display }}</span>
+                    </div>
+                    {% if order.expected_date %}
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Date prévue:</span>
+                            <span class="font-medium">{{ order.expected_date|date:"d/m/Y" }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Totals -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Totaux</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between text-lg font-bold">
+                        <span>Montant Total:</span>
+                        <span class="text-green-600">{{ order.total_amount }} DH</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tracking -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Suivi</h3>
+                <div class="space-y-3 text-sm text-gray-600">
+                    <p><strong>Créé par:</strong> {{ order.created_by.get_full_name }}</p>
+                    <p><strong>Créé le:</strong> {{ order.created_at|date:"d/m/Y H:i" }}</p>
+                    {% if order.approved_by %}
+                        <p><strong>Approuvé par:</strong> {{ order.approved_by.get_full_name }}</p>
+                        <p><strong>Approuvé le:</strong> {{ order.approved_at|date:"d/m/Y H:i" }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Actions -->
+            {% if order.status == 'pending' and user.has_perm 'purchases.change_purchaseorder' %}
+                <form method="post" class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="approve">
+                    <button type="submit" class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg">
+                        <i class="fas fa-check mr-2"></i> Approuver
+                    </button>
+                </form>
+            {% endif %}
+
+            <!-- Notes -->
+            {% if order.notes %}
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Notes</h3>
+                    <p class="text-gray-700 whitespace-pre-line">{{ order.notes }}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ invoice.reference }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span>/</span>
+    <a href="{% url 'purchases:purchase_invoice_list' %}">Factures d'Achat</a>
+    <span>/</span>
+    <span>{{ invoice.reference }}</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">{{ invoice.reference }}</h1>
+            <p class="text-gray-600 mt-1">{{ invoice.date|date:"d F Y" }}</p>
+        </div>
+        <div class="space-x-2">
+            <a href="{% url 'purchases:purchase_invoice_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                <i class="fas fa-arrow-left mr-2"></i> Retour
+            </a>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Supplier Info -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-lg font-bold text-gray-900 mb-4">Informations Fournisseur</h2>
+                <div class="space-y-2">
+                    <p class="text-gray-900 font-bold text-lg">{{ invoice.supplier.name }}</p>
+                    <p class="text-gray-600">{{ invoice.supplier.email }}</p>
+                    <p class="text-gray-600">{{ invoice.supplier.phone }}</p>
+                    <p class="text-gray-600">{{ invoice.supplier.address }}, {{ invoice.supplier.city }}</p>
+                </div>
+            </div>
+
+            <!-- Items Table -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-lg font-bold text-gray-900 mb-4">Articles</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-2 text-left">Description</th>
+                                <th class="px-4 py-2 text-right">Poids (g)</th>
+                                <th class="px-4 py-2 text-right">Prix/g</th>
+                                <th class="px-4 py-2 text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            {% for item in items %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-2">{{ item.description }}</td>
+                                    <td class="px-4 py-2 text-right">{{ item.gross_weight }}</td>
+                                    <td class="px-4 py-2 text-right">{{ item.price_per_gram }} DH</td>
+                                    <td class="px-4 py-2 text-right font-bold">{{ item.total_amount }} DH</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Status -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Statut</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Statut:</span>
+                        <span class="inline-block px-3 py-1 rounded-full text-sm font-medium
+                            {% if invoice.status == 'draft' %}bg-gray-100 text-gray-800
+                            {% elif invoice.status == 'confirmed' %}bg-blue-100 text-blue-800
+                            {% elif invoice.status == 'partial' %}bg-yellow-100 text-yellow-800
+                            {% elif invoice.status == 'paid' %}bg-green-100 text-green-800
+                            {% elif invoice.status == 'cancelled' %}bg-red-100 text-red-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ invoice.get_status_display }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Type:</span>
+                        <span class="font-medium">{{ invoice.get_invoice_type_display }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Totals -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Totaux</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Sous-total:</span>
+                        <span class="font-medium">{{ invoice.subtotal }} DH</span>
+                    </div>
+                    {% if invoice.discount_amount > 0 %}
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Remise:</span>
+                            <span class="font-medium text-red-600">-{{ invoice.discount_amount }} DH</span>
+                        </div>
+                    {% endif %}
+                    <hr>
+                    <div class="flex justify-between text-lg font-bold">
+                        <span>Total:</span>
+                        <span class="text-green-600">{{ invoice.total_amount }} DH</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Info -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Paiement</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Payé:</span>
+                        <span class="font-medium">{{ invoice.amount_paid }} DH</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Solde:</span>
+                        <span class="font-bold {% if invoice.balance_due > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                            {{ invoice.balance_due }} DH
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tracking -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Suivi</h3>
+                <div class="space-y-2 text-sm text-gray-600">
+                    <p><strong>Créé par:</strong> {{ invoice.created_by.get_full_name }}</p>
+                    <p><strong>Créé le:</strong> {{ invoice.created_at|date:"d/m/Y H:i" }}</p>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            {% if invoice.status == 'draft' and user.has_perm 'purchases.change_purchaseinvoice' %}
+                <form method="post" class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="confirm">
+                    <button type="submit" class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg">
+                        <i class="fas fa-check mr-2"></i> Confirmer
+                    </button>
+                </form>
+            {% endif %}
+
+            <!-- Notes -->
+            {% if invoice.notes %}
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Notes</h3>
+                    <p class="text-gray-700 whitespace-pre-line">{{ invoice.notes }}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

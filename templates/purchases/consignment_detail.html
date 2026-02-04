@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ consignment.reference }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span>/</span>
+    <a href="{% url 'purchases:consignment_list' %}">Consignations</a>
+    <span>/</span>
+    <span>{{ consignment.reference }}</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">{{ consignment.reference }}</h1>
+            <p class="text-gray-600 mt-1">Reçue le {{ consignment.date_received|date:"d F Y" }}</p>
+        </div>
+        <div class="space-x-2">
+            <a href="{% url 'purchases:consignment_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                <i class="fas fa-arrow-left mr-2"></i> Retour
+            </a>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Supplier Info -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-lg font-bold text-gray-900 mb-4">Fournisseur</h2>
+                <div class="space-y-2">
+                    <p class="text-gray-900 font-bold text-lg">{{ consignment.supplier.name }}</p>
+                    <p class="text-gray-600">{{ consignment.supplier.email }}</p>
+                    <p class="text-gray-600">{{ consignment.supplier.phone }}</p>
+                </div>
+            </div>
+
+            <!-- Items Table -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-lg font-bold text-gray-900 mb-4">Articles</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-2 text-left">Produit</th>
+                                <th class="px-4 py-2 text-right">Prix Convenu</th>
+                                <th class="px-4 py-2 text-right">Prix Vente Min</th>
+                                <th class="px-4 py-2 text-center">Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            {% for item in items %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-2">
+                                        <p class="font-bold">{{ item.product.reference }}</p>
+                                        <p class="text-gray-600 text-xs">{{ item.product.name }}</p>
+                                    </td>
+                                    <td class="px-4 py-2 text-right">{{ item.agreed_price }} DH</td>
+                                    <td class="px-4 py-2 text-right">{{ item.minimum_selling_price }} DH</td>
+                                    <td class="px-4 py-2 text-center">
+                                        <span class="inline-block px-2 py-1 rounded text-xs font-medium
+                                            {% if item.status == 'available' %}bg-green-100 text-green-800
+                                            {% elif item.status == 'sold' %}bg-blue-100 text-blue-800
+                                            {% elif item.status == 'returned' %}bg-gray-100 text-gray-800
+                                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                            {{ item.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Status -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Statut</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Statut:</span>
+                        <span class="inline-block px-3 py-1 rounded-full text-sm font-medium
+                            {% if consignment.status == 'active' %}bg-green-100 text-green-800
+                            {% elif consignment.status == 'partial' %}bg-yellow-100 text-yellow-800
+                            {% elif consignment.status == 'sold' %}bg-blue-100 text-blue-800
+                            {% elif consignment.status == 'returned' %}bg-gray-100 text-gray-800
+                            {% elif consignment.status == 'closed' %}bg-red-100 text-red-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ consignment.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Statistiques</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Total Articles:</span>
+                        <span class="font-medium">{{ stats.total_items }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Disponibles:</span>
+                        <span class="font-medium">{{ stats.available }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Vendus:</span>
+                        <span class="font-medium">{{ stats.sold }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Retournés:</span>
+                        <span class="font-medium">{{ stats.returned }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Financial Info -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Informations Financières</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Valeur Totale:</span>
+                        <span class="font-bold">{{ stats.total_value|floatformat:0 }} DH</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Commission:</span>
+                        <span class="font-medium">{{ consignment.commission_percent }}%</span>
+                    </div>
+                    <div class="flex justify-between text-lg font-bold">
+                        <span>Montant Dû:</span>
+                        <span class="text-green-600">{{ stats.amount_due|floatformat:0 }} DH</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tracking -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Suivi</h3>
+                <div class="space-y-2 text-sm text-gray-600">
+                    <p><strong>Créé par:</strong> {{ consignment.created_by.get_full_name }}</p>
+                    <p><strong>Créé le:</strong> {{ consignment.created_at|date:"d/m/Y H:i" }}</p>
+                    {% if consignment.return_deadline %}
+                        <p><strong>Date limite retour:</strong> {{ consignment.return_deadline|date:"d/m/Y" }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Notes -->
+            {% if consignment.notes %}
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Notes</h3>
+                    <p class="text-gray-700 whitespace-pre-line">{{ consignment.notes }}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
