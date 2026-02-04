@@ -17,22 +17,15 @@ class SaleInvoiceForm(forms.ModelForm):
     class Meta:
         model = SaleInvoice
         fields = [
-            'client', 'sale_type', 'payment_method', 'bank_account',
-            'discount_percent', 'tax_rate', 'delivery_method',
-            'delivery_person', 'delivery_address', 'delivery_cost',
+            'client', 'payment_method',
+            'discount_percent', 'tax_rate',
             'notes'
         ]
         widgets = {
             'client': forms.Select(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
             }),
-            'sale_type': forms.Select(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
-            }),
             'payment_method': forms.Select(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
-            }),
-            'bank_account': forms.Select(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
             }),
             'discount_percent': forms.NumberInput(attrs={
@@ -51,26 +44,9 @@ class SaleInvoiceForm(forms.ModelForm):
                 'value': '0',
                 'placeholder': '0.00'
             }),
-            'delivery_method': forms.Select(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
-            }),
-            'delivery_person': forms.Select(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
-            }),
-            'delivery_address': forms.Textarea(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none',
-                'rows': '3'
-            }),
-            'delivery_cost': forms.NumberInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
-                'step': '0.01',
-                'min': '0',
-                'value': '0',
-                'placeholder': '0.00'
-            }),
             'notes': forms.Textarea(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none',
-                'rows': '4'
+                'rows': '3'
             }),
         }
 
@@ -78,9 +54,7 @@ class SaleInvoiceForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Make optional fields actually optional
         optional_fields = [
-            'payment_method', 'bank_account', 'sale_type',
-            'discount_percent', 'tax_rate', 'delivery_method',
-            'delivery_person', 'delivery_address', 'delivery_cost', 'notes'
+            'payment_method', 'discount_percent', 'tax_rate', 'notes'
         ]
         for field_name in optional_fields:
             if field_name in self.fields:

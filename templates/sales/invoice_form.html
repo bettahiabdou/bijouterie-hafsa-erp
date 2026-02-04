@@ -59,17 +59,10 @@
                     </div>
                 </div>
 
-                <!-- Basic Info Section -->
+                <!-- Essential Info Section -->
                 <div class="border-b border-gray-200 pb-6">
-                    <h2 class="text-lg font-bold text-gray-900 mb-4">Informations de Base</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Type de Vente</label>
-                            {{ form.sale_type }}
-                            {% if form.sale_type.errors %}
-                                <p class="text-red-600 text-sm mt-1">{{ form.sale_type.errors.0 }}</p>
-                            {% endif %}
-                        </div>
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">Paramètres</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Remise (%)</label>
                             {{ form.discount_percent }}
@@ -78,62 +71,24 @@
                             {% endif %}
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Taux TVA (%)</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">TVA (%)</label>
                             {{ form.tax_rate }}
                             {% if form.tax_rate.errors %}
                                 <p class="text-red-600 text-sm mt-1">{{ form.tax_rate.errors.0 }}</p>
                             {% endif %}
                         </div>
-                    </div>
-                </div>
-
-                <!-- Payment Info Section -->
-                <div class="border-b border-gray-200 pb-6">
-                    <h2 class="text-lg font-bold text-gray-900 mb-4">Paiement & Livraison</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Méthode de Paiement</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Paiement</label>
                             {{ form.payment_method }}
                             {% if form.payment_method.errors %}
                                 <p class="text-red-600 text-sm mt-1">{{ form.payment_method.errors.0 }}</p>
                             {% endif %}
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Compte Bancaire</label>
-                            {{ form.bank_account }}
-                            {% if form.bank_account.errors %}
-                                <p class="text-red-600 text-sm mt-1">{{ form.bank_account.errors.0 }}</p>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Mode de Livraison</label>
-                            {{ form.delivery_method }}
-                            {% if form.delivery_method.errors %}
-                                <p class="text-red-600 text-sm mt-1">{{ form.delivery_method.errors.0 }}</p>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Coût de Livraison (DH)</label>
-                            {{ form.delivery_cost }}
-                            {% if form.delivery_cost.errors %}
-                                <p class="text-red-600 text-sm mt-1">{{ form.delivery_cost.errors.0 }}</p>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Livreur</label>
-                            {{ form.delivery_person }}
-                            {% if form.delivery_person.errors %}
-                                <p class="text-red-600 text-sm mt-1">{{ form.delivery_person.errors.0 }}</p>
-                            {% endif %}
-                        </div>
                     </div>
-                    <div class="mt-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Adresse de Livraison</label>
-                        {{ form.delivery_address }}
-                        {% if form.delivery_address.errors %}
-                            <p class="text-red-600 text-sm mt-1">{{ form.delivery_address.errors.0 }}</p>
-                        {% endif %}
-                    </div>
+                    <p class="text-xs text-gray-500 mt-3">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Livraison et paiement détaillé peuvent être configurés après création de la facture
+                    </p>
                 </div>
 
                 <!-- Items Section -->
@@ -253,13 +208,13 @@
             </div>
 
             <!-- Quick Help -->
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <h3 class="text-lg font-bold text-blue-900 mb-3">Aide Rapide</h3>
-                <ul class="space-y-2 text-sm text-blue-800">
-                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Remplissez les champs principaux</li>
-                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Ajoutez les articles directement ici</li>
-                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Tous les champs sauf Client sont optionnels</li>
-                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Les articles s'ajoutent immédiatement à la facture</li>
+            <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                <h3 class="text-lg font-bold text-green-900 mb-3">🚀 Workflow Simple</h3>
+                <ul class="space-y-2 text-sm text-green-800">
+                    <li><i class="fas fa-check text-green-600 mr-2"></i> Sélectionnez un client (optionnel)</li>
+                    <li><i class="fas fa-check text-green-600 mr-2"></i> Ajoutez les articles</li>
+                    <li><i class="fas fa-check text-green-600 mr-2"></i> Paramètres: remise, TVA, paiement</li>
+                    <li><i class="fas fa-check text-green-600 mr-2"></i> Créer → Facture prête!</li>
                 </ul>
             </div>
 
