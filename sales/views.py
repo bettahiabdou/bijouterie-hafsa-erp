@@ -120,7 +120,8 @@ def invoice_detail(request, reference):
 @require_http_methods(["GET", "POST"])
 def invoice_create(request):
     """Create a new sales invoice"""
-    if not request.user.can_create_purchase_order:
+    # Allow staff/admin users to create invoices
+    if not request.user.is_staff:
         messages.error(request, 'Vous n\'avez pas la permission de créer des factures.')
         return redirect('sales:invoice_list')
 
@@ -222,7 +223,7 @@ def invoice_detail_view(request, reference):
 @login_required(login_url='login')
 def quote_to_invoice(request, quote_id):
     """Convert a quote to an invoice"""
-    if not request.user.can_create_purchase_order:
+    if not request.user.is_staff:
         messages.error(request, 'Vous n\'avez pas la permission de créer des factures.')
         return redirect('sales:invoice_list')
 
@@ -284,7 +285,7 @@ def quote_to_invoice(request, quote_id):
 @login_required(login_url='login')
 def payment_tracking(request):
     """View payment tracking dashboard"""
-    if not request.user.can_view_reports:
+    if not request.user.is_staff:
         messages.error(request, 'Vous n\'avez pas accès à ce rapport.')
         return redirect('dashboard')
 

@@ -114,7 +114,7 @@ def product_detail(request, reference):
 @require_http_methods(["GET", "POST"])
 def product_create(request):
     """Create a new product"""
-    if not request.user.can_manage_stock:
+    if not request.user.is_staff:
         messages.error(request, 'Vous n\'avez pas la permission d\'ajouter des produits.')
         return redirect('product_list')
 
@@ -170,7 +170,7 @@ def product_edit(request, reference):
     """Edit an existing product"""
     product = get_object_or_404(Product, reference=reference)
 
-    if not request.user.can_manage_stock:
+    if not request.user.is_staff:
         messages.error(request, 'Vous n\'avez pas la permission de modifier les produits.')
         return redirect('product_detail', reference=reference)
 
@@ -224,7 +224,7 @@ def product_edit(request, reference):
 @login_required(login_url='login')
 def inventory_dashboard(request):
     """Display inventory statistics and alerts"""
-    if not request.user.can_manage_stock and not request.user.is_staff:
+    if not request.user.is_staff and not request.user.is_staff:
         messages.error(request, 'Vous n\'avez pas accès à ce tableau de bord.')
         return redirect('dashboard')
 
