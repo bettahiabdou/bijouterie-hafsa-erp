@@ -119,12 +119,10 @@
                     <div class="flex justify-between">
                         <span class="text-gray-600">Statut:</span>
                         <span class="inline-block px-3 py-1 rounded-full text-sm font-medium
-                            {% if invoice.status == 'draft' %}bg-gray-100 text-gray-800
-                            {% elif invoice.status == 'confirmed' %}bg-blue-100 text-blue-800
+                            {% if invoice.status == 'unpaid' %}bg-red-100 text-red-800
                             {% elif invoice.status == 'partial' %}bg-yellow-100 text-yellow-800
-                            {% elif invoice.status == 'paid' %}bg-orange-100 text-orange-800
-                            {% elif invoice.status == 'delivered' %}bg-green-100 text-green-800
-                            {% else %}bg-red-100 text-red-800{% endif %}">
+                            {% elif invoice.status == 'paid' %}bg-green-100 text-green-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
                             {{ invoice.get_status_display }}
                         </span>
                     </div>
@@ -161,7 +159,7 @@
             <div class="bg-white rounded-lg shadow-md p-6">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-bold text-gray-900">Paiement</h3>
-                    {% if invoice.status != 'paid' and invoice.status != 'delivered' %}
+                    {% if invoice.status != 'paid' %}
                         <a href="{% url 'sales:invoice_payment' invoice.reference %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center">
                             <i class="fas fa-dollar-sign mr-2"></i> Payer
                         </a>
@@ -178,6 +176,25 @@
                             {{ invoice.balance_due }} DH
                         </span>
                     </div>
+                    {% if invoice.payment_method %}
+                        <hr>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Méthode:</span>
+                            <span class="font-medium">{{ invoice.payment_method.name }}</span>
+                        </div>
+                        {% if invoice.payment_reference %}
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Référence:</span>
+                                <span class="font-medium">{{ invoice.payment_reference }}</span>
+                            </div>
+                        {% endif %}
+                        {% if invoice.bank_account %}
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Compte:</span>
+                                <span class="font-medium">{{ invoice.bank_account.bank_name }}<br/><small>{{ invoice.bank_account.account_number }}</small></span>
+                            </div>
+                        {% endif %}
+                    {% endif %}
                 </div>
             </div>
 

@@ -15,12 +15,9 @@ class SaleInvoice(models.Model):
     """
 
     class Status(models.TextChoices):
-        DRAFT = 'draft', _('Brouillon')
-        CONFIRMED = 'confirmed', _('Confirmé')
-        PARTIAL_PAID = 'partial', _('Partiellement payé')
-        PAID = 'paid', _('Payé')
-        DELIVERED = 'delivered', _('Livré')
-        CANCELLED = 'cancelled', _('Annulé')
+        UNPAID = 'unpaid', _('Non payée')
+        PARTIAL_PAID = 'partial', _('Partiellement payée')
+        PAID = 'paid', _('Payée')
 
     class SaleType(models.TextChoices):
         REGULAR = 'regular', _('Vente normale')
@@ -58,7 +55,7 @@ class SaleInvoice(models.Model):
         _('Statut'),
         max_length=20,
         choices=Status.choices,
-        default=Status.DRAFT
+        default=Status.UNPAID
     )
 
     # Pricing
@@ -310,19 +307,13 @@ class SaleInvoice(models.Model):
         ])
 
     def update_status(self):
-        """Update status based on payment and delivery"""
-        if self.status == self.Status.CANCELLED:
-            return
-
+        """Update status based on payment"""
         if self.amount_paid >= self.total_amount:
-            if self.delivery_status == 'delivered' or not self.delivery_method:
-                self.status = self.Status.DELIVERED
-            else:
-                self.status = self.Status.PAID
+            self.status = self.Status.PAID
         elif self.amount_paid > 0:
             self.status = self.Status.PARTIAL_PAID
         else:
-            self.status = self.Status.CONFIRMED
+            self.status = self.Status.UNPAID
 
     def update_payment(self, amount):
         """Update payment amount"""
@@ -356,19 +347,16 @@ class SaleInvoice(models.Model):
             return ((self.total_amount - total_cost) / total_cost) * 100
         return 0
 
-    # PHASE 3: Status Transition Validation
+    # Status Transition Validation
     def can_transition_to(self, new_status):
         """
         Validate status transition is allowed.
         Returns True if transition is valid, False otherwise.
         """
         valid_transitions = {
-            self.Status.DRAFT: [self.Status.CONFIRMED, self.Status.CANCELLED],
-            self.Status.CONFIRMED: [self.Status.PARTIAL_PAID, self.Status.PAID, self.Status.DELIVERED, self.Status.CANCELLED],
-            self.Status.PARTIAL_PAID: [self.Status.PAID, self.Status.DELIVERED, self.Status.CANCELLED],
-            self.Status.PAID: [self.Status.DELIVERED, self.Status.CANCELLED],
-            self.Status.DELIVERED: [],  # No transitions allowed from DELIVERED
-            self.Status.CANCELLED: [],  # No transitions allowed from CANCELLED
+            self.Status.UNPAID: [self.Status.PARTIAL_PAID, self.Status.PAID],
+            self.Status.PARTIAL_PAID: [self.Status.PAID, self.Status.UNPAID],
+            self.Status.PAID: [self.Status.PARTIAL_PAID, self.Status.UNPAID],
         }
         return new_status in valid_transitions.get(self.status, [])
 

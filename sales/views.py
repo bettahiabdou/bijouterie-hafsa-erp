@@ -327,7 +327,7 @@ def invoice_create(request):
                 invoice.date = timezone.now().date()
                 invoice.seller = request.user
                 invoice.created_by = request.user
-                invoice.status = SaleInvoice.Status.DRAFT
+                invoice.status = SaleInvoice.Status.UNPAID
                 invoice.save()
 
                 # Process articles submitted with the form
