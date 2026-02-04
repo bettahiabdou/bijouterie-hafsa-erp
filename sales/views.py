@@ -135,15 +135,18 @@ def invoice_detail(request, reference):
 @require_http_methods(["GET", "POST"])
 def invoice_create(request):
     """Create a new sales invoice"""
+    from .forms import SaleInvoiceForm
+
     # Allow staff/admin users to create invoices
     if not request.user.is_staff:
         messages.error(request, 'Vous n\'avez pas la permission de créer des factures.')
         return redirect('sales:invoice_list')
 
+    form = None  # Initialize form variable
+
     if request.method == 'POST':
         try:
             # FIXED: Use form for validation
-            from .forms import SaleInvoiceForm
             form = SaleInvoiceForm(request.POST)
 
             if form.is_valid():
@@ -229,8 +232,9 @@ def invoice_create(request):
             logger = logging.getLogger(__name__)
             logger.exception(f'Error creating invoice: {str(e)}')
 
-    # FIXED: Optimize product query with related fields
-    form = SaleInvoiceForm() if request.method == 'GET' else form
+    # FIXED: Create new form if GET request or POST failed
+    if form is None:
+        form = SaleInvoiceForm()
 
     context = {
         'form': form,
