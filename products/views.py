@@ -212,8 +212,8 @@ def product_create(request):
     if request.method == 'POST':
         try:
             bank_account_id = request.POST.get('bank_account')
+            # Create product without reference - will be auto-generated in save()
             product = Product.objects.create(
-                reference=request.POST.get('reference'),
                 name=request.POST.get('name'),
                 name_ar=request.POST.get('name_ar', ''),
                 description=request.POST.get('description', ''),
