@@ -365,6 +365,11 @@
             const bankAccountSection = document.getElementById('bankAccountSection');
 
             function updatePaymentFieldsVisibility() {
+                if (!paymentRefSection || !bankAccountSection) {
+                    console.warn('⚠ Payment or bank account sections not found in DOM');
+                    return;
+                }
+
                 if (!paymentMethodSelect || !paymentMethodSelect.value) {
                     paymentRefSection.classList.add('hidden');
                     paymentRefSection.style.display = 'none';
@@ -411,6 +416,8 @@
                 paymentMethodSelect.addEventListener('change', updatePaymentFieldsVisibility);
                 // Check on page load
                 setTimeout(updatePaymentFieldsVisibility, 100);
+            } else {
+                console.warn('⚠ Payment method select not found');
             }
 
             // ============ ARTICLE MANAGEMENT ============
@@ -422,163 +429,211 @@
             const quantityInput = document.getElementById('quantity');
             const unitPriceInput = document.getElementById('unit_price');
             const estimatedTotalSpan = document.getElementById('estimated_total');
-
-            // Show/hide add item form
-            addItemBtn.addEventListener('click', function() {
-                addItemSection.classList.remove('hidden');
-                productSelect.focus();
-            });
-
-            cancelItemBtn.addEventListener('click', function() {
-                addItemSection.classList.add('hidden');
-                resetItemForm();
-            });
-
             const discountInput = document.getElementById('discount_amount');
 
-            // Auto-fill price when product selected
-            productSelect.addEventListener('change', function() {
-                if (this.value) {
-                    const option = this.options[this.selectedIndex];
-                    const price = parseFloat(option.dataset.price) || 0;
-                    unitPriceInput.value = price.toFixed(2);
-                    updateEstimatedTotal();
-                }
-            });
+            // Check if all article management elements exist
+            if (!addItemBtn || !cancelItemBtn || !confirmItemBtn || !addItemSection ||
+                !productSelect || !quantityInput || !unitPriceInput || !estimatedTotalSpan || !discountInput) {
+                console.warn('⚠ Some article management elements not found - article features may not work');
+            } else {
+                // Show/hide add item form
+                addItemBtn.addEventListener('click', function() {
+                    addItemSection.classList.remove('hidden');
+                    productSelect.focus();
+                });
 
-            // Update total on input change
-            [quantityInput, unitPriceInput, discountInput].forEach(input => {
-                input.addEventListener('change', updateEstimatedTotal);
-                input.addEventListener('keyup', updateEstimatedTotal);
-            });
+                cancelItemBtn.addEventListener('click', function() {
+                    addItemSection.classList.add('hidden');
+                    resetItemForm();
+                });
 
-            function updateEstimatedTotal() {
-                const qty = parseFloat(quantityInput.value) || 0;
-                const price = parseFloat(unitPriceInput.value) || 0;
-                const discount = parseFloat(discountInput.value) || 0;
-                const subtotal = qty * price;
-                const total = Math.max(0, subtotal - discount);
+                // Auto-fill price when product selected
+                productSelect.addEventListener('change', function() {
+                    if (this.value) {
+                        const option = this.options[this.selectedIndex];
+                        const price = parseFloat(option.dataset.price) || 0;
+                        unitPriceInput.value = price.toFixed(2);
+                        updateEstimatedTotal();
+                    }
+                });
 
-                document.getElementById('subtotal_display').textContent = subtotal.toFixed(2);
-                document.getElementById('discount_display').textContent = discount.toFixed(2);
-                estimatedTotalSpan.textContent = total.toFixed(2) + ' DH';
+                // Update total on input change
+                [quantityInput, unitPriceInput, discountInput].forEach(input => {
+                    input.addEventListener('change', updateEstimatedTotal);
+                    input.addEventListener('keyup', updateEstimatedTotal);
+                });
             }
 
-            // Add item to list
-            confirmItemBtn.addEventListener('click', function() {
-                if (!productSelect.value) {
-                    alert('Sélectionnez un produit');
-                    return;
-                }
-                if (!quantityInput.value || parseFloat(quantityInput.value) <= 0) {
-                    alert('Entrez une quantité valide');
-                    return;
-                }
-                if (!unitPriceInput.value || parseFloat(unitPriceInput.value) < 0) {
-                    alert('Entrez un prix valide');
-                    return;
+                function updateEstimatedTotal() {
+                    const qty = parseFloat(quantityInput.value) || 0;
+                    const price = parseFloat(unitPriceInput.value) || 0;
+                    const discount = parseFloat(discountInput.value) || 0;
+                    const subtotal = qty * price;
+                    const total = Math.max(0, subtotal - discount);
+
+                    const subtotalEl = document.getElementById('subtotal_display');
+                    const discountEl = document.getElementById('discount_display');
+                    if (subtotalEl) subtotalEl.textContent = subtotal.toFixed(2);
+                    if (discountEl) discountEl.textContent = discount.toFixed(2);
+                    if (estimatedTotalSpan) estimatedTotalSpan.textContent = total.toFixed(2) + ' DH';
                 }
 
-                const productOption = productSelect.options[productSelect.selectedIndex];
-                const qty = parseFloat(quantityInput.value);
-                const price = parseFloat(unitPriceInput.value);
-                const discount = parseFloat(discountInput.value) || 0;
-                const subtotal = qty * price;
-                const total = Math.max(0, subtotal - discount);
+                // Add item to list
+                confirmItemBtn.addEventListener('click', function() {
+                    if (!productSelect.value) {
+                        alert('Sélectionnez un produit');
+                        return;
+                    }
+                    if (!quantityInput.value || parseFloat(quantityInput.value) <= 0) {
+                        alert('Entrez une quantité valide');
+                        return;
+                    }
+                    if (!unitPriceInput.value || parseFloat(unitPriceInput.value) < 0) {
+                        alert('Entrez un prix valide');
+                        return;
+                    }
 
-                const item = {
-                    id: Date.now(),
-                    product_id: productSelect.value,
-                    product_name: productOption.text,
-                    quantity: qty,
-                    unit_price: price,
-                    discount_amount: discount,
-                    total_amount: total
+                    const productOption = productSelect.options[productSelect.selectedIndex];
+                    const qty = parseFloat(quantityInput.value);
+                    const price = parseFloat(unitPriceInput.value);
+                    const discount = parseFloat(discountInput.value) || 0;
+                    const subtotal = qty * price;
+                    const total = Math.max(0, subtotal - discount);
+
+                    const item = {
+                        id: Date.now(),
+                        product_id: productSelect.value,
+                        product_name: productOption.text,
+                        quantity: qty,
+                        unit_price: price,
+                        discount_amount: discount,
+                        total_amount: total
+                    };
+
+                    invoiceItems.push(item);
+                    renderItems();
+                    resetItemForm();
+                    addItemSection.classList.add('hidden');
+                    function resetItemForm() {
+                        productSelect.value = '';
+                        quantityInput.value = '1';
+                        unitPriceInput.value = '';
+                        discountInput.value = '0';
+                        if (estimatedTotalSpan) estimatedTotalSpan.textContent = '0.00 DH';
+                        const subtotalEl = document.getElementById('subtotal_display');
+                        const discountEl = document.getElementById('discount_display');
+                        if (subtotalEl) subtotalEl.textContent = '0.00';
+                        if (discountEl) discountEl.textContent = '0.00';
+                    }
+
+                    function renderItems() {
+                        const container = document.getElementById('itemsContainer');
+                        const emptyState = document.getElementById('emptyState');
+
+                        if (!container || !emptyState) {
+                            console.warn('⚠ Items container or empty state not found');
+                            return;
+                        }
+
+                        if (invoiceItems.length === 0) {
+                            container.innerHTML = '';
+                            emptyState.classList.remove('hidden');
+                            return;
+                        }
+
+                        emptyState.classList.add('hidden');
+                        container.innerHTML = invoiceItems.map((item, index) => `
+                            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex-1">
+                                        <p class="font-bold text-gray-900">${item.product_name}</p>
+                                        <p class="text-sm text-gray-600">Qty: ${item.quantity} × ${item.unit_price.toFixed(2)} DH</p>
+                                    </div>
+                                    <button type="button" class="text-red-600 hover:text-red-800 text-sm ml-2" onclick="removeItem(${index})">
+                                        <i class="fas fa-trash mr-1"></i> Supprimer
+                                    </button>
+                                </div>
+                                <div class="bg-gray-50 p-2 rounded text-sm">
+                                    <div class="flex justify-between">
+                                        <span>Sous-total:</span>
+                                        <span>${(item.quantity * item.unit_price).toFixed(2)} DH</span>
+                                    </div>
+                                    ${item.discount_amount > 0 ? `<div class="flex justify-between text-red-600">
+                                        <span>Remise:</span>
+                                        <span>-${item.discount_amount.toFixed(2)} DH</span>
+                                    </div>` : ''}
+                                    <div class="flex justify-between font-bold border-t pt-1 mt-1">
+                                        <span>Total:</span>
+                                        <span class="text-green-600">${item.total_amount.toFixed(2)} DH</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+
+                    window.removeItem = function(index) {
+                        invoiceItems.splice(index, 1);
+                        renderItems();
+                    };
+                });
+            }
+
+            // Define renderItems globally for article section to work even if article management is disabled
+            if (typeof window.renderItems === 'undefined') {
+                window.renderItems = function() {
+                    const container = document.getElementById('itemsContainer');
+                    const emptyState = document.getElementById('emptyState');
+                    if (!container || !emptyState) return;
+                    if (invoiceItems.length === 0) {
+                        container.innerHTML = '';
+                        emptyState.classList.remove('hidden');
+                    }
                 };
-
-                invoiceItems.push(item);
-                renderItems();
-                resetItemForm();
-                addItemSection.classList.add('hidden');
-            });
-
-            function resetItemForm() {
-                productSelect.value = '';
-                quantityInput.value = '1';
-                unitPriceInput.value = '';
-                discountInput.value = '0';
-                estimatedTotalSpan.textContent = '0.00 DH';
-                document.getElementById('subtotal_display').textContent = '0.00';
-                document.getElementById('discount_display').textContent = '0.00';
             }
 
-            function renderItems() {
-                const container = document.getElementById('itemsContainer');
-                const emptyState = document.getElementById('emptyState');
-
-                if (invoiceItems.length === 0) {
-                    container.innerHTML = '';
-                    emptyState.classList.remove('hidden');
-                    return;
-                }
-
-                emptyState.classList.add('hidden');
-                container.innerHTML = invoiceItems.map((item, index) => `
-                    <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="flex-1">
-                                <p class="font-bold text-gray-900">${item.product_name}</p>
-                                <p class="text-sm text-gray-600">Qty: ${item.quantity} × ${item.unit_price.toFixed(2)} DH</p>
-                            </div>
-                            <button type="button" class="text-red-600 hover:text-red-800 text-sm ml-2" onclick="removeItem(${index})">
-                                <i class="fas fa-trash mr-1"></i> Supprimer
-                            </button>
-                        </div>
-                        <div class="bg-gray-50 p-2 rounded text-sm">
-                            <div class="flex justify-between">
-                                <span>Sous-total:</span>
-                                <span>${(item.quantity * item.unit_price).toFixed(2)} DH</span>
-                            </div>
-                            ${item.discount_amount > 0 ? `<div class="flex justify-between text-red-600">
-                                <span>Remise:</span>
-                                <span>-${item.discount_amount.toFixed(2)} DH</span>
-                            </div>` : ''}
-                            <div class="flex justify-between font-bold border-t pt-1 mt-1">
-                                <span>Total:</span>
-                                <span class="text-green-600">${item.total_amount.toFixed(2)} DH</span>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
+            // Define removeItem globally
+            if (typeof window.removeItem === 'undefined') {
+                window.removeItem = function(index) {
+                    invoiceItems.splice(index, 1);
+                    if (window.renderItems) window.renderItems();
+                };
             }
-
-            window.removeItem = function(index) {
-                invoiceItems.splice(index, 1);
-                renderItems();
-            };
 
             // Add items to form before submit
-            const forms = document.querySelectorAll('form');
-            const mainForm = forms[0]; // Get the main form (not the modal form)
+            const mainForm = document.querySelector('form[method="post"]');
 
-            mainForm.addEventListener('submit', function(e) {
-                console.log('Main form submit event triggered');
+            if (!mainForm) {
+                console.error('✗ CRITICAL ERROR: Form element not found!');
+            } else {
+                console.log('✓ Main form found:', mainForm.action);
 
-                // Add items as hidden inputs
-                if (invoiceItems.length > 0) {
-                    console.log('Adding', invoiceItems.length, 'items to form');
-                    invoiceItems.forEach((item, index) => {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = `items[${index}]`;
-                        input.value = JSON.stringify(item);
-                        mainForm.appendChild(input);
-                    });
-                }
+                mainForm.addEventListener('submit', function(e) {
+                    console.log('✓ Form submit event triggered');
+                    console.log('✓ Invoice items count:', invoiceItems.length);
 
-                console.log('Form submitting with', invoiceItems.length, 'items');
-                // Allow natural form submission
-            });
+                    // Add items as hidden inputs
+                    if (invoiceItems.length > 0) {
+                        console.log('✓ Adding', invoiceItems.length, 'items to form');
+
+                        // Remove any existing item inputs first
+                        mainForm.querySelectorAll('input[name^="items["]').forEach(el => el.remove());
+
+                        invoiceItems.forEach((item, index) => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = `items[${index}]`;
+                            input.value = JSON.stringify(item);
+                            mainForm.appendChild(input);
+                            console.log(`  ✓ Item ${index} added:`, item.product_id);
+                        });
+                    }
+
+                    console.log('✓ Form ready to submit with', invoiceItems.length, 'items');
+                    console.log('✓ Form action:', mainForm.action);
+                    console.log('✓ Form method:', mainForm.method);
+                    // Don't prevent default - let the form submit naturally
+                });
+            }
         });
     </script>
 {% endblock %}
