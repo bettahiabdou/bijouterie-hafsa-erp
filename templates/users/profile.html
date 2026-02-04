@@ -100,7 +100,7 @@
                     {% if stats.last_login %}
                         <div>
                             <p class="text-sm text-gray-600">Dernière Connexion</p>
-                            <p class="font-medium text-gray-900">{{ stats.last_login.timestamp|date:"d/m/Y H:i" }}</p>
+                            <p class="font-medium text-gray-900">{{ stats.last_login.created_at|date:"d/m/Y H:i" }}</p>
                         </div>
                     {% endif %}
                 </div>

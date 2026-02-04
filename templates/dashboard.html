@@ -9,149 +9,297 @@
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
+    <div class="flex-between">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">Tableau de Bord</h1>
-            <p class="text-gray-600 mt-1">Bienvenue, {{ user.first_name }}! Voici un aperçu de votre activité.</p>
+            <h1 style="margin-bottom: 0.5rem;">Tableau de Bord</h1>
+            <p class="text-muted" style="margin: 0;">Bienvenue, <strong>{{ user.first_name }}</strong>! Voici un aperçu de votre activité.</p>
         </div>
-        <div class="text-right">
-            <p class="text-sm text-gray-500">{{ now|date:'d F Y' }}</p>
-            <p class="text-xs text-gray-400">Dernière mise à jour: maintenant</p>
+        <div style="text-align: right;">
+            <p style="font-size: var(--text-sm); color: var(--color-neutral-gray); margin: 0;">{{ now|date:'d F Y' }}</p>
+            <p style="font-size: var(--text-xs); color: var(--color-neutral-gray); margin-top: 0.25rem;">Dernière mise à jour: maintenant</p>
         </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <!-- KPI Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <style>
+        /* KPI Cards - Elegant styling */
+        .kpi-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-6);
+            animation: slideInLeft var(--transition-base) ease-out backwards;
+        }
+
+        .kpi-card:nth-child(2) { animation-delay: 0.1s; }
+        .kpi-card:nth-child(3) { animation-delay: 0.2s; }
+        .kpi-card:nth-child(4) { animation-delay: 0.3s; }
+
+        .kpi-content {
+            flex: 1;
+        }
+
+        .kpi-label {
+            font-size: var(--text-sm);
+            color: var(--color-neutral-gray);
+            text-transform: uppercase;
+            letter-spacing: var(--tracking-wide);
+            font-weight: var(--weight-semibold);
+            margin-bottom: var(--space-2);
+        }
+
+        .kpi-value {
+            font-size: var(--text-3xl);
+            font-family: var(--font-serif);
+            color: var(--color-neutral-black);
+            font-weight: var(--weight-normal);
+            margin: 0;
+        }
+
+        .kpi-detail {
+            font-size: var(--text-xs);
+            color: var(--color-neutral-gray);
+            margin-top: var(--space-2);
+            font-style: italic;
+        }
+
+        .kpi-icon {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-lg);
+            background: linear-gradient(135deg, rgba(183, 110, 121, 0.1), rgba(183, 110, 121, 0.05));
+            flex-shrink: 0;
+        }
+
+        .kpi-icon i {
+            font-size: 2rem;
+            color: var(--color-primary);
+        }
+
+        @media (max-width: 767px) {
+            .kpi-card {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .kpi-label, .kpi-detail {
+                text-align: center;
+            }
+
+            .kpi-icon {
+                width: 60px;
+                height: 60px;
+            }
+
+            .kpi-icon i {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+
+    <!-- KPI Cards - Refined Minimalist -->
+    <div class="grid grid-cols-1 grid-cols-2 grid-cols-4 gap-6 mb-8 animate-stagger">
         <!-- Ventes du Jour -->
-        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Ventes du Jour</p>
-                    <p class="text-2xl font-bold text-gray-900 mt-2">0 DH</p>
-                    <p class="text-xs text-gray-400 mt-1">0 factures</p>
-                </div>
-                <div class="bg-blue-100 p-4 rounded-lg">
-                    <i class="fas fa-shopping-cart text-2xl text-blue-500"></i>
-                </div>
+        <div class="card kpi-card">
+            <div class="kpi-content">
+                <div class="kpi-label">Ventes du Jour</div>
+                <p class="kpi-value">{{ today_sales_amount|floatformat:0 }}</p>
+                <div class="kpi-detail">DH • {{ today_sales_count }} facture{{ today_sales_count|pluralize }}</div>
+            </div>
+            <div class="kpi-icon">
+                <i class="fas fa-shopping-cart"></i>
             </div>
         </div>
 
         <!-- Stock Total -->
-        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Stock Total</p>
-                    <p class="text-2xl font-bold text-gray-900 mt-2">0 pcs</p>
-                    <p class="text-xs text-gray-400 mt-1">Disponible</p>
-                </div>
-                <div class="bg-green-100 p-4 rounded-lg">
-                    <i class="fas fa-boxes text-2xl text-green-500"></i>
-                </div>
+        <div class="card kpi-card">
+            <div class="kpi-content">
+                <div class="kpi-label">Stock Total</div>
+                <p class="kpi-value">{{ total_stock }}</p>
+                <div class="kpi-detail">Pièces • Disponible</div>
+            </div>
+            <div class="kpi-icon">
+                <i class="fas fa-boxes"></i>
             </div>
         </div>
 
-        <!-- Clients -->
-        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Clients Actifs</p>
-                    <p class="text-2xl font-bold text-gray-900 mt-2">0</p>
-                    <p class="text-xs text-gray-400 mt-1">Enregistrés</p>
-                </div>
-                <div class="bg-purple-100 p-4 rounded-lg">
-                    <i class="fas fa-users text-2xl text-purple-500"></i>
-                </div>
+        <!-- Clients Actifs -->
+        <div class="card kpi-card">
+            <div class="kpi-content">
+                <div class="kpi-label">Clients Actifs</div>
+                <p class="kpi-value">{{ total_clients }}</p>
+                <div class="kpi-detail">Enregistrés • Cette année</div>
+            </div>
+            <div class="kpi-icon">
+                <i class="fas fa-users"></i>
             </div>
         </div>
 
         <!-- Revenus Mois -->
-        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Revenus Mois</p>
-                    <p class="text-2xl font-bold text-gray-900 mt-2">0 DH</p>
-                    <p class="text-xs text-gray-400 mt-1">À date</p>
-                </div>
-                <div class="bg-yellow-100 p-4 rounded-lg">
-                    <i class="fas fa-chart-line text-2xl text-yellow-500"></i>
-                </div>
+        <div class="card kpi-card">
+            <div class="kpi-content">
+                <div class="kpi-label">Revenus Mois</div>
+                <p class="kpi-value">{{ month_revenue|floatformat:0 }}</p>
+                <div class="kpi-detail">DH • À date de ce mois</div>
+            </div>
+            <div class="kpi-icon">
+                <i class="fas fa-chart-line"></i>
             </div>
         </div>
     </div>
 
     <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <!-- Recent Sales -->
-        <div class="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
-            <h2 class="text-lg font-bold text-gray-900 mb-4">Ventes Récentes</h2>
+    <style>
+        .sales-table tbody tr {
+            transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+            cursor: pointer;
+        }
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-200">
+        .sales-table tbody tr:hover {
+            background-color: rgba(183, 110, 121, 0.03);
+            box-shadow: inset 0 0 0 1px rgba(183, 110, 121, 0.1);
+        }
+
+        .quick-action {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            padding: var(--space-3) var(--space-4);
+            background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+            color: white;
+            border-radius: var(--radius-md);
+            font-weight: var(--weight-semibold);
+            font-size: var(--text-sm);
+            text-transform: uppercase;
+            letter-spacing: var(--tracking-wide);
+            transition: all var(--transition-fast);
+            text-decoration: none;
+            min-height: 2.75rem;
+        }
+
+        .quick-action:hover {
+            background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-2px);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-3) 0;
+            border-bottom: 1px solid var(--color-neutral-medium);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            font-size: var(--text-sm);
+            color: var(--color-neutral-gray);
+        }
+
+        .stat-value {
+            font-size: var(--text-2xl);
+            font-family: var(--font-serif);
+            color: var(--color-primary);
+            font-weight: var(--weight-normal);
+        }
+    </style>
+
+    <div class="grid grid-cols-1 grid-cols-3 gap-6 mb-8">
+        <!-- Recent Sales -->
+        <div class="card" style="grid-column: 1 / -1; grid-column: span 2;">
+            <div class="card-header">
+                <h2>Ventes Récentes</h2>
+            </div>
+            <div class="card-body">
+                <table class="table sales-table">
+                    <thead>
                         <tr>
-                            <th class="px-4 py-3 text-left text-gray-600 font-medium">Ref</th>
-                            <th class="px-4 py-3 text-left text-gray-600 font-medium">Client</th>
-                            <th class="px-4 py-3 text-left text-gray-600 font-medium">Montant</th>
-                            <th class="px-4 py-3 text-left text-gray-600 font-medium">Statut</th>
+                            <th>Référence</th>
+                            <th>Client</th>
+                            <th>Montant</th>
+                            <th>Statut</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        <tr class="hover:bg-gray-50">
-                            <td colspan="4" class="px-4 py-8 text-center text-gray-500">
-                                Aucune vente à afficher
-                            </td>
-                        </tr>
+                    <tbody>
+                        {% for sale in recent_sales %}
+                            <tr>
+                                <td style="font-weight: var(--weight-semibold); color: var(--color-primary);">{{ sale.reference }}</td>
+                                <td>{{ sale.client.full_name|default:"Vente Anonyme" }}</td>
+                                <td style="font-weight: var(--weight-semibold);">{{ sale.total_amount|floatformat:2 }} DH</td>
+                                <td>
+                                    <span class="badge
+                                        {% if sale.status == 'paid' %}badge-success
+                                        {% elif sale.status == 'partial' %}badge-warning
+                                        {% elif sale.status == 'pending' %}badge-info
+                                        {% else %}badge-primary{% endif %}">
+                                        {{ sale.get_status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" style="text-align: center; padding: 3rem 1rem; color: var(--color-neutral-gray);">
+                                    <i class="fas fa-inbox" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5; display: block;"></i>
+                                    Aucune vente à afficher
+                                </td>
+                            </tr>
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>
-
-            <a href="{% url 'sales:invoice_list' %}" class="block mt-4 text-center text-blue-600 hover:text-blue-700 text-sm font-medium">
-                Voir toutes les ventes →
-            </a>
+            <div class="card-footer">
+                <a href="{% url 'sales:invoice_list' %}" class="btn btn-secondary" style="margin-left: auto;">
+                    Voir toutes les ventes →
+                </a>
+            </div>
         </div>
 
-        <!-- Quick Actions & Stats -->
-        <div class="space-y-6">
+        <!-- Quick Actions & Stats Sidebar -->
+        <div style="display: flex; flex-direction: column; gap: var(--space-6);">
             <!-- Quick Actions -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Actions Rapides</h3>
-                <div class="space-y-2">
-                    <a href="{% url 'sales:invoice_create' %}" class="block w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-center font-medium text-sm">
-                        <i class="fas fa-plus mr-2"></i> Nouvelle Facture
+            <div class="card">
+                <div class="card-header">
+                    <h3>Actions Rapides</h3>
+                </div>
+                <div class="card-body" style="display: flex; flex-direction: column; gap: var(--space-2);">
+                    <a href="{% url 'sales:invoice_create' %}" class="quick-action">
+                        <i class="fas fa-receipt"></i> Facture
                     </a>
-                    <a href="{% url 'products:create' %}" class="block w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center font-medium text-sm">
-                        <i class="fas fa-gem mr-2"></i> Ajouter Produit
+                    <a href="{% url 'products:create' %}" class="quick-action">
+                        <i class="fas fa-gem"></i> Produit
                     </a>
-                    <a href="{% url 'sales:invoice_create' %}" class="block w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-center font-medium text-sm">
-                        <i class="fas fa-user-plus mr-2"></i> Nouveau Client
-                    </a>
-                    <a href="{% url 'quotes:quote_create' %}" class="block w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-center font-medium text-sm">
-                        <i class="fas fa-receipt mr-2"></i> Nouveau Devis
+                    <a href="{% url 'quotes:quote_create' %}" class="quick-action">
+                        <i class="fas fa-file-contract"></i> Devis
                     </a>
                 </div>
             </div>
 
             <!-- Statistics -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Statistiques</h3>
-                <div class="space-y-3 text-sm">
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600">Produits</span>
-                        <span class="font-bold text-gray-900">0</span>
+            <div class="card">
+                <div class="card-header">
+                    <h3>Statistiques</h3>
+                </div>
+                <div class="card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Produits</span>
+                        <span class="stat-value">{{ total_products }}</span>
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600">Fournisseurs</span>
-                        <span class="font-bold text-gray-900">0</span>
+                    <div class="stat-row">
+                        <span class="stat-label">Fournisseurs</span>
+                        <span class="stat-value">{{ total_suppliers }}</span>
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600">Réparations En Cours</span>
-                        <span class="font-bold text-gray-900">0</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600">Paiements Attendus</span>
-                        <span class="font-bold text-gray-900">0 DH</span>
+                    <div class="stat-row">
+                        <span class="stat-label">Réparations</span>
+                        <span class="stat-value">{{ repairs_in_progress }}</span>
                     </div>
                 </div>
             </div>
@@ -159,23 +307,103 @@
     </div>
 
     <!-- Activity Log -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-lg font-bold text-gray-900 mb-4">Activité Récente</h2>
+    <style>
+        .activity-item {
+            display: flex;
+            gap: var(--space-4);
+            padding: var(--space-4) 0;
+            border-bottom: 1px solid var(--color-neutral-medium);
+            transition: background-color var(--transition-fast);
+        }
 
-        <div class="space-y-4">
+        .activity-item:hover {
+            background-color: rgba(183, 110, 121, 0.02);
+            padding-left: var(--space-2);
+            padding-right: var(--space-2);
+            border-radius: var(--radius-md);
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, rgba(183, 110, 121, 0.15), rgba(183, 110, 121, 0.05));
+        }
+
+        .activity-icon i {
+            color: var(--color-primary);
+            font-size: 1rem;
+        }
+
+        .activity-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .activity-action {
+            font-weight: var(--weight-semibold);
+            color: var(--color-neutral-black);
+            font-size: var(--text-sm);
+            margin-bottom: var(--space-1);
+        }
+
+        .activity-object {
+            font-size: var(--text-xs);
+            color: var(--color-neutral-gray);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .activity-time {
+            font-size: var(--text-xs);
+            color: var(--color-neutral-gray);
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+    </style>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Activité Récente</h2>
+        </div>
+        <div class="card-body">
             {% for activity in activities %}
-                <div class="flex items-start space-x-4 pb-4 border-b border-gray-100 last:border-b-0">
-                    <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-{{ activity.icon }} text-gray-600 text-sm"></i>
+                <div class="activity-item">
+                    <div class="activity-icon">
+                        {% if activity.action == 'create' %}
+                            <i class="fas fa-plus"></i>
+                        {% elif activity.action == 'update' %}
+                            <i class="fas fa-pencil-alt"></i>
+                        {% elif activity.action == 'delete' %}
+                            <i class="fas fa-trash"></i>
+                        {% elif activity.action == 'login' %}
+                            <i class="fas fa-sign-in-alt"></i>
+                        {% elif activity.action == 'logout' %}
+                            <i class="fas fa-sign-out-alt"></i>
+                        {% else %}
+                            <i class="fas fa-circle"></i>
+                        {% endif %}
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-gray-900">{{ activity.title }}</p>
-                        <p class="text-xs text-gray-500">{{ activity.description }}</p>
+                    <div class="activity-content">
+                        <p class="activity-action">{{ activity.get_action_display }}</p>
+                        <p class="activity-object">{{ activity.object_repr }}</p>
                     </div>
-                    <p class="text-xs text-gray-400 flex-shrink-0">{{ activity.time }}</p>
+                    <p class="activity-time">{{ activity.created_at|date:"d/m/Y H:i" }}</p>
                 </div>
             {% empty %}
-                <p class="text-center text-gray-500 py-8">Aucune activité à afficher</p>
+                <p style="text-align: center; padding: 2rem 1rem; color: var(--color-neutral-gray);">
+                    <i class="fas fa-history" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5; display: block;"></i>
+                    Aucune activité à afficher
+                </p>
             {% endfor %}
         </div>
     </div>

@@ -7,143 +7,156 @@
 <style>
     .supplier-card {
         background: white;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 12px;
-        border: 1px solid #e5e7eb;
-        transition: box-shadow 0.2s;
+        border-radius: var(--radius-lg);
+        padding: var(--space-6);
+        margin-bottom: var(--space-3);
+        border: 1px solid var(--color-neutral-medium);
+        transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
     }
 
     .supplier-card:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: var(--shadow-md);
+        border-color: var(--color-primary);
     }
 
     .supplier-header {
         display: flex;
         justify-content: space-between;
         align-items: start;
-        margin-bottom: 12px;
+        margin-bottom: var(--space-3);
     }
 
     .supplier-name {
-        font-size: 1.1em;
-        font-weight: 600;
-        color: #111827;
+        font-size: 1.125rem;
+        font-weight: var(--weight-semibold);
+        color: var(--color-neutral-dark);
         text-decoration: none;
+        font-family: var(--font-serif);
     }
 
     .supplier-name:hover {
-        color: #2563eb;
+        color: var(--color-primary);
     }
 
     .supplier-type-badge {
         display: inline-block;
-        padding: 4px 12px;
-        border-radius: 12px;
-        font-size: 0.85em;
-        font-weight: 500;
+        padding: var(--space-1) var(--space-3);
+        border-radius: var(--radius-md);
+        font-size: 0.825rem;
+        font-weight: var(--weight-semibold);
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-wide);
+        margin-right: var(--space-2);
     }
 
-    .supplier-type-material { background-color: #dbeafe; color: #1e40af; }
-    .supplier-type-artisan { background-color: #fce7f3; color: #831843; }
-    .supplier-type-other { background-color: #f3f4f6; color: #374151; }
+    .supplier-type-material { background-color: rgba(122, 159, 184, 0.15); color: #7a9fb8; }
+    .supplier-type-artisan { background-color: rgba(183, 110, 121, 0.15); color: var(--color-primary); }
+    .supplier-type-other { background-color: rgba(168, 157, 149, 0.1); color: var(--color-neutral-gray); }
 
     .supplier-info {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 16px;
-        margin-bottom: 12px;
+        gap: var(--space-4);
+        margin-bottom: var(--space-3);
     }
 
     .info-item {
-        font-size: 0.9em;
-        color: #6b7280;
+        font-size: 0.875rem;
+        color: var(--color-neutral-gray);
     }
 
     .info-label {
-        font-weight: 600;
-        color: #374151;
+        font-weight: var(--weight-semibold);
+        color: var(--color-neutral-dark);
         display: block;
+        margin-bottom: var(--space-1);
     }
 
     .info-value {
-        color: #111827;
+        color: var(--color-neutral-black);
     }
 
     .supplier-actions {
         display: flex;
-        gap: 8px;
+        gap: var(--space-2);
         justify-content: flex-end;
     }
 
     .btn-small {
-        padding: 6px 12px;
-        font-size: 0.85em;
-        border-radius: 4px;
+        padding: var(--space-2) var(--space-3);
+        font-size: 0.825rem;
+        border-radius: var(--radius-md);
         text-decoration: none;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        transition: all 0.2s;
+        gap: var(--space-1);
+        transition: all var(--transition-fast);
+        border: none;
+        cursor: pointer;
+        font-weight: var(--weight-semibold);
     }
 
     .btn-primary-small {
-        background-color: #2563eb;
+        background-color: var(--color-primary);
         color: white;
     }
 
     .btn-primary-small:hover {
-        background-color: #1d4ed8;
+        background-color: var(--color-primary-dark);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
     }
 
     .btn-secondary-small {
-        background-color: #e5e7eb;
-        color: #374151;
+        background-color: var(--color-neutral-medium);
+        color: var(--color-neutral-dark);
     }
 
     .btn-secondary-small:hover {
-        background-color: #d1d5db;
+        background-color: var(--color-neutral-light);
     }
 
     .btn-danger-small {
-        background-color: #ef4444;
+        background-color: var(--color-error);
         color: white;
     }
 
     .btn-danger-small:hover {
-        background-color: #dc2626;
+        background-color: #a84a47;
     }
 
     .active-badge {
         display: inline-block;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 0.8em;
-        font-weight: 500;
+        padding: var(--space-1) var(--space-2);
+        border-radius: var(--radius-sm);
+        font-size: 0.75rem;
+        font-weight: var(--weight-semibold);
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-wide);
     }
 
     .active-true {
-        background-color: #d1fae5;
-        color: #065f46;
+        background-color: rgba(124, 179, 66, 0.15);
+        color: #7cb342;
     }
 
     .active-false {
-        background-color: #fee2e2;
-        color: #7f1d1d;
+        background-color: rgba(200, 90, 84, 0.15);
+        color: #c85a54;
     }
 
     .filter-section {
         background: white;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 20px;
-        border: 1px solid #e5e7eb;
+        border-radius: var(--radius-lg);
+        padding: var(--space-6);
+        margin-bottom: var(--space-8);
+        border: 1px solid var(--color-neutral-medium);
     }
 
     .filter-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 16px;
+        gap: var(--space-4);
     }
 
     .filter-group {
@@ -152,92 +165,129 @@
     }
 
     .filter-group label {
-        font-weight: 600;
-        margin-bottom: 6px;
-        color: #374151;
-        font-size: 0.9em;
+        font-weight: var(--weight-semibold);
+        margin-bottom: var(--space-2);
+        color: var(--color-neutral-dark);
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-wide);
     }
 
     .filter-group select,
     .filter-group input {
-        padding: 8px;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-        font-size: 0.9em;
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--color-neutral-medium);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        transition: border-color var(--transition-fast);
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
     }
 
     .filter-actions {
         display: flex;
-        gap: 8px;
+        gap: var(--space-2);
         align-items: flex-end;
     }
 
     .filter-actions button {
-        padding: 8px 16px;
+        padding: var(--space-2) var(--space-4);
         border: none;
-        border-radius: 4px;
-        font-weight: 500;
+        border-radius: var(--radius-md);
+        font-weight: var(--weight-semibold);
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all var(--transition-fast);
     }
 
     .pagination {
         display: flex;
         justify-content: center;
-        gap: 4px;
-        margin-top: 24px;
+        gap: var(--space-1);
+        margin-top: var(--space-8);
     }
 
     .pagination a, .pagination span {
-        padding: 8px 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--color-neutral-medium);
+        border-radius: var(--radius-md);
         text-decoration: none;
-        color: #374151;
-        font-size: 0.9em;
+        color: var(--color-neutral-dark);
+        font-size: 0.875rem;
+        transition: all var(--transition-fast);
     }
 
     .pagination a:hover {
-        background-color: #f3f4f6;
+        background-color: var(--color-neutral-light);
+        border-color: var(--color-primary);
     }
 
     .pagination .current {
-        background-color: #2563eb;
+        background-color: var(--color-primary);
         color: white;
-        border-color: #2563eb;
+        border-color: var(--color-primary);
+        font-weight: var(--weight-semibold);
     }
 
     .no-results {
         text-align: center;
-        padding: 40px;
-        color: #6b7280;
+        padding: var(--space-12);
+        color: var(--color-neutral-gray);
     }
 
     .no-results i {
-        font-size: 3em;
-        color: #d1d5db;
-        margin-bottom: 16px;
+        font-size: 3rem;
+        color: var(--color-neutral-medium);
+        margin-bottom: var(--space-4);
+        opacity: 0.5;
+    }
+
+    .no-results h3 {
+        font-size: 1.25rem;
+        font-weight: var(--weight-semibold);
+        color: var(--color-neutral-dark);
+        font-family: var(--font-serif);
+    }
+
+    .results-count {
+        background: rgba(183, 110, 121, 0.05);
+        border: 1px solid rgba(183, 110, 121, 0.15);
+        border-radius: var(--radius-md);
+        padding: var(--space-3);
+        margin-bottom: var(--space-4);
+        font-size: 0.875rem;
+        color: var(--color-neutral-dark);
+    }
+
+    .results-count strong {
+        color: var(--color-primary);
+        font-weight: var(--weight-semibold);
     }
 </style>
 {% endblock %}
 
-{% block content %}
-<div class="container mx-auto px-4 py-8">
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-8">
+{% block page_header %}
+    <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">Fournisseurs</h1>
-            <p class="text-gray-600 mt-2">Gérez vos fournisseurs et leurs informations</p>
+            <h1 style="margin-bottom: 0.5rem; font-family: var(--font-serif); color: var(--color-neutral-black);">Fournisseurs</h1>
+            <p style="margin: 0; font-size: var(--text-sm); color: var(--color-neutral-gray);">Gérez vos fournisseurs et leurs informations</p>
         </div>
-        <a href="{% url 'suppliers:create' %}" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center">
-            <i class="fas fa-plus mr-2"></i> Nouveau Fournisseur
+        <a href="{% url 'suppliers:create' %}" style="display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-6); background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light)); color: white; border-radius: var(--radius-md); text-decoration: none; font-weight: var(--weight-semibold); font-size: var(--text-sm); text-transform: uppercase; letter-spacing: var(--tracking-wide); transition: all var(--transition-fast);" onmouseover="this.style.background='linear-gradient(135deg, var(--color-primary-dark), var(--color-primary))'; this.style.boxShadow='var(--shadow-hover)'; this.style.transform='translateY(-2px)'" onmouseout="this.style.background='linear-gradient(135deg, var(--color-primary), var(--color-primary-light))'; this.style.boxShadow='none'; this.style.transform='translateY(0)'">
+            <i class="fas fa-plus"></i> Nouveau Fournisseur
         </a>
     </div>
+{% endblock %}
 
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto; padding: 0 var(--space-4);">
     <!-- Messages -->
     {% if messages %}
         {% for message in messages %}
-            <div class="mb-6 p-4 {% if message.tags %}bg-{{ message.tags }}-100 text-{{ message.tags }}-800{% else %}bg-blue-100 text-blue-800{% endif %} rounded-lg">
+            <div style="margin-bottom: var(--space-6); padding: var(--space-4); background-color: {% if message.tags == 'success' %}rgba(124, 179, 66, 0.1){% elif message.tags == 'error' %}rgba(200, 90, 84, 0.1){% else %}rgba(122, 159, 184, 0.1){% endif %}; color: {% if message.tags == 'success' %}#7cb342{% elif message.tags == 'error' %>#c85a54{% else %>#7a9fb8{% endif %}; border-radius: var(--radius-md); border: 1px solid {% if message.tags == 'success' %}rgba(124, 179, 66, 0.3){% elif message.tags == 'error' %}rgba(200, 90, 84, 0.3){% else %}rgba(122, 159, 184, 0.3){% endif %};">
                 {{ message }}
             </div>
         {% endfor %}
@@ -281,10 +331,10 @@
             </div>
 
             <div class="filter-actions">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white">
+                <button type="submit" style="background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light)); color: white;">
                     <i class="fas fa-search mr-2"></i> Filtrer
                 </button>
-                <a href="{% url 'suppliers:list' %}" class="bg-gray-400 hover:bg-gray-500 text-white" style="padding: 8px 16px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center;">
+                <a href="{% url 'suppliers:list' %}" style="background-color: var(--color-neutral-medium); color: var(--color-neutral-dark); padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); text-decoration: none; display: inline-flex; align-items: center; font-weight: var(--weight-semibold);">
                     <i class="fas fa-redo mr-2"></i> Réinitialiser
                 </a>
             </div>
@@ -293,7 +343,7 @@
 
     <!-- Suppliers List -->
     {% if suppliers %}
-        <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+        <div class="results-count">
             <strong>{{ page_obj.paginator.count }}</strong> fournisseur(s) trouvé(s)
         </div>
 
@@ -402,9 +452,9 @@
     {% else %}
         <div class="no-results">
             <i class="fas fa-inbox"></i>
-            <h3 class="text-xl font-semibold text-gray-900">Aucun fournisseur trouvé</h3>
-            <p class="mt-2">Commencez par créer un nouveau fournisseur</p>
-            <a href="{% url 'suppliers:create' %}" class="inline-block mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">
+            <h3 class="no-results h3">Aucun fournisseur trouvé</h3>
+            <p style="margin: var(--space-2) 0; color: var(--color-neutral-gray);">Commencez par créer un nouveau fournisseur</p>
+            <a href="{% url 'suppliers:create' %}" style="display: inline-block; margin-top: var(--space-4); padding: var(--space-3) var(--space-6); background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light)); color: white; text-decoration: none; border-radius: var(--radius-md); font-weight: var(--weight-semibold);">
                 <i class="fas fa-plus mr-2"></i> Créer un fournisseur
             </a>
         </div>

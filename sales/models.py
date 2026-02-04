@@ -300,9 +300,8 @@ class SaleInvoice(models.Model):
             self.tax_amount +
             self.delivery_cost
         )
-        self.balance_due = self.total_amount - self.amount_paid
 
-        # Update status
+        # Update status (which will set correct balance_due: 0 if paid, remaining balance otherwise)
         self.update_status()
 
         self.save(update_fields=[
@@ -313,15 +312,21 @@ class SaleInvoice(models.Model):
         """Update status based on payment"""
         if self.amount_paid >= self.total_amount:
             self.status = self.Status.PAID
+            # When fully paid, balance due is 0 (no outstanding balance)
+            self.balance_due = Decimal('0')
         elif self.amount_paid > 0:
             self.status = self.Status.PARTIAL_PAID
+            # For partial payment, show remaining balance
+            self.balance_due = self.total_amount - self.amount_paid
         else:
             self.status = self.Status.UNPAID
+            # For unpaid invoices, balance due equals total amount
+            self.balance_due = self.total_amount
 
     def update_payment(self, amount):
         """Update payment amount"""
         self.amount_paid += amount
-        self.balance_due = self.total_amount - self.amount_paid
+        # Update status which will automatically set correct balance_due
         self.update_status()
         self.save(update_fields=['amount_paid', 'balance_due', 'status'])
 
@@ -477,14 +482,17 @@ class SaleInvoiceItem(models.Model):
         self.unit_price = self.negotiated_price or self.original_price
 
         # FIXED: Calculate total with quantity
-        self.total_amount = (self.unit_price * self.quantity) - self.discount_amount
+        # NOTE: The unit_price is already the final selling price (after any discount)
+        # The discount_amount field is stored for informational/reference purposes
+        # and represents the difference from original_price to unit_price
+        # So we calculate total = unit_price * quantity (discount is already in unit_price)
+        self.total_amount = self.unit_price * self.quantity
 
         super().save(*args, **kwargs)
 
-        # Update product status
-        if self.invoice.status not in ['draft', 'cancelled']:
-            self.product.status = 'sold'
-            self.product.save(update_fields=['status'])
+        # NOTE: Product status is now updated in the view AFTER invoice status is changed to PAID
+        # (see sales/views.py bulk_invoice_create and single invoice creation views)
+        # This cannot be done here because the invoice status hasn't been updated yet when save() is called
 
         # Update invoice totals
         self.invoice.calculate_totals()

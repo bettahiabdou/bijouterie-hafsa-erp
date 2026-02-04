@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -5,14 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Bijouterie Hafsa - ERP{% endblock %}</title>
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Refined Minimalist Design System -->
+    <link rel="stylesheet" href="{% static 'css/design-system.css' %}">
 
     <!-- Bootstrap CSS (for modals) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Mobile-Friendly Forms CSS (Phase 1) -->
+    <link rel="stylesheet" href="{% static 'css/mobile-forms.css' %}">
 
     <style>
         :root {
@@ -60,10 +64,137 @@
     </style>
 
     {% block extra_css %}{% endblock %}
+
+    <style>
+        body {
+            background-color: var(--color-neutral-cream);
+            color: var(--color-neutral-dark);
+            font-family: var(--font-sans);
+        }
+
+        /* Navigation Bar - Refined Minimalist */
+        nav {
+            background: white;
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        nav .px-4 {
+            padding: 0 var(--space-4);
+        }
+
+        nav .sm\:px-6 {
+            padding: 0 var(--space-6);
+        }
+
+        nav .lg\:px-8 {
+            padding: 0 var(--space-8);
+        }
+
+        /* Navigation flex layout */
+        nav .flex {
+            display: flex;
+        }
+
+        nav .flex.justify-between {
+            justify-content: space-between;
+        }
+
+        nav .flex.items-center {
+            align-items: center;
+        }
+
+        nav .h-16 {
+            height: 4rem;
+        }
+
+        /* Logo styling */
+        nav .bg-yellow-500 {
+            background-color: var(--color-warning);
+            color: white;
+            padding: var(--space-2) var(--space-3);
+            border-radius: var(--radius-md);
+            font-weight: var(--weight-bold);
+        }
+
+        nav a {
+            color: var(--color-neutral-dark);
+            text-decoration: none;
+            transition: all var(--transition-fast);
+        }
+
+        nav a:hover {
+            color: var(--color-primary);
+        }
+
+        /* Search bar */
+        nav input {
+            background: var(--color-neutral-light);
+            border: 1px solid var(--color-neutral-medium);
+            color: var(--color-neutral-dark);
+            padding: var(--space-2) var(--space-4);
+            border-radius: var(--radius-md);
+            font-size: var(--text-sm);
+        }
+
+        nav input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
+        }
+
+        /* Sidebar */
+        aside.sidebar {
+            background: #2d2d2d;
+            color: white;
+            overflow-y: auto;
+        }
+
+        aside.sidebar a {
+            color: #ccc;
+        }
+
+        aside.sidebar a:hover {
+            background: #404040;
+            color: white;
+        }
+
+        aside.sidebar .submenu {
+            display: none;
+        }
+
+        aside.sidebar .submenu.block {
+            display: block;
+        }
+
+        /* Dropdown menus */
+        .hidden {
+            display: none;
+        }
+
+        .block {
+            display: block;
+        }
+
+        @media (max-width: 1023px) {
+            aside.sidebar {
+                position: fixed;
+                left: 0;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease-in-out;
+            }
+
+            aside.sidebar.open {
+                transform: translateX(0);
+            }
+        }
+    </style>
 </head>
-<body class="bg-gray-50">
+<body>
     <!-- Navigation Bar -->
-    <nav class="bg-white shadow-md sticky top-0 z-50">
+    <nav>
         <div class="px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
@@ -92,23 +223,24 @@
                     </button>
 
                     <!-- User Dropdown -->
-                    <div class="relative group">
-                        <button class="flex items-center space-x-2 text-gray-700 hover:text-gray-900">
+                    <div class="relative" id="userDropdownContainer">
+                        <button id="userDropdownBtn" class="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none">
                             <img src="https://ui-avatars.com/api/?name={{ user.first_name }}+{{ user.last_name }}&background=d4af37&color=fff"
                                 class="w-8 h-8 rounded-full">
                             <span class="hidden md:inline text-sm font-medium">{{ user.first_name }}</span>
+                            <i class="fas fa-chevron-down text-xs"></i>
                         </button>
 
                         <!-- Dropdown Menu -->
-                        <div class="hidden group-hover:block absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 z-50">
-                            <a href="{% url 'users:profile' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        <div id="userDropdownMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 z-50">
+                            <a href="{% url 'users:profile' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
                                 <i class="fas fa-user-circle mr-2"></i> Mon Profil
                             </a>
-                            <a href="{% url 'users:profile_edit' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            <a href="{% url 'users:profile_edit' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
                                 <i class="fas fa-cog mr-2"></i> Paramètres
                             </a>
                             <hr class="my-2">
-                            <a href="{% url 'logout' %}" class="block px-4 py-2 text-sm text-red-700 hover:bg-gray-100">
+                            <a href="{% url 'logout' %}" class="block px-4 py-2 text-sm text-red-700 hover:bg-gray-100 transition">
                                 <i class="fas fa-sign-out-alt mr-2"></i> Déconnexion
                             </a>
                         </div>
@@ -120,7 +252,7 @@
 
     <div class="flex">
         <!-- Sidebar -->
-        <aside class="sidebar w-64 bg-gray-900 text-white h-screen overflow-y-auto fixed lg:static transform lg:transform-none transition-transform duration-300 ease-in-out z-40">
+        <aside class="sidebar w-64 bg-gray-900 text-white h-screen overflow-y-auto fixed lg:sticky lg:top-0 transform lg:transform-none transition-transform duration-300 ease-in-out z-40">
             <div class="p-6 border-b border-gray-700">
                 <h3 class="text-lg font-bold">Menu Principal</h3>
             </div>
@@ -257,6 +389,15 @@
     <!-- Bootstrap JS (for modals) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+    <!-- Mobile-Friendly Forms JavaScript (Phase 2) -->
+    <script src="{% static 'js/mobile-forms.js' %}"></script>
+
+    <!-- Form Validation JavaScript (Phase 3) -->
+    <script src="{% static 'js/form-validation.js' %}"></script>
+
+    <!-- Field Dependencies JavaScript (Phase 3) -->
+    <script src="{% static 'js/field-dependencies.js' %}"></script>
+
     <script>
         // Sidebar toggle
         document.getElementById('sidebar-toggle')?.addEventListener('click', function() {
@@ -272,6 +413,38 @@
             const sidebar = document.querySelector('aside');
             sidebar.classList.add('transform', '-translate-x-full');
             this.classList.add('hidden');
+        });
+
+        // User dropdown menu toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const userDropdownBtn = document.getElementById('userDropdownBtn');
+            const userDropdownMenu = document.getElementById('userDropdownMenu');
+            const userDropdownContainer = document.getElementById('userDropdownContainer');
+
+            if (userDropdownBtn && userDropdownMenu) {
+                // Toggle dropdown on button click
+                userDropdownBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    userDropdownMenu.classList.toggle('hidden');
+                    userDropdownBtn.classList.toggle('text-yellow-500');
+                });
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', function(e) {
+                    if (!userDropdownContainer.contains(e.target)) {
+                        userDropdownMenu.classList.add('hidden');
+                        userDropdownBtn.classList.remove('text-yellow-500');
+                    }
+                });
+
+                // Close dropdown when clicking a link
+                userDropdownMenu.querySelectorAll('a').forEach(link => {
+                    link.addEventListener('click', function() {
+                        userDropdownMenu.classList.add('hidden');
+                        userDropdownBtn.classList.remove('text-yellow-500');
+                    });
+                });
+            }
         });
     </script>
 

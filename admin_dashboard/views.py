@@ -374,14 +374,20 @@ def user_create(request):
     if request.method == 'POST':
         form = UserManagementForm(request.POST)
         if form.is_valid():
-            user = form.save(commit=False)
-            # Set password
-            if request.POST.get('password'):
-                user.set_password(request.POST.get('password'))
-            # Auto-assign permissions based on role
-            user.assign_permissions_by_role()
-            user.save()
-            messages.success(request, f'Utilisateur {user.full_name} créé avec succès.')
+            user = form.save()
+            # Permissions are auto-assigned by User.save() based on role
+
+            # Log the activity
+            ActivityLog.objects.create(
+                user=request.user,
+                action='create',
+                model_name='User',
+                object_id=user.id,
+                object_repr=user.get_full_name(),
+                ip_address=get_client_ip(request),
+            )
+
+            messages.success(request, f'Utilisateur {user.get_full_name()} créé avec succès.')
             return redirect('admin_dashboard:user_list')
     else:
         form = UserManagementForm()
@@ -398,6 +404,7 @@ def user_create(request):
 
 @login_required(login_url='login')
 @staff_required
+@require_http_methods(["GET", "POST"])
 def user_edit(request, user_id):
     """Edit user details"""
     from admin_dashboard.forms import UserManagementForm
@@ -412,20 +419,26 @@ def user_edit(request, user_id):
     if request.method == 'POST':
         form = UserManagementForm(request.POST, instance=user_obj)
         if form.is_valid():
-            user = form.save(commit=False)
-            # Update password if provided
-            if request.POST.get('password'):
-                user.set_password(request.POST.get('password'))
-            # Update permissions based on new role
-            user.assign_permissions_by_role()
-            user.save()
-            messages.success(request, f'Utilisateur {user.full_name} mis à jour.')
+            user = form.save()
+            # Permissions are auto-assigned by User.save() based on role
+
+            # Log the activity
+            ActivityLog.objects.create(
+                user=request.user,
+                action='update',
+                model_name='User',
+                object_id=user.id,
+                object_repr=user.get_full_name(),
+                ip_address=get_client_ip(request),
+            )
+
+            messages.success(request, f'Utilisateur {user.get_full_name()} mis à jour.')
             return redirect('admin_dashboard:user_list')
     else:
         form = UserManagementForm(instance=user_obj)
 
     context = {
-        'page_title': f'Éditer {user_obj.full_name}',
+        'page_title': f'Éditer {user_obj.get_full_name()}',
         'section': 'users',
         'form': form,
         'user_obj': user_obj,
@@ -454,7 +467,7 @@ def user_deactivate(request, user_id):
 
     user_obj.is_active = False
     user_obj.save()
-    messages.success(request, f'Utilisateur {user_obj.full_name} désactivé.')
+    messages.success(request, f'Utilisateur {user_obj.get_full_name()} désactivé.')
 
     # Log the action
     ActivityLog.objects.create(
@@ -462,7 +475,7 @@ def user_deactivate(request, user_id):
         action='delete',
         model_name='User',
         object_id=user_obj.id,
-        object_repr=user_obj.full_name,
+        object_repr=user_obj.get_full_name(),
         ip_address=get_client_ip(request),
     )
 

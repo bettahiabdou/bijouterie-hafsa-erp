@@ -399,6 +399,11 @@ def invoice_create(request):
                             discount_amount=Decimal(str(item_data['discount_amount'])),
                             total_amount=Decimal(str(item_data['total_amount']))
                         )
+
+                        # RESERVE PRODUCT: Mark as 'indisponible' when invoice is created
+                        # Product will be either 'sold' (if paid) or stay 'indisponible' (if unpaid/partial)
+                        product.status = 'indisponible'
+                        product.save(update_fields=['status'])
                     except (Product.DoesNotExist, ValueError, KeyError) as e:
                         print(f'Error creating item: {str(e)}')
                         continue
@@ -424,6 +429,13 @@ def invoice_create(request):
                     invoice.balance_due = invoice.total_amount - amount_paid
                     invoice.update_status()
                     invoice.save(update_fields=['amount_paid', 'balance_due', 'status'])
+
+                    # UPDATE PRODUCT STATUS: If invoice is now PAID, mark product as sold
+                    if invoice.status == SaleInvoice.Status.PAID:
+                        for item in invoice.items.all():
+                            item.product.status = 'sold'
+                            item.product.save(update_fields=['status'])
+                    # Note: if status is UNPAID or PARTIAL, product stays 'indisponible' (reserved)
 
                     # Log the payment activity
                     ActivityLog.objects.create(
@@ -566,10 +578,7 @@ def bulk_invoice_create(request):
                         except (ValueError, InvalidOperation):
                             pass
 
-                    # Calculate subtotal (both Decimal now, so multiplication works)
-                    subtotal = selling_price * quantity
-
-                    # Get discount amount if provided
+                    # Get discount amount if provided (auto-calculated as difference from original price)
                     discount_amount = Decimal(0)
                     if i < len(discount_amounts) and discount_amounts[i].strip():
                         try:
@@ -579,8 +588,11 @@ def bulk_invoice_create(request):
                         except (ValueError, InvalidOperation):
                             discount_amount = Decimal(0)
 
-                    # Calculate total after discount
-                    total_amount = subtotal - discount_amount
+                    # IMPORTANT: The selling_price is already the discounted price
+                    # The discount_amount represents the difference from original to selling price
+                    # So total = selling_price * quantity (no need to subtract discount again)
+                    subtotal = selling_price * quantity
+                    total_amount = subtotal  # selling_price is already the final price after discount
 
                     # Create invoice
                     invoice = SaleInvoice.objects.create(
@@ -595,14 +607,21 @@ def bulk_invoice_create(request):
                         amount_paid=Decimal(0),
                     )
 
-                    # Add product item to invoice (subtotal calculated in model)
+                    # Add product item to invoice
+                    # The unit_price is the selling price (already includes any discount)
+                    # discount_amount field stores the actual discount for record-keeping
                     SaleInvoiceItem.objects.create(
                         invoice=invoice,
                         product=product,
                         quantity=quantity,
                         unit_price=selling_price,
-                        discount_amount=discount_amount,
+                        discount_amount=discount_amount,  # Store for reference
                     )
+
+                    # RESERVE PRODUCT: Mark as 'indisponible' when invoice is created
+                    # Product will be either 'sold' (if paid) or stay 'indisponible' (if unpaid/partial)
+                    product.status = 'indisponible'
+                    product.save(update_fields=['status'])
 
                     # Handle payment method & reference if provided
                     if i < len(payment_methods) and payment_methods[i]:
@@ -613,7 +632,8 @@ def bulk_invoice_create(request):
                         try:
                             payment_method = PaymentMethod.objects.get(id=payment_method_id)
                             invoice.payment_method = payment_method
-                            invoice.payment_reference = payment_reference
+                            # Set payment_reference to None if empty (to avoid UNIQUE constraint on empty strings)
+                            invoice.payment_reference = payment_reference if payment_reference.strip() else None
 
                             # Set bank account for virement bancaire payments
                             if bank_account_id:
@@ -634,13 +654,20 @@ def bulk_invoice_create(request):
                             if amount_paid > 0:
                                 invoice.amount_paid = amount_paid
 
-                                # Update status based on amount paid
-                                if amount_paid >= invoice.total_amount:
-                                    invoice.status = SaleInvoice.Status.PAID
-                                elif amount_paid > 0:
-                                    invoice.status = SaleInvoice.Status.PARTIAL_PAID
+                                # Call update_status() to properly set status AND balance_due
+                                # This ensures balance_due = 0 when PAID, and correct balance otherwise
+                                invoice.update_status()
 
-                                invoice.save(update_fields=['amount_paid', 'status'])
+                                invoice.save(update_fields=['amount_paid', 'status', 'balance_due'])
+
+                                # UPDATE PRODUCT STATUS: Change status based on final invoice status
+                                # This must be done AFTER invoice status is updated (not in SaleInvoiceItem.save)
+                                if invoice.status == SaleInvoice.Status.PAID:
+                                    # Get the product from the invoice items
+                                    for item in invoice.items.all():
+                                        item.product.status = 'sold'
+                                        item.product.save(update_fields=['status'])
+                                # Note: if status is UNPAID or PARTIAL, product stays 'indisponible' (reserved)
 
                                 # Log payment activity
                                 ActivityLog.objects.create(
@@ -694,7 +721,6 @@ def bulk_invoice_create(request):
             messages.error(request, f'Erreur lors de la création en lot: {str(e)}')
 
     # Get context data
-    from clients.models import Client
     context = {
         'clients': Client.objects.filter(is_active=True),
         'products': Product.objects.filter(status='available'),
@@ -980,6 +1006,9 @@ def invoice_payment(request, reference):
             form = PaymentForm(request.POST)
             if form.is_valid():
                 amount = form.cleaned_data['amount']
+                payment_method = form.cleaned_data.get('payment_method')
+                payment_reference = form.cleaned_data.get('payment_reference', '').strip()
+                bank_account = form.cleaned_data.get('bank_account')
 
                 # SECURITY: Use transaction lock to prevent race conditions
                 from django.db import transaction
@@ -1023,7 +1052,25 @@ def invoice_payment(request, reference):
                                 invoice.status = SaleInvoice.Status.PARTIAL_PAID
 
                             invoice.amount_paid = paid_amount
-                            invoice.save(update_fields=['status', 'amount_paid'])
+
+                            # Update payment method details if provided
+                            if payment_method:
+                                invoice.payment_method = payment_method
+                            if payment_reference:
+                                invoice.payment_reference = payment_reference
+                            if bank_account:
+                                invoice.bank_account = bank_account
+
+                            # Determine which fields to update
+                            update_fields = ['status', 'amount_paid']
+                            if payment_method:
+                                update_fields.append('payment_method')
+                            if payment_reference:
+                                update_fields.append('payment_reference')
+                            if bank_account:
+                                update_fields.append('bank_account')
+
+                            invoice.save(update_fields=update_fields)
 
                     # Log activity
                     ActivityLog.objects.create(

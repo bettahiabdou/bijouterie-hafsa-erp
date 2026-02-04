@@ -48,14 +48,26 @@
                             {% endif %}
                         </div>
 
-                        <div class="form-group mb-3">
-                            <label for="{{ form.bank_account.id_for_label }}" class="form-label">Compte bancaire</label>
+                        <div class="form-group mb-3" id="bankAccountGroup" style="display: none;">
+                            <label for="{{ form.bank_account.id_for_label }}" class="form-label">Compte bancaire <span class="text-danger">*</span></label>
                             {{ form.bank_account }}
                             {% if form.bank_account.errors %}
                                 <div class="invalid-feedback d-block">
                                     {{ form.bank_account.errors.0 }}
                                 </div>
                             {% endif %}
+                            <small class="form-text text-muted">Sélectionnez le compte bancaire pour ce virement</small>
+                        </div>
+
+                        <div class="form-group mb-3" id="paymentReferenceGroup" style="display: none;">
+                            <label for="{{ form.payment_reference.id_for_label }}" class="form-label">Référence de paiement <span class="text-danger">*</span></label>
+                            {{ form.payment_reference }}
+                            {% if form.payment_reference.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.payment_reference.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">Obligatoire pour virement, chèque, paiement mobile ou carte</small>
                         </div>
 
                         <div class="form-group mb-3">
@@ -150,4 +162,53 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentMethodSelect = document.querySelector('select[name="payment_method"]');
+    const bankAccountGroup = document.getElementById('bankAccountGroup');
+    const bankAccountSelect = document.querySelector('select[name="bank_account"]');
+    const paymentReferenceGroup = document.getElementById('paymentReferenceGroup');
+    const paymentReferenceInput = document.querySelector('input[name="payment_reference"]');
+
+    // Function to update visibility
+    function updatePaymentFieldsVisibility() {
+        if (paymentMethodSelect) {
+            const selectedText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex]?.text || '';
+            const selectedTextLower = selectedText.toLowerCase();
+
+            // Show bank account field if "virement bancaire" is selected
+            const isBankTransfer = selectedTextLower.includes('virement');
+
+            // Show reference field for everything EXCEPT cash/espèces
+            const isCash = selectedTextLower.includes('espèces');
+            const requiresReference = !isCash && selectedText.trim() !== '' && selectedText.trim() !== '---------';
+
+            // Update bank account field visibility
+            if (bankAccountGroup) {
+                bankAccountGroup.style.display = isBankTransfer ? 'block' : 'none';
+                if (bankAccountSelect) {
+                    bankAccountSelect.required = isBankTransfer;
+                }
+            }
+
+            // Update payment reference field visibility
+            if (paymentReferenceGroup) {
+                paymentReferenceGroup.style.display = requiresReference ? 'block' : 'none';
+                if (paymentReferenceInput) {
+                    paymentReferenceInput.required = requiresReference;
+                }
+            }
+        }
+    }
+
+    // Update on load
+    updatePaymentFieldsVisibility();
+
+    // Update on change
+    if (paymentMethodSelect) {
+        paymentMethodSelect.addEventListener('change', updatePaymentFieldsVisibility);
+    }
+});
+</script>
 {% endblock %}

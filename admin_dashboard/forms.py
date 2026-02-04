@@ -38,7 +38,7 @@ class UserManagementForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'first_name', 'last_name', 'first_name_ar', 'last_name_ar', 'role', 'is_active']
+        fields = ['username', 'email', 'first_name', 'last_name', 'role', 'is_active']
         widgets = {
             'username': forms.TextInput(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
@@ -55,14 +55,6 @@ class UserManagementForm(forms.ModelForm):
             'last_name': forms.TextInput(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
                 'placeholder': 'Nom'
-            }),
-            'first_name_ar': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Prénom (Arabe)'
-            }),
-            'last_name_ar': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
-                'placeholder': 'Nom (Arabe)'
             }),
             'role': forms.Select(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500'

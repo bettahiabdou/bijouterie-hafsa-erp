@@ -34,11 +34,11 @@ def profile_view(request):
     seven_days_ago = now() - timedelta(days=7)
     stats = {
         'total_activities': ActivityLog.objects.filter(user=user).count(),
-        'recent_activities': ActivityLog.objects.filter(user=user, timestamp__gte=seven_days_ago).count(),
+        'recent_activities': ActivityLog.objects.filter(user=user, created_at__gte=seven_days_ago).count(),
         'last_login': ActivityLog.objects.filter(
             user=user,
             action='login'
-        ).order_by('-timestamp').first(),
+        ).order_by('-created_at').first(),
         'role': user.get_role_display() if hasattr(user, 'get_role_display') else user.role,
     }
 
@@ -64,9 +64,9 @@ def profile_edit(request):
         ActivityLog.objects.create(
             user=user,
             action='update',
-            object_type='User',
-            object_id=user.id,
-            description=f'Updated profile',
+            model_name='User',
+            object_id=str(user.id),
+            object_repr=f'Updated profile for {user.first_name} {user.last_name}',
             ip_address=get_client_ip(request)
         )
 
@@ -92,9 +92,9 @@ def password_change(request):
             ActivityLog.objects.create(
                 user=user,
                 action='update',
-                object_type='User',
-                object_id=user.id,
-                description='Changed password',
+                model_name='User',
+                object_id=str(user.id),
+                object_repr='Changed password',
                 ip_address=get_client_ip(request)
             )
 
@@ -116,7 +116,7 @@ def password_change(request):
 def activity_log(request):
     """View user activity log"""
     user = request.user
-    logs = ActivityLog.objects.filter(user=user).order_by('-timestamp')
+    logs = ActivityLog.objects.filter(user=user).order_by('-created_at')
 
     # Filter by action type
     action = request.GET.get('action', '')
@@ -127,9 +127,9 @@ def activity_log(request):
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
     if date_from:
-        logs = logs.filter(timestamp__gte=date_from)
+        logs = logs.filter(created_at__gte=date_from)
     if date_to:
-        logs = logs.filter(timestamp__lte=date_to)
+        logs = logs.filter(created_at__lte=date_to)
 
     # Pagination
     from django.core.paginator import Paginator
@@ -211,15 +211,15 @@ def user_detail(request, user_id):
         'last_login': ActivityLog.objects.filter(
             user=user,
             action='login'
-        ).order_by('-timestamp').first(),
+        ).order_by('-created_at').first(),
         'activities_7days': ActivityLog.objects.filter(
             user=user,
-            timestamp__gte=now() - timedelta(days=7)
+            created_at__gte=now() - timedelta(days=7)
         ).count(),
     }
 
     # Get recent activities
-    recent_activities = ActivityLog.objects.filter(user=user).order_by('-timestamp')[:10]
+    recent_activities = ActivityLog.objects.filter(user=user).order_by('-created_at')[:10]
 
     context = {
         'user': user,
@@ -250,9 +250,9 @@ def user_edit(request, user_id):
         ActivityLog.objects.create(
             user=request.user,
             action='update',
-            object_type='User',
-            object_id=user.id,
-            description=f'Edited user {user.get_full_name()}',
+            model_name='User',
+            object_id=str(user.id),
+            object_repr=f'Edited user {user.get_full_name()}',
             ip_address=get_client_ip(request)
         )
 
@@ -280,9 +280,9 @@ def user_deactivate(request, user_id):
         ActivityLog.objects.create(
             user=request.user,
             action='update',
-            object_type='User',
-            object_id=user.id,
-            description=f'Deactivated user {user.get_full_name()}',
+            model_name='User',
+            object_id=str(user.id),
+            object_repr=f'Deactivated user {user.get_full_name()}',
             ip_address=get_client_ip(request)
         )
 
@@ -299,7 +299,7 @@ def user_deactivate(request, user_id):
 @permission_required('users.view_activitylog', raise_exception=True)
 def activity_log_admin(request):
     """View all activity logs (admin only)"""
-    logs = ActivityLog.objects.select_related('user').order_by('-timestamp')
+    logs = ActivityLog.objects.select_related('user').order_by('-created_at')
 
     # Search by user
     search = request.GET.get('search', '')
@@ -307,7 +307,7 @@ def activity_log_admin(request):
         logs = logs.filter(
             Q(user__first_name__icontains=search) |
             Q(user__last_name__icontains=search) |
-            Q(description__icontains=search)
+            Q(object_repr__icontains=search)
         )
 
     # Filter by action
@@ -319,15 +319,15 @@ def activity_log_admin(request):
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
     if date_from:
-        logs = logs.filter(timestamp__gte=date_from)
+        logs = logs.filter(created_at__gte=date_from)
     if date_to:
-        logs = logs.filter(timestamp__lte=date_to)
+        logs = logs.filter(created_at__lte=date_to)
 
     # Statistics
     today = now().date()
     stats = {
         'total': ActivityLog.objects.count(),
-        'today': ActivityLog.objects.filter(timestamp__date=today).count(),
+        'today': ActivityLog.objects.filter(created_at__date=today).count(),
         'by_action': ActivityLog.objects.values('action').annotate(count=Count('id')),
     }
 

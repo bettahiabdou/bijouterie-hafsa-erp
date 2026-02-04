@@ -245,6 +245,15 @@ class PaymentForm(forms.Form):
         })
     )
 
+    payment_reference = forms.CharField(
+        label='Référence de paiement',
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+            'placeholder': 'N° de chèque, référence virement, n° de carte...'
+        })
+    )
+
     notes = forms.CharField(
         label='Notes',
         required=False,
