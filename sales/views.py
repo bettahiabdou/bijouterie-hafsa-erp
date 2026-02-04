@@ -363,7 +363,11 @@ def invoice_create(request):
                 invoice.calculate_totals()
 
                 # Handle payment amount if provided during invoice creation
-                amount_paid = form.cleaned_data.get('amount_paid')
+                try:
+                    amount_paid = Decimal(str(request.POST.get('amount_paid', '0')))
+                except (InvalidOperation, ValueError):
+                    amount_paid = Decimal('0')
+
                 if amount_paid and amount_paid > 0:
                     invoice.update_payment(amount_paid)
                     # Log the payment activity
