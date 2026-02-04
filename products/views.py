@@ -119,6 +119,9 @@ def batch_product_create(request):
         return redirect('products:list')
 
     if request.method == 'POST':
+        import logging
+        logger = logging.getLogger(__name__)
+
         try:
             # Common parameters
             category_id = request.POST.get('category')
@@ -137,28 +140,47 @@ def batch_product_create(request):
             margin_type = request.POST.get('margin_type', 'percentage')
             margin_value = float(request.POST.get('margin_value', 25))
 
-            # Product data
-            product_weights = request.POST.getlist('product_weight')
+            # Product data - Extract all product fields
+            product_names = request.POST.getlist('product_name')
+            product_weights_net = request.POST.getlist('product_weight')
+            product_weights_gross = request.POST.getlist('product_gross_weight')
             product_selling_prices = request.POST.getlist('product_selling_price')
 
             created_count = 0
-            for i, weight_str in enumerate(product_weights):
+            failed_rows = []
+
+            for i, weight_net_str in enumerate(product_weights_net):
                 try:
-                    weight = float(weight_str)
-                    if weight <= 0:
+                    # Parse weights
+                    weight_net = float(weight_net_str) if weight_net_str else 0
+                    weight_gross = float(product_weights_gross[i]) if i < len(product_weights_gross) and product_weights_gross[i] else weight_net
+
+                    # Skip empty rows
+                    if weight_net <= 0:
                         continue
 
-                    selling_price = float(product_selling_prices[i]) if i < len(product_selling_prices) else 0
+                    # Get product name (with default fallback)
+                    product_name = product_names[i].strip() if i < len(product_names) else ""
+                    if not product_name:
+                        product_name = f"Produit {created_count + 1}"
+
+                    # Get selling price override if user entered it
+                    selling_price_override = None
+                    if i < len(product_selling_prices) and product_selling_prices[i].strip():
+                        try:
+                            selling_price_override = float(product_selling_prices[i])
+                        except ValueError:
+                            pass
 
                     # Create product instance (don't save yet)
                     product = Product(
-                        name=f"Produit Lot {i+1}",
+                        name=product_name,
                         product_type=product_type,
                         category_id=category_id,
                         metal_type_id=metal_type_id if metal_type_id else None,
                         metal_purity_id=metal_purity_id if metal_purity_id else None,
-                        net_weight=weight,
-                        gross_weight=weight,
+                        net_weight=weight_net,
+                        gross_weight=weight_gross,
                         purchase_price_per_gram=purchase_price_per_gram,
                         labor_cost=labor_cost,
                         stone_cost=stone_cost,
@@ -172,6 +194,11 @@ def batch_product_create(request):
                     # Save product - triggers auto-generation and calculations
                     product.save()
 
+                    # If user provided a selling price override, update it
+                    if selling_price_override is not None:
+                        product.selling_price = selling_price_override
+                        product.save(update_fields=['selling_price'])
+
                     # Log activity
                     ActivityLog.objects.create(
                         user=request.user,
@@ -184,13 +211,27 @@ def batch_product_create(request):
 
                     created_count += 1
 
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    failed_rows.append((i + 1, str(e)))
+                    logger.warning(f'Failed to create batch product at row {i + 1}: {str(e)}')
+                    continue
+                except Exception as e:
+                    failed_rows.append((i + 1, str(e)))
+                    logger.exception(f'Unexpected error creating batch product at row {i + 1}')
                     continue
 
-            messages.success(request, f'{created_count} produit(s) créé(s) avec succès.')
+            # Provide success/warning feedback
+            if created_count > 0:
+                messages.success(request, f'{created_count} produit(s) créé(s) avec succès.')
+
+            if failed_rows:
+                error_details = '; '.join([f"Ligne {row}: {error}" for row, error in failed_rows])
+                messages.warning(request, f'Certaines lignes n\'ont pas pu être créées: {error_details}')
+
             return redirect('products:list')
 
         except Exception as e:
+            logger.exception(f'Error in batch product creation: {str(e)}')
             messages.error(request, f'Erreur lors de la création en lot: {str(e)}')
 
     context = {
