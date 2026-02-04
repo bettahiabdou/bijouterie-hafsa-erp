@@ -5,7 +5,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q, Count, Sum, F
+from django.db import IntegrityError
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
@@ -51,12 +53,22 @@ def invoice_list(request):
     if date_to:
         invoices = invoices.filter(date__lte=date_to)
 
-    # Sort
-    sort_by = request.GET.get('sort', '-date')
-    try:
-        invoices = invoices.order_by(sort_by)
-    except:
-        invoices = invoices.order_by('-date')
+    # Sort - Use whitelist for safety
+    ALLOWED_SORTS = {
+        'date': '-date',
+        '-date': '-date',
+        'amount': 'total_amount',
+        '-amount': '-total_amount',
+        'client': 'client__first_name',
+        '-client': '-client__first_name',
+        'status': 'status',
+        '-status': '-status',
+        'paid': 'amount_paid',
+        '-paid': '-amount_paid',
+    }
+    sort_param = request.GET.get('sort', '-date')
+    sort_by = ALLOWED_SORTS.get(sort_param, '-date')
+    invoices = invoices.order_by(sort_by)
 
     # Pagination
     paginator = Paginator(invoices, 20)
@@ -242,11 +254,31 @@ def add_invoice_item(request, reference):
             'product_name': product.name
         })
 
-    except Exception as e:
-        print(f'Error adding item: {str(e)}')
+    except SaleInvoice.DoesNotExist:
         return JsonResponse({
             'success': False,
-            'error': f'Erreur: {str(e)}'
+            'error': 'Facture non trouvée'
+        }, status=404)
+    except Product.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Produit non trouvé'
+        }, status=404)
+    except (IntegrityError, ValueError) as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f'Validation error adding item: {str(e)}')
+        return JsonResponse({
+            'success': False,
+            'error': 'Données invalides'
+        }, status=400)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f'Unexpected error adding invoice item: {str(e)}')
+        return JsonResponse({
+            'success': False,
+            'error': 'Erreur serveur'
         }, status=500)
 
 
@@ -294,11 +326,23 @@ def delete_invoice_item(request):
             'message': 'Article supprimé avec succès'
         })
 
-    except Exception as e:
-        print(f'Error deleting item: {str(e)}')
+    except SaleInvoiceItem.DoesNotExist:
         return JsonResponse({
             'success': False,
-            'error': f'Erreur: {str(e)}'
+            'error': 'Article non trouvé'
+        }, status=404)
+    except PermissionDenied:
+        return JsonResponse({
+            'success': False,
+            'error': 'Vous n\'avez pas la permission de supprimer cet article'
+        }, status=403)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f'Unexpected error deleting invoice item: {str(e)}')
+        return JsonResponse({
+            'success': False,
+            'error': 'Erreur serveur'
         }, status=500)
 
 
@@ -420,11 +464,21 @@ def invoice_create(request):
                     for error in errors:
                         messages.error(request, f'{field}: {error}')
 
-        except Exception as e:
-            messages.error(request, f'Erreur lors de la création: {str(e)}')
+        except IntegrityError as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.exception(f'Error creating invoice: {str(e)}')
+            logger.exception(f'Integrity error creating invoice: {str(e)}')
+            messages.error(request, 'Erreur: données dupliquées ou invalides')
+        except ValueError as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f'Validation error creating invoice: {str(e)}')
+            messages.error(request, f'Erreur: {str(e)}')
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f'Unexpected error creating invoice: {str(e)}')
+            messages.error(request, 'Erreur serveur lors de la création')
 
     # FIXED: Create new form if GET request or POST failed
     if form is None:
@@ -719,24 +773,49 @@ def invoice_payment(request, reference):
             if form.is_valid():
                 amount = form.cleaned_data['amount']
 
-                # Validate amount doesn't exceed balance
-                if amount > invoice.balance_due:
-                    messages.error(
-                        request,
-                        f'Le paiement ne peut pas dépasser le solde dû ({invoice.balance_due} DH)'
-                    )
-                else:
-                    # Record payment in activity log (or payment model if exists)
-                    # Update invoice payment status
-                    paid_amount = invoice.amount_paid + amount
+                # SECURITY: Use transaction lock to prevent race conditions
+                from django.db import transaction
+                with transaction.atomic():
+                    # Re-fetch with lock to get current state
+                    invoice = SaleInvoice.objects.select_for_update().get(id=invoice.id)
 
-                    if paid_amount >= invoice.total_amount:
-                        invoice.status = SaleInvoice.Status.PAID
-                    elif paid_amount > 0:
-                        invoice.status = SaleInvoice.Status.PARTIAL
+                    # Validate amount doesn't exceed balance (re-check after lock)
+                    if amount > invoice.balance_due:
+                        messages.error(
+                            request,
+                            f'Le paiement ne peut pas dépasser le solde dû ({invoice.balance_due} DH)'
+                        )
+                    else:
+                        # SECURITY: Check for duplicate payment (same amount within 10 seconds)
+                        from django.utils import timezone
+                        from datetime import timedelta
 
-                    invoice.amount_paid = paid_amount
-                    invoice.save(update_fields=['status', 'amount_paid'])
+                        recent_payments = ActivityLog.objects.filter(
+                            user=request.user,
+                            action=ActivityLog.ActionType.CREATE,
+                            model_name='SaleInvoice',
+                            object_id=str(invoice.id),
+                            created_at__gte=timezone.now() - timedelta(seconds=10),
+                            object_repr__icontains=f'Paiement {amount} DH'
+                        ).count()
+
+                        if recent_payments > 0:
+                            messages.error(
+                                request,
+                                'Un paiement de ce montant a été enregistré récemment. Veuillez patienter.'
+                            )
+                        else:
+                            # Record payment in activity log (or payment model if exists)
+                            # Update invoice payment status
+                            paid_amount = invoice.amount_paid + amount
+
+                            if paid_amount >= invoice.total_amount:
+                                invoice.status = SaleInvoice.Status.PAID
+                            elif paid_amount > 0:
+                                invoice.status = SaleInvoice.Status.PARTIAL_PAID
+
+                            invoice.amount_paid = paid_amount
+                            invoice.save(update_fields=['status', 'amount_paid'])
 
                     # Log activity
                     ActivityLog.objects.create(
