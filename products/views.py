@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from .models import Product, ProductImage, ProductStone
 from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount
+from suppliers.models import Supplier
 from users.models import ActivityLog
 
 
@@ -143,6 +144,7 @@ def batch_product_create(request):
             product_weights_gross = request.POST.getlist('product_gross_weight')
             product_selling_prices = request.POST.getlist('product_selling_price')
             product_banks = request.POST.getlist('product_bank_account')
+            product_suppliers = request.POST.getlist('product_supplier')
 
             created_count = 0
             failed_rows = []
@@ -176,6 +178,7 @@ def batch_product_create(request):
                     product_metal_id = product_metals[i] if i < len(product_metals) else None
                     product_purity_id = product_purities[i] if i < len(product_purities) else None
                     product_bank_id = product_banks[i] if i < len(product_banks) else None
+                    product_supplier_id = product_suppliers[i] if i < len(product_suppliers) else None
 
                     # Create product instance (don't save yet)
                     product = Product(
@@ -193,6 +196,7 @@ def batch_product_create(request):
                         margin_type=margin_type,
                         margin_value=margin_value,
                         bank_account_id=product_bank_id if product_bank_id else None,
+                        supplier_id=product_supplier_id if product_supplier_id else None,
                         status='available',
                         created_by=request.user,
                     )
@@ -244,6 +248,7 @@ def batch_product_create(request):
         'metals': MetalType.objects.filter(is_active=True),
         'purities': MetalPurity.objects.filter(is_active=True),
         'bank_accounts': BankAccount.objects.filter(is_active=True),
+        'suppliers': Supplier.objects.filter(is_active=True),
         'product_types': Product.ProductType.choices,
     }
 

@@ -164,7 +164,7 @@
                                                     <select name="product_metal_type" class="product_metal_type">
                                                         <option value="">--Aucun--</option>
                                                         {% for metal in metals %}
-                                                            <option value="{{ metal.id }}">{{ metal.name }}</option>
+                                                            <option value="{{ metal.id }}" {% if metal.name == 'Or' %}selected{% endif %}>{{ metal.name }}</option>
                                                         {% endfor %}
                                                     </select>
                                                 </div>
@@ -173,7 +173,16 @@
                                                     <select name="product_purity" class="product_purity">
                                                         <option value="">--Aucune--</option>
                                                         {% for purity in purities %}
-                                                            <option value="{{ purity.id }}">{{ purity.name }}</option>
+                                                            <option value="{{ purity.id }}" {% if purity.name == '18K' %}selected{% endif %}>{{ purity.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="detail-field">
+                                                    <label>Fournisseur</label>
+                                                    <select name="product_supplier" class="product_supplier">
+                                                        <option value="">--Aucun--</option>
+                                                        {% for supplier in suppliers %}
+                                                            <option value="{{ supplier.id }}">{{ supplier.name }}</option>
                                                         {% endfor %}
                                                     </select>
                                                 </div>
