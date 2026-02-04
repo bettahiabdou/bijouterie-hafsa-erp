@@ -243,10 +243,20 @@ class SaleInvoice(models.Model):
     created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
     updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
 
+    # Soft delete field - PHASE 3 FIX
+    is_deleted = models.BooleanField(
+        _('Supprimé'),
+        default=False,
+        help_text=_('Marqué comme supprimé (soft delete)')
+    )
+
     class Meta:
         verbose_name = _('Facture de vente')
         verbose_name_plural = _('Factures de vente')
         ordering = ['-date', '-created_at']
+        indexes = [
+            models.Index(fields=['is_deleted', '-date']),
+        ]
 
     def __str__(self):
         return f"{self.reference} - {self.client.full_name} - {self.total_amount} MAD"
@@ -333,6 +343,53 @@ class SaleInvoice(models.Model):
         if total_cost > 0:
             return ((self.total_amount - total_cost) / total_cost) * 100
         return 0
+
+    # PHASE 3: Status Transition Validation
+    def can_transition_to(self, new_status):
+        """
+        Validate status transition is allowed.
+        Returns True if transition is valid, False otherwise.
+        """
+        valid_transitions = {
+            self.Status.DRAFT: [self.Status.CONFIRMED, self.Status.CANCELLED],
+            self.Status.CONFIRMED: [self.Status.PARTIAL_PAID, self.Status.PAID, self.Status.DELIVERED, self.Status.CANCELLED],
+            self.Status.PARTIAL_PAID: [self.Status.PAID, self.Status.DELIVERED, self.Status.CANCELLED],
+            self.Status.PAID: [self.Status.DELIVERED, self.Status.CANCELLED],
+            self.Status.DELIVERED: [],  # No transitions allowed from DELIVERED
+            self.Status.CANCELLED: [],  # No transitions allowed from CANCELLED
+        }
+        return new_status in valid_transitions.get(self.status, [])
+
+    def transition_to(self, new_status):
+        """
+        Change status with validation.
+        Raises ValidationError if transition is invalid.
+        """
+        from django.core.exceptions import ValidationError
+
+        if not self.can_transition_to(new_status):
+            raise ValidationError(
+                f'Cannot transition from {self.get_status_display()} to '
+                f'{self.Status(new_status).label}'
+            )
+
+        self.status = new_status
+        self.save(update_fields=['status'])
+
+    def soft_delete(self):
+        """
+        Mark invoice as deleted (soft delete).
+        Resets product status to 'available'.
+        """
+        # Reset all product statuses
+        for item in self.items.all():
+            item.product.status = 'available'
+            item.product.save(update_fields=['status'])
+
+        # Mark as deleted and cancelled
+        self.is_deleted = True
+        self.status = self.Status.CANCELLED
+        self.save(update_fields=['is_deleted', 'status'])
 
 
 class SaleInvoiceItem(models.Model):

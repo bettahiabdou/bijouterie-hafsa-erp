@@ -133,23 +133,39 @@ class Client(models.Model):
 
     @property
     def current_balance(self):
-        """Calculate current balance (what client owes us)"""
+        """
+        Calculate current balance (what client owes us).
+        Uses caching to optimize repeated queries.
+        PHASE 3: Filter out soft-deleted invoices.
+        """
+        from django.core.cache import cache
         from sales.models import SaleInvoice
         from payments.models import ClientPayment
 
-        total_sales = SaleInvoice.objects.filter(
-            client=self
-        ).aggregate(
-            total=models.Sum('total_amount')
-        )['total'] or Decimal('0')
+        cache_key = f'client_balance_{self.id}'
+        balance = cache.get(cache_key)
 
-        total_payments = ClientPayment.objects.filter(
-            client=self
-        ).aggregate(
-            total=models.Sum('amount')
-        )['total'] or Decimal('0')
+        if balance is None:
+            # PHASE 3: Filter out soft-deleted invoices
+            total_sales = SaleInvoice.objects.filter(
+                client=self,
+                is_deleted=False
+            ).aggregate(
+                total=models.Sum('total_amount')
+            )['total'] or Decimal('0')
 
-        return total_sales - total_payments
+            total_payments = ClientPayment.objects.filter(
+                client=self
+            ).aggregate(
+                total=models.Sum('amount')
+            )['total'] or Decimal('0')
+
+            balance = total_sales - total_payments
+
+            # Cache for 1 hour
+            cache.set(cache_key, balance, 3600)
+
+        return balance
 
     @property
     def is_over_credit_limit(self):

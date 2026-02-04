@@ -166,6 +166,10 @@ class ClientPayment(models.Model):
             if self.layaway:
                 self.layaway.add_payment(self.amount)
 
+        # PHASE 3: Invalidate client balance cache when payment is recorded
+        from django.core.cache import cache
+        cache.delete(f'client_balance_{self.client.id}')
+
 
 class SupplierPayment(models.Model):
     """

@@ -22,7 +22,8 @@ def invoice_list(request):
     today = timezone.now().date()
 
     # FIXED: Optimized query with select_related and prefetch_related
-    invoices = SaleInvoice.objects.select_related(
+    # PHASE 3: Filter out soft-deleted invoices
+    invoices = SaleInvoice.objects.filter(is_deleted=False).select_related(
         'client', 'seller', 'delivery_method', 'payment_method'
     ).prefetch_related('items__product')
 
@@ -207,6 +208,10 @@ def invoice_create(request):
 
                     # Calculate totals
                     invoice.calculate_totals()
+
+                    # PHASE 3: Invalidate client balance cache on new invoice
+                    from django.core.cache import cache
+                    cache.delete(f'client_balance_{invoice.client.id}')
 
                     # Log activity
                     ActivityLog.objects.create(
@@ -474,13 +479,12 @@ def invoice_delete(request, reference):
 
     if request.method == 'POST':
         try:
-            # Soft delete - reset product status and mark invoice as cancelled
-            for item in invoice.items.all():
-                item.product.status = 'available'
-                item.product.save(update_fields=['status'])
+            # Use model soft_delete method
+            invoice.soft_delete()
 
-            invoice.status = SaleInvoice.Status.CANCELLED
-            invoice.save(update_fields=['status'])
+            # PHASE 3: Invalidate client balance cache
+            from django.core.cache import cache
+            cache.delete(f'client_balance_{invoice.client.id}')
 
             ActivityLog.objects.create(
                 user=request.user,
