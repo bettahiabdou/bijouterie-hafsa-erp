@@ -105,6 +105,21 @@ class SaleInvoice(models.Model):
         verbose_name=_('Achat ancien or')
     )
 
+    # Tax fields - CRITICAL FIX
+    tax_rate = models.DecimalField(
+        _('Taux TVA (%)'),
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        help_text=_('Taux de TVA en pourcentage')
+    )
+    tax_amount = models.DecimalField(
+        _('Montant TVA'),
+        max_digits=12,
+        decimal_places=2,
+        default=0
+    )
+
     # Totals
     total_amount = models.DecimalField(
         _('Montant total'),
@@ -123,6 +138,46 @@ class SaleInvoice(models.Model):
         max_digits=14,
         decimal_places=2,
         default=0
+    )
+
+    # Payment method - CRITICAL FIX
+    payment_method = models.ForeignKey(
+        'settings_app.PaymentMethod',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sale_invoices',
+        verbose_name=_('Méthode de paiement')
+    )
+
+    # Bank account for payment - CRITICAL FIX
+    bank_account = models.ForeignKey(
+        'settings_app.BankAccount',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sale_invoices',
+        verbose_name=_('Compte bancaire')
+    )
+
+    # Applied deposit - CRITICAL FIX
+    applied_deposit = models.ForeignKey(
+        'payments.Deposit',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='applied_to_sales',
+        verbose_name=_('Acompte appliqué')
+    )
+
+    # Linked quote - CRITICAL FIX
+    quote = models.ForeignKey(
+        'quotes.Quote',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='converted_sales',
+        verbose_name=_('Devis original')
     )
 
     # Delivery
@@ -208,11 +263,19 @@ class SaleInvoice(models.Model):
         if self.discount_percent > 0:
             self.discount_amount = subtotal * (self.discount_percent / 100)
 
-        # Calculate total
+        # FIXED: Calculate tax on subtotal after discount
+        after_discount = subtotal - self.discount_amount
+        if self.tax_rate > 0:
+            self.tax_amount = after_discount * (self.tax_rate / 100)
+        else:
+            self.tax_amount = Decimal('0')
+
+        # Calculate total with tax
         self.total_amount = (
             subtotal -
             self.discount_amount -
             self.old_gold_amount +
+            self.tax_amount +
             self.delivery_cost
         )
         self.balance_due = self.total_amount - self.amount_paid
@@ -221,7 +284,7 @@ class SaleInvoice(models.Model):
         self.update_status()
 
         self.save(update_fields=[
-            'subtotal', 'discount_amount', 'total_amount', 'balance_due', 'status'
+            'subtotal', 'discount_amount', 'tax_amount', 'total_amount', 'balance_due', 'status'
         ])
 
     def update_status(self):
@@ -291,6 +354,16 @@ class SaleInvoiceItem(models.Model):
         verbose_name=_('Produit')
     )
 
+    # Quantity - CRITICAL FIX
+    quantity = models.DecimalField(
+        _('Quantité'),
+        max_digits=10,
+        decimal_places=3,
+        default=1,
+        validators=[MinValueValidator(Decimal('0.001'))],
+        help_text=_('Quantité de produits vendus')
+    )
+
     # Pricing
     unit_price = models.DecimalField(
         _('Prix unitaire'),
@@ -330,7 +403,7 @@ class SaleInvoiceItem(models.Model):
         verbose_name_plural = _('Lignes de facture vente')
 
     def __str__(self):
-        return f"{self.product.reference} - {self.total_amount} MAD"
+        return f"{self.product.reference} × {self.quantity} - {self.total_amount} MAD"
 
     def save(self, *args, **kwargs):
         # Set original price from product
@@ -340,8 +413,8 @@ class SaleInvoiceItem(models.Model):
         # Use negotiated price if set, otherwise original
         self.unit_price = self.negotiated_price or self.original_price
 
-        # Calculate total
-        self.total_amount = self.unit_price - self.discount_amount
+        # FIXED: Calculate total with quantity
+        self.total_amount = (self.unit_price * self.quantity) - self.discount_amount
 
         super().save(*args, **kwargs)
 
