@@ -99,7 +99,7 @@ def admin_home(request):
 def user_management(request):
     """User Management - List all users"""
 
-    users = User.objects.all().order_by('-created_at')
+    users = User.objects.all().order_by('-date_joined')
 
     # Filter by role if provided
     role = request.GET.get('role')
@@ -283,7 +283,7 @@ def activity_log_view(request):
 
     # Get available filters
     available_actions = ActivityLog.objects.values_list('action', flat=True).distinct()
-    available_users = User.objects.filter(activitylog__isnull=False).distinct()
+    available_users = User.objects.filter(activity_logs__isnull=False).distinct()
     available_object_types = ActivityLog.objects.values_list(
         'object_type', flat=True
     ).distinct()

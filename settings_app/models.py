@@ -229,6 +229,8 @@ class BankAccount(models.Model):
         max_length=50,
         unique=True,
         editable=False,
+        null=True,
+        blank=True,
         help_text=_('Référence unique générée automatiquement')
     )
     bank_name = models.CharField(_('Nom de la banque'), max_length=100)
