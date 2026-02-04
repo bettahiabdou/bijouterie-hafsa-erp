@@ -46,32 +46,67 @@
 
             <!-- Items Table -->
             <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Articles</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 border-b">
-                            <tr>
-                                <th class="px-4 py-2 text-left">Produit</th>
-                                <th class="px-4 py-2 text-right">Prix Unitaire</th>
-                                <th class="px-4 py-2 text-right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y">
-                            {% for item in items %}
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-2">
-                                        <div>
-                                            <p class="font-bold">{{ item.product.reference }}</p>
-                                            <p class="text-gray-600 text-xs">{{ item.product.name }}</p>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-2 text-right">{{ item.unit_price }} DH</td>
-                                    <td class="px-4 py-2 text-right font-bold">{{ item.total_amount }} DH</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-gray-900">Articles</h2>
+                    {% if invoice.status == 'draft' %}
+                        <button type="button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center"
+                                data-bs-toggle="modal" data-bs-target="#addItemModal">
+                            <i class="fas fa-plus mr-2"></i> Ajouter un Article
+                        </button>
+                    {% endif %}
                 </div>
+
+                {% if items %}
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 border-b">
+                                <tr>
+                                    <th class="px-4 py-2 text-left">Produit</th>
+                                    <th class="px-4 py-2 text-right">Quantité</th>
+                                    <th class="px-4 py-2 text-right">Prix Unitaire</th>
+                                    <th class="px-4 py-2 text-right">Total</th>
+                                    {% if invoice.status == 'draft' %}
+                                        <th class="px-4 py-2 text-center">Actions</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                {% for item in items %}
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-2">
+                                            <div>
+                                                <p class="font-bold">{{ item.product.reference }}</p>
+                                                <p class="text-gray-600 text-xs">{{ item.product.name }}</p>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-2 text-right">{{ item.quantity }}</td>
+                                        <td class="px-4 py-2 text-right">{{ item.unit_price }} DH</td>
+                                        <td class="px-4 py-2 text-right font-bold">{{ item.total_amount }} DH</td>
+                                        {% if invoice.status == 'draft' %}
+                                            <td class="px-4 py-2 text-center">
+                                                <a href="javascript:void(0);" onclick="deleteItem({{ item.id }})" class="text-red-600 hover:text-red-800 text-sm font-medium">
+                                                    <i class="fas fa-trash mr-1"></i> Supprimer
+                                                </a>
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                        <p class="text-gray-600">
+                            <i class="fas fa-inbox text-2xl mb-2 block"></i>
+                            Aucun article ajouté.
+                            {% if invoice.status == 'draft' %}
+                                Cliquez sur "Ajouter un Article" pour commencer.
+                            {% else %}
+                                Cette facture ne contient pas d'articles.
+                            {% endif %}
+                        </p>
+                    </div>
+                {% endif %}
             </div>
         </div>
 
@@ -146,4 +181,192 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal: Add Item -->
+    <div class="modal fade" id="addItemModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Ajouter un Article</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addItemForm">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">Produit <span class="text-danger">*</span></label>
+                            <select id="product_id" name="product_id" class="form-control" required>
+                                <option value="">-- Sélectionnez un produit --</option>
+                                {% for product in products %}
+                                    <option value="{{ product.id }}" data-price="{{ product.selling_price }}">
+                                        {{ product.reference }} - {{ product.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Sélectionnez le produit à ajouter à la facture</small>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Quantité <span class="text-danger">*</span></label>
+                                    <input type="number" id="quantity" name="quantity" class="form-control"
+                                           step="0.001" min="0.001" value="1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Prix Unitaire (DH) <span class="text-danger">*</span></label>
+                                    <input type="number" id="unit_price" name="unit_price" class="form-control"
+                                           step="0.01" min="0" required>
+                                    <small class="form-text text-muted">Laissez vide pour utiliser le prix de vente</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Remise (DH)</label>
+                            <input type="number" id="discount_amount" name="discount_amount" class="form-control"
+                                   step="0.01" min="0" value="0">
+                        </div>
+
+                        <div class="bg-light p-3 rounded">
+                            <div class="d-flex justify-content-between">
+                                <span>Total estimé:</span>
+                                <span class="font-weight-bold"><span id="estimated_total">0</span> DH</span>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" id="saveItemBtn">Ajouter Article</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const productSelect = document.getElementById('product_id');
+            const quantityInput = document.getElementById('quantity');
+            const unitPriceInput = document.getElementById('unit_price');
+            const discountInput = document.getElementById('discount_amount');
+            const estimatedTotalSpan = document.getElementById('estimated_total');
+            const saveItemBtn = document.getElementById('saveItemBtn');
+
+            // Update price when product is selected
+            productSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const price = selectedOption.dataset.price || 0;
+                unitPriceInput.value = price;
+                updateEstimatedTotal();
+            });
+
+            // Update estimated total on input change
+            [quantityInput, unitPriceInput, discountInput].forEach(input => {
+                input.addEventListener('change', updateEstimatedTotal);
+                input.addEventListener('keyup', updateEstimatedTotal);
+            });
+
+            function updateEstimatedTotal() {
+                const quantity = parseFloat(quantityInput.value) || 0;
+                const unitPrice = parseFloat(unitPriceInput.value) || 0;
+                const discount = parseFloat(discountInput.value) || 0;
+                const total = (quantity * unitPrice) - discount;
+                estimatedTotalSpan.textContent = Math.max(0, total).toFixed(2);
+            }
+
+            // Save item
+            saveItemBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const form = document.getElementById('addItemForm');
+
+                if (!form.checkValidity()) {
+                    form.reportValidity();
+                    return;
+                }
+
+                const formData = new FormData(form);
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+                saveItemBtn.disabled = true;
+                saveItemBtn.innerHTML = '<span class="spinner-border spinner-border-sm mr-2"></span> Ajout en cours...';
+
+                fetch('{% url "sales:add_item" invoice.reference %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                })
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error('HTTP error, status = ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Response data:', data);
+                    if (data.success) {
+                        // Close modal
+                        const modalEl = document.getElementById('addItemModal');
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) {
+                            modal.hide();
+                        }
+
+                        // Reset form
+                        form.reset();
+                        estimatedTotalSpan.textContent = '0';
+
+                        // Show success message
+                        alert('Article ajouté avec succès!');
+
+                        // Reload page to show updated data
+                        location.reload();
+                    } else {
+                        alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Erreur lors de l\'ajout de l\'article: ' + error);
+                })
+                .finally(() => {
+                    saveItemBtn.disabled = false;
+                    saveItemBtn.innerHTML = 'Ajouter Article';
+                });
+            });
+        });
+
+        function deleteItem(itemId) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer cet article?')) {
+                return;
+            }
+
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            fetch('{% url "sales:delete_item" %}?item_id=' + itemId, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Article supprimé avec succès!');
+                    location.reload();
+                } else {
+                    alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Erreur lors de la suppression de l\'article: ' + error);
+            });
+        }
+    </script>
 {% endblock %}

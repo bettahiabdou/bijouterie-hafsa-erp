@@ -2,6 +2,7 @@
 Sales management views for Bijouterie Hafsa ERP
 """
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q, Count, Sum, F
@@ -124,12 +125,176 @@ def invoice_detail(request, reference):
         ip_address=get_client_ip(request)
     )
 
+    # Get all active products for the add item modal
+    products = Product.objects.filter(is_active=True).order_by('name')
+
     context = {
         'invoice': invoice,
         'items': invoice.items.all(),
+        'products': products,
     }
 
     return render(request, 'sales/invoice_detail.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def add_invoice_item(request, reference):
+    """Add an item to an existing invoice"""
+    try:
+        # Get the invoice
+        invoice = get_object_or_404(SaleInvoice, reference=reference)
+
+        # Check if invoice is in draft status
+        if invoice.status != 'draft':
+            return JsonResponse({
+                'success': False,
+                'error': 'Seules les factures en brouillon peuvent avoir des articles ajoutés'
+            }, status=400)
+
+        # Get the product
+        product_id = request.POST.get('product_id')
+        if not product_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'Produit requis'
+            }, status=400)
+
+        product = get_object_or_404(Product, id=product_id)
+
+        # Get quantity
+        try:
+            quantity = Decimal(request.POST.get('quantity', '1'))
+        except (InvalidOperation, TypeError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Quantité invalide'
+            }, status=400)
+
+        if quantity <= 0:
+            return JsonResponse({
+                'success': False,
+                'error': 'La quantité doit être supérieure à 0'
+            }, status=400)
+
+        # Get unit price
+        try:
+            unit_price_input = request.POST.get('unit_price', '')
+            if unit_price_input:
+                unit_price = Decimal(unit_price_input)
+            else:
+                # Use product's selling price if not provided
+                unit_price = Decimal(str(product.selling_price or 0))
+        except (InvalidOperation, TypeError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Prix unitaire invalide'
+            }, status=400)
+
+        if unit_price < 0:
+            return JsonResponse({
+                'success': False,
+                'error': 'Le prix ne peut pas être négatif'
+            }, status=400)
+
+        # Get discount
+        try:
+            discount_amount = Decimal(request.POST.get('discount_amount', '0'))
+        except (InvalidOperation, TypeError):
+            discount_amount = Decimal('0')
+
+        if discount_amount < 0:
+            discount_amount = Decimal('0')
+
+        # Calculate total
+        total_amount = (quantity * unit_price) - discount_amount
+
+        # Create the item
+        item = SaleInvoiceItem.objects.create(
+            invoice=invoice,
+            product=product,
+            quantity=quantity,
+            unit_price=unit_price,
+            original_price=unit_price,  # Same as unit price for simplicity
+            discount_amount=discount_amount,
+            total_amount=total_amount
+        )
+
+        # Log the activity
+        ActivityLog.objects.create(
+            user=request.user,
+            action=ActivityLog.ActionType.CREATE,
+            model_name='SaleInvoiceItem',
+            object_id=str(item.id),
+            object_repr=f"{invoice.reference} - {product.name}",
+            ip_address=get_client_ip(request)
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Article ajouté avec succès',
+            'item_id': item.id,
+            'product_name': product.name
+        })
+
+    except Exception as e:
+        print(f'Error adding item: {str(e)}')
+        return JsonResponse({
+            'success': False,
+            'error': f'Erreur: {str(e)}'
+        }, status=500)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def delete_invoice_item(request):
+    """Delete an item from an invoice"""
+    try:
+        item_id = request.GET.get('item_id')
+        if not item_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'ID d\'article requis'
+            }, status=400)
+
+        item = get_object_or_404(SaleInvoiceItem, id=item_id)
+        invoice = item.invoice
+
+        # Check if invoice is in draft status
+        if invoice.status != 'draft':
+            return JsonResponse({
+                'success': False,
+                'error': 'Seules les factures en brouillon peuvent avoir des articles supprimés'
+            }, status=400)
+
+        # Store info for logging
+        product_name = item.product.name
+        invoice_reference = invoice.reference
+
+        # Delete the item
+        item.delete()
+
+        # Log the activity
+        ActivityLog.objects.create(
+            user=request.user,
+            action=ActivityLog.ActionType.DELETE,
+            model_name='SaleInvoiceItem',
+            object_id=item_id,
+            object_repr=f"{invoice_reference} - {product_name}",
+            ip_address=get_client_ip(request)
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Article supprimé avec succès'
+        })
+
+    except Exception as e:
+        print(f'Error deleting item: {str(e)}')
+        return JsonResponse({
+            'success': False,
+            'error': f'Erreur: {str(e)}'
+        }, status=500)
 
 
 @login_required(login_url='login')

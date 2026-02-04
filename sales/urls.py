@@ -16,6 +16,10 @@ urlpatterns = [
     path('invoices/<str:reference>/payment/', views.invoice_payment, name='invoice_payment'),
     path('invoices/<str:reference>/delivery/', views.invoice_delivery, name='invoice_delivery'),
 
+    # Invoice Items (Add/Delete)
+    path('invoices/<str:reference>/add-item/', views.add_invoice_item, name='add_item'),
+    path('invoices/delete-item/', views.delete_invoice_item, name='delete_item'),
+
     # Quote to Invoice conversion
     path('quotes/<int:quote_id>/to-invoice/', views.quote_to_invoice, name='quote_to_invoice'),
 
