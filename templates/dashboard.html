@@ -107,7 +107,7 @@
                 </table>
             </div>
 
-            <a href="#" class="block mt-4 text-center text-blue-600 hover:text-blue-700 text-sm font-medium">
+            <a href="{% url 'sales:invoice_list' %}" class="block mt-4 text-center text-blue-600 hover:text-blue-700 text-sm font-medium">
                 Voir toutes les ventes →
             </a>
         </div>
@@ -118,16 +118,16 @@
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h3 class="text-lg font-bold text-gray-900 mb-4">Actions Rapides</h3>
                 <div class="space-y-2">
-                    <a href="#" class="block w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-center font-medium text-sm">
+                    <a href="{% url 'sales:invoice_create' %}" class="block w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-center font-medium text-sm">
                         <i class="fas fa-plus mr-2"></i> Nouvelle Facture
                     </a>
-                    <a href="#" class="block w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center font-medium text-sm">
+                    <a href="{% url 'products:create' %}" class="block w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center font-medium text-sm">
                         <i class="fas fa-gem mr-2"></i> Ajouter Produit
                     </a>
-                    <a href="#" class="block w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-center font-medium text-sm">
+                    <a href="{% url 'sales:invoice_create' %}" class="block w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-center font-medium text-sm">
                         <i class="fas fa-user-plus mr-2"></i> Nouveau Client
                     </a>
-                    <a href="#" class="block w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-center font-medium text-sm">
+                    <a href="{% url 'quotes:quote_create' %}" class="block w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-center font-medium text-sm">
                         <i class="fas fa-receipt mr-2"></i> Nouveau Devis
                     </a>
                 </div>

@@ -73,14 +73,14 @@
 
                         <!-- Dropdown Menu -->
                         <div class="hidden group-hover:block absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 z-50">
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            <a href="{% url 'users:profile' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                 <i class="fas fa-user-circle mr-2"></i> Mon Profil
                             </a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            <a href="{% url 'users:profile_edit' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                 <i class="fas fa-cog mr-2"></i> Paramètres
                             </a>
                             <hr class="my-2">
-                            <a href="{% url 'admin:logout' %}" class="block px-4 py-2 text-sm text-red-700 hover:bg-gray-100">
+                            <a href="{% url 'logout' %}" class="block px-4 py-2 text-sm text-red-700 hover:bg-gray-100">
                                 <i class="fas fa-sign-out-alt mr-2"></i> Déconnexion
                             </a>
                         </div>
@@ -111,9 +111,9 @@
                         <i class="fas fa-chevron-down group-hover:rotate-180 transition"></i>
                     </button>
                     <div class="submenu hidden space-y-1 ml-4">
-                        <a href="#" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Inventaire</a>
-                        <a href="#" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Nouveau Produit</a>
-                        <a href="#" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Catégories</a>
+                        <a href="{% url 'products:inventory_dashboard' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Inventaire</a>
+                        <a href="{% url 'products:create' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Nouveau Produit</a>
+                        <a href="{% url 'products:list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Tous les Produits</a>
                     </div>
                 </div>
 
@@ -125,9 +125,9 @@
                         <i class="fas fa-chevron-down group-hover:rotate-180 transition"></i>
                     </button>
                     <div class="submenu hidden space-y-1 ml-4">
-                        <a href="#" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Nouvelle Facture</a>
-                        <a href="#" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Historique</a>
-                        <a href="#" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Devis</a>
+                        <a href="{% url 'sales:invoice_create' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Nouvelle Facture</a>
+                        <a href="{% url 'sales:invoice_list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Historique</a>
+                        <a href="{% url 'quotes:list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Devis</a>
                     </div>
                 </div>
 
@@ -139,25 +139,25 @@
                         <i class="fas fa-chevron-down group-hover:rotate-180 transition"></i>
                     </button>
                     <div class="submenu hidden space-y-1 ml-4">
-                        <a href="#" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Commandes</a>
-                        <a href="#" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Fournisseurs</a>
-                        <a href="#" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Consignations</a>
+                        <a href="{% url 'purchases:purchase_order_list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Commandes</a>
+                        <a href="{% url 'purchases:purchase_invoice_list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Factures d'Achat</a>
+                        <a href="{% url 'purchases:consignment_list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Consignations</a>
                     </div>
                 </div>
 
                 <!-- Clients -->
-                <a href="#" class="block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800">
+                <a href="{% url 'sales:invoice_list' %}" class="block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800">
                     <i class="fas fa-users mr-3"></i> Clients
                 </a>
 
                 <!-- Repairs -->
-                <a href="#" class="block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800">
+                <a href="{% url 'repairs:repair_list' %}" class="block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800">
                     <i class="fas fa-wrench mr-3"></i> Réparations
                 </a>
 
-                <!-- Reports -->
-                <a href="#" class="block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800">
-                    <i class="fas fa-chart-bar mr-3"></i> Rapports
+                <!-- Quotes -->
+                <a href="{% url 'quotes:quote_list' %}" class="block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800">
+                    <i class="fas fa-file-invoice mr-3"></i> Devis
                 </a>
 
                 {% if user.is_staff %}
