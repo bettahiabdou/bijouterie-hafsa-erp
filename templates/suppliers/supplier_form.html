@@ -267,13 +267,13 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Nom du Fournisseur <span class="required">*</span></label>
-                        <input type="text" name="name" value="{{ supplier.name|default:form_data.name }}" required
+                        <input type="text" name="name" value="{% if supplier %}{{ supplier.name }}{% elif form_data %}{{ form_data.name }}{% endif %}" required
                             placeholder="Nom du fournisseur" maxlength="200">
                     </div>
 
                     <div class="form-group">
                         <label>Nom en Arabe</label>
-                        <input type="text" name="name_ar" value="{{ supplier.name_ar|default:form_data.name_ar }}"
+                        <input type="text" name="name_ar" value="{% if supplier %}{{ supplier.name_ar }}{% elif form_data %}{{ form_data.name_ar }}{% endif %}"
                             placeholder="الاسم بالعربية" maxlength="200">
                     </div>
                 </div>
@@ -283,7 +283,7 @@
                         <label>Type de Fournisseur</label>
                         <select name="supplier_type">
                             {% for value, label in supplier_types %}
-                                <option value="{{ value }}" {% if supplier.supplier_type|default:form_data.supplier_type == value %}selected{% endif %}>
+                                <option value="{{ value }}" {% if supplier.supplier_type == value or form_data.supplier_type == value %}selected{% endif %}>
                                     {{ label }}
                                 </option>
                             {% endfor %}
@@ -292,7 +292,7 @@
 
                     <div class="form-group">
                         <label>Personne de Contact</label>
-                        <input type="text" name="contact_person" value="{{ supplier.contact_person|default:form_data.contact_person }}"
+                        <input type="text" name="contact_person" value="{% if supplier %}{{ supplier.contact_person }}{% elif form_data %}{{ form_data.contact_person }}{% endif %}"
                             placeholder="Nom du contact" maxlength="200">
                     </div>
                 </div>
@@ -305,13 +305,13 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Téléphone Principal</label>
-                        <input type="tel" name="phone" value="{{ supplier.phone|default:form_data.phone }}"
+                        <input type="tel" name="phone" value="{% if supplier %}{{ supplier.phone }}{% elif form_data %}{{ form_data.phone }}{% endif %}"
                             placeholder="+212..." maxlength="20">
                     </div>
 
                     <div class="form-group">
                         <label>Téléphone Secondaire</label>
-                        <input type="tel" name="phone_2" value="{{ supplier.phone_2|default:form_data.phone_2 }}"
+                        <input type="tel" name="phone_2" value="{% if supplier %}{{ supplier.phone_2 }}{% elif form_data %}{{ form_data.phone_2 }}{% endif %}"
                             placeholder="+212..." maxlength="20">
                     </div>
                 </div>
@@ -319,7 +319,7 @@
                 <div class="form-row full">
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" name="email" value="{{ supplier.email|default:form_data.email }}"
+                        <input type="email" name="email" value="{% if supplier %}{{ supplier.email }}{% elif form_data %}{{ form_data.email }}{% endif %}"
                             placeholder="email@example.com" maxlength="200">
                     </div>
                 </div>
@@ -332,14 +332,14 @@
                 <div class="form-row full">
                     <div class="form-group">
                         <label>Adresse</label>
-                        <textarea name="address" placeholder="Adresse complète">{{ supplier.address|default:form_data.address }}</textarea>
+                        <textarea name="address" placeholder="Adresse complète">{% if supplier %}{{ supplier.address }}{% elif form_data %}{{ form_data.address }}{% endif %}</textarea>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label>Ville</label>
-                        <input type="text" name="city" value="{{ supplier.city|default:form_data.city }}"
+                        <input type="text" name="city" value="{% if supplier %}{{ supplier.city }}{% elif form_data %}{{ form_data.city }}{% endif %}"
                             placeholder="Ville" maxlength="100">
                     </div>
                 </div>
@@ -352,14 +352,14 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>ICE (Identifiant Commun Entreprise)</label>
-                        <input type="text" name="ice" value="{{ supplier.ice|default:form_data.ice }}"
+                        <input type="text" name="ice" value="{% if supplier %}{{ supplier.ice }}{% elif form_data %}{{ form_data.ice }}{% endif %}"
                             placeholder="ICE" maxlength="20">
                         <small>Numéro d'identification fiscale</small>
                     </div>
 
                     <div class="form-group">
                         <label>RC (Registre de Commerce)</label>
-                        <input type="text" name="rc" value="{{ supplier.rc|default:form_data.rc }}"
+                        <input type="text" name="rc" value="{% if supplier %}{{ supplier.rc }}{% elif form_data %}{{ form_data.rc }}{% endif %}"
                             placeholder="RC" maxlength="20">
                         <small>Numéro du registre de commerce</small>
                     </div>
@@ -368,7 +368,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Spécialité</label>
-                        <input type="text" name="specialty" value="{{ supplier.specialty|default:form_data.specialty }}"
+                        <input type="text" name="specialty" value="{% if supplier %}{{ supplier.specialty }}{% elif form_data %}{{ form_data.specialty }}{% endif %}"
                             placeholder="Spécialité (ex: Or, Argent, Artisan)" maxlength="200">
                         <small>Domaine de spécialisation du fournisseur</small>
                     </div>
@@ -377,14 +377,14 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Limite de Crédit (DH)</label>
-                        <input type="number" name="credit_limit" value="{{ supplier.credit_limit|default:form_data.credit_limit|default:'0' }}"
+                        <input type="number" name="credit_limit" value="{% if supplier %}{{ supplier.credit_limit }}{% elif form_data %}{{ form_data.credit_limit }}{% else %}0{% endif %}"
                             step="0.01" min="0" placeholder="0.00">
                         <small>Montant maximum de crédit autorisé</small>
                     </div>
 
                     <div class="form-group">
                         <label>Conditions de Paiement</label>
-                        <input type="text" name="payment_terms" value="{{ supplier.payment_terms|default:form_data.payment_terms }}"
+                        <input type="text" name="payment_terms" value="{% if supplier %}{{ supplier.payment_terms }}{% elif form_data %}{{ form_data.payment_terms }}{% endif %}"
                             placeholder="Ex: Net 30, Comptant" maxlength="200">
                     </div>
                 </div>
@@ -397,7 +397,7 @@
                 <div class="form-row full">
                     <div class="form-group">
                         <label>Notes</label>
-                        <textarea name="notes" placeholder="Notes ou remarques sur le fournisseur">{{ supplier.notes|default:form_data.notes }}</textarea>
+                        <textarea name="notes" placeholder="Notes ou remarques sur le fournisseur">{% if supplier %}{{ supplier.notes }}{% elif form_data %}{{ form_data.notes }}{% endif %}</textarea>
                         <small>Informations supplémentaires ou remarques</small>
                     </div>
                 </div>
