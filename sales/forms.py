@@ -39,13 +39,17 @@ class SaleInvoiceForm(forms.ModelForm):
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
                 'step': '0.01',
                 'min': '0',
-                'max': '100'
+                'max': '100',
+                'value': '0',
+                'placeholder': '0.00'
             }),
             'tax_rate': forms.NumberInput(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
                 'step': '0.01',
                 'min': '0',
-                'max': '100'
+                'max': '100',
+                'value': '0',
+                'placeholder': '0.00'
             }),
             'delivery_method': forms.Select(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
@@ -60,13 +64,27 @@ class SaleInvoiceForm(forms.ModelForm):
             'delivery_cost': forms.NumberInput(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
                 'step': '0.01',
-                'min': '0'
+                'min': '0',
+                'value': '0',
+                'placeholder': '0.00'
             }),
             'notes': forms.Textarea(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none',
                 'rows': '4'
             }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make optional fields actually optional
+        optional_fields = [
+            'payment_method', 'bank_account', 'sale_type',
+            'discount_percent', 'tax_rate', 'delivery_method',
+            'delivery_person', 'delivery_address', 'delivery_cost', 'notes'
+        ]
+        for field_name in optional_fields:
+            if field_name in self.fields:
+                self.fields[field_name].required = False
 
     def clean(self):
         """Validate form data"""

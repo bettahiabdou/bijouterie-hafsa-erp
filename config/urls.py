@@ -36,6 +36,7 @@ urlpatterns = [
 
     # App URLs
     path('users/', include('users.urls')),
+    path('clients/', include('clients.urls')),
     path('products/', include('products.urls')),
     path('suppliers/', include('suppliers.urls')),
     path('sales/', include('sales.urls')),

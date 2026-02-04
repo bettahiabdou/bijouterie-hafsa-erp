@@ -30,180 +30,271 @@
             <form method="post" class="bg-white rounded-lg shadow-md p-6 space-y-6">
                 {% csrf_token %}
 
-                <!-- Reference (auto-generated) -->
-                <div class="border-b border-gray-200 pb-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Numéro de Facture</label>
-                            <input type="text" value="{% if form.instance.pk %}{{ form.instance.reference }}{% else %}Auto-généré à la création{% endif %}"
-                                readonly class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">
-                            <p class="text-xs text-gray-500 mt-1">{% if form.instance.pk %}Référence unique de la facture{% else %}Généré automatiquement à la création{% endif %}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Client Info -->
-                <div class="border-b border-gray-200 pb-6">
-                    <h2 class="text-lg font-bold text-gray-900 mb-4">Informations Client</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Client <span class="text-gray-500">(Optionnel)</span>
-                            </label>
-                            <select name="client" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                                <option value="">-- Vente sans client (Walk-in) --</option>
-                                {% for client in clients %}
-                                    <option value="{{ client.id }}" {% if form.instance.client_id == client.id %}selected{% endif %}>
-                                        {{ client.name }} ({{ client.email }})
-                                    </option>
-                                {% endfor %}
-                            </select>
-                            <p class="text-xs text-gray-500 mt-1">Laissez vide pour enregistrer une vente sans client</p>
-                            {% if form.client.errors %}
-                                <p class="text-red-600 text-sm mt-1">{{ form.client.errors.0 }}</p>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Type de Vente <span class="text-red-500">*</span>
-                            </label>
-                            <select name="sale_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" required>
-                                <option value="">-- Sélectionnez le type --</option>
-                                {% for value, label in sale_types %}
-                                    <option value="{{ value }}" {% if form.instance.sale_type == value %}selected{% endif %}>
-                                        {{ label }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                            {% if form.sale_type.errors %}
-                                <p class="text-red-600 text-sm mt-1">{{ form.sale_type.errors.0 }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Invoice Items -->
-                <div class="border-b border-gray-200 pb-6">
-                    <h2 class="text-lg font-bold text-gray-900 mb-4">Articles de la Facture</h2>
-
-                    <div id="items-container" class="space-y-4">
-                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                            <p class="text-gray-600 text-center py-4">
-                                <i class="fas fa-info-circle mr-2"></i>
-                                Les articles peuvent être ajoutés après la création de la facture
-                            </p>
-                        </div>
-                    </div>
-
-                    <button type="button" class="mt-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg flex items-center">
-                        <i class="fas fa-plus mr-2"></i> Ajouter un Article
-                    </button>
-                </div>
-
-                <!-- Payment Info -->
-                <div class="border-b border-gray-200 pb-6">
-                    <h2 class="text-lg font-bold text-gray-900 mb-4">Informations de Paiement</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Méthode de Paiement
-                            </label>
-                            <select name="payment_method" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                                <option value="">-- Sélectionnez une méthode --</option>
-                                <option value="cash" {% if form.instance.payment_method == 'cash' %}selected{% endif %}>Espèces</option>
-                                <option value="card" {% if form.instance.payment_method == 'card' %}selected{% endif %}>Carte Bancaire</option>
-                                <option value="check" {% if form.instance.payment_method == 'check' %}selected{% endif %}>Chèque</option>
-                                <option value="transfer" {% if form.instance.payment_method == 'transfer' %}selected{% endif %}>Virement Bancaire</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Date d'Échéance
-                            </label>
-                            <input type="date" name="due_date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   value="{% if form.instance.due_date %}{{ form.instance.due_date|date:'Y-m-d' }}{% endif %}">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Notes -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Notes/Observations
-                    </label>
-                    <textarea name="notes" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" rows="4" placeholder="Informations supplémentaires ou conditions spéciales">{% if form.instance.notes %}{{ form.instance.notes }}{% endif %}</textarea>
-                    <p class="text-gray-500 text-sm mt-1">Informations supplémentaires ou conditions spéciales</p>
-                </div>
-
-                <!-- Form Errors -->
+                <!-- Display Form Errors -->
                 {% if form.non_field_errors %}
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <p class="text-red-700 font-medium">Erreur:</p>
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <p class="text-red-700 font-bold">Erreurs:</p>
                         {% for error in form.non_field_errors %}
                             <p class="text-red-600 text-sm">{{ error }}</p>
                         {% endfor %}
                     </div>
                 {% endif %}
 
+                <!-- Client Section -->
+                <div class="border-b border-gray-200 pb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold text-gray-900">Client</h2>
+                        <button type="button" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded text-sm"
+                                data-bs-toggle="modal" data-bs-target="#addClientModal">
+                            <i class="fas fa-plus"></i> Nouveau Client
+                        </button>
+                    </div>
+
+                    <div>
+                        {{ form.client }}
+                        <p class="text-xs text-gray-500 mt-2">Laissez vide pour une vente sans client (walk-in)</p>
+                        {% if form.client.errors %}
+                            <p class="text-red-600 text-sm mt-2">{{ form.client.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Basic Info Section -->
+                <div class="border-b border-gray-200 pb-6">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">Informations de Base</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Type de Vente</label>
+                            {{ form.sale_type }}
+                            {% if form.sale_type.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.sale_type.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Remise (%)</label>
+                            {{ form.discount_percent }}
+                            {% if form.discount_percent.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.discount_percent.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Taux TVA (%)</label>
+                            {{ form.tax_rate }}
+                            {% if form.tax_rate.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.tax_rate.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Info Section -->
+                <div class="border-b border-gray-200 pb-6">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">Paiement & Livraison</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Méthode de Paiement</label>
+                            {{ form.payment_method }}
+                            {% if form.payment_method.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.payment_method.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Compte Bancaire</label>
+                            {{ form.bank_account }}
+                            {% if form.bank_account.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.bank_account.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Mode de Livraison</label>
+                            {{ form.delivery_method }}
+                            {% if form.delivery_method.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.delivery_method.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Coût de Livraison (DH)</label>
+                            {{ form.delivery_cost }}
+                            {% if form.delivery_cost.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.delivery_cost.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Livreur</label>
+                            {{ form.delivery_person }}
+                            {% if form.delivery_person.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.delivery_person.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Adresse de Livraison</label>
+                        {{ form.delivery_address }}
+                        {% if form.delivery_address.errors %}
+                            <p class="text-red-600 text-sm mt-1">{{ form.delivery_address.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Items Section -->
+                <div class="border-b border-gray-200 pb-6">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">Articles</h2>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p class="text-blue-700 text-sm">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <strong>Important:</strong> Les articles peuvent être ajoutés après la création de la facture en cliquant sur "Ajouter un Article" depuis le détail de la facture.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Notes Section -->
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">Notes</h2>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Observations</label>
+                    {{ form.notes }}
+                    {% if form.notes.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.notes.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
                 <!-- Submit Buttons -->
                 <div class="flex gap-4 pt-6 border-t border-gray-200">
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg flex items-center">
                         <i class="fas fa-save mr-2"></i>
-                        {% if form.instance.pk %}Mettre à Jour{% else %}Créer la Facture{% endif %}
+                        {% if form.instance.pk %}Mettre à jour{% else %}Créer la Facture{% endif %}
                     </button>
-                    <a href="{% url 'sales:invoice_list' %}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-lg flex items-center">
-                        <i class="fas fa-times mr-2"></i> Annuler
+                    <a href="{% url 'sales:invoice_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg flex items-center">
+                        <i class="fas fa-arrow-left mr-2"></i> Annuler
                     </a>
                 </div>
             </form>
         </div>
 
-        <!-- Summary Sidebar -->
-        <div class="lg:col-span-1">
-            <div class="bg-white rounded-lg shadow-md p-6 sticky top-24">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Résumé</h3>
+        <!-- Info Panel -->
+        <div class="space-y-6">
+            <!-- Reference Info -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Référence</h3>
+                <div class="bg-gray-100 p-3 rounded text-center">
+                    <p class="text-sm text-gray-600">Numéro de Facture</p>
+                    <p class="text-xl font-bold text-gray-900">
+                        {% if form.instance.pk %}
+                            {{ form.instance.reference }}
+                        {% else %}
+                            Auto-généré
+                        {% endif %}
+                    </p>
+                </div>
+                {% if form.instance.pk %}
+                    <p class="text-xs text-gray-500 mt-3">Créée le {{ form.instance.created_at|date:'d/m/Y H:i' }}</p>
+                {% endif %}
+            </div>
 
-                <div class="space-y-4">
-                    <!-- Subtotal -->
-                    <div class="flex justify-between pb-3 border-b border-gray-200">
-                        <span class="text-gray-600">Sous-total:</span>
-                        <span class="font-medium text-gray-900">0 DH</span>
-                    </div>
+            <!-- Quick Help -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <h3 class="text-lg font-bold text-blue-900 mb-3">Aide Rapide</h3>
+                <ul class="space-y-2 text-sm text-blue-800">
+                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Remplissez les champs principaux</li>
+                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Les articles s'ajoutent après création</li>
+                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Tous les champs sauf Client sont optionnels</li>
+                    <li><i class="fas fa-check text-blue-600 mr-2"></i> Cliquez "Nouveau Client" pour en ajouter un vite</li>
+                </ul>
+            </div>
 
-                    <!-- Tax -->
-                    <div class="flex justify-between pb-3 border-b border-gray-200">
-                        <span class="text-gray-600">TVA (20%):</span>
-                        <span class="font-medium text-gray-900">0 DH</span>
-                    </div>
-
-                    <!-- Total -->
-                    <div class="flex justify-between pt-3">
-                        <span class="text-lg font-bold text-gray-900">Total:</span>
-                        <span class="text-2xl font-bold text-blue-600">0 DH</span>
+            <!-- Status Info -->
+            {% if form.instance.pk %}
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">État</h3>
+                    <div class="space-y-2">
+                        <p><strong>Statut:</strong> <span class="badge bg-warning">{{ form.instance.get_status_display }}</span></p>
+                        <p><strong>Total:</strong> <span class="text-xl font-bold text-green-600">{{ form.instance.total_amount|floatformat:2 }} DH</span></p>
+                        <p><strong>Payé:</strong> <span>{{ form.instance.amount_paid|floatformat:2 }} DH</span></p>
+                        <p><strong>Dû:</strong> <span class="font-bold">{{ form.instance.balance_due|floatformat:2 }} DH</span></p>
                     </div>
                 </div>
+            {% endif %}
+        </div>
+    </div>
 
-                <!-- Status -->
-                <div class="mt-6 pt-6 border-t border-gray-200">
-                    <div class="bg-blue-50 rounded-lg p-4">
-                        <p class="text-sm text-blue-700">
-                            <i class="fas fa-info-circle mr-2"></i>
-                            Une nouvelle facture sera créée avec le statut <strong>Brouillon</strong>
-                        </p>
-                    </div>
+    <!-- Modal: Quick Add Client -->
+    <div class="modal fade" id="addClientModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Ajouter un Nouveau Client</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-
-                <!-- Help -->
-                <div class="mt-4 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
-                    <p class="font-medium text-gray-700 mb-2">Besoin d'aide?</p>
-                    <ul class="space-y-1 text-xs">
-                        <li>✓ Sélectionnez d'abord un client</li>
-                        <li>✓ Définissez le type de vente</li>
-                        <li>✓ Complétez les informations</li>
-                        <li>✓ Cliquez sur Créer</li>
-                    </ul>
+                <div class="modal-body">
+                    <form id="quickAddClientForm">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">Prénom</label>
+                            <input type="text" name="first_name" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Nom</label>
+                            <input type="text" name="last_name" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Téléphone</label>
+                            <input type="tel" name="phone" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Ville</label>
+                            <input type="text" name="city" class="form-control">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" id="saveClientBtn">Ajouter Client</button>
                 </div>
             </div>
         </div>
     </div>
+
+    <script>
+        // Quick Add Client
+        document.getElementById('saveClientBtn').addEventListener('click', function() {
+            const form = document.getElementById('quickAddClientForm');
+            const formData = new FormData(form);
+
+            fetch('{% url "clients:quick_create" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Add new client to dropdown
+                    const selectElement = document.querySelector('select[name="client"]');
+                    const option = document.createElement('option');
+                    option.value = data.client_id;
+                    option.textContent = data.client_name + ' (' + data.client_email + ')';
+                    selectElement.appendChild(option);
+                    selectElement.value = data.client_id;
+
+                    // Close modal
+                    bootstrap.Modal.getInstance(document.getElementById('addClientModal')).hide();
+
+                    // Reset form
+                    form.reset();
+
+                    alert('Client ajouté avec succès!');
+                } else {
+                    alert('Erreur: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Erreur lors de l\'ajout du client: ' + error);
+            });
+        });
+    </script>
 {% endblock %}
