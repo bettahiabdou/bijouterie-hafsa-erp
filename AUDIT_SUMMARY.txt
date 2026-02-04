@@ -1,0 +1,285 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    BIJOUTERIE HAFSA ERP AUDIT REPORT                         ║
+║                    SALES & QUOTES MODULE ASSESSMENT                          ║
+║                         February 4, 2026                                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ OVERALL ASSESSMENT                                                           ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                              ┃
+┃  UI/UX Design Quality:        ████████░ 8/10  (Excellent)                   ┃
+┃  Code Organization:            ██████░░░ 6.5/10 (Good, some issues)         ┃
+┃  Security:                      ████░░░░░ 4/10  (Vulnerabilities found)     ┃
+┃  Data Integrity:               ██████░░░ 6/10  (Missing validations)        ┃
+┃  Accessibility:                ███░░░░░░ 3/10  (Needs improvement)          ┃
+┃                                                                              ┃
+┃  PRODUCTION READY?              ⚠️  NO - BLOCKING ISSUES FOUND               ┃
+┃                                                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ CRITICAL BLOCKING ISSUES (Will Crash Application)                           ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                              ┃
+┃  🔴 P0 #1: Missing Status.DRAFT & Status.CANCELLED in Model                 ┃
+┃     → soft_delete(), invoice_edit(), invoice_delete() will crash             ┃
+┃     → Fix: 15 minutes                                                        ┃
+┃     → File: sales/models.py (Lines 17-20)                                   ┃
+┃                                                                              ┃
+┃  🔴 P0 #2: Template Crash - No Null Check on Optional Client Field         ┃
+┃     → Invoice list crashes when displaying walk-in sales                     ┃
+┃     → AttributeError: 'NoneType' object has no attribute 'first_name'       ┃
+┃     → Fix: 5 minutes                                                        ┃
+┃     → File: templates/sales/invoice_list.html (Line 114)                    ┃
+┃                                                                              ┃
+┃  🔴 P0 #3: ActivityLog API Inconsistency Between Modules                    ┃
+┃     → quotes/views.py uses wrong field names (action_type vs action)        ┃
+┃     → Creating quotes will crash with TypeError                              ┃
+┃     → Fix: 10 minutes                                                       ┃
+┃     → File: quotes/views.py (Lines 131, 161, 181)                           ┃
+┃                                                                              ┃
+┃  ⏱️  TOTAL TIME TO FIX: ~30 MINUTES                                          ┃
+┃  🚫  STATUS: BLOCKS ALL PRODUCTION DEPLOYMENT                                ┃
+┃                                                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ SECURITY VULNERABILITIES (HIGH PRIORITY)                                    ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                              ┃
+┃  🟠 SEC #1: Unsafe Order By Parameter (SQL Injection Risk)                  ┃
+┃     → User input directly used in order_by() without validation              ┃
+┃     → Can expose unintended database columns                                 ┃
+┃     → Fix: 20 minutes  │  File: sales/views.py (Line 57)                    ┃
+┃                                                                              ┃
+┃  🟠 SEC #2: Missing Rate Limiting on Payment Recording                      ┃
+┃     → User can submit same payment 10 times, overpaying invoice              ┃
+┃     → No transaction locking or duplicate detection                          ┃
+┃     → Fix: 45 minutes  │  File: sales/views.py (invoice_payment)            ┃
+┃                                                                              ┃
+┃  🟠 SEC #3: Bare Exception Handling Masks Security Errors                   ┃
+┃     → Multiple bare except Exception clauses                                 ┃
+┃     → Hides PermissionDenied, NotFound errors                                ┃
+┃     → Fix: 30 minutes  │  File: sales/views.py (Lines 246-250, etc)         ┃
+┃                                                                              ┃
+┃  ⏱️  TOTAL TIME TO FIX: ~95 MINUTES (1.5 hours)                              ┃
+┃  🔒 STATUS: HIGH PRIORITY - FIX BEFORE BETA TESTING                          ┃
+┃                                                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ DATA INTEGRITY & VALIDATION ISSUES (MEDIUM PRIORITY)                        ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                              ┃
+┃  🟡 DATA #1: Product Status Reversal on Partial Invoice Deletion            ┃
+┃     → If invoice has 2 units of product, deleting reverts ALL to available   ┃
+┃     → Can sell same unit twice (inventory inconsistency)                     ┃
+┃     → Fix: 60 minutes  │  File: sales/models.py (Line 386)                  ┃
+┃                                                                              ┃
+┃  🟡 DATA #2: No Validation of Minimum Invoice Amount                        ┃
+┃     → User can submit invoice with 0 items                                   ┃
+┃     → Creates empty invoice records (database clutter)                       ┃
+┃     → Fix: 10 minutes  │  File: sales/views.py (Line 363)                   ┃
+┃                                                                              ┃
+┃  🟡 DATA #3: Missing Payment Reference Validation on Backend               ┃
+┃     → Form shows "Required for bank transfer" but no server validation       ┃
+┃     → User can bypass by submitting directly                                 ┃
+┃     → Fix: 15 minutes  │  File: Multiple (form + view)                      ┃
+┃                                                                              ┃
+┃  🟡 CODE #4: Orphaned Duplicate View Function                               ┃
+┃     → invoice_detail_view() exists but never called (dead code)              ┃
+┃     → Creates confusion, maintenance burden                                  ┃
+┃     → Fix: 5 minutes   │  File: sales/views.py (Lines 447-470)              ┃
+┃                                                                              ┃
+┃  ⏱️  TOTAL TIME TO FIX: ~90 MINUTES (1.5 hours)                              ┃
+┃  💾 STATUS: MEDIUM PRIORITY - FIX BEFORE GENERAL RELEASE                     ┃
+┃                                                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ ACCESSIBILITY & UX ISSUES (IMPORTANT)                                       ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                              ┃
+┃  ♿ A11Y #1: Missing ARIA Labels on Action Icons                             ┃
+┃     → Screen readers cannot identify action buttons                          ┃
+┃     → Inaccessible to vision-impaired users                                  ┃
+┃     → Fix: 20 minutes  │  Files: Multiple templates                          ┃
+┃                                                                              ┃
+┃  ♿ A11Y #2: Color-Only Status Indicators (No Text)                          ┃
+┃     → Red/green colorblind users cannot distinguish statuses                 ┃
+┃     → Violates WCAG 2.1 AA accessibility standards                           ┃
+┃     → Fix: 30 minutes  │  Files: invoice_list.html, quote_list.html         ┃
+┃                                                                              ┃
+┃  💬 UX #3: Browser alert() Used for Feedback (Poor UX)                      ┃
+┃     → alert() blocks page and is harsh user experience                       ┃
+┃     → Should use toast notifications                                         ┃
+┃     → Fix: 25 minutes  │  File: invoice_detail.html                         ┃
+┃                                                                              ┃
+┃  💬 UX #4: Non-Searchable Product Dropdown                                   ┃
+┃     → With 100+ products, must scroll entire list                            ┃
+┃     → Very frustrating to find products                                      ┃
+┃     → Fix: 45 minutes  │  File: invoice_form.html                           ┃
+┃                                                                              ┃
+┃  💬 UX #5: No "Save as Draft" Option                                         ┃
+┃     → Must complete entire invoice or lose work                              ┃
+┃     → Cannot save work-in-progress                                           ┃
+┃     → Fix: 30 minutes  │  File: invoice_form.html                           ┃
+┃                                                                              ┃
+┃  ⏱️  TOTAL TIME TO FIX: ~150 MINUTES (2.5 hours)                             ┃
+┃  ♿ STATUS: IMPORTANT - FIX BEFORE GENERAL RELEASE                            ┃
+┃                                                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ WHAT'S WORKING WELL ✅                                                       ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                              ┃
+┃  ✅ Responsive Design                                                        ┃
+┃     • Clean Tailwind CSS implementation                                      ┃
+┃     • Good use of grid layouts and spacing                                   ┃
+┃     • Consistent color scheme (blue primary, gray secondary)                 ┃
+┃                                                                              ┃
+┃  ✅ Form Organization & UX                                                   ┃
+┃     • Clear section separation (Client → Params → Items → Payment)          ┃
+┃     • Helpful hints under fields                                             ┃
+┃     • Dynamic field visibility based on selections                           ┃
+┃     • Real-time balance calculation with color indicators                    ┃
+┃                                                                              ┃
+┃  ✅ Data Validation                                                          ┃
+┃     • Comprehensive form-level validation                                    ┃
+┃     • Decimal support for jewelry quantities                                 ┃
+┃     • Field-level error messages                                             ┃
+┃                                                                              ┃
+┃  ✅ Recent Improvements                                                      ┃
+┃     • Payment amount field now correctly inside form                         ┃
+┃     • Unique payment reference constraint enforced                           ┃
+┃     • Simplified status system (Unpaid, Partial, Paid)                       ┃
+┃     • Auto-updates invoice status based on payment                           ┃
+┃                                                                              ┃
+┃  ✅ Invoice Status System                                                    ┃
+┃     • Color-coded badges (red/yellow/green) - once accessibility is fixed    ┃
+┃     • Clear status meanings                                                  ┃
+┃     • No manual status changes needed                                        ┃
+┃                                                                              ┃
+┃  ✅ Item Management                                                          ┃
+┃     • AJAX-based item addition (no page reload)                              ┃
+┃     • Real-time line total calculations                                      ┃
+┃     • Discount support per item                                              ┃
+┃     • Can edit/delete items from draft invoices                              ┃
+┃                                                                              ┃
+┃  ✅ Quote System                                                             ┃
+┃     • Separate quote/estimate workflow                                       ┃
+┃     • Status tracking (draft, sent, accepted, expired, converted)            ┃
+┃     • Seamless conversion to invoice                                         ┃
+┃     • Validity date tracking                                                 ┃
+┃                                                                              ┃
+┃  ✅ Activity Logging                                                         ┃
+┃     • Comprehensive audit trail                                              ┃
+┃     • Tracks all major operations                                            ┃
+┃     • User and timestamp recording                                           ┃
+┃                                                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ DETAILED MODULE ASSESSMENT                                                   ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                              ┃
+┃  📄 NOUVELLE FACTURE (Create Invoice)                                        ┃
+┃     Rating: 8/10 ████████░                                                   ┃
+┃     • Clean form with clear sections                                         ┃
+┃     • Real-time calculation in sidebar                                       ┃
+┃     • Workflow checklist guides user                                         ┃
+┃     • Needs: Better form validation feedback, Save as Draft option           ┃
+┃                                                                              ┃
+┃  📊 HISTORIQUE (Invoice List)                                                ┃
+┃     Rating: 7.5/10 ███████░░                                                 ┃
+┃     • KPI cards show key metrics                                             ┃
+┃     • Comprehensive filters (status, date range, search)                     ┃
+┃     • Color-coded status badges (red/yellow/green)                           ┃
+┃     ⚠️  BUG: Crashes on walk-in invoices (null client)                       ┃
+┃     • Needs: Sortable columns, PDF export, bulk actions                      ┃
+┃                                                                              ┃
+┃  📋 DEVIS (Quotes)                                                           ┃
+┃     Rating: 8/10 ████████░                                                   ┃
+┃     • Statistics overview cards (Total, Sent, Accepted, etc)                 ┃
+┃     • Good filter interface (status, date range)                             ┃
+┃     • Search by reference or client                                          ┃
+┃     • Needs: Color-coded status badges, expiry warnings, bulk operations     ┃
+┃                                                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ FIX PRIORITIZATION ROADMAP                                                   ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                              ┃
+┃  PHASE 1: CRITICAL (30 MINUTES) - ⚠️  BLOCKS PRODUCTION                      ┃
+┃  ┌─────────────────────────────────────────────────────────────────────┐    ┃
+┃  │ □ Add Status.DRAFT & Status.CANCELLED to model                      │    ┃
+┃  │ □ Fix template null check on invoice.client                         │    ┃
+┃  │ □ Fix ActivityLog API field names in quotes/views.py               │    ┃
+┃  └─────────────────────────────────────────────────────────────────────┘    ┃
+┃                                                                              ┃
+┃  PHASE 2: SECURITY (95 MINUTES) - 🔒 FIX BEFORE BETA                        ┃
+┃  ┌─────────────────────────────────────────────────────────────────────┐    ┃
+┃  │ □ Implement whitelist for order_by parameter                        │    ┃
+┃  │ □ Add rate limiting and transaction locking to payments            │    ┃
+┃  │ □ Replace bare exceptions with specific error handling             │    ┃
+┃  └─────────────────────────────────────────────────────────────────────┘    ┃
+┃                                                                              ┃
+┃  PHASE 3: DATA INTEGRITY (90 MINUTES) - 💾 FIX BEFORE RELEASE               ┃
+┃  ┌─────────────────────────────────────────────────────────────────────┐    ┃
+┃  │ □ Fix product reversal logic on invoice deletion                   │    ┃
+┃  │ □ Add minimum 1 item validation for invoices                       │    ┃
+┃  │ □ Add server-side payment reference validation                     │    ┃
+┃  │ □ Remove dead code (invoice_detail_view)                           │    ┃
+┃  └─────────────────────────────────────────────────────────────────────┘    ┃
+┃                                                                              ┃
+┃  PHASE 4: ACCESSIBILITY & UX (150 MINUTES) - ♿ IMPORTANT                    ┃
+┃  ┌─────────────────────────────────────────────────────────────────────┐    ┃
+┃  │ □ Add ARIA labels to action icons                                  │    ┃
+┃  │ □ Add text status indicators (not color-only)                      │    ┃
+┃  │ □ Replace alert() with toast notifications                         │    ┃
+┃  │ □ Integrate Select2 for searchable product dropdown                │    ┃
+┃  │ □ Add "Save as Draft" functionality                                │    ┃
+┃  └─────────────────────────────────────────────────────────────────────┘    ┃
+┃                                                                              ┃
+┃  TOTAL ESTIMATED TIME: 5-6 HOURS                                            ┃
+┃  PRODUCTION DEPLOYMENT MINIMUM: Complete Phases 1 & 2 (2 hours)             ┃
+┃                                                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ FINAL VERDICT                                                                ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                              ┃
+┃  ⚠️  NOT PRODUCTION READY                                                    ┃
+┃                                                                              ┃
+┃  The application has good UI/UX design and solid code organization, but     ┃
+┃  contains CRITICAL BLOCKING ISSUES that will crash in production:           ┃
+┃                                                                              ┃
+┃  • Missing status enum values → soft_delete() crash                         ┃
+┃  • Template null check missing → invoice list crash on walk-in sales        ┃
+┃  • ActivityLog API mismatch → quote creation crash                          ┃
+┃                                                                              ┃
+┃  📋 RECOMMENDATION:                                                          ┃
+┃  1. Complete Phase 1 fixes (30 min) → Basic functionality                   ┃
+┃  2. Complete Phase 2 fixes (95 min) → Security hardening                    ┃
+┃  3. Complete Phase 3 fixes (90 min) → Data integrity                        ┃
+┃  4. Complete Phase 4 fixes (150 min) → Full compliance                      ┃
+┃                                                                              ┃
+┃  ✅ Minimum viable product: Phases 1 & 2 (2 hours of fixes)                 ┃
+┃  ✅ Production ready: All 4 phases (5-6 hours of fixes)                     ┃
+┃                                                                              ┃
+┃  🎯 After fixes, system will be:                                             ┃
+┃     ✅ Fully functional                                                      ┃
+┃     ✅ Secure (rate limiting, input validation)                              ┃
+┃     ✅ Accessible (WCAG 2.1 AA compliant)                                    ┃
+┃     ✅ User-friendly (searchable dropdowns, draft save)                      ┃
+┃     ✅ Maintainable (consistent code patterns)                               ┃
+┃                                                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Full detailed report available at: AUDIT_REPORT_VENTES_DEVIS.md
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

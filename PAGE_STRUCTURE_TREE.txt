@@ -1,0 +1,413 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          APPLICATION PAGE STRUCTURE                          ║
+║                    VENTES (Sales) & DEVIS (Quotes) Modules                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─ MAIN MENU ────────────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  🏠 Accueil                                                                    │
+│  📦 Produits ▼                                                                 │
+│  👥 Fournisseurs ▼                                                             │
+│  💰 VENTES ▼ ◄─────── YOU ARE HERE                                            │
+│  📥 Achats ▼                                                                   │
+│  👤 Clients                                                                    │
+│  🔧 Réparations                                                                │
+│  📋 Devis ◄─────---- ALSO HERE                                                │
+│  ⚙️  Administration                                                            │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                           💰 VENTES (Sales) Module                           ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+Accueil / Ventes
+├─
+├─ 📊 FACTURES DE VENTE (Invoice List - Historique)
+│  URL: /sales/invoices/
+│  Rating: 7.5/10 ████████░
+│  Status: ⚠️  HAS CRITICAL TEMPLATE BUG (null client crash)
+│
+│  Components:
+│  ├─ KPI Cards (4)
+│  │  ├─ Aujourd'hui: 116625 DH
+│  │  ├─ Ce Mois: 116625 DH
+│  │  ├─ Total Factures: 6
+│  │  └─ Chiffre d'Affaires: 116625 DH
+│  │
+│  ├─ Filters & Search
+│  │  ├─ Search by Ref or Client
+│  │  ├─ Status Filter (Tous/Unpaid/Partial/Paid)
+│  │  ├─ Date Range (Du/Au)
+│  │  ├─ Filter Button
+│  │  └─ Reset Button
+│  │
+│  ├─ Invoice Table
+│  │  ├─ Référence (Link to detail)
+│  │  ├─ Client (⚠️  CRASHES IF NULL)
+│  │  ├─ Montant
+│  │  ├─ Payé
+│  │  ├─ Solde (Red if > 0)
+│  │  ├─ Date
+│  │  ├─ Statut (Color badges)
+│  │  │  ├─ Non payée (Red)
+│  │  │  ├─ Partiellement payée (Yellow)
+│  │  │  └─ Payée (Green)
+│  │  └─ Actions (Eye icon)
+│  │
+│  ├─ Pagination (if needed)
+│  │
+│  └─ "+ Nouvelle Facture" Button (Top Right)
+│
+│
+├─ 🆕 NOUVELLE FACTURE (Create/Edit Invoice)
+│  URL: /sales/invoices/create/
+│       /sales/invoices/<ref>/edit/
+│  Rating: 8/10 ████████░
+│  Status: ✅ WORKING (recent fixes applied)
+│
+│  Left Column (Main Form - 2/3 width):
+│  ├─ Client Selection
+│  │  ├─ Client Dropdown (Optional for walk-in)
+│  │  ├─ "+ Nouveau Client" Button
+│  │  └─ Helper text: "Laissez vide pour une vente sans client"
+│  │
+│  ├─ Paramètres (Parameters)
+│  │  ├─ TVA (%) - Default: 0
+│  │  ├─ Méthode de Paiement (Optional)
+│  │  ├─ Payment Reference (Conditional - shown if method selected)
+│  │  │  └─ Required for: Virement, Chèque, Mobile, Card
+│  │  ├─ Compte Bancaire (Conditional - shown for bank transfers)
+│  │  └─ Helper text
+│  │
+│  ├─ Articles (Items)
+│  │  ├─ "+ Ajouter un Article" Button
+│  │  │
+│  │  ├─ Items List (If any)
+│  │  │  ├─ Product Name
+│  │  │  ├─ Quantity
+│  │  │  ├─ Unit Price
+│  │  │  ├─ Discount
+│  │  │  ├─ Line Total
+│  │  │  └─ Delete Button (per item)
+│  │  │
+│  │  ├─ Add Item Modal (Hidden by default)
+│  │  │  ├─ Product Selection (Dropdown)
+│  │  │  ├─ Quantity (Number input)
+│  │  │  ├─ Unit Price (Auto-filled from product, readonly)
+│  │  │  ├─ Discount (DH)
+│  │  │  ├─ Calculation Preview
+│  │  │  │  ├─ Sous-total
+│  │  │  │  ├─ Remise
+│  │  │  │  └─ Total (Green, bold)
+│  │  │  ├─ "Ajouter" Button (Green)
+│  │  │  └─ "Annuler" Button (Gray)
+│  │  │
+│  │  └─ Empty State (if no items)
+│  │     └─ "Aucun article ajouté..."
+│  │
+│  ├─ Paiement à la Création
+│  │  └─ Montant Payé (Optionnel) ✅ FIXED - Now inside form
+│  │     └─ Helper: "Montant payé lors de la création de la facture"
+│  │
+│  ├─ Notes
+│  │  └─ Observations Textarea
+│  │
+│  └─ Submit Buttons
+│     ├─ "Créer la Facture" / "Mettre à jour" (Blue)
+│     └─ "Annuler" (Gray)
+│
+│  Right Sidebar (1/3 width):
+│  ├─ Référence Card
+│  │  └─ "Auto-généré" (shows number will be generated)
+│  │
+│  ├─ Workflow Checklist
+│  │  ✓ Sélectionnez un client (optionnel)
+│  │  ✓ Ajoutez les articles
+│  │  ✓ Paramètres: remise, TVA, paiement
+│  │  ✓ Créer → Facture prêt!
+│  │
+│  └─ Résumé & Paiement
+│     ├─ Total Facture: X.XX DH (Green, large)
+│     ├─ Solde Restant: X.XX DH (Blue)
+│     └─ Helper: "Ajoutez les articles pour voir le total"
+│
+│
+├─ 👁️  INVOICE DETAIL (View & Edit Invoice)
+│  URL: /sales/invoices/<ref>/
+│  Rating: 8/10 ████████░
+│  Status: ✅ WORKING
+│
+│  Header:
+│  ├─ Invoice Reference (Large, bold)
+│  ├─ Date
+│  └─ "Retour" Button
+│
+│  Left Column:
+│  ├─ Informations Client
+│  │  ├─ Client Name
+│  │  ├─ Email/Phone
+│  │  ├─ Address
+│  │  └─ Notes
+│  │
+│  ├─ Articles (Items Table)
+│  │  ├─ Produit | Quantité | Prix Unitaire | Total
+│  │  ├─ Row per item...
+│  │  └─ Totals row
+│  │
+│  ├─ Modal: Add Item (During edit)
+│  │  └─ Same as create form
+│  │
+│  └─ Invoice Details Card
+│     └─ Notes, Internal notes, etc.
+│
+│  Right Sidebar:
+│  ├─ Statut Card
+│  │  ├─ Status Badge (Color coded)
+│  │  │  ├─ Red: Non payée (Unpaid)
+│  │  │  ├─ Yellow: Partiellement payée (Partial)
+│  │  │  └─ Green: Payée (Paid)
+│  │  └─ Vendeur: Name
+│  │
+│  ├─ Totaux Card
+│  │  ├─ Sous-total
+│  │  ├─ Remise
+│  │  ├─ TVA
+│  │  └─ Total (Green, large)
+│  │
+│  ├─ Paiement Card
+│  │  ├─ "Payer" Button (Green) - Only if status != 'paid'
+│  │  ├─ Payé: X.XX DH
+│  │  ├─ Solde: X.XX DH (Red if > 0)
+│  │  ├─ Méthode: (Payment method)
+│  │  ├─ Référence: (Payment reference - check #, transfer ref, etc.)
+│  │  ├─ Compte: (Bank account name & number)
+│  │  └─ Helper text
+│  │
+│  └─ Actions Card
+│     ├─ Edit Button (Pencil icon) - If draft
+│     ├─ Delete Button (Trash icon) - If draft
+│     ├─ Payer Button - If not paid
+│     └─ Download PDF (future)
+│
+│
+├─ 💳 INVOICE PAYMENT (Record Payment)
+│  URL: /sales/invoices/<ref>/payment/
+│  Rating: Not fully assessed
+│  Status: ⚠️  VULNERABLE to rate limiting attack
+│
+│  Components:
+│  ├─ Current Invoice Info
+│  ├─ Amount Outstanding
+│  ├─ Payment Method Selection
+│  ├─ Amount to Pay
+│  ├─ Payment Reference
+│  ├─ Notes
+│  └─ Submit Button
+│
+│
+├─ 🚚 DELIVERY INFO (Update Delivery Status)
+│  URL: /sales/invoices/<ref>/delivery/
+│  Rating: Not fully assessed
+│  Status: ✅ Lower priority
+│
+│  Components:
+│  ├─ Delivery Method
+│  ├─ Delivery Person
+│  ├─ Delivery Address
+│  ├─ Delivery Cost
+│  ├─ Delivery Status (Select)
+│  ├─ Delivery Date
+│  └─ Submit Button
+│
+│
+└─ 📊 PAYMENT TRACKING (Dashboard)
+   URL: /sales/payment-tracking/ (future)
+   Rating: Not fully assessed
+   Status: 🟡 Enhancement needed
+
+   Components:
+   ├─ Overdue Invoices List
+   ├─ Pending Payments List
+   ├─ Payment Schedule
+   └─ Collection Metrics
+
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                           📋 DEVIS (Quotes) Module                           ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+Accueil / Devis
+│
+├─ 📋 DEVIS LIST (Quotes List)
+│  URL: /quotes/list/
+│  Rating: 8/10 ████████░
+│  Status: ✅ WORKING (but missing features)
+│
+│  Components:
+│  ├─ Statistics Cards (5)
+│  │  ├─ Total Devis: 0
+│  │  ├─ Envoyés: 0 (Blue)
+│  │  ├─ Acceptés: 0 (Green)
+│  │  ├─ Montant Total: 0 DH
+│  │  └─ Expirés: 0 (Red)
+│  │
+│  ├─ Filters & Search
+│  │  ├─ Search by Référence or Client
+│  │  ├─ Status Filter Dropdown
+│  │  │  └─ Options: Tous les statuts, Draft, Sent, Accepted, Rejected, Expired
+│  │  ├─ Date Range (From/To)
+│  │  └─ Search Button (Blue)
+│  │
+│  ├─ Quotes Table
+│  │  ├─ Référence (Link)
+│  │  ├─ Client
+│  │  ├─ Date
+│  │  ├─ Valide jusqu'au (Expiry date)
+│  │  ├─ Montant (Total amount)
+│  │  ├─ Statut (Badge)
+│  │  │  ├─ Brouillon (Draft) - Gray
+│  │  │  ├─ Envoyé (Sent) - Blue
+│  │  │  ├─ Accepté (Accepted) - Green
+│  │  │  ├─ Rejeté (Rejected) - Red
+│  │  │  └─ Expiré (Expired) - Orange
+│  │  └─ Actions (Eye icon)
+│  │
+│  ├─ Empty State (if no quotes)
+│  │  └─ "Aucun devis trouvé"
+│  │
+│  └─ "+ Nouveau" Button (Top Right, Blue)
+│
+│
+├─ 🆕 CREATE QUOTE
+│  URL: /quotes/create/
+│  Rating: Not fully assessed
+│  Status: ⚠️  ActivityLog API bug (will crash)
+│
+│  Components:
+│  ├─ Client Selection
+│  │  └─ Optional (can create quote for future client)
+│  │
+│  ├─ Quote Details
+│  │  ├─ Validity Date (Valid until)
+│  │  ├─ TVA (%)
+│  │  ├─ Notes/Terms
+│  │  └─ Description
+│  │
+│  ├─ Items Section
+│  │  ├─ "+ Add Item" Button
+│  │  │
+│  │  ├─ Items List
+│  │  │  ├─ Description
+│  │  │  ├─ Quantity
+│  │  │  ├─ Unit Price
+│  │  │  ├─ Line Total
+│  │  │  └─ Delete Button (per item)
+│  │  │
+│  │  └─ Empty State
+│  │
+│  ├─ Summary Panel
+│  │  ├─ Subtotal
+│  │  ├─ Tax
+│  │  └─ Total (Green, large)
+│  │
+│  └─ Buttons
+│     ├─ "Créer Devis" (Blue)
+│     └─ "Annuler" (Gray)
+│
+│
+├─ 👁️  QUOTE DETAIL
+│  URL: /quotes/<ref>/
+│  Rating: Not fully assessed
+│  Status: ✅ WORKING
+│
+│  Components:
+│  ├─ Quote Header
+│  │  ├─ Reference
+│  │  ├─ Date Issued
+│  │  └─ Client Name
+│  │
+│  ├─ Left Column
+│  │  ├─ Client Info
+│  │  ├─ Items Table
+│  │  │  ├─ Description | Qty | Unit Price | Total
+│  │  │  └─ Totals row
+│  │  └─ Terms/Notes
+│  │
+│  ├─ Right Sidebar
+│  │  ├─ Status Card (Badge)
+│  │  ├─ Validity Card
+│  │  │  ├─ Issued: Date
+│  │  │  ├─ Valid Until: Date
+│  │  │  └─ Days Remaining
+│  │  │
+│  │  ├─ Totals Card
+│  │  │  ├─ Subtotal
+│  │  │  ├─ Tax
+│  │  │  └─ Total (Green)
+│  │  │
+│  │  └─ Actions
+│  │     ├─ Edit (if draft)
+│  │     ├─ Send to Client
+│  │     ├─ Mark as Accepted
+│  │     ├─ Mark as Rejected
+│  │     ├─ Convert to Invoice (if accepted)
+│  │     └─ Delete (if draft)
+│  │
+│  └─ Status Change Form (If not sent/accepted/rejected)
+│     └─ Change Status Dropdown + Submit
+│
+│
+├─ 📊 QUOTE DASHBOARD
+│  URL: /quotes/dashboard/ (future)
+│  Rating: Not fully assessed
+│  Status: 🟡 Enhancement needed
+│
+│  Components:
+│  ├─ KPI Cards (same as list)
+│  ├─ By Status Breakdown (Pie/Bar chart?)
+│  ├─ Recent Quotes List
+│  ├─ Expiring Soon List
+│  └─ Quote Success Rate (Accepted / Sent %)
+│
+│
+└─ ↔️  CONVERT QUOTE TO INVOICE
+   URL: /quotes/<ref>/convert-to-invoice/
+   Rating: Not fully assessed
+   Status: ⚠️  Missing error handling for deleted products
+
+   Action: Converts accepted quote to sale invoice
+   Components:
+   ├─ Verify all items still exist (products not deleted)
+   ├─ Create SaleInvoice with quote data
+   ├─ Link invoice back to quote
+   ├─ Update quote status to CONVERTED
+   └─ Redirect to new invoice detail
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              LEGEND & NOTES                                  ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  Rating Scale:                                                               ║
+║  8-10/10 ████████░ = Excellent, mostly working                              ║
+║  6-7/10  ██████░░░ = Good, some issues                                       ║
+║  4-5/10  ████░░░░░ = Fair, multiple issues                                   ║
+║  1-3/10  ░░░░░░░░░ = Poor, major problems                                    ║
+║                                                                              ║
+║  Status Indicators:                                                          ║
+║  ✅ WORKING = Fully functional                                              ║
+║  🟡 WORKING BUT = Has issues to fix                                          ║
+║  ⚠️  HAS BUG = Known bug exists                                              ║
+║  ⚠️  VULNERABLE = Security vulnerability                                     ║
+║  🔒 SECURITY = Security issue needs fixing                                   ║
+║  ♿ ACCESSIBILITY = Accessibility issue                                      ║
+║  🟡 MISSING FEATURE = Feature not yet implemented                            ║
+║                                                                              ║
+║  Critical Issues (⚠️):                                                        ║
+║  1. Invoice List crashes on walk-in sales (null client)                      ║
+║  2. Quote creation crashes (ActivityLog API mismatch)                        ║
+║  3. Missing Status.DRAFT enum value                                          ║
+║  4. Payment endpoint vulnerable to rate limiting attack                      ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
