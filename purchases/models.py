@@ -121,6 +121,13 @@ class PurchaseOrder(models.Model):
     def __str__(self):
         return f"{self.reference} - {self.supplier.name}"
 
+    def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_purchase_order_reference
+            self.reference = generate_purchase_order_reference()
+        super().save(*args, **kwargs)
+
     def calculate_total(self):
         """Calculate total from line items"""
         total = self.items.aggregate(
@@ -337,6 +344,13 @@ class PurchaseInvoice(models.Model):
 
     def __str__(self):
         return f"{self.reference} - {self.supplier.name} - {self.total_amount} MAD"
+
+    def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_purchase_invoice_reference
+            self.reference = generate_purchase_invoice_reference()
+        super().save(*args, **kwargs)
 
     def calculate_totals(self):
         """Calculate totals from line items"""
@@ -572,6 +586,13 @@ class Consignment(models.Model):
 
     def __str__(self):
         return f"{self.reference} - {self.supplier.name}"
+
+    def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_consignment_reference
+            self.reference = generate_consignment_reference()
+        super().save(*args, **kwargs)
 
     def update_totals(self):
         """Update totals from items"""

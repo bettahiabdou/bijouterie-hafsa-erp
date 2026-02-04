@@ -147,6 +147,11 @@ class Repair(models.Model):
         return f"{self.reference} - {self.client.name}"
 
     def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_repair_reference
+            self.reference = generate_repair_reference()
+
         # Auto-calculate total cost
         self.total_cost_dh = (
             self.assessment_cost_dh +

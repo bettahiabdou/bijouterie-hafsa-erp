@@ -301,6 +301,12 @@ class Product(models.Model):
         return f"{self.reference} - {self.name}"
 
     def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_product_reference
+            product_type = 'FIN' if self.product_type == self.ProductType.FINISHED else 'RAW'
+            self.reference = generate_product_reference(product_type)
+
         # Calculate metal cost
         self.metal_cost = self.net_weight * self.purchase_price_per_gram
 

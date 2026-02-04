@@ -254,6 +254,13 @@ class SaleInvoice(models.Model):
         )['total'] or Decimal('0')
         return self.total_amount - total_cost
 
+    def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_sales_invoice_reference
+            self.reference = generate_sales_invoice_reference()
+        super().save(*args, **kwargs)
+
     @property
     def profit_margin(self):
         """Calculate profit margin percentage"""

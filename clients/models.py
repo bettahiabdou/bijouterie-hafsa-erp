@@ -289,6 +289,11 @@ class OldGoldPurchase(models.Model):
         return f"{self.reference} - {self.client_name} - {self.net_weight}g"
 
     def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_old_gold_reference
+            self.reference = generate_old_gold_reference()
+
         # Calculate total amount
         self.total_amount = self.net_weight * self.price_per_gram
         super().save(*args, **kwargs)

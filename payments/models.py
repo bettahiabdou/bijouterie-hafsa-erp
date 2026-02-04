@@ -151,6 +151,11 @@ class ClientPayment(models.Model):
         return f"{self.reference} - {self.client.full_name} - {self.amount} MAD"
 
     def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_payment_reference
+            self.reference = generate_payment_reference('PAY')
+
         is_new = self.pk is None
         super().save(*args, **kwargs)
 
@@ -282,6 +287,11 @@ class SupplierPayment(models.Model):
         return f"{self.reference} - {self.supplier.name} - {self.amount} MAD"
 
     def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_payment_reference
+            self.reference = generate_payment_reference('SUP-PAY')
+
         is_new = self.pk is None
         super().save(*args, **kwargs)
 
@@ -413,6 +423,11 @@ class Deposit(models.Model):
         return f"{self.reference} - {party} - {self.amount_remaining} MAD restant"
 
     def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_payment_reference
+            self.reference = generate_payment_reference('DEP')
+
         self.amount_remaining = self.original_amount - self.amount_applied
 
         if self.amount_remaining <= 0:

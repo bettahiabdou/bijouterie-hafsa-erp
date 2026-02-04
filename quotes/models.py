@@ -136,6 +136,11 @@ class Quote(models.Model):
         return f"{self.reference} - {self.client.name}"
 
     def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_quote_reference
+            self.reference = generate_quote_reference()
+
         # Auto-calculate totals
         self.discount_amount_dh = self.subtotal_dh * (self.discount_percent / 100)
         self.total_amount_dh = (
