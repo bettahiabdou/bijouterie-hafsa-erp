@@ -179,18 +179,44 @@
                 <p class="text-xs text-gray-500 mt-1">Calculé automatiquement = Coût Métal + Main d'œuvre + Pierres + Autres</p>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Prix de Vente (DH) *</label>
-                <input type="number" name="selling_price" value="{% if product %}{{ product.selling_price }}{% else %}0{% endif %}"
-                    step="0.01" min="0" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <!-- Margin Settings -->
+            <div class="lg:col-span-2">
+                <h3 class="text-base font-bold text-gray-900 mb-3">Calcul du Prix de Vente</h3>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Prix Minimum (DH)</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Type de Marge</label>
+                <select id="margin_type" name="margin_type" onchange="calculateSellingPrice()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="percentage" selected>Pourcentage (%)</option>
+                    <option value="fixed">Montant Fixe (DH)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Valeur de Marge</label>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="margin_value" name="margin_value" value="{% if product %}{{ product.margin_value }}{% else %}25{% endif %}"
+                        step="0.01" min="0" onchange="calculateSellingPrice()"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <span id="margin_unit" class="text-gray-600 font-medium whitespace-nowrap">%</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Marge à appliquer au coût total</p>
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Prix de Vente Calculé (DH)</label>
+                <input type="number" id="selling_price" name="selling_price" value="{% if product %}{{ product.selling_price }}{% else %}0{% endif %}"
+                    step="0.01" min="0" readonly
+                    class="w-full px-4 py-2 bg-orange-50 border border-orange-300 rounded-lg text-orange-700 font-bold text-lg">
+                <p class="text-xs text-gray-500 mt-1">Calculé automatiquement = Coût Total + Marge</p>
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Prix Minimum (DH) *</label>
                 <input type="number" name="minimum_price" value="{% if product %}{{ product.minimum_price }}{% else %}0{% endif %}"
-                    step="0.01" min="0"
+                    step="0.01" min="0" required
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1">Prix minimum en dessous duquel une approbation est nécessaire</p>
             </div>
 
             <!-- Bank Account -->
@@ -256,11 +282,43 @@
             // Calculate total cost
             const totalCost = metalCost + laborCost + stoneCost + otherCost;
             document.getElementById('total_cost').value = totalCost.toFixed(2);
+
+            // Calculate selling price based on total cost
+            calculateSellingPrice();
         }
 
-        // Calculate costs on page load
+        // Calculate selling price based on margin
+        function calculateSellingPrice() {
+            const totalCost = parseFloat(document.getElementById('total_cost').value) || 0;
+            const marginType = document.getElementById('margin_type').value;
+            const marginValue = parseFloat(document.getElementById('margin_value').value) || 0;
+
+            let sellingPrice;
+            if (marginType === 'percentage') {
+                // Percentage margin: Selling Price = Cost × (1 + margin%)
+                sellingPrice = totalCost * (1 + marginValue / 100);
+            } else {
+                // Fixed amount margin: Selling Price = Cost + margin amount
+                sellingPrice = totalCost + marginValue;
+            }
+
+            document.getElementById('selling_price').value = sellingPrice.toFixed(2);
+        }
+
+        // Update margin unit display when type changes
         document.addEventListener('DOMContentLoaded', function() {
+            // Initial calculation
             calculateCosts();
+
+            // Update margin unit when type changes
+            const marginTypeSelect = document.getElementById('margin_type');
+            const marginUnit = document.getElementById('margin_unit');
+
+            if (marginTypeSelect) {
+                marginTypeSelect.addEventListener('change', function() {
+                    marginUnit.textContent = this.value === 'percentage' ? '%' : 'DH';
+                });
+            }
         });
     </script>
 {% endblock %}

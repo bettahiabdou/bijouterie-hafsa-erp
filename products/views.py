@@ -133,6 +133,10 @@ def batch_product_create(request):
             stone_cost = float(request.POST.get('stone_cost', 0))
             other_cost = float(request.POST.get('other_cost', 0))
 
+            # Margin settings
+            margin_type = request.POST.get('margin_type', 'percentage')
+            margin_value = float(request.POST.get('margin_value', 25))
+
             # Product data
             product_weights = request.POST.getlist('product_weight')
             product_selling_prices = request.POST.getlist('product_selling_price')
@@ -158,7 +162,8 @@ def batch_product_create(request):
                         labor_cost=labor_cost,
                         stone_cost=stone_cost,
                         other_cost=other_cost,
-                        selling_price=selling_price,
+                        margin_type=margin_type,
+                        margin_value=margin_value,
                         bank_account_id=bank_account_id if bank_account_id else None,
                         status='available',
                         created_by=request.user,
@@ -219,11 +224,12 @@ def product_create(request):
                 gross_weight=request.POST.get('gross_weight', 0),
                 net_weight=request.POST.get('net_weight', 0),
                 purchase_price_per_gram=request.POST.get('purchase_price_per_gram', 0),
-                selling_price=request.POST.get('selling_price', 0),
                 minimum_price=request.POST.get('minimum_price', 0),
                 labor_cost=request.POST.get('labor_cost', 0),
                 stone_cost=request.POST.get('stone_cost', 0),
                 other_cost=request.POST.get('other_cost', 0),
+                margin_type=request.POST.get('margin_type', 'percentage'),
+                margin_value=request.POST.get('margin_value', 25),
                 bank_account_id=bank_account_id if bank_account_id else None,
                 status='available',
                 created_by=request.user,
@@ -274,11 +280,12 @@ def product_edit(request, reference):
             product.gross_weight = request.POST.get('gross_weight', product.gross_weight)
             product.net_weight = request.POST.get('net_weight', product.net_weight)
             product.purchase_price_per_gram = request.POST.get('purchase_price_per_gram', product.purchase_price_per_gram)
-            product.selling_price = request.POST.get('selling_price', product.selling_price)
             product.minimum_price = request.POST.get('minimum_price', product.minimum_price)
             product.labor_cost = request.POST.get('labor_cost', product.labor_cost)
             product.stone_cost = request.POST.get('stone_cost', product.stone_cost)
             product.other_cost = request.POST.get('other_cost', product.other_cost)
+            product.margin_type = request.POST.get('margin_type', product.margin_type)
+            product.margin_value = request.POST.get('margin_value', product.margin_value)
             product.status = request.POST.get('status', product.status)
 
             if request.POST.get('metal_type'):
