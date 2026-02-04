@@ -454,10 +454,10 @@ def user_deactivate(request, user_id):
     # Log the action
     ActivityLog.objects.create(
         user=request.user,
-        action='deactivate',
-        object_type='user',
+        action='delete',
+        model_name='User',
         object_id=user_obj.id,
-        description=f'Désactivé par {request.user.full_name}',
+        object_repr=user_obj.full_name,
         ip_address=get_client_ip(request),
     )
 
@@ -646,7 +646,7 @@ class ConfigurationCreateView(CreateView):
             action='create',
             model_name=config['model'].__name__,
             object_id=self.object.id,
-            description=f'Créé {config["singular"]}: {self.object}',
+            object_repr=str(self.object),
             ip_address=get_client_ip(self.request),
         )
 
@@ -702,7 +702,7 @@ class ConfigurationUpdateView(UpdateView):
             action='update',
             model_name=config['model'].__name__,
             object_id=self.object.id,
-            description=f'Modifié {config["singular"]}: {self.object}',
+            object_repr=str(self.object),
             ip_address=get_client_ip(self.request),
         )
 
@@ -750,7 +750,7 @@ class ConfigurationDeleteView(DeleteView):
             user=request.user,
             action='delete',
             model_name=config['model'].__name__,
-            description=f'Supprimé {config["singular"]}: {obj_str}',
+            object_repr=obj_str,
             ip_address=get_client_ip(request),
         )
 
