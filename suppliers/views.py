@@ -12,7 +12,6 @@ from .models import Supplier
 from purchases.models import PurchaseInvoice, Consignment
 from payments.models import SupplierPayment
 from users.models import ActivityLog
-from utils import get_client_ip
 
 
 @login_required(login_url='login')
@@ -295,3 +294,13 @@ def supplier_delete(request, code):
         'supplier': supplier,
     }
     return render(request, 'suppliers/supplier_delete.html', context)
+
+
+def get_client_ip(request):
+    """Get client IP address from request"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
