@@ -142,7 +142,7 @@
                                 </span>
                                 {{ activity.description }}
                             </p>
-                            <p class="text-xs text-gray-600 mt-1">{{ activity.user.full_name }} • {{ activity.timestamp|timesince }} ago</p>
+                            <p class="text-xs text-gray-600 mt-1">{{ activity.user.full_name }} • {{ activity.created_at|timesince }} ago</p>
                         </div>
                     </div>
                     {% empty %}

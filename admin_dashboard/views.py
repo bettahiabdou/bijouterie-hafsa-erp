@@ -80,7 +80,7 @@ def admin_home(request):
         'payment_methods': PaymentMethod.objects.count(),
 
         # Recent Activity
-        'recent_activities': ActivityLog.objects.all().order_by('-timestamp')[:10],
+        'recent_activities': ActivityLog.objects.all().order_by('-created_at')[:10],
 
         # System Health
         'pending_repairs': Repair.objects.exclude(
@@ -256,7 +256,7 @@ def activity_log_view(request):
     """Activity Log - View and filter system activity"""
 
     # Get all activities
-    activities = ActivityLog.objects.all().order_by('-timestamp')
+    activities = ActivityLog.objects.all().order_by('-created_at')
 
     # Filters
     action = request.GET.get('action')
@@ -277,7 +277,7 @@ def activity_log_view(request):
     try:
         days_back = int(days)
         since_date = timezone.now() - timedelta(days=days_back)
-        activities = activities.filter(timestamp__gte=since_date)
+        activities = activities.filter(created_at__gte=since_date)
     except (ValueError, TypeError):
         pass
 
@@ -333,7 +333,7 @@ def system_status(request):
         # Recent errors
         'recent_errors': ActivityLog.objects.filter(
             action='error'
-        ).order_by('-timestamp')[:10],
+        ).order_by('-created_at')[:10],
     }
 
     return render(request, 'admin_dashboard/status.html', context)
