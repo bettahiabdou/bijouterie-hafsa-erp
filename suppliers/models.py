@@ -125,6 +125,13 @@ class Supplier(models.Model):
 
         return total_purchases - total_payments
 
+    def save(self, *args, **kwargs):
+        # Auto-generate supplier code if not present
+        if not self.code:
+            from utils import generate_supplier_code
+            self.code = generate_supplier_code()
+        super().save(*args, **kwargs)
+
 
 class SupplierBankAccount(models.Model):
     """

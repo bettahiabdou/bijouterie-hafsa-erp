@@ -158,6 +158,13 @@ class Client(models.Model):
             return self.current_balance > self.credit_limit
         return False
 
+    def save(self, *args, **kwargs):
+        # Auto-generate client code if not present
+        if not self.code:
+            from utils import generate_client_code
+            self.code = generate_client_code(self.first_name, self.last_name)
+        super().save(*args, **kwargs)
+
 
 class OldGoldPurchase(models.Model):
     """

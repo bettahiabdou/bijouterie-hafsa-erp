@@ -223,6 +223,14 @@ class BankAccount(models.Model):
     """
     Bank accounts for the business
     """
+    # Auto-generated reference
+    reference = models.CharField(
+        _('Référence'),
+        max_length=50,
+        unique=True,
+        editable=False,
+        help_text=_('Référence unique générée automatiquement')
+    )
     bank_name = models.CharField(_('Nom de la banque'), max_length=100)
     account_name = models.CharField(_('Nom du compte'), max_length=100)
     account_number = models.CharField(
@@ -256,9 +264,14 @@ class BankAccount(models.Model):
         ordering = ['bank_name', 'account_name']
 
     def __str__(self):
-        return f"{self.bank_name} - {self.account_name}"
+        return f"{self.reference} - {self.bank_name} - {self.account_name}"
 
     def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_bank_account_code
+            self.reference = generate_bank_account_code()
+
         # Ensure only one default account
         if self.is_default:
             BankAccount.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
