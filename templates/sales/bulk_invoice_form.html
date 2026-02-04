@@ -359,8 +359,10 @@
                 const bankAccountField = detailRow.querySelector('.bank-account-field');
 
                 if (bankAccountField) {
-                    // Show bank account field if payment method is virement
-                    bankAccountField.style.display = methodName.includes('virement') ? 'flex' : 'none';
+                    // Show bank account field if payment method is virement (dynamic check)
+                    const isVirement = methodName.includes('virement') || methodName.includes('bank');
+                    bankAccountField.style.display = isVirement ? 'flex' : 'none';
+                    console.log(`Row payment method: ${methodName}, showing bank field: ${isVirement}`);
                 }
             }
 
@@ -375,24 +377,30 @@
             const newRow = templateRow.cloneNode(true);
             const newDetailRow = templateRow.nextElementSibling.cloneNode(true);
 
-            // Reset values in cloned row
+            // Reset values in cloned row - CRITICAL: Reset ALL input fields
             newRow.querySelectorAll('input').forEach(input => {
-                input.value = input.name === 'quantity' ? '1' : '';
+                // Only set quantity to 1, all others (including amount_paid) must be empty
+                if (input.name === 'quantity') {
+                    input.value = '1';
+                } else {
+                    input.value = '';
+                }
             });
             newRow.querySelectorAll('select').forEach(select => {
                 select.value = '';
             });
 
-            // Reset values in cloned detail row
+            // Reset values in cloned detail row - explicitly reset all fields
             newDetailRow.querySelectorAll('input').forEach(input => {
-                input.value = '';
+                input.value = '';  // Clear payment_reference
             });
             newDetailRow.querySelectorAll('select').forEach(select => {
-                select.value = '';
+                select.value = '';  // Clear bank_account
             });
-            // Hide bank account field by default in new row
+            // DO NOT hide bank account field - let attachPaymentMethodHandler manage visibility
             const newBankAccountField = newDetailRow.querySelector('.bank-account-field');
             if (newBankAccountField) {
+                // Set initial state based on payment method
                 newBankAccountField.style.display = 'none';
             }
 
@@ -420,12 +428,14 @@
                 }
             });
 
-            // Attach handlers for expand toggle and payment method
+            // Append rows to DOM FIRST so that nextElementSibling works
+            invoicesList.appendChild(newRow);
+            invoicesList.appendChild(newDetailRow);
+
+            // THEN attach handlers (after DOM elements are connected)
             attachExpandToggleHandler(newRow);
             attachPaymentMethodHandler(newRow);
 
-            invoicesList.appendChild(newRow);
-            invoicesList.appendChild(newDetailRow);
             updateSummary();
         });
 
@@ -479,6 +489,49 @@
         document.querySelectorAll('.invoice_item').forEach(row => {
             attachExpandToggleHandler(row);
             attachPaymentMethodHandler(row);
+        });
+
+        // Validate form before submission
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const rows = document.querySelectorAll('.invoice_item');
+            const products = [];
+            const references = [];
+            let hasError = false;
+
+            rows.forEach((row, idx) => {
+                const productSelect = row.querySelector('.product_id');
+                const productId = productSelect.value;
+
+                // Check for duplicate products
+                if (productId) {
+                    if (products.includes(productId)) {
+                        alert(`⚠️ Erreur ligne ${idx + 1}: Le même produit ne peut pas être sélectionné deux fois. Choisissez des produits différents.`);
+                        e.preventDefault();
+                        hasError = true;
+                        return;
+                    }
+                    products.push(productId);
+                }
+
+                // Check for duplicate payment references (if payment method is set)
+                const paymentMethodSelect = row.querySelector('.payment_method');
+                const detailRow = row.nextElementSibling;
+                const paymentRef = detailRow.querySelector('.payment_reference')?.value;
+
+                if (paymentMethodSelect.value && paymentRef) {
+                    if (references.includes(paymentRef)) {
+                        alert(`⚠️ Erreur ligne ${idx + 1}: La référence de paiement "${paymentRef}" est déjà utilisée. Utilisez une référence unique.`);
+                        e.preventDefault();
+                        hasError = true;
+                        return;
+                    }
+                    references.push(paymentRef);
+                }
+            });
+
+            if (hasError) {
+                e.preventDefault();
+            }
         });
 
         // Initialize summary
