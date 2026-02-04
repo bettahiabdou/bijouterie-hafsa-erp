@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Administration</h1>
+            <p class="text-gray-600 mt-2">Gérez votre système ERP depuis ce tableau de bord</p>
+        </div>
+        <div class="text-sm text-gray-600">
+            {{ request.user.full_name }}
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Users -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm font-medium">Utilisateurs</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_users }}</p>
+                    <p class="text-green-600 text-sm mt-2">{{ active_users }} actifs</p>
+                </div>
+                <div class="bg-blue-100 rounded-full p-3">
+                    <i class="fas fa-users text-blue-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clients -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm font-medium">Clients</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_clients }}</p>
+                </div>
+                <div class="bg-green-100 rounded-full p-3">
+                    <i class="fas fa-user-tie text-green-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Produits -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm font-medium">Produits</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_products }}</p>
+                </div>
+                <div class="bg-purple-100 rounded-full p-3">
+                    <i class="fas fa-gem text-purple-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenue -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm font-medium">Revenus Mois</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ invoices_this_month|floatformat:0 }} MAD</p>
+                </div>
+                <div class="bg-yellow-100 rounded-full p-3">
+                    <i class="fas fa-chart-line text-yellow-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- User Management -->
+        <a href="{% url 'admin_dashboard:user_list' %}" class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Gestion des Utilisateurs</h3>
+                    <p class="text-gray-600 text-sm mt-2">{{ total_users }} utilisateurs, {{ staff_count }} admins</p>
+                </div>
+                <div class="bg-blue-100 rounded-full p-3">
+                    <i class="fas fa-users-cog text-blue-600 text-xl"></i>
+                </div>
+            </div>
+        </a>
+
+        <!-- System Configuration -->
+        <a href="{% url 'admin_dashboard:configuration' %}" class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Configuration Système</h3>
+                    <p class="text-gray-600 text-sm mt-2">{{ metal_types }} types de métaux, {{ product_categories }} catégories</p>
+                </div>
+                <div class="bg-purple-100 rounded-full p-3">
+                    <i class="fas fa-cog text-purple-600 text-xl"></i>
+                </div>
+            </div>
+        </a>
+
+        <!-- Activity Log -->
+        <a href="{% url 'admin_dashboard:activity_log' %}" class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Journal d'Activité</h3>
+                    <p class="text-gray-600 text-sm mt-2">Voir toutes les actions système</p>
+                </div>
+                <div class="bg-green-100 rounded-full p-3">
+                    <i class="fas fa-history text-green-600 text-xl"></i>
+                </div>
+            </div>
+        </a>
+
+        <!-- System Status -->
+        <a href="{% url 'admin_dashboard:status' %}" class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">État du Système</h3>
+                    <p class="text-gray-600 text-sm mt-2">Diagnostics et santé du système</p>
+                </div>
+                <div class="bg-yellow-100 rounded-full p-3">
+                    <i class="fas fa-heartbeat text-yellow-600 text-xl"></i>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Today's Activity -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Activité Récente</h3>
+                </div>
+                <div class="divide-y">
+                    {% for activity in recent_activities %}
+                    <div class="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">
+                                <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs mr-2">
+                                    {{ activity.get_action_display }}
+                                </span>
+                                {{ activity.description }}
+                            </p>
+                            <p class="text-xs text-gray-600 mt-1">{{ activity.user.full_name }} • {{ activity.timestamp|timesince }} ago</p>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="px-6 py-4 text-center text-gray-500">
+                        <p>Aucune activité récente</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- System Health -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">Santé du Système</h3>
+            </div>
+            <div class="px-6 py-4 space-y-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Réparations en cours</span>
+                    <span class="inline-block px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
+                        {{ pending_repairs }}
+                    </span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Commandes en attente</span>
+                    <span class="inline-block px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
+                        {{ pending_purchase_orders }}
+                    </span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Factures aujourd'hui</span>
+                    <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                        {{ invoices_today }}
+                    </span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Réparations aujourd'hui</span>
+                    <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                        {{ repairs_today }}
+                    </span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Statut</span>
+                    <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                        ✓ Normal
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-blue-100 { background-color: #dbeafe; }
+    .text-blue-600 { color: #2563eb; }
+    .bg-green-100 { background-color: #dcfce7; }
+    .text-green-600 { color: #16a34a; }
+    .bg-purple-100 { background-color: #e9d5ff; }
+    .text-purple-600 { color: #9333ea; }
+    .bg-yellow-100 { background-color: #fef3c7; }
+    .text-yellow-600 { color: #ca8a04; }
+    .bg-orange-100 { background-color: #fed7aa; }
+    .text-orange-800 { color: #92400e; }
+</style>
+{% endblock %}

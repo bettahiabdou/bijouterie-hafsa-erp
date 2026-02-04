@@ -21,7 +21,8 @@ from django.conf.urls.static import static
 from . import views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Django Admin - DISABLED in favor of consolidated dashboard
+    # path('admin/', admin.site.urls),  # Replaced with mobile-responsive admin_dashboard
 
     # Authentication
     path('login/', views.login_view, name='login'),
@@ -29,6 +30,9 @@ urlpatterns = [
 
     # Dashboard
     path('', views.dashboard, name='dashboard'),
+
+    # Admin Dashboard (Mobile-Responsive)
+    path('settings/', include('admin_dashboard.urls')),
 
     # App URLs
     path('users/', include('users.urls')),

@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-2xl">
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h1 class="text-2xl font-bold text-gray-900">
+                {% if is_create %}
+                Créer un Nouvel Utilisateur
+                {% else %}
+                Éditer Utilisateur
+                {% endif %}
+            </h1>
+        </div>
+
+        <form method="post" class="px-6 py-6 space-y-6">
+            {% csrf_token %}
+
+            <!-- Username -->
+            <div>
+                <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    Nom d'utilisateur *
+                </label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                <p class="text-red-600 text-sm mt-1">{{ form.username.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Email -->
+            <div>
+                <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    Email *
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                <p class="text-red-600 text-sm mt-1">{{ form.email.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Names -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Prénom
+                    </label>
+                    {{ form.first_name }}
+                </div>
+                <div>
+                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Nom
+                    </label>
+                    {{ form.last_name }}
+                </div>
+            </div>
+
+            <!-- Arabic Names -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="{{ form.first_name_ar.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Prénom (Arabe)
+                    </label>
+                    {{ form.first_name_ar }}
+                </div>
+                <div>
+                    <label for="{{ form.last_name_ar.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Nom (Arabe)
+                    </label>
+                    {{ form.last_name_ar }}
+                </div>
+            </div>
+
+            <!-- Role -->
+            <div>
+                <label for="{{ form.role.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    Rôle *
+                </label>
+                {{ form.role }}
+                {% if form.role.errors %}
+                <p class="text-red-600 text-sm mt-1">{{ form.role.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Password -->
+            <div>
+                <label for="id_password" class="block text-sm font-medium text-gray-700 mb-2">
+                    {% if is_create %}
+                    Mot de passe *
+                    {% else %}
+                    Nouveau Mot de Passe (optionnel)
+                    {% endif %}
+                </label>
+                <input type="password" name="password" id="id_password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Mot de passe">
+                <p class="text-gray-600 text-xs mt-1">{{ form.password.help_text }}</p>
+            </div>
+
+            <!-- Confirm Password -->
+            <div>
+                <label for="id_password_confirm" class="block text-sm font-medium text-gray-700 mb-2">
+                    {% if is_create %}
+                    Confirmer le Mot de Passe *
+                    {% else %}
+                    Confirmer le Nouveau Mot de Passe
+                    {% endif %}
+                </label>
+                <input type="password" name="password_confirm" id="id_password_confirm" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Confirmer le mot de passe">
+            </div>
+
+            <!-- Active Status -->
+            <div class="flex items-center">
+                <input type="checkbox" id="{{ form.is_active.id_for_label }}" name="is_active" {% if form.is_active.value %}checked{% endif %} class="w-4 h-4 rounded">
+                <label for="{{ form.is_active.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700">
+                    Actif
+                </label>
+            </div>
+
+            <!-- Non-field Errors -->
+            {% if form.non_field_errors %}
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p class="text-red-800 text-sm">{{ form.non_field_errors }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Buttons -->
+            <div class="flex justify-between pt-6">
+                <a href="{% url 'admin_dashboard:user_list' %}" class="text-gray-600 hover:text-gray-900">
+                    <i class="fas fa-arrow-left mr-2"></i> Retour
+                </a>
+                <div class="space-x-4">
+                    <a href="{% url 'admin_dashboard:user_list' %}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        Annuler
+                    </a>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        {% if is_create %}
+                        <i class="fas fa-plus mr-2"></i> Créer Utilisateur
+                        {% else %}
+                        <i class="fas fa-save mr-2"></i> Mettre à Jour
+                        {% endif %}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    select,
+    textarea {
+        @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500;
+    }
+</style>
+{% endblock %}

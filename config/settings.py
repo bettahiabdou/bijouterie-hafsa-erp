@@ -39,6 +39,7 @@ INSTALLED_APPS = [
 
     # Local apps
     'users.apps.UsersConfig',
+    'admin_dashboard.apps.AdminDashboardConfig',
     'products.apps.ProductsConfig',
     'stock.apps.StockConfig',
     'sales.apps.SalesConfig',
