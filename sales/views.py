@@ -390,3 +390,247 @@ def get_client_ip(request):
     else:
         ip = request.META.get('REMOTE_ADDR')
     return ip
+
+
+# ============================================================================
+# PHASE 2: MISSING ENDPOINTS (Invoice Edit, Delete, Payment, Delivery)
+# ============================================================================
+
+@login_required(login_url='login')
+@require_http_methods(["GET", "POST"])
+def invoice_edit(request, reference):
+    """Edit existing invoice (DRAFT invoices only)"""
+    from .forms import SaleInvoiceForm
+
+    invoice = get_object_or_404(SaleInvoice, reference=reference)
+
+    # Check status - only draft can be edited
+    if invoice.status != SaleInvoice.Status.DRAFT:
+        messages.error(request, 'Seuls les brouillons peuvent être édités.')
+        return redirect('sales:invoice_detail', reference=reference)
+
+    # Check permissions
+    if request.user != invoice.created_by and not request.user.is_staff:
+        messages.error(request, 'Vous n\'avez pas la permission d\'éditer cette facture.')
+        return redirect('sales:invoice_detail', reference=reference)
+
+    form = None
+
+    if request.method == 'POST':
+        try:
+            form = SaleInvoiceForm(request.POST, instance=invoice)
+            if form.is_valid():
+                form.save()
+                invoice.calculate_totals()
+
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action=ActivityLog.ActionType.UPDATE,
+                    model_name='SaleInvoice',
+                    object_id=str(invoice.id),
+                    object_repr=invoice.reference,
+                    ip_address=get_client_ip(request)
+                )
+
+                messages.success(request, 'Facture mise à jour avec succès.')
+                return redirect('sales:invoice_detail', reference=reference)
+            else:
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        messages.error(request, f'{field}: {error}')
+        except Exception as e:
+            messages.error(request, f'Erreur lors de la mise à jour: {str(e)}')
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f'Error editing invoice {reference}: {str(e)}')
+
+    if form is None:
+        form = SaleInvoiceForm(instance=invoice)
+
+    context = {
+        'invoice': invoice,
+        'form': form,
+        'clients': Client.objects.filter(is_active=True),
+    }
+
+    return render(request, 'sales/invoice_edit.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["GET", "POST"])
+def invoice_delete(request, reference):
+    """Delete (soft delete) invoice - only DRAFT invoices"""
+    invoice = get_object_or_404(SaleInvoice, reference=reference)
+
+    # Only allow deleting DRAFT invoices
+    if invoice.status != SaleInvoice.Status.DRAFT:
+        messages.error(request, 'Seules les factures brouillons peuvent être supprimées.')
+        return redirect('sales:invoice_detail', reference=reference)
+
+    # Check permissions
+    if request.user != invoice.created_by and not request.user.is_staff:
+        messages.error(request, 'Vous n\'avez pas la permission de supprimer cette facture.')
+        return redirect('sales:invoice_detail', reference=reference)
+
+    if request.method == 'POST':
+        try:
+            # Soft delete - reset product status and mark invoice as cancelled
+            for item in invoice.items.all():
+                item.product.status = 'available'
+                item.product.save(update_fields=['status'])
+
+            invoice.status = SaleInvoice.Status.CANCELLED
+            invoice.save(update_fields=['status'])
+
+            ActivityLog.objects.create(
+                user=request.user,
+                action=ActivityLog.ActionType.DELETE,
+                model_name='SaleInvoice',
+                object_id=str(invoice.id),
+                object_repr=invoice.reference,
+                ip_address=get_client_ip(request)
+            )
+
+            messages.success(request, f'Facture {invoice.reference} supprimée.')
+            return redirect('sales:invoice_list')
+        except Exception as e:
+            messages.error(request, f'Erreur lors de la suppression: {str(e)}')
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f'Error deleting invoice {reference}: {str(e)}')
+
+    context = {'invoice': invoice}
+    return render(request, 'sales/invoice_delete.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["GET", "POST"])
+def invoice_payment(request, reference):
+    """Record payment for invoice"""
+    from .forms import PaymentForm
+
+    invoice = get_object_or_404(SaleInvoice, reference=reference)
+
+    # Check permissions
+    if not request.user.is_staff:
+        messages.error(request, 'Vous n\'avez pas la permission d\'enregistrer un paiement.')
+        return redirect('sales:invoice_detail', reference=reference)
+
+    form = None
+
+    if request.method == 'POST':
+        try:
+            form = PaymentForm(request.POST)
+            if form.is_valid():
+                amount = form.cleaned_data['amount']
+
+                # Validate amount doesn't exceed balance
+                if amount > invoice.balance_due:
+                    messages.error(
+                        request,
+                        f'Le paiement ne peut pas dépasser le solde dû ({invoice.balance_due} DH)'
+                    )
+                else:
+                    # Record payment in activity log (or payment model if exists)
+                    # Update invoice payment status
+                    paid_amount = invoice.amount_paid + amount
+
+                    if paid_amount >= invoice.total_amount:
+                        invoice.status = SaleInvoice.Status.PAID
+                    elif paid_amount > 0:
+                        invoice.status = SaleInvoice.Status.PARTIAL
+
+                    invoice.amount_paid = paid_amount
+                    invoice.save(update_fields=['status', 'amount_paid'])
+
+                    # Log activity
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.CREATE,
+                        model_name='SaleInvoice',
+                        object_id=str(invoice.id),
+                        object_repr=f'{invoice.reference} - Paiement {amount} DH',
+                        ip_address=get_client_ip(request)
+                    )
+
+                    messages.success(request, f'Paiement de {amount} DH enregistré.')
+                    return redirect('sales:invoice_detail', reference=reference)
+            else:
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        messages.error(request, f'{field}: {error}')
+        except Exception as e:
+            messages.error(request, f'Erreur lors de l\'enregistrement du paiement: {str(e)}')
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f'Error recording payment for {reference}: {str(e)}')
+
+    if form is None:
+        form = PaymentForm()
+
+    context = {
+        'invoice': invoice,
+        'form': form,
+        'remaining': invoice.balance_due,
+    }
+
+    return render(request, 'sales/invoice_payment.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["GET", "POST"])
+def invoice_delivery(request, reference):
+    """Update delivery information"""
+    from .forms import DeliveryForm
+
+    invoice = get_object_or_404(SaleInvoice, reference=reference)
+
+    # Check permissions
+    if not request.user.is_staff:
+        messages.error(request, 'Vous n\'avez pas la permission de mettre à jour la livraison.')
+        return redirect('sales:invoice_detail', reference=reference)
+
+    form = None
+
+    if request.method == 'POST':
+        try:
+            form = DeliveryForm(request.POST, instance=invoice)
+            if form.is_valid():
+                form.save()
+
+                # Update status if delivered
+                if form.cleaned_data.get('delivery_status') == 'delivered':
+                    invoice.delivery_date = timezone.now().date()
+                    invoice.status = SaleInvoice.Status.DELIVERED
+                    invoice.save(update_fields=['delivery_date', 'status'])
+
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action=ActivityLog.ActionType.UPDATE,
+                    model_name='SaleInvoice',
+                    object_id=str(invoice.id),
+                    object_repr=f'{invoice.reference} - Livraison',
+                    ip_address=get_client_ip(request)
+                )
+
+                messages.success(request, 'Informations de livraison mises à jour.')
+                return redirect('sales:invoice_detail', reference=reference)
+            else:
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        messages.error(request, f'{field}: {error}')
+        except Exception as e:
+            messages.error(request, f'Erreur lors de la mise à jour de la livraison: {str(e)}')
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f'Error updating delivery for {reference}: {str(e)}')
+
+    if form is None:
+        form = DeliveryForm(instance=invoice)
+
+    context = {
+        'invoice': invoice,
+        'form': form,
+    }
+
+    return render(request, 'sales/invoice_delivery.html', context)

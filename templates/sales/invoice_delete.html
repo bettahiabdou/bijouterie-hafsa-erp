@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Supprimer Facture {{ invoice.reference }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-trash"></i> Supprimer Facture
+                    </h3>
+                </div>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <div class="card-body">
+                    {% if invoice.status != 'draft' %}
+                        <div class="alert alert-warning" role="alert">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Action impossible:</strong> Seules les factures en brouillon peuvent être supprimées.
+                        </div>
+                        <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Retour
+                        </a>
+                    {% else %}
+                        <div class="alert alert-danger" role="alert">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <strong>Attention!</strong> Cette action va supprimer la facture <code>{{ invoice.reference }}</code> définitivement.
+                            Les produits repasseront à l'état "disponible".
+                        </div>
+
+                        <h5 class="mb-3">Détails de la facture</h5>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <p><strong>Référence:</strong> {{ invoice.reference }}</p>
+                                <p><strong>Client:</strong> {{ invoice.client.full_name }}</p>
+                                <p><strong>Date:</strong> {{ invoice.date|date:'d/m/Y' }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Statut:</strong> <span class="badge bg-warning">{{ invoice.get_status_display }}</span></p>
+                                <p><strong>Total:</strong> <span class="h5">{{ invoice.total_amount|floatformat:2 }} DH</span></p>
+                                <p><strong>Articles:</strong> {{ invoice.items.count }}</p>
+                            </div>
+                        </div>
+
+                        <h6>Articles à supprimer:</h6>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Produit</th>
+                                        <th>Quantité</th>
+                                        <th>Prix unitaire</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in invoice.items.all %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ item.product.reference }}</strong><br>
+                                                <small class="text-muted">{{ item.product.name }}</small>
+                                            </td>
+                                            <td>{{ item.quantity }}</td>
+                                            <td>{{ item.unit_price|floatformat:2 }} DH</td>
+                                            <td>{{ item.total_amount|floatformat:2 }} DH</td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted">Aucun article</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Note:</strong> Cette suppression est permanente. Les produits repasseront à l'état "disponible" après la suppression.
+                        </div>
+
+                        <form method="POST">
+                            {% csrf_token %}
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="confirm" required>
+                                <label class="form-check-label" for="confirm">
+                                    J'ai lu l'avertissement et je confirme la suppression de cette facture
+                                </label>
+                            </div>
+
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Supprimer définitivement
+                            </button>
+                            <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Annuler
+                            </a>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

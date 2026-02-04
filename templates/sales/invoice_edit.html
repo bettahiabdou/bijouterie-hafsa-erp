@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Éditer Facture {{ invoice.reference }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-edit"></i> Éditer Facture {{ invoice.reference }}
+                    </h3>
+                </div>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <div class="card-body">
+                    {% if invoice.status != 'draft' %}
+                        <div class="alert alert-warning" role="alert">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Seules les factures en brouillon peuvent être éditées.
+                        </div>
+                    {% else %}
+                        <form method="POST" novalidate>
+                            {% csrf_token %}
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Référence</label>
+                                        <input type="text" class="form-control" value="{{ invoice.reference }}" disabled>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Date</label>
+                                        <input type="text" class="form-control" value="{{ invoice.date|date:'d/m/Y' }}" disabled>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="{{ form.client.id_for_label }}" class="form-label">Client <span class="text-danger">*</span></label>
+                                {{ form.client }}
+                                {% if form.client.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.client.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label for="{{ form.discount_percent.id_for_label }}" class="form-label">Remise (%)</label>
+                                        {{ form.discount_percent }}
+                                        {% if form.discount_percent.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ form.discount_percent.errors.0 }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label for="{{ form.tax_rate.id_for_label }}" class="form-label">Taux TVA (%)</label>
+                                        {{ form.tax_rate }}
+                                        {% if form.tax_rate.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ form.tax_rate.errors.0 }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label for="{{ form.payment_method.id_for_label }}" class="form-label">Méthode de paiement</label>
+                                        {{ form.payment_method }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label for="{{ form.bank_account.id_for_label }}" class="form-label">Compte bancaire</label>
+                                        {{ form.bank_account }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="{{ form.delivery_address.id_for_label }}" class="form-label">Adresse de livraison</label>
+                                {{ form.delivery_address }}
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="{{ form.delivery_cost.id_for_label }}" class="form-label">Coût de livraison</label>
+                                {{ form.delivery_cost }}
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="{{ form.notes.id_for_label }}" class="form-label">Notes</label>
+                                {{ form.notes }}
+                            </div>
+
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Enregistrer les modifications
+                                </button>
+                                <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> Annuler
+                                </a>
+                            </div>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Informations de la facture</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <strong>Référence:</strong> {{ invoice.reference }}<br>
+                        <strong>Client:</strong> {{ invoice.client.full_name }}<br>
+                        <strong>Statut:</strong>
+                        <span class="badge bg-{% if invoice.status == 'draft' %}warning{% elif invoice.status == 'confirmed' %}info{% elif invoice.status == 'paid' %}success{% else %}secondary{% endif %}">
+                            {{ invoice.get_status_display }}
+                        </span><br>
+                        <strong>Date:</strong> {{ invoice.date|date:'d/m/Y' }}<br>
+                    </p>
+                    <hr>
+                    <p>
+                        <strong>Sous-total:</strong> {{ invoice.subtotal|floatformat:2 }} DH<br>
+                        <strong>Remise:</strong> -{{ invoice.discount_amount|floatformat:2 }} DH<br>
+                        <strong>TVA:</strong> +{{ invoice.tax_amount|floatformat:2 }} DH<br>
+                        <strong>Livraison:</strong> +{{ invoice.delivery_cost|floatformat:2 }} DH<br>
+                    </p>
+                    <hr>
+                    <h6>
+                        <strong>Total:</strong> <span class="text-success">{{ invoice.total_amount|floatformat:2 }} DH</span>
+                    </h6>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Articles ({{ invoice.items.count }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Qté</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in invoice.items.all %}
+                                    <tr>
+                                        <td>{{ item.product.reference }}</td>
+                                        <td>{{ item.quantity }}</td>
+                                        <td>{{ item.total_amount|floatformat:2 }} DH</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">Aucun article</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Livraison - {{ invoice.reference }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-truck"></i> Informations de Livraison
+                    </h3>
+                </div>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <div class="card-body">
+                    <form method="POST" novalidate>
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.delivery_method.id_for_label }}" class="form-label">Mode de livraison</label>
+                                    {{ form.delivery_method }}
+                                    {% if form.delivery_method.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.delivery_method.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.delivery_person.id_for_label }}" class="form-label">Livreur</label>
+                                    {{ form.delivery_person }}
+                                    {% if form.delivery_person.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.delivery_person.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="{{ form.delivery_address.id_for_label }}" class="form-label">Adresse de livraison</label>
+                            {{ form.delivery_address }}
+                            {% if form.delivery_address.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.delivery_address.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.delivery_cost.id_for_label }}" class="form-label">Coût de livraison (DH)</label>
+                                    {{ form.delivery_cost }}
+                                    {% if form.delivery_cost.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.delivery_cost.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="{{ form.delivery_date.id_for_label }}" class="form-label">Date de livraison prévue</label>
+                                    {{ form.delivery_date }}
+                                    {% if form.delivery_date.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.delivery_date.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="{{ form.delivery_status.id_for_label }}" class="form-label">Statut de livraison</label>
+                            {{ form.delivery_status }}
+                            {% if form.delivery_status.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.delivery_status.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Enregistrer les informations
+                            </button>
+                            <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Annuler
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Facture</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <strong>Référence:</strong> {{ invoice.reference }}<br>
+                        <strong>Client:</strong> {{ invoice.client.full_name }}<br>
+                        <strong>Date:</strong> {{ invoice.date|date:'d/m/Y' }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Statut actuel</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        <strong>Statut facture:</strong>
+                        <span class="badge bg-{% if invoice.status == 'draft' %}warning{% elif invoice.status == 'delivered' %}success{% else %}info{% endif %}">
+                            {{ invoice.get_status_display }}
+                        </span>
+                    </p>
+                    <p class="mb-0">
+                        <strong>Mode de livraison:</strong>
+                        <br>{{ invoice.delivery_method.name|default:"Non défini" }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Articles à livrer</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Qté</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in invoice.items.all %}
+                                    <tr>
+                                        <td>{{ item.product.reference }}</td>
+                                        <td>{{ item.quantity }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="2" class="text-center text-muted">Aucun article</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
