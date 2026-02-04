@@ -35,19 +35,33 @@
                     <h2 class="text-lg font-bold text-gray-900 mb-4">Informations Client</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="{{ form.client.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Client <span class="text-red-500">*</span>
                             </label>
-                            {{ form.client }}
+                            <select name="client" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" required>
+                                <option value="">-- Sélectionnez un client --</option>
+                                {% for client in clients %}
+                                    <option value="{{ client.id }}" {% if form.instance.client_id == client.id %}selected{% endif %}>
+                                        {{ client.name }} ({{ client.email }})
+                                    </option>
+                                {% endfor %}
+                            </select>
                             {% if form.client.errors %}
                                 <p class="text-red-600 text-sm mt-1">{{ form.client.errors.0 }}</p>
                             {% endif %}
                         </div>
                         <div>
-                            <label for="{{ form.sale_type.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Type de Vente <span class="text-red-500">*</span>
                             </label>
-                            {{ form.sale_type }}
+                            <select name="sale_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" required>
+                                <option value="">-- Sélectionnez le type --</option>
+                                {% for value, label in sale_types %}
+                                    <option value="{{ value }}" {% if form.instance.sale_type == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
                             {% if form.sale_type.errors %}
                                 <p class="text-red-600 text-sm mt-1">{{ form.sale_type.errors.0 }}</p>
                             {% endif %}
@@ -78,26 +92,33 @@
                     <h2 class="text-lg font-bold text-gray-900 mb-4">Informations de Paiement</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="{{ form.payment_method.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Méthode de Paiement
                             </label>
-                            {{ form.payment_method }}
+                            <select name="payment_method" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                <option value="">-- Sélectionnez une méthode --</option>
+                                <option value="cash" {% if form.instance.payment_method == 'cash' %}selected{% endif %}>Espèces</option>
+                                <option value="card" {% if form.instance.payment_method == 'card' %}selected{% endif %}>Carte Bancaire</option>
+                                <option value="check" {% if form.instance.payment_method == 'check' %}selected{% endif %}>Chèque</option>
+                                <option value="transfer" {% if form.instance.payment_method == 'transfer' %}selected{% endif %}>Virement Bancaire</option>
+                            </select>
                         </div>
                         <div>
-                            <label for="{{ form.due_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Date d'Échéance
                             </label>
-                            {{ form.due_date }}
+                            <input type="date" name="due_date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   value="{% if form.instance.due_date %}{{ form.instance.due_date|date:'Y-m-d' }}{% endif %}">
                         </div>
                     </div>
                 </div>
 
                 <!-- Notes -->
                 <div>
-                    <label for="{{ form.notes.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
                         Notes/Observations
                     </label>
-                    {{ form.notes }}
+                    <textarea name="notes" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" rows="4" placeholder="Informations supplémentaires ou conditions spéciales">{% if form.instance.notes %}{{ form.instance.notes }}{% endif %}</textarea>
                     <p class="text-gray-500 text-sm mt-1">Informations supplémentaires ou conditions spéciales</p>
                 </div>
 
@@ -172,22 +193,4 @@
             </div>
         </div>
     </div>
-
-    <style>
-        {{ form.client.id_for_label|add:"-" }}{{ form.client.id_for_label|add:"-" }},
-        {{ form.sale_type.id_for_label|add:"-" }}{{ form.sale_type.id_for_label|add:"-" }},
-        {{ form.payment_method.id_for_label|add:"-" }}{{ form.payment_method.id_for_label|add:"-" }},
-        {{ form.due_date.id_for_label|add:"-" }}{{ form.due_date.id_for_label|add:"-" }},
-        {{ form.notes.id_for_label|add:"-" }}{{ form.notes.id_for_label|add:"-" }} {
-            @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
-        }
-
-        select {
-            @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
-        }
-
-        textarea {
-            @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none;
-        }
-    </style>
 {% endblock %}
