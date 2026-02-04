@@ -406,6 +406,12 @@ def invoice_create(request):
                 # Calculate totals (with articles if any)
                 invoice.calculate_totals()
 
+                # VALIDATION: Require at least 1 item in invoice
+                if invoice.items.count() == 0:
+                    messages.error(request, 'Une facture doit contenir au moins un article.')
+                    invoice.delete()  # Clean up empty invoice
+                    return redirect('sales:invoice_create')
+
                 # Handle payment amount if provided during invoice creation
                 try:
                     amount_paid = Decimal(str(request.POST.get('amount_paid', '0')))

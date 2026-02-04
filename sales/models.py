@@ -382,13 +382,16 @@ class SaleInvoice(models.Model):
     def soft_delete(self):
         """
         Mark invoice as deleted (soft delete).
-        Resets product status to 'available'.
-        """
-        # Reset all product statuses
-        for item in self.items.all():
-            item.product.status = 'available'
-            item.product.save(update_fields=['status'])
 
+        NOTE: Does NOT revert product status because:
+        - Invoice may contain multiple units of same product (N items, M units each)
+        - Cannot safely determine if product should revert to available
+        - Would cause inventory inconsistency if other invoices reference same product
+        - Example: Invoice #1 has 2 units of Ring A; Invoice #2 has 1 unit of Ring A
+                   Deleting #1 would revert all Ring A to available, breaking #2's inventory
+
+        TODO: Implement proper inventory tracking system with allocation/reservation
+        """
         # Mark as deleted and cancelled
         self.is_deleted = True
         self.status = self.Status.CANCELLED

@@ -84,6 +84,8 @@ class SaleInvoiceForm(forms.ModelForm):
         cleaned_data = super().clean()
         client = cleaned_data.get('client')
         tax_rate = cleaned_data.get('tax_rate')
+        payment_method = cleaned_data.get('payment_method')
+        payment_reference = cleaned_data.get('payment_reference')
 
         # Validate tax rate
         if tax_rate and (tax_rate < 0 or tax_rate > 100):
@@ -94,6 +96,33 @@ class SaleInvoiceForm(forms.ModelForm):
             raise ValidationError(
                 f'Le client {client.full_name} a dépassé sa limite de crédit.'
             )
+
+        # VALIDATION: Payment reference is required for certain payment methods
+        if payment_method:
+            payment_method_name = str(payment_method).lower()
+            # Methods that require a reference
+            REQUIRES_REFERENCE = ['virement', 'transfer', 'chèque', 'cheque', 'check', 'carte', 'card', 'mobile']
+            requires_ref = any(req in payment_method_name for req in REQUIRES_REFERENCE)
+
+            if requires_ref and not payment_reference:
+                raise ValidationError(
+                    f'Une référence de paiement est obligatoire pour {payment_method} '
+                    '(N° de chèque, référence virement, n° de carte, etc.)'
+                )
+
+            # Validate payment reference is unique (if provided)
+            if payment_reference:
+                # Check for duplicates (exclude current invoice if editing)
+                from sales.models import SaleInvoice
+                existing = SaleInvoice.objects.filter(
+                    payment_reference=payment_reference
+                ).exclude(
+                    id=self.instance.id if self.instance.id else None
+                )
+                if existing.exists():
+                    raise ValidationError(
+                        f'Cette référence de paiement est déjà utilisée par la facture {existing.first().reference}'
+                    )
 
         return cleaned_data
 
