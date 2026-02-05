@@ -3,161 +3,456 @@
 {% block title %}{{ consignment.reference }} - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'purchases:consignment_list' %}">Consignations</a>
-    <span>/</span>
-    <span>{{ consignment.reference }}</span>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'purchases:consignment_list' %}" class="breadcrumb-item">Consignations</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ consignment.reference }}</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">{{ consignment.reference }}</h1>
-            <p class="text-gray-600 mt-1">Reçue le {{ consignment.date_received|date:"d F Y" }}</p>
-        </div>
-        <div class="space-x-2">
-            <a href="{% url 'purchases:consignment_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-                <i class="fas fa-arrow-left mr-2"></i> Retour
-            </a>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">{{ consignment.reference }}</h1>
+                <p class="page-subtitle">Recue le {{ consignment.date_received|date:"d F Y" }}</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'purchases:consignment_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
         </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="detail-layout">
         <!-- Main Content -->
-        <div class="lg:col-span-2 space-y-6">
+        <div class="detail-main">
             <!-- Supplier Info -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Fournisseur</h2>
-                <div class="space-y-2">
-                    <p class="text-gray-900 font-bold text-lg">{{ consignment.supplier.name }}</p>
-                    <p class="text-gray-600">{{ consignment.supplier.email }}</p>
-                    <p class="text-gray-600">{{ consignment.supplier.phone }}</p>
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-building mr-2"></i> Fournisseur</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Nom</span>
+                            <span class="info-value font-semibold">{{ consignment.supplier.name }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Email</span>
+                            <span class="info-value">{{ consignment.supplier.email|default:"-" }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Telephone</span>
+                            <span class="info-value">{{ consignment.supplier.phone|default:"-" }}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Items Table -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Articles</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 border-b">
-                            <tr>
-                                <th class="px-4 py-2 text-left">Produit</th>
-                                <th class="px-4 py-2 text-right">Prix Convenu</th>
-                                <th class="px-4 py-2 text-right">Prix Vente Min</th>
-                                <th class="px-4 py-2 text-center">Statut</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y">
-                            {% for item in items %}
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-2">
-                                        <p class="font-bold">{{ item.product.reference }}</p>
-                                        <p class="text-gray-600 text-xs">{{ item.product.name }}</p>
-                                    </td>
-                                    <td class="px-4 py-2 text-right">{{ item.agreed_price }} DH</td>
-                                    <td class="px-4 py-2 text-right">{{ item.minimum_selling_price }} DH</td>
-                                    <td class="px-4 py-2 text-center">
-                                        <span class="inline-block px-2 py-1 rounded text-xs font-medium
-                                            {% if item.status == 'available' %}bg-green-100 text-green-800
-                                            {% elif item.status == 'sold' %}bg-blue-100 text-blue-800
-                                            {% elif item.status == 'returned' %}bg-gray-100 text-gray-800
-                                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                            {{ item.get_status_display }}
-                                        </span>
-                                    </td>
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-gem mr-2"></i> Articles</h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <!-- Desktop Table -->
+                    <div class="table-wrapper desktop-view" style="border: none; border-radius: 0;">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th style="text-align: right;">Prix Convenu</th>
+                                    <th style="text-align: right;">Prix Vente Min</th>
+                                    <th style="text-align: center;">Statut</th>
                                 </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                    <tr>
+                                        <td>
+                                            <div class="product-info">
+                                                <span class="product-ref">{{ item.product.reference }}</span>
+                                                <span class="product-name">{{ item.product.name }}</span>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right;">{{ item.agreed_price }} DH</td>
+                                        <td style="text-align: right;">{{ item.minimum_selling_price }} DH</td>
+                                        <td style="text-align: center;">
+                                            <span class="badge {% if item.status == 'available' %}badge-success{% elif item.status == 'sold' %}badge-info{% elif item.status == 'returned' %}badge-neutral{% else %}badge-neutral{% endif %}">
+                                                {{ item.get_status_display }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Aucun article</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Mobile Cards -->
+                    <div class="mobile-view" style="padding: var(--space-4);">
+                        {% for item in items %}
+                            <div class="item-card">
+                                <div class="item-card-header">
+                                    <div class="product-info">
+                                        <span class="product-ref">{{ item.product.reference }}</span>
+                                        <span class="product-name">{{ item.product.name }}</span>
+                                    </div>
+                                    <span class="badge {% if item.status == 'available' %}badge-success{% elif item.status == 'sold' %}badge-info{% elif item.status == 'returned' %}badge-neutral{% else %}badge-neutral{% endif %}">
+                                        {{ item.get_status_display }}
+                                    </span>
+                                </div>
+                                <div class="item-card-details">
+                                    <div class="item-detail">
+                                        <span class="item-detail-label">Prix Convenu</span>
+                                        <span class="item-detail-value">{{ item.agreed_price }} DH</span>
+                                    </div>
+                                    <div class="item-detail">
+                                        <span class="item-detail-label">Prix Min</span>
+                                        <span class="item-detail-value">{{ item.minimum_selling_price }} DH</span>
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <p class="text-center text-muted">Aucun article</p>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Sidebar -->
-        <div class="space-y-6">
+        <div class="detail-sidebar">
             <!-- Status -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Statut</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Statut:</span>
-                        <span class="inline-block px-3 py-1 rounded-full text-sm font-medium
-                            {% if consignment.status == 'active' %}bg-green-100 text-green-800
-                            {% elif consignment.status == 'partial' %}bg-yellow-100 text-yellow-800
-                            {% elif consignment.status == 'sold' %}bg-blue-100 text-blue-800
-                            {% elif consignment.status == 'returned' %}bg-gray-100 text-gray-800
-                            {% elif consignment.status == 'closed' %}bg-red-100 text-red-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ consignment.get_status_display }}
-                        </span>
+            <div class="card animate-slide-up" style="animation-delay: 150ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle mr-2"></i> Statut</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Statut</span>
+                            <span class="badge {% if consignment.status == 'active' %}badge-success{% elif consignment.status == 'partial' %}badge-warning{% elif consignment.status == 'sold' %}badge-info{% elif consignment.status == 'returned' %}badge-neutral{% elif consignment.status == 'closed' %}badge-error{% else %}badge-neutral{% endif %}">
+                                {{ consignment.get_status_display }}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Statistics -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Statistiques</h3>
-                <div class="space-y-3 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Total Articles:</span>
-                        <span class="font-medium">{{ stats.total_items }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Disponibles:</span>
-                        <span class="font-medium">{{ stats.available }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Vendus:</span>
-                        <span class="font-medium">{{ stats.sold }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Retournés:</span>
-                        <span class="font-medium">{{ stats.returned }}</span>
+            <div class="card animate-slide-up" style="animation-delay: 200ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-pie mr-2"></i> Statistiques</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Total Articles</span>
+                            <span class="status-value">{{ stats.total_items }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Disponibles</span>
+                            <span class="status-value text-success">{{ stats.available }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Vendus</span>
+                            <span class="status-value text-info">{{ stats.sold }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Retournes</span>
+                            <span class="status-value">{{ stats.returned }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Financial Info -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Informations Financières</h3>
-                <div class="space-y-3 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Valeur Totale:</span>
-                        <span class="font-bold">{{ stats.total_value|floatformat:0 }} DH</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Commission:</span>
-                        <span class="font-medium">{{ consignment.commission_percent }}%</span>
-                    </div>
-                    <div class="flex justify-between text-lg font-bold">
-                        <span>Montant Dû:</span>
-                        <span class="text-green-600">{{ stats.amount_due|floatformat:0 }} DH</span>
+            <div class="card animate-slide-up" style="animation-delay: 250ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-coins mr-2"></i> Informations Financieres</h3>
+                </div>
+                <div class="card-body">
+                    <div class="totals-list">
+                        <div class="total-row">
+                            <span>Valeur Totale</span>
+                            <span class="font-semibold">{{ stats.total_value|floatformat:0 }} DH</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Commission</span>
+                            <span>{{ consignment.commission_percent }}%</span>
+                        </div>
+                        <div class="total-row total-final">
+                            <span>Montant Du</span>
+                            <span class="text-success">{{ stats.amount_due|floatformat:0 }} DH</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Tracking -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Suivi</h3>
-                <div class="space-y-2 text-sm text-gray-600">
-                    <p><strong>Créé par:</strong> {{ consignment.created_by.get_full_name }}</p>
-                    <p><strong>Créé le:</strong> {{ consignment.created_at|date:"d/m/Y H:i" }}</p>
-                    {% if consignment.return_deadline %}
-                        <p><strong>Date limite retour:</strong> {{ consignment.return_deadline|date:"d/m/Y" }}</p>
-                    {% endif %}
+            <div class="card animate-slide-up" style="animation-delay: 300ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-history mr-2"></i> Suivi</h3>
+                </div>
+                <div class="card-body">
+                    <div class="tracking-list">
+                        <div class="tracking-item">
+                            <span class="tracking-label">Cree par</span>
+                            <span class="tracking-value">{{ consignment.created_by.get_full_name }}</span>
+                        </div>
+                        <div class="tracking-item">
+                            <span class="tracking-label">Cree le</span>
+                            <span class="tracking-value">{{ consignment.created_at|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        {% if consignment.return_deadline %}
+                            <div class="tracking-item">
+                                <span class="tracking-label">Date limite retour</span>
+                                <span class="tracking-value">{{ consignment.return_deadline|date:"d/m/Y" }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
             <!-- Notes -->
             {% if consignment.notes %}
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-lg font-bold text-gray-900 mb-4">Notes</h3>
-                    <p class="text-gray-700 whitespace-pre-line">{{ consignment.notes }}</p>
+                <div class="card animate-slide-up" style="animation-delay: 350ms;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-sticky-note mr-2"></i> Notes</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="notes-text">{{ consignment.notes }}</p>
+                    </div>
                 </div>
             {% endif %}
         </div>
     </div>
+
+    <style>
+        /* Detail Layout */
+        .detail-layout {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: var(--space-6);
+        }
+
+        .detail-main {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        .detail-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        /* Info Grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .info-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .info-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+        }
+
+        /* Product Info */
+        .product-info {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .product-ref {
+            font-weight: var(--font-bold);
+            color: var(--primary-600);
+        }
+
+        .product-name {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        /* Status List */
+        .status-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .status-value {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+        }
+
+        /* Total Rows */
+        .totals-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-2) 0;
+            font-size: var(--text-sm);
+        }
+
+        .total-row.total-final {
+            font-size: var(--text-lg);
+            font-weight: var(--font-bold);
+            padding-top: var(--space-3);
+            margin-top: var(--space-2);
+            border-top: 2px solid var(--neutral-200);
+        }
+
+        /* Tracking List */
+        .tracking-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .tracking-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .tracking-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .tracking-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        /* Notes */
+        .notes-text {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+            white-space: pre-line;
+            line-height: 1.6;
+        }
+
+        /* Item Cards for Mobile */
+        .item-card {
+            background: var(--neutral-50);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            margin-bottom: var(--space-3);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .item-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .item-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: var(--space-3);
+        }
+
+        .item-card-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-3);
+        }
+
+        .item-detail {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .item-detail-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .item-detail-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+        }
+
+        /* Desktop/Mobile Toggle */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .detail-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-sidebar {
+                order: -1;
+            }
+
+            .info-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+        }
+    </style>
 {% endblock %}

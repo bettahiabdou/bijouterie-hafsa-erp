@@ -3,213 +3,290 @@
 {% block title %}{{ invoice.reference }} - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'sales:invoice_list' %}">Factures</a>
-    <span>/</span>
-    <span>{{ invoice.reference }}</span>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_list' %}" class="breadcrumb-item">Factures</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ invoice.reference }}</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">{{ invoice.reference }}</h1>
-            <p class="text-gray-600 mt-1">{{ invoice.date|date:"d F Y" }}</p>
-        </div>
-        <div class="space-x-2">
-            <a href="{% url 'sales:invoice_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-                <i class="fas fa-arrow-left mr-2"></i> Retour
-            </a>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">{{ invoice.reference }}</h1>
+                <p class="page-subtitle">
+                    {{ invoice.date|date:"d F Y" }}
+                    <span class="badge {% if invoice.status == 'paid' %}badge-success{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'unpaid' %}badge-error{% else %}badge-neutral{% endif %}" style="margin-left: var(--space-2);">
+                        {{ invoice.get_status_display }}
+                    </span>
+                </p>
+            </div>
+            <div class="page-actions">
+                {% if invoice.status != 'paid' %}
+                    <a href="{% url 'sales:invoice_payment' invoice.reference %}" class="btn btn-primary">
+                        <i class="fas fa-dollar-sign"></i>
+                        <span>Enregistrer Paiement</span>
+                    </a>
+                {% endif %}
+                <a href="{% url 'sales:invoice_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
         </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="detail-layout">
         <!-- Main Content -->
-        <div class="lg:col-span-2 space-y-6">
+        <div class="detail-main">
             <!-- Client Info -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Informations Client</h2>
-                {% if invoice.client %}
-                    <div class="space-y-2">
-                        <p class="text-gray-900 font-bold text-lg">{{ invoice.client.first_name }} {{ invoice.client.last_name }}</p>
-                        <p class="text-gray-600">{{ invoice.client.email }}</p>
-                        <p class="text-gray-600">{{ invoice.client.phone }}</p>
-                        <p class="text-gray-600">{{ invoice.client.address }}, {{ invoice.client.city }}</p>
-                    </div>
-                {% else %}
-                    <div class="space-y-2">
-                        <p class="text-gray-500 italic">Pas de client associé (vente anonyme/walk-in)</p>
-                    </div>
-                {% endif %}
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-user mr-2"></i> Client</h3>
+                </div>
+                <div class="card-body">
+                    {% if invoice.client %}
+                        <div class="client-info">
+                            <p class="client-name">{{ invoice.client.first_name }} {{ invoice.client.last_name }}</p>
+                            {% if invoice.client.email %}
+                                <p class="client-detail"><i class="fas fa-envelope"></i>{{ invoice.client.email }}</p>
+                            {% endif %}
+                            {% if invoice.client.phone %}
+                                <p class="client-detail"><i class="fas fa-phone"></i>{{ invoice.client.phone }}</p>
+                            {% endif %}
+                            {% if invoice.client.address or invoice.client.city %}
+                                <p class="client-detail"><i class="fas fa-map-marker-alt"></i>{{ invoice.client.address }}{% if invoice.client.city %}, {{ invoice.client.city }}{% endif %}</p>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="empty-client">
+                            <i class="fas fa-user-slash"></i>
+                            <span>Vente anonyme (walk-in)</span>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
 
             <!-- Items Table -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-bold text-gray-900">Articles</h2>
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-shopping-bag mr-2"></i> Articles</h3>
                     {% if invoice.status == 'draft' %}
-                        <button type="button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center"
-                                data-bs-toggle="modal" data-bs-target="#addItemModal">
-                            <i class="fas fa-plus mr-2"></i> Ajouter un Article
+                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                            <i class="fas fa-plus"></i> Ajouter
                         </button>
                     {% endif %}
                 </div>
-
                 {% if items %}
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-gray-50 border-b">
-                                <tr>
-                                    <th class="px-4 py-2 text-left">Produit</th>
-                                    <th class="px-4 py-2 text-right">Quantité</th>
-                                    <th class="px-4 py-2 text-right">Prix Unitaire</th>
-                                    <th class="px-4 py-2 text-right">Total</th>
-                                    {% if invoice.status == 'draft' %}
-                                        <th class="px-4 py-2 text-center">Actions</th>
-                                    {% endif %}
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y">
-                                {% for item in items %}
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-4 py-2">
-                                            <div>
-                                                <p class="font-bold">{{ item.product.reference }}</p>
-                                                <p class="text-gray-600 text-xs">{{ item.product.name }}</p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-2 text-right">{{ item.quantity }}</td>
-                                        <td class="px-4 py-2 text-right">{{ item.unit_price }} DH</td>
-                                        <td class="px-4 py-2 text-right font-bold">{{ item.total_amount }} DH</td>
+                    <!-- Desktop View -->
+                    <div class="desktop-view">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Produit</th>
+                                        <th class="text-right">Quantite</th>
+                                        <th class="text-right">Prix Unitaire</th>
+                                        <th class="text-right">Total</th>
                                         {% if invoice.status == 'draft' %}
-                                            <td class="px-4 py-2 text-center">
-                                                <a href="javascript:void(0);" onclick="deleteItem({{ item.id }})" class="text-red-600 hover:text-red-800 text-sm font-medium">
-                                                    <i class="fas fa-trash mr-1"></i> Supprimer
-                                                </a>
-                                            </td>
+                                            <th class="text-center">Actions</th>
                                         {% endif %}
                                     </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {% for item in items %}
+                                        <tr>
+                                            <td>
+                                                <div class="product-cell">
+                                                    <span class="product-ref">{{ item.product.reference }}</span>
+                                                    <span class="product-name">{{ item.product.name }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-right">{{ item.quantity }}</td>
+                                            <td class="text-right font-mono">{{ item.unit_price }} DH</td>
+                                            <td class="text-right font-mono font-semibold">{{ item.total_amount }} DH</td>
+                                            {% if invoice.status == 'draft' %}
+                                                <td class="text-center">
+                                                    <button type="button" onclick="deleteItem({{ item.id }})" class="btn btn-ghost btn-sm text-error">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Mobile View -->
+                    <div class="mobile-view">
+                        <div class="mobile-list">
+                            {% for item in items %}
+                                <div class="mobile-item-card">
+                                    <div class="mobile-item-header">
+                                        <div class="mobile-item-product">
+                                            <span class="mobile-item-ref">{{ item.product.reference }}</span>
+                                            <span class="mobile-item-name">{{ item.product.name }}</span>
+                                        </div>
+                                        {% if invoice.status == 'draft' %}
+                                            <button type="button" onclick="deleteItem({{ item.id }})" class="btn btn-ghost btn-sm text-error">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                    <div class="mobile-item-details">
+                                        <div class="mobile-item-row">
+                                            <span class="mobile-item-label">Quantite</span>
+                                            <span class="mobile-item-value">{{ item.quantity }}</span>
+                                        </div>
+                                        <div class="mobile-item-row">
+                                            <span class="mobile-item-label">Prix Unitaire</span>
+                                            <span class="mobile-item-value">{{ item.unit_price }} DH</span>
+                                        </div>
+                                        <div class="mobile-item-row mobile-item-total">
+                                            <span class="mobile-item-label">Total</span>
+                                            <span class="mobile-item-value">{{ item.total_amount }} DH</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
                 {% else %}
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                        <p class="text-gray-600">
-                            <i class="fas fa-inbox text-2xl mb-2 block"></i>
-                            Aucun article ajouté.
-                            {% if invoice.status == 'draft' %}
-                                Cliquez sur "Ajouter un Article" pour commencer.
-                            {% else %}
-                                Cette facture ne contient pas d'articles.
-                            {% endif %}
-                        </p>
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <h4>Aucun article</h4>
+                            <p>
+                                {% if invoice.status == 'draft' %}
+                                    Cliquez sur "Ajouter" pour ajouter des articles.
+                                {% else %}
+                                    Cette facture ne contient pas d'articles.
+                                {% endif %}
+                            </p>
+                        </div>
                     </div>
                 {% endif %}
             </div>
+
+            <!-- Notes -->
+            {% if invoice.notes %}
+            <div class="card animate-slide-up" style="animation-delay: 150ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-sticky-note mr-2"></i> Notes</h3>
+                </div>
+                <div class="card-body">
+                    <p class="notes-text">{{ invoice.notes }}</p>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Sidebar -->
-        <div class="space-y-6">
-            <!-- Status -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Statut</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Statut:</span>
-                        <span class="inline-block px-3 py-1 rounded-full text-sm font-medium
-                            {% if invoice.status == 'unpaid' %}bg-red-100 text-red-800
-                            {% elif invoice.status == 'partial' %}bg-yellow-100 text-yellow-800
-                            {% elif invoice.status == 'paid' %}bg-green-100 text-green-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}"
-                           {% if invoice.status == 'unpaid' %}aria-label="Statut: Non payée"
-                           {% elif invoice.status == 'partial' %}aria-label="Statut: Partiellement payée"
-                           {% elif invoice.status == 'paid' %}aria-label="Statut: Payée"{% endif %}>
-                            {% if invoice.status == 'unpaid' %}<i class="fas fa-circle-xmark mr-1"></i>
-                            {% elif invoice.status == 'partial' %}<i class="fas fa-hourglass-half mr-1"></i>
-                            {% elif invoice.status == 'paid' %}<i class="fas fa-circle-check mr-1"></i>{% endif %}
-                            {{ invoice.get_status_display }}
-                        </span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Vendeur:</span>
-                        <span class="font-medium">{{ invoice.seller.first_name }}</span>
+        <div class="detail-sidebar">
+            <!-- Status Card -->
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle mr-2"></i> Informations</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="info-label">Statut</span>
+                            <span class="badge {% if invoice.status == 'paid' %}badge-success{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'unpaid' %}badge-error{% else %}badge-neutral{% endif %}">
+                                {{ invoice.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Date</span>
+                            <span class="info-value">{{ invoice.date|date:"d/m/Y" }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Vendeur</span>
+                            <span class="info-value">{{ invoice.seller.first_name }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Totals -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Totaux</h3>
-                <div class="space-y-3 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Sous-total:</span>
-                        <span class="font-medium">{{ invoice.subtotal }} DH</span>
-                    </div>
-                    {% if invoice.discount_amount > 0 %}
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Remise:</span>
-                            <span class="font-medium text-red-600">-{{ invoice.discount_amount }} DH</span>
+            <div class="card animate-slide-up" style="animation-delay: 50ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-calculator mr-2"></i> Totaux</h3>
+                </div>
+                <div class="card-body">
+                    <div class="totals-list">
+                        <div class="totals-item">
+                            <span class="totals-label">Sous-total</span>
+                            <span class="totals-value">{{ invoice.subtotal }} DH</span>
                         </div>
-                    {% endif %}
-                    <hr>
-                    <div class="flex justify-between text-lg font-bold">
-                        <span>Total:</span>
-                        <span class="text-green-600">{{ invoice.total_amount }} DH</span>
+                        {% if invoice.discount_amount > 0 %}
+                            <div class="totals-item totals-discount">
+                                <span class="totals-label">Remise</span>
+                                <span class="totals-value">-{{ invoice.discount_amount }} DH</span>
+                            </div>
+                        {% endif %}
+                        <div class="totals-highlight">
+                            <span class="totals-highlight-label">Total</span>
+                            <span class="totals-highlight-value">{{ invoice.total_amount }} DH</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Payment Info -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-gray-900">Paiement</h3>
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-credit-card mr-2"></i> Paiement</h3>
                     {% if invoice.status != 'paid' %}
-                        <a href="{% url 'sales:invoice_payment' invoice.reference %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center">
-                            <i class="fas fa-dollar-sign mr-2"></i> Payer
+                        <a href="{% url 'sales:invoice_payment' invoice.reference %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Payer
                         </a>
                     {% endif %}
                 </div>
-                <div class="space-y-3 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Payé:</span>
-                        <span class="font-medium">{{ invoice.amount_paid }} DH</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Solde:</span>
-                        <span class="font-bold {% if invoice.balance_due > 0 %}text-red-600{% else %}text-green-600{% endif %}">
-                            {{ invoice.balance_due }} DH
-                        </span>
-                    </div>
-                    {% if invoice.payment_method %}
-                        <hr>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Méthode:</span>
-                            <span class="font-medium">{{ invoice.payment_method.name }}</span>
+                <div class="card-body">
+                    <div class="payment-list">
+                        <div class="payment-item">
+                            <span class="payment-label">Paye</span>
+                            <span class="payment-value">{{ invoice.amount_paid }} DH</span>
                         </div>
-                        {% if invoice.payment_reference %}
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Référence:</span>
-                                <span class="font-medium">{{ invoice.payment_reference }}</span>
+                        <div class="payment-item">
+                            <span class="payment-label">Solde</span>
+                            <span class="payment-value {% if invoice.balance_due > 0 %}text-error{% else %}text-success{% endif %}">
+                                {{ invoice.balance_due }} DH
+                            </span>
+                        </div>
+                        {% if invoice.payment_method %}
+                            <div class="payment-item">
+                                <span class="payment-label">Methode</span>
+                                <span class="payment-value">{{ invoice.payment_method.name }}</span>
                             </div>
+                            {% if invoice.payment_reference %}
+                                <div class="payment-item">
+                                    <span class="payment-label">Reference</span>
+                                    <span class="payment-value font-mono">{{ invoice.payment_reference }}</span>
+                                </div>
+                            {% endif %}
+                            {% if invoice.bank_account %}
+                                <div class="payment-item payment-bank">
+                                    <span class="payment-label">Compte</span>
+                                    <span class="payment-value">
+                                        {{ invoice.bank_account.bank_name }}<br>
+                                        <span class="font-mono">{{ invoice.bank_account.account_number }}</span>
+                                    </span>
+                                </div>
+                            {% endif %}
                         {% endif %}
-                        {% if invoice.bank_account %}
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Compte:</span>
-                                <span class="font-medium">{{ invoice.bank_account.bank_name }}<br/><small>{{ invoice.bank_account.account_number }}</small></span>
-                            </div>
-                        {% endif %}
-                    {% endif %}
+                    </div>
                 </div>
             </div>
 
-            <!-- Actions -->
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p class="text-sm text-blue-800">
-                    <i class="fas fa-info-circle mr-2"></i>
-                    Facture du {{ invoice.date|date:"d/m/Y" }}
-                </p>
+            <!-- Created Info -->
+            <div class="info-box animate-slide-up" style="animation-delay: 150ms;">
+                <i class="fas fa-info-circle"></i>
+                <span>Facture creee le {{ invoice.created_at|date:"d/m/Y H:i" }}</span>
             </div>
         </div>
     </div>
@@ -225,71 +302,558 @@
                 <div class="modal-body">
                     <form id="addItemForm">
                         {% csrf_token %}
-                        <div class="mb-3">
-                            <label class="form-label">Produit <span class="text-danger">*</span></label>
-                            <select id="product_id" name="product_id" class="form-control" required>
-                                <option value="">-- Sélectionnez un produit --</option>
+                        <div class="form-group">
+                            <label class="form-label">Produit <span class="required">*</span></label>
+                            <select id="product_id" name="product_id" class="form-select" required>
+                                <option value="">-- Selectionnez un produit --</option>
                                 {% for product in products %}
                                     <option value="{{ product.id }}" data-price="{{ product.selling_price }}">
                                         {{ product.reference }} - {{ product.name }}
                                     </option>
                                 {% endfor %}
                             </select>
-                            <small class="form-text text-muted">Sélectionnez le produit à ajouter à la facture</small>
+                            <p class="form-hint">Selectionnez le produit a ajouter a la facture</p>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Quantité <span class="text-danger">*</span></label>
-                                    <input type="number" id="quantity" name="quantity" class="form-control"
-                                           step="0.001" min="0.001" value="1" required>
-                                </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Quantite <span class="required">*</span></label>
+                                <input type="number" id="quantity" name="quantity" class="form-input"
+                                       step="0.001" min="0.001" value="1" required>
                             </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Prix Unitaire (DH)</label>
-                                    <input type="number" id="unit_price" name="unit_price" class="form-control"
-                                           step="0.01" min="0" readonly style="background-color: #f5f5f5;">
-                                    <small class="form-text text-muted">Auto-détecté du produit</small>
-                                </div>
+                            <div class="form-group">
+                                <label class="form-label">Prix Unitaire (DH)</label>
+                                <input type="number" id="unit_price" name="unit_price" class="form-input form-input-readonly"
+                                       step="0.01" min="0" readonly>
+                                <p class="form-hint">Auto-detecte du produit</p>
                             </div>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="form-group">
                             <label class="form-label">Remise (DH)</label>
-                            <input type="number" id="discount_amount" name="discount_amount" class="form-control"
+                            <input type="number" id="discount_amount" name="discount_amount" class="form-input"
                                    step="0.01" min="0" value="0">
                         </div>
 
-                        <div class="bg-light p-3 rounded border">
-                            <div class="mb-2">
-                                <div class="d-flex justify-content-between small">
-                                    <span>Sous-total:</span>
-                                    <span><span id="subtotal_display">0.00</span> DH</span>
-                                </div>
+                        <div class="modal-summary">
+                            <div class="modal-summary-row">
+                                <span>Sous-total:</span>
+                                <span><span id="subtotal_display">0.00</span> DH</span>
                             </div>
-                            <div class="mb-2">
-                                <div class="d-flex justify-content-between small">
-                                    <span>Remise:</span>
-                                    <span>-<span id="discount_display">0.00</span> DH</span>
-                                </div>
+                            <div class="modal-summary-row modal-summary-discount">
+                                <span>Remise:</span>
+                                <span>-<span id="discount_display">0.00</span> DH</span>
                             </div>
-                            <hr style="margin: 0.5rem 0;">
-                            <div class="d-flex justify-content-between">
-                                <span class="font-weight-bold">Total:</span>
-                                <span class="font-weight-bold text-success"><span id="estimated_total">0.00</span> DH</span>
+                            <div class="modal-summary-row modal-summary-total">
+                                <span>Total:</span>
+                                <span><span id="estimated_total">0.00</span> DH</span>
                             </div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="button" class="btn btn-primary" id="saveItemBtn">Ajouter Article</button>
+                    <button type="button" class="btn btn-primary" id="saveItemBtn">
+                        <i class="fas fa-plus"></i> Ajouter Article
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <style>
+        /* Detail Layout */
+        .detail-layout {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: var(--space-6);
+        }
+
+        .detail-main {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        .detail-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        /* Client Info */
+        .client-info {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .client-name {
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .client-detail {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .client-detail i {
+            margin-right: var(--space-2);
+            width: 16px;
+        }
+
+        .empty-client {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            color: var(--neutral-500);
+            font-size: var(--text-sm);
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: var(--neutral-50);
+            border-bottom: 2px solid var(--neutral-200);
+        }
+
+        .data-table th {
+            padding: var(--space-3) var(--space-4);
+            text-align: left;
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-600);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table td {
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--neutral-50);
+        }
+
+        .product-cell {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .product-ref {
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+        }
+
+        .product-name {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        /* Mobile Item Cards */
+        .mobile-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mobile-item-card {
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .mobile-item-card:last-child {
+            border-bottom: none;
+        }
+
+        .mobile-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: var(--space-3);
+        }
+
+        .mobile-item-product {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .mobile-item-ref {
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+        }
+
+        .mobile-item-name {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .mobile-item-details {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .mobile-item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mobile-item-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .mobile-item-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+            font-family: var(--font-mono);
+        }
+
+        .mobile-item-total {
+            padding-top: var(--space-2);
+            border-top: 1px solid var(--neutral-100);
+        }
+
+        .mobile-item-total .mobile-item-value {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        /* Notes */
+        .notes-text {
+            white-space: pre-line;
+            color: var(--neutral-700);
+            line-height: 1.6;
+        }
+
+        /* Info List */
+        .info-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .info-item:last-child {
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .info-value {
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+        }
+
+        /* Totals List */
+        .totals-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .totals-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .totals-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .totals-value {
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+            font-family: var(--font-mono);
+        }
+
+        .totals-discount {
+            color: var(--error-500);
+        }
+
+        .totals-discount .totals-label,
+        .totals-discount .totals-value {
+            color: var(--error-500);
+        }
+
+        .totals-highlight {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-3);
+            border-radius: var(--radius-md);
+            background: var(--success-50);
+            margin-top: var(--space-2);
+        }
+
+        .totals-highlight-label {
+            font-weight: var(--font-semibold);
+            color: var(--success-700);
+        }
+
+        .totals-highlight-value {
+            font-size: var(--text-xl);
+            font-weight: var(--font-bold);
+            color: var(--success-600);
+            font-family: var(--font-mono);
+        }
+
+        /* Payment List */
+        .payment-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .payment-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .payment-item:last-child {
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .payment-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .payment-value {
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+        }
+
+        .payment-bank .payment-value {
+            text-align: right;
+            font-size: var(--text-sm);
+        }
+
+        /* Info Box */
+        .info-box {
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            background: var(--info-50);
+            border: 1px solid var(--info-200);
+            color: var(--info-700);
+            font-size: var(--text-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-8);
+            color: var(--neutral-400);
+        }
+
+        .empty-state i {
+            font-size: var(--text-4xl);
+            margin-bottom: var(--space-3);
+            display: block;
+        }
+
+        .empty-state h4 {
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-600);
+            margin-bottom: var(--space-2);
+        }
+
+        .empty-state p {
+            font-size: var(--text-sm);
+        }
+
+        /* Modal */
+        .modal-title {
+            font-family: var(--font-display);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-4);
+        }
+
+        .form-group {
+            margin-bottom: var(--space-4);
+        }
+
+        .form-label {
+            display: block;
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-700);
+            margin-bottom: var(--space-2);
+        }
+
+        .form-label .required {
+            color: var(--error-500);
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: var(--space-3) var(--space-4);
+            border: 1px solid var(--neutral-300);
+            border-radius: var(--radius-md);
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+            background: white;
+            transition: all var(--transition-fast);
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary-400);
+            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
+        }
+
+        .form-input-readonly {
+            background: var(--neutral-100);
+            color: var(--neutral-500);
+        }
+
+        .form-hint {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            margin-top: var(--space-1);
+        }
+
+        .modal-summary {
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            background: var(--neutral-50);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .modal-summary-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: var(--text-sm);
+            margin-bottom: var(--space-2);
+        }
+
+        .modal-summary-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .modal-summary-discount {
+            color: var(--error-500);
+        }
+
+        .modal-summary-total {
+            font-weight: var(--font-semibold);
+            padding-top: var(--space-2);
+            border-top: 1px solid var(--neutral-200);
+            color: var(--success-600);
+        }
+
+        /* Desktop/Mobile Views */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        /* Utilities */
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .text-error {
+            color: var(--error-500);
+        }
+
+        .text-success {
+            color: var(--success-600);
+        }
+
+        .font-mono {
+            font-family: var(--font-mono);
+        }
+
+        .font-semibold {
+            font-weight: var(--font-semibold);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .detail-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-sidebar {
+                order: -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .page-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .page-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -300,18 +864,20 @@
             const estimatedTotalSpan = document.getElementById('estimated_total');
             const saveItemBtn = document.getElementById('saveItemBtn');
 
-            // Update price when product is selected
-            productSelect.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const price = selectedOption.dataset.price || 0;
-                unitPriceInput.value = parseFloat(price).toFixed(2);
-                updateEstimatedTotal();
-            });
+            if (productSelect) {
+                productSelect.addEventListener('change', function() {
+                    const selectedOption = this.options[this.selectedIndex];
+                    const price = selectedOption.dataset.price || 0;
+                    unitPriceInput.value = parseFloat(price).toFixed(2);
+                    updateEstimatedTotal();
+                });
+            }
 
-            // Update estimated total on input change
             [quantityInput, unitPriceInput, discountInput].forEach(input => {
-                input.addEventListener('change', updateEstimatedTotal);
-                input.addEventListener('keyup', updateEstimatedTotal);
+                if (input) {
+                    input.addEventListener('change', updateEstimatedTotal);
+                    input.addEventListener('keyup', updateEstimatedTotal);
+                }
             });
 
             function updateEstimatedTotal() {
@@ -326,74 +892,55 @@
                 estimatedTotalSpan.textContent = total.toFixed(2);
             }
 
-            // Save item
-            saveItemBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                const form = document.getElementById('addItemForm');
+            if (saveItemBtn) {
+                saveItemBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const form = document.getElementById('addItemForm');
 
-                if (!form.checkValidity()) {
-                    form.reportValidity();
-                    return;
-                }
-
-                const formData = new FormData(form);
-                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-                saveItemBtn.disabled = true;
-                saveItemBtn.innerHTML = '<span class="spinner-border spinner-border-sm mr-2"></span> Ajout en cours...';
-
-                fetch('{% url "sales:add_item" invoice.reference %}', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': csrfToken
+                    if (!form.checkValidity()) {
+                        form.reportValidity();
+                        return;
                     }
-                })
-                .then(response => {
-                    console.log('Response status:', response.status);
-                    if (!response.ok) {
-                        throw new Error('HTTP error, status = ' + response.status);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Response data:', data);
-                    if (data.success) {
-                        // Close modal
-                        const modalEl = document.getElementById('addItemModal');
-                        const modal = bootstrap.Modal.getInstance(modalEl);
-                        if (modal) {
-                            modal.hide();
+
+                    const formData = new FormData(form);
+                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+                    saveItemBtn.disabled = true;
+                    saveItemBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ajout...';
+
+                    fetch('{% url "sales:add_item" invoice.reference %}', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': csrfToken
                         }
-
-                        // Reset form
-                        form.reset();
-                        estimatedTotalSpan.textContent = '0.00';
-                        document.getElementById('subtotal_display').textContent = '0.00';
-                        document.getElementById('discount_display').textContent = '0.00';
-
-                        // Show success message
-                        alert('Article ajouté avec succès!');
-
-                        // Reload page to show updated data
-                        location.reload();
-                    } else {
-                        alert('Erreur: ' + (data.error || 'Erreur inconnue'));
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Erreur lors de l\'ajout de l\'article: ' + error);
-                })
-                .finally(() => {
-                    saveItemBtn.disabled = false;
-                    saveItemBtn.innerHTML = 'Ajouter Article';
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const modalEl = document.getElementById('addItemModal');
+                            const modal = bootstrap.Modal.getInstance(modalEl);
+                            if (modal) modal.hide();
+                            form.reset();
+                            location.reload();
+                        } else {
+                            alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Erreur: ' + error);
+                    })
+                    .finally(() => {
+                        saveItemBtn.disabled = false;
+                        saveItemBtn.innerHTML = '<i class="fas fa-plus"></i> Ajouter Article';
+                    });
                 });
-            });
+            }
         });
 
         function deleteItem(itemId) {
-            if (!confirm('Êtes-vous sûr de vouloir supprimer cet article?')) {
+            if (!confirm('Etes-vous sur de vouloir supprimer cet article?')) {
                 return;
             }
 
@@ -408,7 +955,6 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('Article supprimé avec succès!');
                     location.reload();
                 } else {
                     alert('Erreur: ' + (data.error || 'Erreur inconnue'));
@@ -416,7 +962,7 @@
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Erreur lors de la suppression de l\'article: ' + error);
+                alert('Erreur: ' + error);
             });
         }
     </script>

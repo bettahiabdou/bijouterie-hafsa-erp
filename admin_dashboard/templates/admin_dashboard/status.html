@@ -1,143 +1,348 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<div class="space-y-6">
-    <div>
-        <h1 class="text-3xl font-bold text-gray-900">État du Système</h1>
-        <p class="text-gray-600 mt-2">Diagnostics et santé générale du système</p>
-    </div>
+{% block title %}Etat du Systeme - Bijouterie Hafsa ERP{% endblock %}
 
-    <!-- System Status Overview -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Database Status -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Base de Données</h3>
-                <div class="bg-green-100 rounded-full p-3">
-                    <i class="fas fa-database text-green-600 text-xl"></i>
-                </div>
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'admin_dashboard:home' %}" class="breadcrumb-item">Administration</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Etat du Systeme</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Etat du Systeme</h1>
+                <p class="page-subtitle">Diagnostics et sante generale du systeme</p>
             </div>
-            <div class="space-y-3">
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Total Enregistrements</span>
-                    <span class="font-semibold">{{ total_records }}</span>
+            <div class="page-actions">
+                <a href="{% url 'admin_dashboard:home' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- System Status Overview -->
+    <div class="status-grid mb-8 animate-stagger">
+        <!-- Database Status -->
+        <div class="card status-card">
+            <div class="card-body">
+                <div class="status-card-header">
+                    <h3 class="status-card-title">Base de Donnees</h3>
+                    <div class="status-icon success">
+                        <i class="fas fa-database"></i>
+                    </div>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Statut</span>
-                    <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">✓ Normal</span>
+                <div class="status-details">
+                    <div class="status-row">
+                        <span class="status-label">Total Enregistrements</span>
+                        <span class="status-value">{{ total_records }}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Statut</span>
+                        <span class="badge badge-success"><i class="fas fa-check"></i> Normal</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- User Statistics -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Utilisateurs</h3>
-                <div class="bg-blue-100 rounded-full p-3">
-                    <i class="fas fa-users text-blue-600 text-xl"></i>
+        <div class="card status-card">
+            <div class="card-body">
+                <div class="status-card-header">
+                    <h3 class="status-card-title">Utilisateurs</h3>
+                    <div class="status-icon info">
+                        <i class="fas fa-users"></i>
+                    </div>
                 </div>
-            </div>
-            <div class="space-y-3">
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Total Utilisateurs</span>
-                    <span class="font-semibold">{{ total_users }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Utilisateurs Actifs</span>
-                    <span class="font-semibold text-green-600">{{ active_users }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Administrateurs</span>
-                    <span class="font-semibold">{{ admin_users }}</span>
+                <div class="status-details">
+                    <div class="status-row">
+                        <span class="status-label">Total Utilisateurs</span>
+                        <span class="status-value">{{ total_users }}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Utilisateurs Actifs</span>
+                        <span class="status-value text-success">{{ active_users }}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Administrateurs</span>
+                        <span class="status-value">{{ admin_users }}</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Application Health Checks -->
-    <div class="bg-white rounded-lg shadow">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900">Vérifications de Santé</h3>
+    <div class="card mb-8 animate-slide-up">
+        <div class="card-header">
+            <h3><i class="fas fa-heartbeat mr-2"></i> Verifications de Sante</h3>
         </div>
-        <div class="divide-y">
-            <div class="px-6 py-4 flex items-center justify-between">
-                <span class="text-gray-900 font-medium">Django Application</span>
-                <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">✓ Running</span>
-            </div>
-            <div class="px-6 py-4 flex items-center justify-between">
-                <span class="text-gray-900 font-medium">Database Connection</span>
-                <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">✓ Connected</span>
-            </div>
-            <div class="px-6 py-4 flex items-center justify-between">
-                <span class="text-gray-900 font-medium">Static Files</span>
-                <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">✓ OK</span>
-            </div>
-            <div class="px-6 py-4 flex items-center justify-between">
-                <span class="text-gray-900 font-medium">Media Files</span>
-                <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">✓ OK</span>
-            </div>
-            <div class="px-6 py-4 flex items-center justify-between">
-                <span class="text-gray-900 font-medium">Email Configuration</span>
-                <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">✓ Configured</span>
+        <div class="card-body" style="padding: 0;">
+            <div class="health-list">
+                <div class="health-item">
+                    <span class="health-label">Django Application</span>
+                    <span class="badge badge-success"><i class="fas fa-check"></i> Running</span>
+                </div>
+                <div class="health-item">
+                    <span class="health-label">Database Connection</span>
+                    <span class="badge badge-success"><i class="fas fa-check"></i> Connected</span>
+                </div>
+                <div class="health-item">
+                    <span class="health-label">Static Files</span>
+                    <span class="badge badge-success"><i class="fas fa-check"></i> OK</span>
+                </div>
+                <div class="health-item">
+                    <span class="health-label">Media Files</span>
+                    <span class="badge badge-success"><i class="fas fa-check"></i> OK</span>
+                </div>
+                <div class="health-item">
+                    <span class="health-label">Email Configuration</span>
+                    <span class="badge badge-success"><i class="fas fa-check"></i> Configured</span>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Data Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Produits</h3>
-            <p class="text-3xl font-bold text-gray-900">{{ total_products }}</p>
+    <div class="stats-row mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-gem"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Produits</div>
+                <div class="stat-value">{{ total_products }}</div>
+            </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Clients</h3>
-            <p class="text-3xl font-bold text-gray-900">{{ total_clients }}</p>
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Clients</div>
+                <div class="stat-value">{{ total_clients }}</div>
+            </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Fournisseurs</h3>
-            <p class="text-3xl font-bold text-gray-900">{{ total_suppliers }}</p>
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fas fa-truck"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Fournisseurs</div>
+                <div class="stat-value">{{ total_suppliers }}</div>
+            </div>
         </div>
     </div>
 
     <!-- System Information -->
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Informations Système</h3>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
-            <div>
-                <p class="text-gray-600 text-sm">Framework</p>
-                <p class="font-semibold text-gray-900">Django</p>
-            </div>
-            <div>
-                <p class="text-gray-600 text-sm">Base de Données</p>
-                <p class="font-semibold text-gray-900">PostgreSQL</p>
-            </div>
-            <div>
-                <p class="text-gray-600 text-sm">Environnement</p>
-                <p class="font-semibold text-gray-900">Production</p>
+    <div class="card mb-8 animate-slide-up">
+        <div class="card-header">
+            <h3><i class="fas fa-server mr-2"></i> Informations Systeme</h3>
+        </div>
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Framework</span>
+                    <span class="info-value">Django</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Base de Donnees</span>
+                    <span class="info-value">PostgreSQL</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Environnement</span>
+                    <span class="info-value">Production</span>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Support & Help -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Besoin d'Aide?</h3>
-        <p class="text-gray-600 mb-4">Si vous rencontrez des problèmes ou avez des questions, veuillez contacter l'administrateur système.</p>
-        <div class="space-y-2">
-            <a href="{% url 'admin_dashboard:activity_log' %}" class="text-blue-600 hover:text-blue-900 block">
-                <i class="fas fa-arrow-right mr-2"></i> Consulter le journal d'activité pour plus de détails
+    <div class="alert alert-info animate-slide-up">
+        <i class="fas fa-info-circle"></i>
+        <div>
+            <strong>Besoin d'Aide?</strong>
+            <p style="margin-top: var(--space-1); font-size: var(--text-sm);">
+                Si vous rencontrez des problemes ou avez des questions, veuillez contacter l'administrateur systeme.
+            </p>
+            <a href="{% url 'admin_dashboard:activity_log' %}" class="btn btn-secondary btn-sm" style="margin-top: var(--space-3);">
+                <i class="fas fa-history"></i>
+                <span>Consulter le journal d'activite</span>
             </a>
         </div>
     </div>
-</div>
 
-<style>
-    .bg-green-100 { background-color: #dcfce7; }
-    .text-green-800 { color: #166534; }
-    .bg-blue-100 { background-color: #dbeafe; }
-    .text-blue-800 { color: #1e40af; }
-    .bg-blue-50 { background-color: #eff6ff; }
-    .border-blue-200 { border-color: #bfdbfe; }
-</style>
+    <style>
+        /* Status Grid */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-6);
+        }
+
+        .status-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: var(--space-4);
+        }
+
+        .status-card-title {
+            font-family: var(--font-display);
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .status-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--text-xl);
+        }
+
+        .status-icon.success {
+            background: var(--success-50);
+            color: var(--success-600);
+        }
+
+        .status-icon.info {
+            background: var(--info-50);
+            color: var(--info-600);
+        }
+
+        .status-details {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .status-value {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .text-success {
+            color: var(--success-600);
+        }
+
+        /* Health List */
+        .health-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .health-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .health-item:last-child {
+            border-bottom: none;
+        }
+
+        .health-label {
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+        }
+
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-4);
+        }
+
+        /* Info Grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-6);
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .info-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .info-value {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        /* Alert */
+        .alert {
+            display: flex;
+            gap: var(--space-4);
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+        }
+
+        .alert-info {
+            background: var(--info-50);
+            color: var(--info-700);
+            border: 1px solid var(--info-200);
+        }
+
+        .alert i:first-child {
+            font-size: var(--text-xl);
+            flex-shrink: 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 1023px) {
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .info-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .alert {
+                flex-direction: column;
+            }
+        }
+    </style>
 {% endblock %}

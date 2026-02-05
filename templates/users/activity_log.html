@@ -1,102 +1,398 @@
 {% extends 'base.html' %}
 
-{% block title %}Mon Activité - Bijouterie Hafsa ERP{% endblock %}
+{% block title %}Mon Activite - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'users:activity_log' %}">Mon Activité</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Mon Activite</span>
 {% endblock %}
 
 {% block page_header %}
-    <div>
-        <h1 class="text-3xl font-bold text-gray-900">Historique d'Activité</h1>
-        <p class="text-gray-600 mt-1">Consultez votre historique de connexion et d'actions</p>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Historique d'Activite</h1>
+                <p class="page-subtitle">Consultez votre historique de connexion et d'actions</p>
+            </div>
+        </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-                <select name="action" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Toutes les actions</option>
-                    {% for value, label in action_choices %}
-                        <option value="{{ value }}" {% if action == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <input type="date" name="date_from" value="{{ date_from }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <input type="date" name="date_to" value="{{ date_to }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                <i class="fas fa-search mr-2"></i> Filtrer
-            </button>
-        </form>
-    </div>
+    <div class="card animate-slide-up">
+        <!-- Filters -->
+        <div class="card-header filter-header">
+            <form method="get" class="filter-form">
+                <div class="filter-grid filter-grid-3">
+                    <!-- Action Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Action</label>
+                        <select name="action" class="form-select">
+                            <option value="">Toutes les actions</option>
+                            {% for value, label in action_choices %}
+                                <option value="{{ value }}" {% if action == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-    <!-- Activity List -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b">
-                    <tr>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Date/Heure</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Action</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Description</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Adresse IP</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% for log in logs %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-3 text-gray-600">{{ log.created_at|date:"d/m/Y H:i:s" }}</td>
-                            <td class="px-6 py-3">
-                                <span class="inline-block px-3 py-1 rounded-full text-xs font-medium
-                                    {% if log.action == 'login' %}bg-green-100 text-green-800
-                                    {% elif log.action == 'logout' %}bg-red-100 text-red-800
-                                    {% elif log.action == 'create' %}bg-blue-100 text-blue-800
-                                    {% elif log.action == 'update' %}bg-yellow-100 text-yellow-800
-                                    {% elif log.action == 'delete' %}bg-red-100 text-red-800
-                                    {% elif log.action == 'view' %}bg-gray-100 text-gray-800
-                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                    {{ log.get_action_display }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-3 text-gray-700">{{ log.object_repr }}</td>
-                            <td class="px-6 py-3 text-gray-600 font-mono text-xs">{{ log.ip_address }}</td>
-                        </tr>
-                    {% empty %}
+                    <!-- Date From -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Du</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" class="form-input">
+                    </div>
+
+                    <!-- Date To -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Au</label>
+                        <input type="date" name="date_to" value="{{ date_to }}" class="form-input">
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <a href="{% url 'users:activity_log' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Table - Desktop -->
+        <div class="card-body desktop-view" style="padding: 0;">
+            <div class="table-wrapper" style="border: none; border-radius: 0;">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td colspan="4" class="px-6 py-8 text-center text-gray-500">
-                                Aucune activité trouvée
-                            </td>
+                            <th>Date/Heure</th>
+                            <th>Action</th>
+                            <th>Description</th>
+                            <th class="hide-mobile">Adresse IP</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                            <tr>
+                                <td class="text-muted">{{ log.created_at|date:"d/m/Y H:i:s" }}</td>
+                                <td>
+                                    <span class="badge {% if log.action == 'login' %}badge-success{% elif log.action == 'logout' %}badge-neutral{% elif log.action == 'create' %}badge-info{% elif log.action == 'update' %}badge-warning{% elif log.action == 'delete' %}badge-error{% elif log.action == 'view' %}badge-neutral{% else %}badge-neutral{% endif %}">
+                                        {{ log.get_action_display }}
+                                    </span>
+                                </td>
+                                <td>{{ log.object_repr }}</td>
+                                <td class="text-muted hide-mobile" style="font-family: monospace; font-size: var(--text-xs);">{{ log.ip_address }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">
+                                            <i class="fas fa-history"></i>
+                                        </div>
+                                        <h4 class="empty-state-title">Aucune activite trouvee</h4>
+                                        <p class="empty-state-text">Votre historique d'activite est vide.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
+
+        <!-- Cards - Mobile -->
+        <div class="card-body mobile-view">
+            <div class="activity-cards">
+                {% for log in logs %}
+                    <div class="activity-card">
+                        <div class="activity-card-header">
+                            <div class="activity-card-icon {% if log.action == 'login' %}success{% elif log.action == 'logout' %}neutral{% elif log.action == 'create' %}info{% elif log.action == 'update' %}warning{% elif log.action == 'delete' %}error{% else %}neutral{% endif %}">
+                                {% if log.action == 'login' %}
+                                    <i class="fas fa-sign-in-alt"></i>
+                                {% elif log.action == 'logout' %}
+                                    <i class="fas fa-sign-out-alt"></i>
+                                {% elif log.action == 'create' %}
+                                    <i class="fas fa-plus"></i>
+                                {% elif log.action == 'update' %}
+                                    <i class="fas fa-edit"></i>
+                                {% elif log.action == 'delete' %}
+                                    <i class="fas fa-trash"></i>
+                                {% elif log.action == 'view' %}
+                                    <i class="fas fa-eye"></i>
+                                {% else %}
+                                    <i class="fas fa-circle"></i>
+                                {% endif %}
+                            </div>
+                            <div class="activity-card-info">
+                                <div class="activity-card-action">
+                                    <span class="badge {% if log.action == 'login' %}badge-success{% elif log.action == 'logout' %}badge-neutral{% elif log.action == 'create' %}badge-info{% elif log.action == 'update' %}badge-warning{% elif log.action == 'delete' %}badge-error{% elif log.action == 'view' %}badge-neutral{% else %}badge-neutral{% endif %}">
+                                        {{ log.get_action_display }}
+                                    </span>
+                                </div>
+                                <div class="activity-card-date">
+                                    <i class="fas fa-clock"></i> {{ log.created_at|date:"d/m/Y H:i" }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="activity-card-description">
+                            {{ log.object_repr }}
+                        </div>
+                        <div class="activity-card-footer">
+                            <span class="activity-card-ip">
+                                <i class="fas fa-globe"></i> {{ log.ip_address }}
+                            </span>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-state" style="padding: var(--space-6);">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <h4 class="empty-state-title">Aucune activite trouvee</h4>
+                        <p class="empty-state-text">Votre historique d'activite est vide.</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if logs.has_other_pages %}
+            <div class="card-footer pagination-footer">
+                <div class="pagination-info">
+                    Page {{ logs.number }} / {{ logs.paginator.num_pages }}
+                </div>
+                <div class="pagination-buttons">
+                    {% if logs.has_previous %}
+                        <a href="?page={{ logs.previous_page_number }}{% if action %}&action={{ action }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+
+                    {% if logs.has_next %}
+                        <a href="?page={{ logs.next_page_number }}{% if action %}&action={{ action }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
     </div>
 
-    <!-- Pagination -->
-    {% if logs.has_other_pages %}
-        <div class="mt-6 flex justify-center gap-2">
-            {% if logs.has_previous %}
-                <a href="?page=1" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Première</a>
-                <a href="?page={{ logs.previous_page_number }}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Précédente</a>
-            {% endif %}
+    <style>
+        /* Filter Styles */
+        .filter-header {
+            background: white;
+            padding: var(--space-4) var(--space-5);
+        }
 
-            <span class="px-3 py-2">Page {{ logs.number }} sur {{ logs.paginator.num_pages }}</span>
+        .filter-form {
+            width: 100%;
+            display: flex;
+            gap: var(--space-4);
+            align-items: flex-end;
+        }
 
-            {% if logs.has_next %}
-                <a href="?page={{ logs.next_page_number }}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Suivante</a>
-                <a href="?page={{ logs.paginator.num_pages }}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Dernière</a>
-            {% endif %}
-        </div>
-    {% endif %}
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            flex: 1;
+        }
+
+        .filter-grid-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Desktop/Mobile Toggle */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        .hide-mobile {
+            display: table-cell;
+        }
+
+        /* Activity Cards */
+        .activity-cards {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+            padding: var(--space-4);
+        }
+
+        .activity-card {
+            background: var(--neutral-50);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            transition: all var(--transition-fast);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .activity-card:hover {
+            background: white;
+            border-color: var(--neutral-300);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .activity-card-header {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-3);
+            margin-bottom: var(--space-3);
+        }
+
+        .activity-card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: var(--text-sm);
+        }
+
+        .activity-card-icon.success {
+            background: linear-gradient(135deg, var(--success-50) 0%, var(--success-100) 100%);
+            color: var(--success-600);
+        }
+
+        .activity-card-icon.neutral {
+            background: linear-gradient(135deg, var(--neutral-100) 0%, var(--neutral-200) 100%);
+            color: var(--neutral-600);
+        }
+
+        .activity-card-icon.info {
+            background: linear-gradient(135deg, var(--info-50) 0%, var(--info-100) 100%);
+            color: var(--info-600);
+        }
+
+        .activity-card-icon.warning {
+            background: linear-gradient(135deg, var(--warning-50) 0%, var(--warning-100) 100%);
+            color: var(--warning-600);
+        }
+
+        .activity-card-icon.error {
+            background: linear-gradient(135deg, var(--error-50) 0%, var(--error-100) 100%);
+            color: var(--error-600);
+        }
+
+        .activity-card-info {
+            flex: 1;
+        }
+
+        .activity-card-action {
+            margin-bottom: var(--space-1);
+        }
+
+        .activity-card-date {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .activity-card-date i {
+            margin-right: var(--space-1);
+        }
+
+        .activity-card-description {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-200);
+            margin-bottom: var(--space-3);
+        }
+
+        .activity-card-footer {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .activity-card-ip {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            font-family: monospace;
+        }
+
+        .activity-card-ip i {
+            margin-right: var(--space-1);
+        }
+
+        /* Pagination */
+        .pagination-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pagination-info {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .pagination-buttons {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .filter-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .filter-grid-3 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filter-form {
+                flex-direction: column;
+                gap: var(--space-3);
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr 1fr;
+                width: 100%;
+            }
+
+            .filter-grid-3 {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .filter-grid-3 .form-group:first-child {
+                grid-column: 1 / -1;
+            }
+
+            .filter-actions {
+                width: 100%;
+            }
+
+            .filter-actions .btn {
+                flex: 1;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+
+            .hide-mobile {
+                display: none !important;
+            }
+        }
+    </style>
 {% endblock %}

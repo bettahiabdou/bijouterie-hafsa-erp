@@ -1,153 +1,298 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<div class="space-y-6">
-    <div>
-        <h1 class="text-3xl font-bold text-gray-900">Journal d'Activité</h1>
-        <p class="text-gray-600 mt-2">Consultez toutes les actions du système</p>
-    </div>
+{% block title %}Journal d'Activite - Bijouterie Hafsa ERP{% endblock %}
 
-    <!-- Filters -->
-    <div class="bg-white rounded-lg shadow p-4">
-        <form method="get" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <!-- Action Filter -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Action</label>
-                    <select name="action" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        <option value="">Toutes les actions</option>
-                        {% for act in available_actions %}
-                        <option value="{{ act }}" {% if act == selected_action %}selected{% endif %}>{{ act }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'admin_dashboard:home' %}" class="breadcrumb-item">Administration</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Journal d'Activite</span>
+{% endblock %}
 
-                <!-- User Filter -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Utilisateur</label>
-                    <select name="user" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        <option value="">Tous les utilisateurs</option>
-                        {% for user in available_users %}
-                        <option value="{{ user.id }}" {% if user.id|stringformat:"s" == selected_user %}selected{% endif %}>{{ user.full_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Object Type Filter -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
-                    <select name="object_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        <option value="">Tous les types</option>
-                        {% for obj_type in available_object_types %}
-                        <option value="{{ obj_type }}" {% if obj_type == selected_object_type %}selected{% endif %}>{{ obj_type }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Days Filter -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Période</label>
-                    <select name="days" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        <option value="1" {% if selected_days == "1" %}selected{% endif %}>Dernier jour</option>
-                        <option value="7" {% if selected_days == "7" %}selected{% endif %}>7 derniers jours</option>
-                        <option value="30" {% if selected_days == "30" %}selected{% endif %}>30 derniers jours</option>
-                        <option value="90" {% if selected_days == "90" %}selected{% endif %}>90 derniers jours</option>
-                    </select>
-                </div>
-            </div>
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
             <div>
-                <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
-                    <i class="fas fa-filter mr-2"></i> Filtrer
-                </button>
+                <h1 class="page-title">Journal d'Activite</h1>
+                <p class="page-subtitle">Consultez toutes les actions du systeme</p>
             </div>
-        </form>
+            <div class="page-actions">
+                <a href="{% url 'admin_dashboard:home' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- Filters -->
+    <div class="card mb-6 animate-slide-up">
+        <div class="card-header">
+            <h3><i class="fas fa-filter mr-2"></i> Filtres</h3>
+        </div>
+        <div class="card-body">
+            <form method="get" class="filter-form">
+                <div class="filter-grid">
+                    <!-- Action Filter -->
+                    <div class="form-group">
+                        <label class="form-label">Action</label>
+                        <select name="action" class="form-select">
+                            <option value="">Toutes les actions</option>
+                            {% for act in available_actions %}
+                                <option value="{{ act }}" {% if act == selected_action %}selected{% endif %}>{{ act }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- User Filter -->
+                    <div class="form-group">
+                        <label class="form-label">Utilisateur</label>
+                        <select name="user" class="form-select">
+                            <option value="">Tous les utilisateurs</option>
+                            {% for user in available_users %}
+                                <option value="{{ user.id }}" {% if user.id|stringformat:"s" == selected_user %}selected{% endif %}>{{ user.full_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Object Type Filter -->
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select name="object_type" class="form-select">
+                            <option value="">Tous les types</option>
+                            {% for obj_type in available_object_types %}
+                                <option value="{{ obj_type }}" {% if obj_type == selected_object_type %}selected{% endif %}>{{ obj_type }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Days Filter -->
+                    <div class="form-group">
+                        <label class="form-label">Periode</label>
+                        <select name="days" class="form-select">
+                            <option value="1" {% if selected_days == "1" %}selected{% endif %}>Dernier jour</option>
+                            <option value="7" {% if selected_days == "7" %}selected{% endif %}>7 derniers jours</option>
+                            <option value="30" {% if selected_days == "30" %}selected{% endif %}>30 derniers jours</option>
+                            <option value="90" {% if selected_days == "90" %}selected{% endif %}>90 derniers jours</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter"></i>
+                        <span>Filtrer</span>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Activity Feed -->
-    <div class="space-y-4">
+    <div class="activity-feed">
         {% for activity in activities %}
-        <div class="bg-white rounded-lg shadow p-4 border-l-4
-            {% if activity.action == 'create' %}
-            border-green-500
-            {% elif activity.action == 'update' %}
-            border-blue-500
-            {% elif activity.action == 'delete' %}
-            border-red-500
-            {% elif activity.action == 'view' %}
-            border-gray-500
-            {% elif activity.action == 'error' %}
-            border-orange-500
-            {% else %}
-            border-purple-500
-            {% endif %}
-        ">
-            <div class="flex items-start justify-between">
-                <div class="flex-1">
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="inline-block px-3 py-1 text-xs font-semibold rounded-full
-                            {% if activity.action == 'create' %}
-                            bg-green-100 text-green-800
-                            {% elif activity.action == 'update' %}
-                            bg-blue-100 text-blue-800
-                            {% elif activity.action == 'delete' %}
-                            bg-red-100 text-red-800
-                            {% elif activity.action == 'view' %}
-                            bg-gray-100 text-gray-800
-                            {% elif activity.action == 'error' %}
-                            bg-orange-100 text-orange-800
-                            {% else %}
-                            bg-purple-100 text-purple-800
-                            {% endif %}
-                        ">
-                            {{ activity.get_action_display|upper }}
-                        </span>
-                        <span class="text-sm text-gray-600">{{ activity.model_name }}</span>
+            <div class="card activity-card animate-slide-up {% if activity.action == 'create' %}border-success{% elif activity.action == 'update' %}border-info{% elif activity.action == 'delete' %}border-error{% elif activity.action == 'view' %}border-neutral{% elif activity.action == 'error' %}border-warning{% else %}border-accent{% endif %}" style="animation-delay: {{ forloop.counter0 }}0ms;">
+                <div class="card-body">
+                    <div class="activity-header">
+                        <div class="activity-badges">
+                            <span class="badge {% if activity.action == 'create' %}badge-success{% elif activity.action == 'update' %}badge-info{% elif activity.action == 'delete' %}badge-error{% elif activity.action == 'view' %}badge-neutral{% elif activity.action == 'error' %}badge-warning{% else %}badge-accent{% endif %}">
+                                {{ activity.get_action_display|upper }}
+                            </span>
+                            <span class="activity-type">{{ activity.model_name }}</span>
+                        </div>
                     </div>
-                    <p class="text-gray-900 font-medium">{{ activity.description }}</p>
-                    <div class="mt-2 flex items-center gap-4 text-sm text-gray-600">
-                        <span><i class="fas fa-user mr-1"></i> {{ activity.user.full_name }}</span>
-                        <span><i class="fas fa-clock mr-1"></i> {{ activity.created_at|date:'d/m/Y H:i' }}</span>
+                    <p class="activity-description">{{ activity.description }}</p>
+                    <div class="activity-meta">
+                        <span><i class="fas fa-user"></i> {{ activity.user.full_name }}</span>
+                        <span><i class="fas fa-clock"></i> {{ activity.created_at|date:'d/m/Y H:i' }}</span>
                         {% if activity.ip_address %}
-                        <span><i class="fas fa-globe mr-1"></i> {{ activity.ip_address }}</span>
+                            <span><i class="fas fa-globe"></i> {{ activity.ip_address }}</span>
                         {% endif %}
                     </div>
                 </div>
             </div>
-        </div>
         {% empty %}
-        <div class="bg-white rounded-lg shadow p-8 text-center">
-            <i class="fas fa-inbox text-3xl text-gray-400 mb-3"></i>
-            <p class="text-gray-600">Aucune activité trouvée pour cette période</p>
-        </div>
+            <div class="card">
+                <div class="card-body">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-inbox"></i>
+                        </div>
+                        <h4 class="empty-state-title">Aucune activite trouvee</h4>
+                        <p class="empty-state-text">Aucune activite pour cette periode</p>
+                    </div>
+                </div>
+            </div>
         {% endfor %}
     </div>
 
     <!-- Pagination Info -->
     {% if activities|length >= 500 %}
-    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <p class="text-yellow-800 text-sm">
-            <i class="fas fa-exclamation-triangle mr-2"></i>
-            Affichage des 500 activités les plus récentes. Affinez vos filtres pour voir plus d'entrées.
-        </p>
-    </div>
+        <div class="alert alert-warning mt-6">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+                Affichage des 500 activites les plus recentes. Affinez vos filtres pour voir plus d'entrees.
+            </div>
+        </div>
     {% endif %}
-</div>
 
-<style>
-    .bg-green-100 { background-color: #dcfce7; }
-    .text-green-800 { color: #166534; }
-    .bg-blue-100 { background-color: #dbeafe; }
-    .text-blue-800 { color: #1e40af; }
-    .bg-red-100 { background-color: #fee2e2; }
-    .text-red-800 { color: #991b1b; }
-    .bg-gray-100 { background-color: #f3f4f6; }
-    .text-gray-800 { color: #1f2937; }
-    .bg-orange-100 { background-color: #fed7aa; }
-    .text-orange-800 { color: #92400e; }
-    .bg-purple-100 { background-color: #e9d5ff; }
-    .text-purple-800 { color: #6b21a8; }
-    .bg-yellow-50 { background-color: #fffbeb; }
-    .text-yellow-800 { color: #854d0e; }
-    .border-yellow-200 { border-color: #fde68a; }
-</style>
+    <style>
+        /* Filter Form */
+        .filter-form {
+            margin-bottom: 0;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
+
+        .filter-grid .form-group {
+            margin-bottom: 0;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Activity Feed */
+        .activity-feed {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .activity-card {
+            border-left: 4px solid var(--neutral-300);
+        }
+
+        .activity-card.border-success {
+            border-left-color: var(--success-500);
+        }
+
+        .activity-card.border-info {
+            border-left-color: var(--info-500);
+        }
+
+        .activity-card.border-error {
+            border-left-color: var(--error-500);
+        }
+
+        .activity-card.border-neutral {
+            border-left-color: var(--neutral-400);
+        }
+
+        .activity-card.border-warning {
+            border-left-color: var(--warning-500);
+        }
+
+        .activity-card.border-accent {
+            border-left-color: var(--accent-500);
+        }
+
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-2);
+        }
+
+        .activity-badges {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .activity-type {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .activity-description {
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+            margin-bottom: var(--space-3);
+        }
+
+        .activity-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-4);
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .activity-meta i {
+            margin-right: var(--space-1);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-8);
+        }
+
+        .empty-state-icon {
+            font-size: var(--text-4xl);
+            color: var(--neutral-300);
+            margin-bottom: var(--space-4);
+        }
+
+        .empty-state-title {
+            font-family: var(--font-display);
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-700);
+            margin-bottom: var(--space-2);
+        }
+
+        .empty-state-text {
+            color: var(--neutral-500);
+        }
+
+        /* Alert */
+        .alert {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+        }
+
+        .alert-warning {
+            background: var(--warning-50);
+            color: var(--warning-700);
+            border: 1px solid var(--warning-200);
+        }
+
+        /* Responsive */
+        @media (max-width: 1023px) {
+            .filter-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-actions {
+                flex-direction: column;
+            }
+
+            .filter-actions .btn {
+                width: 100%;
+            }
+
+            .activity-meta {
+                flex-direction: column;
+                gap: var(--space-2);
+            }
+        }
+    </style>
 {% endblock %}

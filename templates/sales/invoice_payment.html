@@ -3,212 +3,219 @@
 
 {% block title %}Enregistrer Paiement - {{ invoice.reference }}{% endblock %}
 
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_list' %}" class="breadcrumb-item">Factures</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="breadcrumb-item">{{ invoice.reference }}</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Paiement</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Enregistrer Paiement</h1>
+                <p class="page-subtitle">Facture {{ invoice.reference }} - {{ invoice.date|date:"d/m/Y" }}</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h3 class="mb-0">
-                        <i class="fas fa-money-bill-wave"></i> Enregistrer Paiement
-                    </h3>
-                </div>
+    <div class="grid" style="grid-template-columns: 2fr 1fr; gap: var(--space-6);">
+        <!-- Main Form -->
+        <div class="card animate-slide-up">
+            <div class="card-header" style="background: var(--success-50); border-bottom-color: var(--success-200);">
+                <h3 style="color: var(--success-700);"><i class="fas fa-money-bill-wave mr-2"></i> Paiement</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" novalidate>
+                    {% csrf_token %}
 
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
+                    <div class="form-group">
+                        <label for="{{ form.amount.id_for_label }}" class="form-label">
+                            Montant paye (DH) <span class="required">*</span>
+                        </label>
+                        {{ form.amount }}
+                        {% if form.amount.errors %}
+                            <p class="form-error">{{ form.amount.errors.0 }}</p>
+                        {% endif %}
+                        <p class="form-help">Montant maximum: <strong class="text-primary">{{ remaining|floatformat:2 }} DH</strong></p>
+                    </div>
 
-                <div class="card-body">
-                    <form method="POST" novalidate>
-                        {% csrf_token %}
+                    <div class="form-group">
+                        <label for="{{ form.payment_method.id_for_label }}" class="form-label">
+                            Methode de paiement <span class="required">*</span>
+                        </label>
+                        {{ form.payment_method }}
+                        {% if form.payment_method.errors %}
+                            <p class="form-error">{{ form.payment_method.errors.0 }}</p>
+                        {% endif %}
+                    </div>
 
-                        <div class="form-group mb-3">
-                            <label for="{{ form.amount.id_for_label }}" class="form-label">Montant payé (DH) <span class="text-danger">*</span></label>
-                            {{ form.amount }}
-                            {% if form.amount.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.amount.errors.0 }}
-                                </div>
-                            {% endif %}
-                            <small class="form-text text-muted">Montant maximum: <strong>{{ remaining|floatformat:2 }} DH</strong></small>
-                        </div>
+                    <div class="form-group" id="bankAccountGroup" style="display: none;">
+                        <label for="{{ form.bank_account.id_for_label }}" class="form-label">
+                            Compte bancaire <span class="required">*</span>
+                        </label>
+                        {{ form.bank_account }}
+                        {% if form.bank_account.errors %}
+                            <p class="form-error">{{ form.bank_account.errors.0 }}</p>
+                        {% endif %}
+                        <p class="form-help">Selectionnez le compte bancaire pour ce virement</p>
+                    </div>
 
-                        <div class="form-group mb-3">
-                            <label for="{{ form.payment_method.id_for_label }}" class="form-label">Méthode de paiement <span class="text-danger">*</span></label>
-                            {{ form.payment_method }}
-                            {% if form.payment_method.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.payment_method.errors.0 }}
-                                </div>
-                            {% endif %}
-                        </div>
+                    <div class="form-group" id="paymentReferenceGroup" style="display: none;">
+                        <label for="{{ form.payment_reference.id_for_label }}" class="form-label">
+                            Reference de paiement <span class="required">*</span>
+                        </label>
+                        {{ form.payment_reference }}
+                        {% if form.payment_reference.errors %}
+                            <p class="form-error">{{ form.payment_reference.errors.0 }}</p>
+                        {% endif %}
+                        <p class="form-help">Obligatoire pour virement, cheque, paiement mobile ou carte</p>
+                    </div>
 
-                        <div class="form-group mb-3" id="bankAccountGroup" style="display: none;">
-                            <label for="{{ form.bank_account.id_for_label }}" class="form-label">Compte bancaire <span class="text-danger">*</span></label>
-                            {{ form.bank_account }}
-                            {% if form.bank_account.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.bank_account.errors.0 }}
-                                </div>
-                            {% endif %}
-                            <small class="form-text text-muted">Sélectionnez le compte bancaire pour ce virement</small>
-                        </div>
+                    <div class="form-group">
+                        <label for="{{ form.notes.id_for_label }}" class="form-label">Notes</label>
+                        {{ form.notes }}
+                    </div>
 
-                        <div class="form-group mb-3" id="paymentReferenceGroup" style="display: none;">
-                            <label for="{{ form.payment_reference.id_for_label }}" class="form-label">Référence de paiement <span class="text-danger">*</span></label>
-                            {{ form.payment_reference }}
-                            {% if form.payment_reference.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.payment_reference.errors.0 }}
-                                </div>
-                            {% endif %}
-                            <small class="form-text text-muted">Obligatoire pour virement, chèque, paiement mobile ou carte</small>
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label for="{{ form.notes.id_for_label }}" class="form-label">Notes</label>
-                            {{ form.notes }}
-                        </div>
-
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-success">
-                                <i class="fas fa-check"></i> Enregistrer le paiement
-                            </button>
-                            <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Annuler
-                            </a>
-                        </div>
-                    </form>
-                </div>
+                    <div class="flex gap-4 mt-6">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check"></i>
+                            <span>Enregistrer le paiement</span>
+                        </button>
+                        <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i>
+                            <span>Annuler</span>
+                        </a>
+                    </div>
+                </form>
             </div>
         </div>
 
-        <div class="col-md-4">
-            <div class="card mb-3">
+        <!-- Sidebar -->
+        <div class="flex flex-col gap-6">
+            <!-- Reference Card -->
+            <div class="card animate-slide-up">
                 <div class="card-header">
-                    <h5 class="mb-0">Référence</h5>
+                    <h3>Reference</h3>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0">
-                        <strong>{{ invoice.reference }}</strong><br>
-                        <small class="text-muted">{{ invoice.date|date:'d/m/Y' }}</small>
-                    </p>
+                    <div class="p-4 rounded-lg text-center" style="background: var(--neutral-50);">
+                        <p class="text-2xl font-bold" style="font-family: var(--font-display);">{{ invoice.reference }}</p>
+                        <p class="text-sm text-muted mt-2">{{ invoice.date|date:'d/m/Y' }}</p>
+                    </div>
                 </div>
             </div>
 
-            <div class="card">
+            <!-- Payment Summary -->
+            <div class="card animate-slide-up" style="animation-delay: 50ms;">
                 <div class="card-header">
-                    <h5 class="mb-0">Récapitulatif du paiement</h5>
+                    <h3><i class="fas fa-calculator mr-2"></i> Recapitulatif</h3>
                 </div>
                 <div class="card-body">
-                    <table class="table table-sm">
-                        <tr>
-                            <td><strong>Total facture:</strong></td>
-                            <td class="text-end">{{ invoice.total_amount|floatformat:2 }} DH</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Déjà payé:</strong></td>
-                            <td class="text-end">{{ invoice.amount_paid|floatformat:2 }} DH</td>
-                        </tr>
-                        <tr class="table-active">
-                            <td><strong>Solde dû:</strong></td>
-                            <td class="text-end">
-                                <span class="badge bg-danger">
-                                    {{ remaining|floatformat:2 }} DH
-                                </span>
-                            </td>
-                        </tr>
-                    </table>
+                    <div class="flex flex-col gap-3">
+                        <div class="flex justify-between items-center" style="padding-bottom: var(--space-3); border-bottom: 1px solid var(--neutral-200);">
+                            <span class="text-muted">Total facture</span>
+                            <span class="font-semibold">{{ invoice.total_amount|floatformat:2 }} DH</span>
+                        </div>
+                        <div class="flex justify-between items-center" style="padding-bottom: var(--space-3); border-bottom: 1px solid var(--neutral-200);">
+                            <span class="text-muted">Deja paye</span>
+                            <span class="font-medium">{{ invoice.amount_paid|floatformat:2 }} DH</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 rounded-lg" style="background: var(--error-50);">
+                            <span class="font-semibold" style="color: var(--error-700);">Solde du</span>
+                            <span class="text-xl font-bold" style="color: var(--error-600);">{{ remaining|floatformat:2 }} DH</span>
+                        </div>
+                    </div>
 
                     {% if invoice.status == 'paid' %}
-                        <div class="alert alert-success">
-                            <i class="fas fa-check-circle"></i> Facture entièrement payée
+                        <div class="alert alert-success mt-4">
+                            <i class="alert-icon fas fa-check-circle"></i>
+                            <div class="alert-content">
+                                <p class="alert-message">Facture entierement payee</p>
+                            </div>
                         </div>
                     {% elif invoice.status == 'partial' %}
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i> Paiement partiel reçu
+                        <div class="alert alert-info mt-4">
+                            <i class="alert-icon fas fa-info-circle"></i>
+                            <div class="alert-content">
+                                <p class="alert-message">Paiement partiel recu</p>
+                            </div>
                         </div>
                     {% endif %}
                 </div>
             </div>
 
-            <div class="card mt-3">
+            <!-- Client Info -->
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
                 <div class="card-header">
-                    <h5 class="mb-0">Client</h5>
+                    <h3><i class="fas fa-user mr-2"></i> Client</h3>
                 </div>
                 <div class="card-body">
                     {% if invoice.client %}
-                        <p class="mb-2">
-                            <strong>{{ invoice.client.full_name }}</strong>
-                        </p>
-                        <p class="mb-0">
-                            <small class="text-muted">
-                                {{ invoice.client.email }}<br>
-                                {{ invoice.client.phone }}
-                            </small>
-                        </p>
+                        <p class="font-semibold text-lg mb-2">{{ invoice.client.full_name }}</p>
+                        {% if invoice.client.email %}
+                            <p class="text-sm text-muted"><i class="fas fa-envelope mr-2"></i>{{ invoice.client.email }}</p>
+                        {% endif %}
+                        {% if invoice.client.phone %}
+                            <p class="text-sm text-muted"><i class="fas fa-phone mr-2"></i>{{ invoice.client.phone }}</p>
+                        {% endif %}
                     {% else %}
-                        <p class="text-muted">
-                            <em>Pas de client associé (vente anonyme)</em>
-                        </p>
+                        <p class="text-muted"><i class="fas fa-user-slash mr-2"></i>Vente anonyme (walk-in)</p>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const paymentMethodSelect = document.querySelector('select[name="payment_method"]');
-    const bankAccountGroup = document.getElementById('bankAccountGroup');
-    const bankAccountSelect = document.querySelector('select[name="bank_account"]');
-    const paymentReferenceGroup = document.getElementById('paymentReferenceGroup');
-    const paymentReferenceInput = document.querySelector('input[name="payment_reference"]');
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const paymentMethodSelect = document.querySelector('select[name="payment_method"]');
+        const bankAccountGroup = document.getElementById('bankAccountGroup');
+        const bankAccountSelect = document.querySelector('select[name="bank_account"]');
+        const paymentReferenceGroup = document.getElementById('paymentReferenceGroup');
+        const paymentReferenceInput = document.querySelector('input[name="payment_reference"]');
 
-    // Function to update visibility
-    function updatePaymentFieldsVisibility() {
-        if (paymentMethodSelect) {
-            const selectedText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex]?.text || '';
-            const selectedTextLower = selectedText.toLowerCase();
+        function updatePaymentFieldsVisibility() {
+            if (paymentMethodSelect) {
+                const selectedText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex]?.text || '';
+                const selectedTextLower = selectedText.toLowerCase();
 
-            // Show bank account field if "virement bancaire" is selected
-            const isBankTransfer = selectedTextLower.includes('virement');
+                const isBankTransfer = selectedTextLower.includes('virement');
+                const isCash = selectedTextLower.includes('especes') || selectedTextLower.includes('espèces');
+                const requiresReference = !isCash && selectedText.trim() !== '' && selectedText.trim() !== '---------';
 
-            // Show reference field for everything EXCEPT cash/espèces
-            const isCash = selectedTextLower.includes('espèces');
-            const requiresReference = !isCash && selectedText.trim() !== '' && selectedText.trim() !== '---------';
-
-            // Update bank account field visibility
-            if (bankAccountGroup) {
-                bankAccountGroup.style.display = isBankTransfer ? 'block' : 'none';
-                if (bankAccountSelect) {
-                    bankAccountSelect.required = isBankTransfer;
+                if (bankAccountGroup) {
+                    bankAccountGroup.style.display = isBankTransfer ? 'block' : 'none';
+                    if (bankAccountSelect) {
+                        bankAccountSelect.required = isBankTransfer;
+                    }
                 }
-            }
 
-            // Update payment reference field visibility
-            if (paymentReferenceGroup) {
-                paymentReferenceGroup.style.display = requiresReference ? 'block' : 'none';
-                if (paymentReferenceInput) {
-                    paymentReferenceInput.required = requiresReference;
+                if (paymentReferenceGroup) {
+                    paymentReferenceGroup.style.display = requiresReference ? 'block' : 'none';
+                    if (paymentReferenceInput) {
+                        paymentReferenceInput.required = requiresReference;
+                    }
                 }
             }
         }
-    }
 
-    // Update on load
-    updatePaymentFieldsVisibility();
+        updatePaymentFieldsVisibility();
 
-    // Update on change
-    if (paymentMethodSelect) {
-        paymentMethodSelect.addEventListener('change', updatePaymentFieldsVisibility);
-    }
-});
-</script>
+        if (paymentMethodSelect) {
+            paymentMethodSelect.addEventListener('change', updatePaymentFieldsVisibility);
+        }
+    });
+    </script>
 {% endblock %}

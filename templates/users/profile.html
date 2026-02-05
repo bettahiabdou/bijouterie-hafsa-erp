@@ -3,123 +3,299 @@
 {% block title %}Mon Profil - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'users:profile' %}">Mon Profil</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Mon Profil</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Mon Profil</h1>
-            <p class="text-gray-600 mt-1">{{ user.get_full_name }}</p>
-        </div>
-        <div class="space-x-2">
-            <a href="{% url 'users:profile_edit' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                <i class="fas fa-edit mr-2"></i> Modifier
-            </a>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Mon Profil</h1>
+                <p class="page-subtitle">{{ user.get_full_name }}</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'users:profile_edit' %}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i>
+                    <span>Modifier</span>
+                </a>
+            </div>
         </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="detail-layout">
         <!-- Main Content -->
-        <div class="lg:col-span-2 space-y-6">
+        <div class="detail-main">
             <!-- Personal Information -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Informations Personnelles</h2>
-                <div class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-sm text-gray-600">Prénom</p>
-                            <p class="font-medium text-gray-900">{{ user.first_name }}</p>
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-user mr-2"></i> Informations Personnelles</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Prenom</span>
+                            <span class="info-value font-semibold">{{ user.first_name }}</span>
                         </div>
-                        <div>
-                            <p class="text-sm text-gray-600">Nom</p>
-                            <p class="font-medium text-gray-900">{{ user.last_name }}</p>
+                        <div class="info-item">
+                            <span class="info-label">Nom</span>
+                            <span class="info-value font-semibold">{{ user.last_name }}</span>
                         </div>
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-600">Email</p>
-                        <p class="font-medium text-gray-900">{{ user.email }}</p>
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-600">Nom d'utilisateur</p>
-                        <p class="font-medium text-gray-900">{{ user.username }}</p>
+                        <div class="info-item">
+                            <span class="info-label">Email</span>
+                            <span class="info-value">{{ user.email }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Nom d'utilisateur</span>
+                            <span class="info-value" style="font-family: monospace;">{{ user.username }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Account Security -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Sécurité du Compte</h2>
-                <div class="space-y-3">
-                    <a href="{% url 'users:password_change' %}" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded border border-gray-200">
-                        <div>
-                            <p class="font-medium text-gray-900">Changer le mot de passe</p>
-                            <p class="text-sm text-gray-600">Mettez à jour votre mot de passe</p>
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-shield-alt mr-2"></i> Securite du Compte</h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <a href="{% url 'users:password_change' %}" class="action-link">
+                        <div class="action-link-content">
+                            <span class="action-link-title">Changer le mot de passe</span>
+                            <span class="action-link-desc">Mettez a jour votre mot de passe</span>
                         </div>
-                        <i class="fas fa-arrow-right text-gray-400"></i>
+                        <i class="fas fa-chevron-right text-muted"></i>
                     </a>
                 </div>
             </div>
 
             <!-- Activity -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Activité Récente</h2>
-                <div class="space-y-3">
-                    <a href="{% url 'users:activity_log' %}" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded border border-gray-200">
-                        <div>
-                            <p class="font-medium text-gray-900">Historique d'Activité</p>
-                            <p class="text-sm text-gray-600">Consultez votre historique de connexion</p>
+            <div class="card animate-slide-up" style="animation-delay: 150ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-history mr-2"></i> Activite Recente</h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <a href="{% url 'users:activity_log' %}" class="action-link">
+                        <div class="action-link-content">
+                            <span class="action-link-title">Historique d'Activite</span>
+                            <span class="action-link-desc">Consultez votre historique de connexion</span>
                         </div>
-                        <i class="fas fa-arrow-right text-gray-400"></i>
+                        <i class="fas fa-chevron-right text-muted"></i>
                     </a>
                 </div>
             </div>
         </div>
 
         <!-- Sidebar -->
-        <div class="space-y-6">
+        <div class="detail-sidebar">
             <!-- Statistics -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Statistiques</h3>
-                <div class="space-y-4">
-                    <div class="border-b pb-3">
-                        <p class="text-sm text-gray-600">Rôle</p>
-                        <p class="font-bold text-gray-900 text-lg">{{ stats.role }}</p>
-                    </div>
-                    <div class="border-b pb-3">
-                        <p class="text-sm text-gray-600">Activités Totales</p>
-                        <p class="font-bold text-gray-900 text-lg">{{ stats.total_activities }}</p>
-                    </div>
-                    <div class="border-b pb-3">
-                        <p class="text-sm text-gray-600">7 Derniers Jours</p>
-                        <p class="font-bold text-gray-900 text-lg">{{ stats.recent_activities }}</p>
-                    </div>
-                    {% if stats.last_login %}
-                        <div>
-                            <p class="text-sm text-gray-600">Dernière Connexion</p>
-                            <p class="font-medium text-gray-900">{{ stats.last_login.created_at|date:"d/m/Y H:i" }}</p>
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-bar mr-2"></i> Statistiques</h3>
+                </div>
+                <div class="card-body">
+                    <div class="stats-list">
+                        <div class="stats-item">
+                            <span class="stats-label">Role</span>
+                            <span class="badge badge-primary">{{ stats.role }}</span>
                         </div>
-                    {% endif %}
+                        <div class="stats-item">
+                            <span class="stats-label">Activites Totales</span>
+                            <span class="stats-value">{{ stats.total_activities }}</span>
+                        </div>
+                        <div class="stats-item">
+                            <span class="stats-label">7 Derniers Jours</span>
+                            <span class="stats-value">{{ stats.recent_activities }}</span>
+                        </div>
+                        {% if stats.last_login %}
+                            <div class="stats-item">
+                                <span class="stats-label">Derniere Connexion</span>
+                                <span class="stats-value-date">{{ stats.last_login.created_at|date:"d/m/Y H:i" }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
             <!-- Account Info -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Compte</h3>
-                <div class="space-y-2 text-sm text-gray-600">
-                    <p><strong>Créé:</strong> {{ user.date_joined|date:"d/m/Y" }}</p>
-                    <p><strong>Statut:</strong>
-                        {% if user.is_active %}
-                            <span class="inline-block px-2 py-1 rounded bg-green-100 text-green-800 text-xs">Actif</span>
-                        {% else %}
-                            <span class="inline-block px-2 py-1 rounded bg-red-100 text-red-800 text-xs">Inactif</span>
-                        {% endif %}
-                    </p>
+            <div class="card animate-slide-up" style="animation-delay: 50ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle mr-2"></i> Compte</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Cree</span>
+                            <span class="status-value">{{ user.date_joined|date:"d/m/Y" }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Statut</span>
+                            {% if user.is_active %}
+                                <span class="badge badge-success">Actif</span>
+                            {% else %}
+                                <span class="badge badge-error">Inactif</span>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <style>
+        /* Detail Layout */
+        .detail-layout {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: var(--space-6);
+        }
+
+        .detail-main {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        .detail-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        /* Info Grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .info-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .info-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+        }
+
+        /* Action Link */
+        .action-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--space-4);
+            text-decoration: none;
+            color: inherit;
+            transition: background var(--transition-fast);
+        }
+
+        .action-link:hover {
+            background: var(--neutral-50);
+        }
+
+        .action-link-content {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .action-link-title {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .action-link-desc {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        /* Stats List */
+        .stats-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .stats-item:last-child {
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .stats-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .stats-value {
+            font-size: var(--text-xl);
+            font-weight: var(--font-bold);
+            color: var(--neutral-800);
+        }
+
+        .stats-value-date {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-700);
+        }
+
+        /* Status List */
+        .status-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .status-value {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .detail-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-sidebar {
+                order: -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 {% endblock %}

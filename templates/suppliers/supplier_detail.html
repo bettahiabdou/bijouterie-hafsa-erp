@@ -1,546 +1,878 @@
 {% extends 'base.html' %}
-{% load static %}
 
-{% block title %}{{ supplier.name }}{% endblock %}
+{% block title %}{{ supplier.name }} - Bijouterie Hafsa ERP{% endblock %}
 
-{% block extra_css %}
-<style>
-    .detail-container {
-        display: flex;
-        justify-content: center;
-        padding: 20px;
-    }
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'suppliers:list' %}" class="breadcrumb-item">Fournisseurs</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ supplier.name }}</span>
+{% endblock %}
 
-    .detail-wrapper {
-        width: 100%;
-        max-width: 1000px;
-    }
-
-    .detail-header {
-        background: white;
-        border-radius: 8px;
-        padding: 32px;
-        margin-bottom: 24px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        border: 1px solid #e5e7eb;
-    }
-
-    .detail-header-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: start;
-        margin-bottom: 20px;
-    }
-
-    .detail-header-title h1 {
-        font-size: 2.2em;
-        font-weight: bold;
-        color: #111827;
-        margin: 0;
-    }
-
-    .detail-header-title .subtitle {
-        color: #6b7280;
-        font-size: 1em;
-        font-weight: normal;
-        margin-top: 4px;
-    }
-
-    .detail-badges {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        margin-top: 12px;
-    }
-
-    .badge {
-        display: inline-block;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 0.85em;
-        font-weight: 500;
-    }
-
-    .badge-type {
-        background-color: #dbeafe;
-        color: #1e40af;
-    }
-
-    .badge-active {
-        background-color: #d1fae5;
-        color: #065f46;
-    }
-
-    .badge-inactive {
-        background-color: #fee2e2;
-        color: #7f1d1d;
-    }
-
-    .detail-actions {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-
-    .btn-action {
-        padding: 8px 16px;
-        border-radius: 6px;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-weight: 500;
-        transition: all 0.2s;
-        font-size: 0.9em;
-        border: none;
-        cursor: pointer;
-    }
-
-    .btn-primary {
-        background-color: #2563eb;
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background-color: #1d4ed8;
-    }
-
-    .btn-secondary {
-        background-color: #e5e7eb;
-        color: #374151;
-    }
-
-    .btn-secondary:hover {
-        background-color: #d1d5db;
-    }
-
-    .btn-danger {
-        background-color: #ef4444;
-        color: white;
-    }
-
-    .btn-danger:hover {
-        background-color: #dc2626;
-    }
-
-    .detail-card {
-        background: white;
-        border-radius: 8px;
-        padding: 24px;
-        margin-bottom: 24px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        border: 1px solid #e5e7eb;
-    }
-
-    .card-title {
-        font-size: 1.2em;
-        font-weight: 600;
-        color: #111827;
-        margin-bottom: 20px;
-        padding-bottom: 12px;
-        border-bottom: 2px solid #f3f4f6;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .info-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
-    }
-
-    .info-item {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .info-label {
-        font-weight: 600;
-        color: #374151;
-        font-size: 0.9em;
-        margin-bottom: 6px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .info-value {
-        color: #111827;
-        font-size: 1em;
-        word-break: break-word;
-    }
-
-    .info-value.empty {
-        color: #9ca3af;
-        font-style: italic;
-    }
-
-    .table-container {
-        overflow-x: auto;
-    }
-
-    .detail-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    .detail-table thead {
-        background-color: #f3f4f6;
-        border-bottom: 2px solid #d1d5db;
-    }
-
-    .detail-table th {
-        padding: 12px;
-        text-align: left;
-        font-weight: 600;
-        color: #374151;
-        font-size: 0.9em;
-    }
-
-    .detail-table td {
-        padding: 12px;
-        border-bottom: 1px solid #e5e7eb;
-        color: #111827;
-    }
-
-    .detail-table tbody tr:hover {
-        background-color: #f9fafb;
-    }
-
-    .currency {
-        font-family: monospace;
-        font-weight: 500;
-    }
-
-    .date {
-        font-size: 0.9em;
-        color: #6b7280;
-    }
-
-    .no-data {
-        text-align: center;
-        padding: 40px;
-        color: #9ca3af;
-    }
-
-    .no-data i {
-        font-size: 2.5em;
-        margin-bottom: 12px;
-        color: #d1d5db;
-    }
-
-    .summary-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 16px;
-    }
-
-    .summary-box {
-        padding: 16px;
-        border-radius: 6px;
-        text-align: center;
-        border: 1px solid #e5e7eb;
-    }
-
-    .summary-box.highlight {
-        background-color: #f0fdf4;
-        border-color: #bbf7d0;
-    }
-
-    .summary-label {
-        font-weight: 500;
-        color: #6b7280;
-        font-size: 0.9em;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 8px;
-    }
-
-    .summary-value {
-        font-size: 1.8em;
-        font-weight: bold;
-        color: #111827;
-    }
-
-    .summary-value.currency {
-        font-family: monospace;
-    }
-
-    @media (max-width: 768px) {
-        .detail-header {
-            padding: 20px;
-        }
-
-        .detail-header-top {
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .detail-actions {
-            width: 100%;
-        }
-
-        .btn-action {
-            flex: 1;
-            justify-content: center;
-        }
-
-        .info-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .summary-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .detail-table {
-            font-size: 0.9em;
-        }
-
-        .detail-table th,
-        .detail-table td {
-            padding: 8px;
-        }
-    }
-</style>
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">{{ supplier.name }}</h1>
+                {% if supplier.name_ar %}
+                    <p class="page-subtitle" dir="rtl">{{ supplier.name_ar }}</p>
+                {% else %}
+                    <p class="page-subtitle">{{ supplier.code }}</p>
+                {% endif %}
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'suppliers:edit' code=supplier.code %}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i>
+                    <span>Modifier</span>
+                </a>
+                <a href="{% url 'suppliers:delete' code=supplier.code %}" class="btn btn-error">
+                    <i class="fas fa-trash"></i>
+                    <span>Supprimer</span>
+                </a>
+                <a href="{% url 'suppliers:list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block content %}
-<div class="detail-container">
-    <div class="detail-wrapper">
-        <!-- Messages -->
-        {% if messages %}
-            {% for message in messages %}
-                <div class="mb-6 p-4 {% if message.tags %}bg-{{ message.tags }}-100 text-{{ message.tags }}-800{% else %}bg-blue-100 text-blue-800{% endif %} rounded-lg">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-
-        <!-- Header Card -->
-        <div class="detail-header">
-            <div class="detail-header-top">
-                <div class="detail-header-title">
-                    <h1>{{ supplier.name }}</h1>
-                    {% if supplier.name_ar %}
-                        <div class="subtitle">{{ supplier.name_ar }}</div>
-                    {% endif %}
-                    <div class="detail-badges">
-                        <span class="badge badge-type">{{ supplier.get_supplier_type_display }}</span>
-                        <span class="badge {% if supplier.is_active %}badge-active{% else %}badge-inactive{% endif %}">
-                            {% if supplier.is_active %}Actif{% else %}Inactif{% endif %}
-                        </span>
-                    </div>
-                </div>
-                <div class="detail-actions">
-                    <a href="{% url 'suppliers:edit' code=supplier.code %}" class="btn-action btn-primary">
-                        <i class="fas fa-edit"></i> Éditer
-                    </a>
-                    <a href="{% url 'suppliers:delete' code=supplier.code %}" class="btn-action btn-danger">
-                        <i class="fas fa-trash"></i> Supprimer
-                    </a>
-                    <a href="{% url 'suppliers:list' %}" class="btn-action btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Retour
-                    </a>
-                </div>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} mb-4 animate-slide-up">
+                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                {{ message }}
             </div>
+        {% endfor %}
+    {% endif %}
 
+    <div class="detail-layout">
+        <!-- Main Content -->
+        <div class="detail-main">
             <!-- Basic Information -->
-            <div class="info-grid">
-                <div class="info-item">
-                    <span class="info-label"><i class="fas fa-barcode"></i> Code</span>
-                    <span class="info-value">{{ supplier.code }}</span>
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle mr-2"></i> Informations du Fournisseur</h3>
                 </div>
-
-                {% if supplier.contact_person %}
-                    <div class="info-item">
-                        <span class="info-label"><i class="fas fa-user"></i> Contact</span>
-                        <span class="info-value">{{ supplier.contact_person }}</span>
-                    </div>
-                {% endif %}
-
-                {% if supplier.phone %}
-                    <div class="info-item">
-                        <span class="info-label"><i class="fas fa-phone"></i> Téléphone</span>
-                        <span class="info-value"><a href="tel:{{ supplier.phone }}" style="color: #2563eb; text-decoration: none;">{{ supplier.phone }}</a></span>
-                    </div>
-                {% endif %}
-
-                {% if supplier.phone_2 %}
-                    <div class="info-item">
-                        <span class="info-label"><i class="fas fa-phone"></i> Téléphone 2</span>
-                        <span class="info-value"><a href="tel:{{ supplier.phone_2 }}" style="color: #2563eb; text-decoration: none;">{{ supplier.phone_2 }}</a></span>
-                    </div>
-                {% endif %}
-
-                {% if supplier.email %}
-                    <div class="info-item">
-                        <span class="info-label"><i class="fas fa-envelope"></i> Email</span>
-                        <span class="info-value"><a href="mailto:{{ supplier.email }}" style="color: #2563eb; text-decoration: none;">{{ supplier.email }}</a></span>
-                    </div>
-                {% endif %}
-
-                {% if supplier.city %}
-                    <div class="info-item">
-                        <span class="info-label"><i class="fas fa-map-marker-alt"></i> Ville</span>
-                        <span class="info-value">{{ supplier.city }}</span>
-                    </div>
-                {% endif %}
-
-                {% if supplier.specialty %}
-                    <div class="info-item">
-                        <span class="info-label"><i class="fas fa-star"></i> Spécialité</span>
-                        <span class="info-value">{{ supplier.specialty }}</span>
-                    </div>
-                {% endif %}
-
-                {% if supplier.credit_limit %}
-                    <div class="info-item">
-                        <span class="info-label"><i class="fas fa-credit-card"></i> Limite de Crédit</span>
-                        <span class="info-value currency">{{ supplier.credit_limit|floatformat:2 }} DH</span>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Summary Section -->
-        <div class="detail-card">
-            <h2 class="card-title"><i class="fas fa-chart-bar"></i> Résumé Financier</h2>
-            <div class="summary-grid">
-                <div class="summary-box highlight">
-                    <div class="summary-label">Total Achats</div>
-                    <div class="summary-value currency">{{ total_purchases|floatformat:2 }} DH</div>
-                </div>
-                <div class="summary-box highlight">
-                    <div class="summary-label">Total Paiements</div>
-                    <div class="summary-value currency">{{ total_payments|floatformat:2 }} DH</div>
-                </div>
-                <div class="summary-box">
-                    <div class="summary-label">Solde</div>
-                    <div class="summary-value currency" style="{% if balance > 0 %}color: #dc2626;{% else %}color: #059669;{% endif %}">
-                        {{ balance|floatformat:2 }} DH
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Code</span>
+                            <span class="info-value font-mono">{{ supplier.code }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Type</span>
+                            <span class="info-value">{{ supplier.get_supplier_type_display }}</span>
+                        </div>
+                        {% if supplier.contact_person %}
+                        <div class="info-item">
+                            <span class="info-label">Contact</span>
+                            <span class="info-value">{{ supplier.contact_person }}</span>
+                        </div>
+                        {% endif %}
+                        {% if supplier.specialty %}
+                        <div class="info-item">
+                            <span class="info-label">Specialite</span>
+                            <span class="info-value">{{ supplier.specialty }}</span>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Purchases Section -->
-        <div class="detail-card">
-            <h2 class="card-title"><i class="fas fa-file-invoice"></i> Derniers Achats ({{ purchases|length }})</h2>
-            {% if purchases %}
-                <div class="table-container">
-                    <table class="detail-table">
-                        <thead>
-                            <tr>
-                                <th>Référence</th>
-                                <th>Date</th>
-                                <th>Montant (DH)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+            <!-- Contact Information -->
+            <div class="card animate-slide-up" style="animation-delay: 50ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-phone mr-2"></i> Contact</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        {% if supplier.phone %}
+                        <div class="info-item">
+                            <span class="info-label">Telephone</span>
+                            <a href="tel:{{ supplier.phone }}" class="info-value info-link">{{ supplier.phone }}</a>
+                        </div>
+                        {% endif %}
+                        {% if supplier.phone_2 %}
+                        <div class="info-item">
+                            <span class="info-label">Telephone 2</span>
+                            <a href="tel:{{ supplier.phone_2 }}" class="info-value info-link">{{ supplier.phone_2 }}</a>
+                        </div>
+                        {% endif %}
+                        {% if supplier.email %}
+                        <div class="info-item">
+                            <span class="info-label">Email</span>
+                            <a href="mailto:{{ supplier.email }}" class="info-value info-link">{{ supplier.email }}</a>
+                        </div>
+                        {% endif %}
+                        {% if supplier.city %}
+                        <div class="info-item">
+                            <span class="info-label">Ville</span>
+                            <span class="info-value">{{ supplier.city }}</span>
+                        </div>
+                        {% endif %}
+                        {% if supplier.address %}
+                        <div class="info-item info-item-full">
+                            <span class="info-label">Adresse</span>
+                            <span class="info-value">{{ supplier.address }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Financial Summary -->
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-bar mr-2"></i> Resume Financier</h3>
+                </div>
+                <div class="card-body">
+                    <div class="stats-grid">
+                        <div class="stat-box stat-box-success">
+                            <div class="stat-icon">
+                                <i class="fas fa-shopping-cart"></i>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value">{{ total_purchases|floatformat:2 }} DH</span>
+                                <span class="stat-label">Total Achats</span>
+                            </div>
+                        </div>
+                        <div class="stat-box stat-box-info">
+                            <div class="stat-icon">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value">{{ total_payments|floatformat:2 }} DH</span>
+                                <span class="stat-label">Total Paiements</span>
+                            </div>
+                        </div>
+                        <div class="stat-box {% if balance > 0 %}stat-box-error{% else %}stat-box-success{% endif %}">
+                            <div class="stat-icon">
+                                <i class="fas fa-balance-scale"></i>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value">{{ balance|floatformat:2 }} DH</span>
+                                <span class="stat-label">Solde</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Purchases Table -->
+            <div class="card animate-slide-up" style="animation-delay: 150ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-file-invoice mr-2"></i> Derniers Achats</h3>
+                    <span class="badge badge-neutral">{{ purchases|length }}</span>
+                </div>
+                {% if purchases %}
+                    <!-- Desktop View -->
+                    <div class="desktop-view">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Reference</th>
+                                        <th>Date</th>
+                                        <th class="text-right">Montant</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for purchase in purchases %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'purchases:purchase_invoice_detail' reference=purchase.reference %}" class="table-link">
+                                                    {{ purchase.reference }}
+                                                </a>
+                                            </td>
+                                            <td class="text-muted">{{ purchase.created_at|date:"d/m/Y H:i" }}</td>
+                                            <td class="text-right font-mono font-semibold">{{ purchase.total_amount|floatformat:2 }} DH</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Mobile View -->
+                    <div class="mobile-view">
+                        <div class="mobile-list">
                             {% for purchase in purchases %}
-                                <tr>
-                                    <td>
-                                        <a href="{% url 'purchases:invoice_detail' reference=purchase.reference %}" style="color: #2563eb; text-decoration: none;">
-                                            {{ purchase.reference }}
-                                        </a>
-                                    </td>
-                                    <td class="date">{{ purchase.created_at|date:"d/m/Y H:i" }}</td>
-                                    <td class="currency">{{ purchase.total_amount|floatformat:2 }}</td>
-                                </tr>
+                                <a href="{% url 'purchases:purchase_invoice_detail' reference=purchase.reference %}" class="mobile-card">
+                                    <div class="mobile-card-header">
+                                        <span class="mobile-card-title">{{ purchase.reference }}</span>
+                                        <span class="mobile-card-amount">{{ purchase.total_amount|floatformat:2 }} DH</span>
+                                    </div>
+                                    <div class="mobile-card-meta">
+                                        <span><i class="fas fa-calendar"></i> {{ purchase.created_at|date:"d/m/Y" }}</span>
+                                    </div>
+                                </a>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="no-data">
-                    <i class="fas fa-inbox"></i>
-                    <p>Aucun achat enregistré</p>
-                </div>
-            {% endif %}
-        </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>Aucun achat enregistre</p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
 
-        <!-- Consignments Section -->
-        <div class="detail-card">
-            <h2 class="card-title"><i class="fas fa-boxes"></i> Consignations ({{ consignments|length }})</h2>
-            {% if consignments %}
-                <div class="table-container">
-                    <table class="detail-table">
-                        <thead>
-                            <tr>
-                                <th>Référence</th>
-                                <th>Date</th>
-                                <th>Montant (DH)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+            <!-- Consignments Table -->
+            <div class="card animate-slide-up" style="animation-delay: 200ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-boxes mr-2"></i> Consignations</h3>
+                    <span class="badge badge-neutral">{{ consignments|length }}</span>
+                </div>
+                {% if consignments %}
+                    <!-- Desktop View -->
+                    <div class="desktop-view">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Reference</th>
+                                        <th>Date</th>
+                                        <th class="text-right">Montant</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for consignment in consignments %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'purchases:consignment_detail' reference=consignment.reference %}" class="table-link">
+                                                    {{ consignment.reference }}
+                                                </a>
+                                            </td>
+                                            <td class="text-muted">{{ consignment.created_at|date:"d/m/Y H:i" }}</td>
+                                            <td class="text-right font-mono font-semibold">{{ consignment.total_amount|floatformat:2 }} DH</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Mobile View -->
+                    <div class="mobile-view">
+                        <div class="mobile-list">
                             {% for consignment in consignments %}
-                                <tr>
-                                    <td>{{ consignment.reference }}</td>
-                                    <td class="date">{{ consignment.created_at|date:"d/m/Y H:i" }}</td>
-                                    <td class="currency">{{ consignment.total_amount|floatformat:2 }}</td>
-                                </tr>
+                                <a href="{% url 'purchases:consignment_detail' reference=consignment.reference %}" class="mobile-card">
+                                    <div class="mobile-card-header">
+                                        <span class="mobile-card-title">{{ consignment.reference }}</span>
+                                        <span class="mobile-card-amount">{{ consignment.total_amount|floatformat:2 }} DH</span>
+                                    </div>
+                                    <div class="mobile-card-meta">
+                                        <span><i class="fas fa-calendar"></i> {{ consignment.created_at|date:"d/m/Y" }}</span>
+                                    </div>
+                                </a>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="no-data">
-                    <i class="fas fa-inbox"></i>
-                    <p>Aucune consignation enregistrée</p>
-                </div>
-            {% endif %}
-        </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>Aucune consignation enregistree</p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
 
-        <!-- Payments Section -->
-        <div class="detail-card">
-            <h2 class="card-title"><i class="fas fa-coins"></i> Derniers Paiements ({{ payments|length }})</h2>
-            {% if payments %}
-                <div class="table-container">
-                    <table class="detail-table">
-                        <thead>
-                            <tr>
-                                <th>Référence</th>
-                                <th>Date</th>
-                                <th>Montant (DH)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+            <!-- Payments Table -->
+            <div class="card animate-slide-up" style="animation-delay: 250ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-coins mr-2"></i> Derniers Paiements</h3>
+                    <span class="badge badge-neutral">{{ payments|length }}</span>
+                </div>
+                {% if payments %}
+                    <!-- Desktop View -->
+                    <div class="desktop-view">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Reference</th>
+                                        <th>Date</th>
+                                        <th class="text-right">Montant</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for payment in payments %}
+                                        <tr>
+                                            <td class="font-mono">{{ payment.reference }}</td>
+                                            <td class="text-muted">{{ payment.payment_date|date:"d/m/Y" }}</td>
+                                            <td class="text-right font-mono font-semibold text-success">{{ payment.amount|floatformat:2 }} DH</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Mobile View -->
+                    <div class="mobile-view">
+                        <div class="mobile-list">
                             {% for payment in payments %}
-                                <tr>
-                                    <td>{{ payment.reference }}</td>
-                                    <td class="date">{{ payment.payment_date|date:"d/m/Y" }}</td>
-                                    <td class="currency">{{ payment.amount|floatformat:2 }}</td>
-                                </tr>
+                                <div class="mobile-card">
+                                    <div class="mobile-card-header">
+                                        <span class="mobile-card-title">{{ payment.reference }}</span>
+                                        <span class="mobile-card-amount text-success">{{ payment.amount|floatformat:2 }} DH</span>
+                                    </div>
+                                    <div class="mobile-card-meta">
+                                        <span><i class="fas fa-calendar"></i> {{ payment.payment_date|date:"d/m/Y" }}</span>
+                                    </div>
+                                </div>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="no-data">
-                    <i class="fas fa-inbox"></i>
-                    <p>Aucun paiement enregistré</p>
-                </div>
-            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>Aucun paiement enregistre</p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
         </div>
 
-        <!-- Bank Accounts Section -->
-        {% if bank_accounts %}
-            <div class="detail-card">
-                <h2 class="card-title"><i class="fas fa-university"></i> Comptes Bancaires</h2>
-                <div class="info-grid">
-                    {% for account in bank_accounts %}
-                        <div style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 6px;">
-                            <div class="info-label">{{ account.bank_name }}</div>
-                            <div class="info-value">{{ account.account_number }}</div>
-                            {% if account.is_default %}
-                                <span class="badge badge-active" style="margin-top: 8px;">Compte Par Défaut</span>
+        <!-- Sidebar -->
+        <div class="detail-sidebar">
+            <!-- Status Card -->
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle mr-2"></i> Statut</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Statut</span>
+                            {% if supplier.is_active %}
+                                <span class="badge badge-success">Actif</span>
+                            {% else %}
+                                <span class="badge badge-error">Inactif</span>
                             {% endif %}
                         </div>
-                    {% endfor %}
+                        <div class="status-item">
+                            <span class="status-label">Type</span>
+                            <span class="badge badge-primary">{{ supplier.get_supplier_type_display }}</span>
+                        </div>
+                        {% if supplier.credit_limit %}
+                        <div class="status-item">
+                            <span class="status-label">Limite Credit</span>
+                            <span class="status-value font-mono">{{ supplier.credit_limit|floatformat:2 }} DH</span>
+                        </div>
+                        {% endif %}
+                        {% if supplier.payment_terms %}
+                        <div class="status-item">
+                            <span class="status-label">Conditions</span>
+                            <span class="status-value">{{ supplier.payment_terms }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-        {% endif %}
+
+            <!-- Business Info -->
+            {% if supplier.ice or supplier.rc %}
+            <div class="card animate-slide-up" style="animation-delay: 50ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-briefcase mr-2"></i> Informations Legales</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        {% if supplier.ice %}
+                        <div class="status-item">
+                            <span class="status-label">ICE</span>
+                            <span class="status-value font-mono">{{ supplier.ice }}</span>
+                        </div>
+                        {% endif %}
+                        {% if supplier.rc %}
+                        <div class="status-item">
+                            <span class="status-label">RC</span>
+                            <span class="status-value font-mono">{{ supplier.rc }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Bank Accounts -->
+            {% if bank_accounts %}
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-university mr-2"></i> Comptes Bancaires</h3>
+                </div>
+                <div class="card-body">
+                    <div class="bank-list">
+                        {% for account in bank_accounts %}
+                            <div class="bank-item">
+                                <div class="bank-name">{{ account.bank_name }}</div>
+                                <div class="bank-number font-mono">{{ account.account_number }}</div>
+                                {% if account.is_default %}
+                                    <span class="badge badge-success badge-sm">Par defaut</span>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Notes -->
+            {% if supplier.notes %}
+            <div class="card animate-slide-up" style="animation-delay: 150ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-sticky-note mr-2"></i> Notes</h3>
+                </div>
+                <div class="card-body">
+                    <p class="notes-text">{{ supplier.notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Dates -->
+            <div class="card animate-slide-up" style="animation-delay: 200ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-clock mr-2"></i> Historique</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Cree le</span>
+                            <span class="status-value">{{ supplier.created_at|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Modifie le</span>
+                            <span class="status-value">{{ supplier.updated_at|date:"d/m/Y H:i" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+
+    <style>
+        /* Detail Layout */
+        .detail-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: var(--space-6);
+        }
+
+        .detail-main {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        .detail-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        /* Info Grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .info-item-full {
+            grid-column: 1 / -1;
+        }
+
+        .info-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .info-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+        }
+
+        .info-link {
+            color: var(--primary-600);
+            text-decoration: none;
+        }
+
+        .info-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-4);
+        }
+
+        .stat-box {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-4);
+            border-radius: var(--radius-lg);
+            background: var(--neutral-50);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .stat-box-success {
+            background: var(--success-50);
+            border-color: var(--success-200);
+        }
+
+        .stat-box-success .stat-icon {
+            background: var(--success-100);
+            color: var(--success-600);
+        }
+
+        .stat-box-info {
+            background: var(--info-50);
+            border-color: var(--info-200);
+        }
+
+        .stat-box-info .stat-icon {
+            background: var(--info-100);
+            color: var(--info-600);
+        }
+
+        .stat-box-error {
+            background: var(--error-50);
+            border-color: var(--error-200);
+        }
+
+        .stat-box-error .stat-icon {
+            background: var(--error-100);
+            color: var(--error-600);
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--text-lg);
+            background: var(--neutral-100);
+            color: var(--neutral-600);
+            flex-shrink: 0;
+        }
+
+        .stat-content {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+            min-width: 0;
+        }
+
+        .stat-value {
+            font-size: var(--text-lg);
+            font-weight: var(--font-bold);
+            color: var(--neutral-800);
+            font-family: var(--font-mono);
+        }
+
+        .stat-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Status List */
+        .status-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .status-item:last-child {
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .status-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .status-value {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+        }
+
+        /* Bank List */
+        .bank-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .bank-item {
+            padding: var(--space-3);
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .bank-name {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+            margin-bottom: var(--space-1);
+        }
+
+        .bank-number {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+            margin-bottom: var(--space-2);
+        }
+
+        /* Notes */
+        .notes-text {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        /* Data Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: var(--neutral-50);
+            border-bottom: 2px solid var(--neutral-200);
+        }
+
+        .data-table th {
+            padding: var(--space-3) var(--space-4);
+            text-align: left;
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-600);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table td {
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--neutral-50);
+        }
+
+        .table-link {
+            color: var(--primary-600);
+            text-decoration: none;
+            font-weight: var(--font-medium);
+        }
+
+        .table-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-8);
+            color: var(--neutral-400);
+        }
+
+        .empty-state i {
+            font-size: var(--text-4xl);
+            margin-bottom: var(--space-3);
+        }
+
+        .empty-state p {
+            font-size: var(--text-sm);
+        }
+
+        /* Mobile List */
+        .mobile-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mobile-card {
+            display: block;
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+            text-decoration: none;
+            color: inherit;
+            transition: background var(--transition-fast);
+        }
+
+        .mobile-card:hover {
+            background: var(--neutral-50);
+        }
+
+        .mobile-card:last-child {
+            border-bottom: none;
+        }
+
+        .mobile-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-2);
+        }
+
+        .mobile-card-title {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .mobile-card-amount {
+            font-family: var(--font-mono);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .mobile-card-meta {
+            display: flex;
+            gap: var(--space-4);
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .mobile-card-meta i {
+            margin-right: var(--space-1);
+        }
+
+        /* Desktop/Mobile Views */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        /* Alert */
+        .alert {
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            font-size: var(--text-sm);
+        }
+
+        .alert-success {
+            background: var(--success-50);
+            color: var(--success-700);
+            border: 1px solid var(--success-200);
+        }
+
+        .alert-error {
+            background: var(--error-50);
+            color: var(--error-700);
+            border: 1px solid var(--error-200);
+        }
+
+        .alert-info {
+            background: var(--info-50);
+            color: var(--info-700);
+            border: 1px solid var(--info-200);
+        }
+
+        /* Utilities */
+        .font-mono {
+            font-family: var(--font-mono);
+        }
+
+        .font-semibold {
+            font-weight: var(--font-semibold);
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-muted {
+            color: var(--neutral-500);
+        }
+
+        .text-success {
+            color: var(--success-600);
+        }
+
+        .badge-sm {
+            font-size: var(--text-xs);
+            padding: 2px 8px;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .detail-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-sidebar {
+                order: -1;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+
+            .page-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .page-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
 {% endblock %}

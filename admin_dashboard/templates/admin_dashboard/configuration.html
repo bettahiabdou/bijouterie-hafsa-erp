@@ -1,150 +1,412 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<div class="space-y-6">
-    <div>
-        <h1 class="text-3xl font-bold text-gray-900">Configuration Système</h1>
-        <p class="text-gray-600 mt-2">Gérez toutes les 15 types de configurations du système</p>
-    </div>
+{% block title %}Configuration Systeme - Bijouterie Hafsa ERP{% endblock %}
 
-    <!-- Summary Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {% for config_key, config in all_configs.items %}
-        <div class="bg-white rounded-lg shadow p-4 hover:shadow-md transition cursor-pointer config-card" data-config="{{ config_key }}">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm">{{ config.label }}</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ config.count }}</p>
-                </div>
-                <button class="text-3xl text-blue-400 hover:text-blue-600 transition config-toggle">
-                    <i class="fas fa-chevron-down"></i>
-                </button>
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'admin_dashboard:home' %}" class="breadcrumb-item">Administration</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Configuration</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Configuration Systeme</h1>
+                <p class="page-subtitle">Gerez toutes les configurations du systeme</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'admin_dashboard:home' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
             </div>
         </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- Summary Cards Grid -->
+    <div class="config-grid mb-8 animate-stagger">
+        {% for config_key, config in all_configs.items %}
+            <div class="card config-card" data-config="{{ config_key }}">
+                <div class="card-body">
+                    <div class="config-card-content">
+                        <div class="config-card-info">
+                            <span class="config-card-label">{{ config.label }}</span>
+                            <span class="config-card-count">{{ config.count }}</span>
+                        </div>
+                        <button type="button" class="config-toggle btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
         {% endfor %}
     </div>
 
     <!-- Detailed Configuration Sections -->
-    <div class="space-y-4">
+    <div class="config-sections">
         {% for config_key, config in all_configs.items %}
-        <div class="bg-white rounded-lg shadow overflow-hidden config-section" id="section-{{ config_key }}" style="display: none;">
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">{{ config.label }}</h3>
-                    <p class="text-sm text-gray-600 mt-1">{{ config.count }} élément{{ config.count|pluralize }}</p>
-                </div>
-                <a href="{% url 'admin_dashboard:config_create' config_key %}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
-                    <i class="fas fa-plus"></i> Ajouter
-                </a>
-            </div>
-
-            <!-- Items List -->
-            <div class="divide-y max-h-64 overflow-y-auto">
-                {% if config.items %}
-                    {% for item in config.items %}
-                        <div class="px-6 py-3 flex items-center justify-between hover:bg-gray-50 transition">
-                            <div class="flex-1">
-                                <p class="text-gray-900 font-medium">{{ item }}</p>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <a href="{% url 'admin_dashboard:config_edit' config_key item.pk %}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm transition inline-flex items-center gap-1">
-                                    <i class="fas fa-edit fa-sm"></i> Éditer
-                                </a>
-                                <form method="POST" action="{% url 'admin_dashboard:config_delete' config_key item.pk %}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet élément?');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition inline-flex items-center gap-1">
-                                        <i class="fas fa-trash fa-sm"></i> Supprimer
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                <div class="px-6 py-8 text-center text-gray-500">
-                    <p><i class="fas fa-inbox text-3xl text-gray-300 mb-2 block"></i></p>
-                    <p>Aucun élément pour l'instant</p>
-                    <a href="{% url 'admin_dashboard:config_create' config_key %}" class="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-block">
-                        → Créer le premier
+            <div class="card config-section animate-slide-up" id="section-{{ config_key }}" style="display: none;">
+                <div class="card-header">
+                    <div>
+                        <h3>{{ config.label }}</h3>
+                        <span class="badge badge-neutral">{{ config.count }} element{{ config.count|pluralize }}</span>
+                    </div>
+                    <a href="{% url 'admin_dashboard:config_create' config_key %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i>
+                        <span>Ajouter</span>
                     </a>
                 </div>
-                {% endif %}
+
+                <!-- Desktop View -->
+                <div class="desktop-view">
+                    {% if config.items %}
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nom</th>
+                                        <th style="text-align: right; width: 200px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in config.items %}
+                                        <tr>
+                                            <td class="font-medium">{{ item }}</td>
+                                            <td style="text-align: right;">
+                                                <div class="table-actions">
+                                                    <a href="{% url 'admin_dashboard:config_edit' config_key item.pk %}" class="btn btn-secondary btn-sm">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <form method="POST" action="{% url 'admin_dashboard:config_delete' config_key item.pk %}" style="display: inline;" onsubmit="return confirm('Etes-vous sur de vouloir supprimer cet element?');">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-error btn-sm">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="card-body">
+                            <div class="empty-state">
+                                <i class="fas fa-inbox"></i>
+                                <p>Aucun element pour l'instant</p>
+                                <a href="{% url 'admin_dashboard:config_create' config_key %}" class="btn btn-primary btn-sm" style="margin-top: var(--space-3);">
+                                    <i class="fas fa-plus"></i> Creer le premier
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Mobile View -->
+                <div class="mobile-view">
+                    {% if config.items %}
+                        <div class="mobile-list">
+                            {% for item in config.items %}
+                                <div class="mobile-config-item">
+                                    <span class="mobile-config-name">{{ item }}</span>
+                                    <div class="mobile-config-actions">
+                                        <a href="{% url 'admin_dashboard:config_edit' config_key item.pk %}" class="btn btn-secondary btn-sm">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="{% url 'admin_dashboard:config_delete' config_key item.pk %}" style="display: inline;" onsubmit="return confirm('Supprimer cet element?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-error btn-sm">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="card-body">
+                            <div class="empty-state">
+                                <i class="fas fa-inbox"></i>
+                                <p>Aucun element</p>
+                                <a href="{% url 'admin_dashboard:config_create' config_key %}" class="btn btn-primary btn-sm" style="margin-top: var(--space-3);">
+                                    <i class="fas fa-plus"></i> Creer
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-        </div>
         {% endfor %}
     </div>
 
     <!-- Info Alert -->
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
-        <div class="flex-shrink-0">
-            <i class="fas fa-info-circle text-blue-600 text-lg mt-0.5"></i>
-        </div>
+    <div class="alert alert-info mt-8 animate-slide-up">
+        <i class="fas fa-info-circle"></i>
         <div>
-            <h3 class="text-blue-900 font-semibold">Système de Configuration Unifié</h3>
-            <p class="text-blue-800 text-sm mt-1">
-                Toutes les configurations système sont centralisées ici. Ce tableau de bord remplace le système Django Admin ancien et offre une interface mobile-responsive pour gérer les 15 types de configurations différentes.
+            <strong>Systeme de Configuration Unifie</strong>
+            <p style="margin-top: var(--space-1); font-size: var(--text-sm);">
+                Toutes les configurations systeme sont centralisees ici. Cliquez sur une carte pour voir et gerer ses elements.
             </p>
         </div>
     </div>
-</div>
 
-<style>
-    .max-h-64 {
-        max-height: 256px;
-    }
-    .overflow-y-auto {
-        overflow-y: auto;
-    }
-    .config-section {
-        animation: slideDown 0.3s ease-out;
-    }
-    @keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
+    <style>
+        /* Config Grid */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-4);
         }
-        to {
-            opacity: 1;
-            transform: translateY(0);
+
+        .config-card {
+            cursor: pointer;
+            transition: all var(--transition-base);
         }
-    }
-</style>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Get all config cards
-    const configCards = document.querySelectorAll('.config-card');
+        .config-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
 
-    configCards.forEach(card => {
-        card.addEventListener('click', function(e) {
-            // Don't trigger if clicking on the button
-            if (e.target.closest('.config-toggle')) return;
+        .config-card.active {
+            border-color: var(--primary-400);
+            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
+        }
 
-            const configKey = this.getAttribute('data-config');
-            const section = document.getElementById('section-' + configKey);
-            const toggle = this.querySelector('.config-toggle i');
+        .config-card-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
 
-            if (section.style.display === 'none') {
-                section.style.display = 'block';
-                toggle.classList.remove('fa-chevron-down');
-                toggle.classList.add('fa-chevron-up');
-                // Scroll to section
-                setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-            } else {
-                section.style.display = 'none';
-                toggle.classList.remove('fa-chevron-up');
-                toggle.classList.add('fa-chevron-down');
+        .config-card-info {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .config-card-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .config-card-count {
+            font-size: var(--text-2xl);
+            font-weight: var(--font-bold);
+            color: var(--neutral-800);
+        }
+
+        .config-toggle {
+            color: var(--primary-500);
+            transition: transform var(--transition-fast);
+        }
+
+        .config-card.active .config-toggle {
+            transform: rotate(180deg);
+        }
+
+        /* Config Sections */
+        .config-sections {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .config-section {
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
             }
-        });
-
-        // Also handle direct button clicks
-        const toggleBtn = card.querySelector('.config-toggle');
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                card.click();
-            });
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
-    });
-});
-</script>
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: var(--neutral-50);
+            border-bottom: 2px solid var(--neutral-200);
+            position: sticky;
+            top: 0;
+        }
+
+        .data-table th {
+            padding: var(--space-3) var(--space-4);
+            text-align: left;
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-600);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table td {
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--neutral-50);
+        }
+
+        .table-actions {
+            display: flex;
+            gap: var(--space-2);
+            justify-content: flex-end;
+        }
+
+        /* Mobile List */
+        .mobile-list {
+            display: flex;
+            flex-direction: column;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .mobile-config-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .mobile-config-item:last-child {
+            border-bottom: none;
+        }
+
+        .mobile-config-name {
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+        }
+
+        .mobile-config-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-8);
+            color: var(--neutral-400);
+        }
+
+        .empty-state i {
+            font-size: var(--text-3xl);
+            margin-bottom: var(--space-2);
+            display: block;
+        }
+
+        .empty-state p {
+            font-size: var(--text-sm);
+        }
+
+        /* Alert */
+        .alert {
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            display: flex;
+            gap: var(--space-3);
+            font-size: var(--text-sm);
+        }
+
+        .alert-info {
+            background: var(--info-50);
+            color: var(--info-700);
+            border: 1px solid var(--info-200);
+        }
+
+        .alert i {
+            font-size: var(--text-lg);
+            flex-shrink: 0;
+        }
+
+        /* Desktop/Mobile Views */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .config-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const configCards = document.querySelectorAll('.config-card');
+
+            configCards.forEach(card => {
+                card.addEventListener('click', function(e) {
+                    const configKey = this.getAttribute('data-config');
+                    const section = document.getElementById('section-' + configKey);
+
+                    // Close all other sections
+                    document.querySelectorAll('.config-section').forEach(s => {
+                        if (s.id !== 'section-' + configKey) {
+                            s.style.display = 'none';
+                        }
+                    });
+
+                    // Remove active from all cards
+                    configCards.forEach(c => c.classList.remove('active'));
+
+                    // Toggle current section
+                    if (section.style.display === 'none') {
+                        section.style.display = 'block';
+                        this.classList.add('active');
+                        // Scroll to section
+                        setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                    } else {
+                        section.style.display = 'none';
+                        this.classList.remove('active');
+                    }
+                });
+            });
+        });
+    </script>
 {% endblock %}

@@ -3,174 +3,464 @@
 {% block title %}{{ quote.reference }} - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'quotes:quote_list' %}">Devis</a>
-    <span>/</span>
-    <span>{{ quote.reference }}</span>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'quotes:quote_list' %}" class="breadcrumb-item">Devis</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ quote.reference }}</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">{{ quote.reference }}</h1>
-            <p class="text-gray-600 mt-1">Émis le {{ quote.issued_date|date:"d F Y" }}</p>
-        </div>
-        <div class="space-x-2">
-            <a href="{% url 'quotes:quote_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-                <i class="fas fa-arrow-left mr-2"></i> Retour
-            </a>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">{{ quote.reference }}</h1>
+                <p class="page-subtitle">Emis le {{ quote.issued_date|date:"d F Y" }}</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'quotes:quote_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
         </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="detail-layout">
         <!-- Main Content -->
-        <div class="lg:col-span-2 space-y-6">
+        <div class="detail-main">
             <!-- Client Info -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Client</h2>
-                <div class="space-y-2">
-                    <p class="text-gray-900 font-bold text-lg">{{ quote.client.first_name }} {{ quote.client.last_name }}</p>
-                    <p class="text-gray-600">{{ quote.client.email }}</p>
-                    <p class="text-gray-600">{{ quote.client.phone }}</p>
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-user mr-2"></i> Client</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Nom</span>
+                            <span class="info-value font-semibold">{{ quote.client.first_name }} {{ quote.client.last_name }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Email</span>
+                            <span class="info-value">{{ quote.client.email|default:"-" }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Telephone</span>
+                            <span class="info-value">{{ quote.client.phone|default:"-" }}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Items Table -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Articles</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 border-b">
-                            <tr>
-                                <th class="px-4 py-2 text-left">Description</th>
-                                <th class="px-4 py-2 text-right">Quantité</th>
-                                <th class="px-4 py-2 text-right">Prix Unitaire</th>
-                                <th class="px-4 py-2 text-right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y">
-                            {% for item in items %}
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-2">{{ item.description }}</td>
-                                    <td class="px-4 py-2 text-right">{{ item.quantity }}</td>
-                                    <td class="px-4 py-2 text-right">{{ item.unit_price_dh }} DH</td>
-                                    <td class="px-4 py-2 text-right font-bold">{{ item.line_total_dh }} DH</td>
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-list mr-2"></i> Articles</h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <!-- Desktop Table -->
+                    <div class="table-wrapper desktop-view" style="border: none; border-radius: 0;">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th style="text-align: right;">Quantite</th>
+                                    <th style="text-align: right;">Prix Unitaire</th>
+                                    <th style="text-align: right;">Total</th>
                                 </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                    <tr>
+                                        <td>{{ item.description }}</td>
+                                        <td style="text-align: right;">{{ item.quantity }}</td>
+                                        <td style="text-align: right;">{{ item.unit_price_dh }} DH</td>
+                                        <td style="text-align: right;" class="font-semibold">{{ item.line_total_dh }} DH</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Aucun article</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Mobile Cards -->
+                    <div class="mobile-view" style="padding: var(--space-4);">
+                        {% for item in items %}
+                            <div class="item-card">
+                                <div class="item-card-header">
+                                    <span class="item-card-title">{{ item.description }}</span>
+                                </div>
+                                <div class="item-card-details">
+                                    <div class="item-detail">
+                                        <span class="item-detail-label">Quantite</span>
+                                        <span class="item-detail-value">{{ item.quantity }}</span>
+                                    </div>
+                                    <div class="item-detail">
+                                        <span class="item-detail-label">Prix Unit.</span>
+                                        <span class="item-detail-value">{{ item.unit_price_dh }} DH</span>
+                                    </div>
+                                    <div class="item-detail">
+                                        <span class="item-detail-label">Total</span>
+                                        <span class="item-detail-value font-semibold">{{ item.line_total_dh }} DH</span>
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <p class="text-center text-muted">Aucun article</p>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
 
             <!-- Description -->
             {% if quote.description %}
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h2 class="text-lg font-bold text-gray-900 mb-4">Description</h2>
-                    <p class="text-gray-700">{{ quote.description }}</p>
+                <div class="card animate-slide-up" style="animation-delay: 150ms;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-align-left mr-2"></i> Description</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="notes-text">{{ quote.description }}</p>
+                    </div>
                 </div>
             {% endif %}
         </div>
 
         <!-- Sidebar -->
-        <div class="space-y-6">
+        <div class="detail-sidebar">
             <!-- Status -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Statut</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Statut:</span>
-                        <span class="inline-block px-3 py-1 rounded-full text-sm font-medium
-                            {% if quote.status == 'draft' %}bg-gray-100 text-gray-800
-                            {% elif quote.status == 'sent' %}bg-blue-100 text-blue-800
-                            {% elif quote.status == 'accepted' %}bg-green-100 text-green-800
-                            {% elif quote.status == 'rejected' %}bg-red-100 text-red-800
-                            {% elif quote.status == 'expired' %}bg-yellow-100 text-yellow-800
-                            {% elif quote.status == 'converted' %}bg-purple-100 text-purple-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ quote.get_status_display }}
-                        </span>
+            <div class="card animate-slide-up" style="animation-delay: 200ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle mr-2"></i> Statut</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Statut</span>
+                            <span class="badge {% if quote.status == 'draft' %}badge-neutral{% elif quote.status == 'sent' %}badge-info{% elif quote.status == 'accepted' %}badge-success{% elif quote.status == 'rejected' %}badge-error{% elif quote.status == 'expired' %}badge-warning{% elif quote.status == 'converted' %}badge-accent{% else %}badge-neutral{% endif %}">
+                                {{ quote.get_status_display }}
+                            </span>
+                        </div>
                     </div>
                     {% if is_expired %}
-                        <div class="text-red-600 text-sm">⚠️ Devis expiré</div>
+                        <div class="alert alert-error mt-3">
+                            <i class="fas fa-exclamation-triangle"></i> Devis expire
+                        </div>
                     {% elif days_until_expiry <= 3 %}
-                        <div class="text-orange-600 text-sm">⚠️ Expire dans {{ days_until_expiry }} jour(s)</div>
+                        <div class="alert alert-warning mt-3">
+                            <i class="fas fa-clock"></i> Expire dans {{ days_until_expiry }} jour(s)
+                        </div>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Validity -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Validité</h3>
-                <div class="space-y-3 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Émis le:</span>
-                        <span class="font-medium">{{ quote.issued_date|date:"d/m/Y" }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Valide jusqu'au:</span>
-                        <span class="font-medium">{{ quote.valid_until_date|date:"d/m/Y" }}</span>
+            <div class="card animate-slide-up" style="animation-delay: 250ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-calendar mr-2"></i> Validite</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Emis le</span>
+                            <span class="status-value">{{ quote.issued_date|date:"d/m/Y" }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Valide jusqu'au</span>
+                            <span class="status-value">{{ quote.valid_until_date|date:"d/m/Y" }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Totals -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Totaux</h3>
-                <div class="space-y-3 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Sous-total:</span>
-                        <span class="font-medium">{{ quote.subtotal_dh }} DH</span>
-                    </div>
-                    {% if quote.discount_amount_dh > 0 %}
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Remise:</span>
-                            <span class="font-medium text-red-600">-{{ quote.discount_amount_dh }} DH</span>
+            <div class="card animate-slide-up" style="animation-delay: 300ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-calculator mr-2"></i> Totaux</h3>
+                </div>
+                <div class="card-body">
+                    <div class="totals-list">
+                        <div class="total-row">
+                            <span>Sous-total</span>
+                            <span>{{ quote.subtotal_dh }} DH</span>
                         </div>
-                    {% endif %}
-                    {% if quote.tax_amount_dh > 0 %}
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Taxe:</span>
-                            <span class="font-medium">+{{ quote.tax_amount_dh }} DH</span>
+                        {% if quote.discount_amount_dh > 0 %}
+                            <div class="total-row">
+                                <span>Remise</span>
+                                <span class="text-error">-{{ quote.discount_amount_dh }} DH</span>
+                            </div>
+                        {% endif %}
+                        {% if quote.tax_amount_dh > 0 %}
+                            <div class="total-row">
+                                <span>Taxe</span>
+                                <span>+{{ quote.tax_amount_dh }} DH</span>
+                            </div>
+                        {% endif %}
+                        <div class="total-row total-final">
+                            <span>Total</span>
+                            <span class="text-success">{{ quote.total_amount_dh }} DH</span>
                         </div>
-                    {% endif %}
-                    <hr>
-                    <div class="flex justify-between text-lg font-bold">
-                        <span>Total:</span>
-                        <span class="text-green-600">{{ quote.total_amount_dh }} DH</span>
                     </div>
                 </div>
             </div>
 
             <!-- Actions -->
             {% if quote.status in 'draft,sent,accepted' %}
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-                    <form method="post" class="space-y-2">
-                        {% csrf_token %}
-                        {% if quote.status == 'draft' %}
-                            <button type="submit" name="action" value="send" class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm">
-                                <i class="fas fa-paper-plane mr-1"></i> Envoyer
-                            </button>
-                        {% elif quote.status == 'sent' %}
-                            <button type="submit" name="action" value="accept" class="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg text-sm">
-                                <i class="fas fa-check mr-1"></i> Accepter
-                            </button>
-                            <button type="submit" name="action" value="reject" class="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-sm">
-                                <i class="fas fa-times mr-1"></i> Rejeter
-                            </button>
-                        {% endif %}
-                    </form>
+                <div class="card animate-slide-up" style="animation-delay: 350ms;">
+                    <div class="card-body">
+                        <form method="post" class="action-buttons">
+                            {% csrf_token %}
+                            {% if quote.status == 'draft' %}
+                                <button type="submit" name="action" value="send" class="btn btn-info btn-block">
+                                    <i class="fas fa-paper-plane"></i>
+                                    <span>Envoyer</span>
+                                </button>
+                            {% elif quote.status == 'sent' %}
+                                <button type="submit" name="action" value="accept" class="btn btn-success btn-block">
+                                    <i class="fas fa-check"></i>
+                                    <span>Accepter</span>
+                                </button>
+                                <button type="submit" name="action" value="reject" class="btn btn-error btn-block">
+                                    <i class="fas fa-times"></i>
+                                    <span>Rejeter</span>
+                                </button>
+                            {% endif %}
+                        </form>
+                    </div>
                 </div>
             {% endif %}
 
             <!-- Notes -->
             {% if quote.notes %}
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-lg font-bold text-gray-900 mb-4">Notes</h3>
-                    <p class="text-gray-700 text-sm">{{ quote.notes }}</p>
+                <div class="card animate-slide-up" style="animation-delay: 400ms;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-sticky-note mr-2"></i> Notes</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="notes-text">{{ quote.notes }}</p>
+                    </div>
                 </div>
             {% endif %}
         </div>
     </div>
+
+    <style>
+        /* Detail Layout */
+        .detail-layout {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: var(--space-6);
+        }
+
+        .detail-main {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        .detail-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        /* Info Grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .info-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .info-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+        }
+
+        /* Status List */
+        .status-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .status-value {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+        }
+
+        /* Total Rows */
+        .totals-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-2) 0;
+            font-size: var(--text-sm);
+        }
+
+        .total-row.total-final {
+            font-size: var(--text-lg);
+            font-weight: var(--font-bold);
+            padding-top: var(--space-3);
+            margin-top: var(--space-2);
+            border-top: 2px solid var(--neutral-200);
+        }
+
+        /* Alert */
+        .alert {
+            padding: var(--space-3);
+            border-radius: var(--radius-md);
+            font-size: var(--text-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .alert-warning {
+            background: var(--warning-50);
+            color: var(--warning-700);
+            border: 1px solid var(--warning-200);
+        }
+
+        .alert-error {
+            background: var(--error-50);
+            color: var(--error-700);
+            border: 1px solid var(--error-200);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        /* Notes */
+        .notes-text {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+            white-space: pre-line;
+            line-height: 1.6;
+        }
+
+        /* Item Cards for Mobile */
+        .item-card {
+            background: var(--neutral-50);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            margin-bottom: var(--space-3);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .item-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .item-card-header {
+            margin-bottom: var(--space-3);
+        }
+
+        .item-card-title {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .item-card-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-3);
+        }
+
+        .item-detail {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .item-detail-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .item-detail-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+        }
+
+        /* Desktop/Mobile Toggle */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        /* Button Block */
+        .btn-block {
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .detail-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-sidebar {
+                order: -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+
+            .item-card-details {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
 {% endblock %}

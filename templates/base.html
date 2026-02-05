@@ -6,445 +6,694 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Bijouterie Hafsa - ERP{% endblock %}</title>
 
-    <!-- Refined Minimalist Design System -->
+    <!-- Modern Design System -->
     <link rel="stylesheet" href="{% static 'css/design-system.css' %}">
+    <link rel="stylesheet" href="{% static 'css/mobile-forms.css' %}">
 
-    <!-- Bootstrap CSS (for modals) -->
+    <!-- Bootstrap CSS (for modals only) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Mobile-Friendly Forms CSS (Phase 1) -->
-    <link rel="stylesheet" href="{% static 'css/mobile-forms.css' %}">
-
     <style>
-        :root {
-            --primary: #d4af37;
-            --secondary: #1f2937;
+        /* Enhanced Responsive Sidebar Styles */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: var(--sidebar-width);
+            background: white;
+            border-right: 1px solid var(--neutral-200);
+            display: flex;
+            flex-direction: column;
+            z-index: var(--z-fixed);
+            transition: transform var(--transition-slow), width var(--transition-slow);
+            overflow: hidden;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        /* Mobile Sidebar - Hidden by default */
+        @media (max-width: 1023px) {
+            .sidebar {
+                transform: translateX(-100%);
+                box-shadow: var(--shadow-2xl);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0 !important;
+            }
+
+            .sidebar-toggle {
+                display: flex !important;
+            }
         }
 
-        .sidebar-collapsed .sidebar {
-            transform: translateX(-100%);
+        /* Tablet adjustments */
+        @media (min-width: 768px) and (max-width: 1023px) {
+            .page-wrapper {
+                padding: var(--space-6);
+            }
         }
 
-        .badge-success { @apply bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium; }
-        .badge-danger { @apply bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium; }
-        .badge-warning { @apply bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium; }
-        .badge-info { @apply bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium; }
+        /* Mobile adjustments */
+        @media (max-width: 767px) {
+            :root {
+                --navbar-height: 64px;
+            }
 
-        /* Modal styling override for Tailwind */
-        .modal {
-            background-color: rgba(0, 0, 0, 0.5);
+            .navbar {
+                padding: 0 var(--space-4);
+            }
+
+            .search-wrapper {
+                display: none;
+            }
+
+            .user-info {
+                display: none;
+            }
+
+            .page-wrapper {
+                padding: var(--space-4);
+            }
+
+            .page-header-inner {
+                flex-direction: column;
+                align-items: stretch;
+                gap: var(--space-4);
+            }
+
+            .page-actions {
+                flex-direction: column;
+            }
+
+            .page-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            /* Mobile grid adjustments */
+            .grid-cols-2,
+            .grid-cols-3,
+            .grid-cols-4 {
+                grid-template-columns: 1fr !important;
+            }
+
+            /* Mobile stat cards */
+            .stat-card {
+                padding: var(--space-4);
+            }
+
+            .stat-value {
+                font-size: var(--text-2xl);
+            }
+
+            /* Mobile cards */
+            .card-body {
+                padding: var(--space-4);
+            }
+
+            .card-header {
+                padding: var(--space-4);
+                flex-direction: column;
+                align-items: flex-start;
+                gap: var(--space-3);
+            }
+
+            .card-footer {
+                padding: var(--space-4);
+                flex-direction: column;
+                gap: var(--space-3);
+            }
+
+            /* Mobile tables */
+            .table-wrapper {
+                margin: 0 calc(var(--space-4) * -1);
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+
+            .table th,
+            .table td {
+                padding: var(--space-3);
+                font-size: var(--text-xs);
+            }
+
+            /* Mobile forms */
+            .form-row,
+            .form-row-3 {
+                grid-template-columns: 1fr !important;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .btn-group .btn {
+                width: 100%;
+            }
+
+            /* Mobile breadcrumb */
+            .breadcrumb {
+                display: none;
+            }
         }
 
-        .modal-content {
+        /* Overlay for mobile sidebar */
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: calc(var(--z-fixed) - 1);
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-base);
+        }
+
+        .sidebar-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Mobile bottom navigation (optional) */
+        .mobile-bottom-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid var(--neutral-200);
+            padding: var(--space-2) var(--space-4);
+            z-index: var(--z-sticky);
+            box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        @media (max-width: 767px) {
+            .mobile-bottom-nav {
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+            }
+
+            .page-wrapper {
+                padding-bottom: calc(var(--space-4) + 70px);
+            }
+        }
+
+        .mobile-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-1);
+            padding: var(--space-2);
+            color: var(--neutral-500);
+            text-decoration: none;
+            font-size: var(--text-xs);
+            transition: color var(--transition-fast);
+            min-width: 60px;
+        }
+
+        .mobile-nav-item:hover,
+        .mobile-nav-item.active {
+            color: var(--primary-600);
+        }
+
+        .mobile-nav-item i {
+            font-size: var(--text-lg);
+        }
+
+        /* Enhanced sidebar toggle button */
+        .sidebar-toggle {
+            display: none;
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-lg);
             border: none;
-            border-radius: 0.5rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            background: transparent;
+            color: var(--neutral-600);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            align-items: center;
+            justify-content: center;
         }
 
-        .modal-header {
-            border-bottom: 1px solid #e5e7eb;
-            background-color: #ffffff;
+        .sidebar-toggle:hover {
+            background: var(--neutral-100);
+            color: var(--neutral-900);
         }
 
-        .modal-body {
-            background-color: #ffffff;
+        /* Sidebar close button for mobile */
+        .sidebar-close {
+            display: none;
+            position: absolute;
+            top: var(--space-4);
+            right: var(--space-4);
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-full);
+            border: none;
+            background: var(--neutral-100);
+            color: var(--neutral-600);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
         }
 
-        .modal-footer {
-            border-top: 1px solid #e5e7eb;
-            background-color: #ffffff;
+        .sidebar-close:hover {
+            background: var(--neutral-200);
+            color: var(--neutral-900);
+        }
+
+        @media (max-width: 1023px) {
+            .sidebar-close {
+                display: flex;
+            }
+        }
+
+        /* Fix for small screens nav sections */
+        @media (max-width: 1023px) {
+            .nav-section-title {
+                padding: 0 var(--space-4);
+            }
         }
     </style>
 
     {% block extra_css %}{% endblock %}
-
-    <style>
-        body {
-            background-color: var(--color-neutral-cream);
-            color: var(--color-neutral-dark);
-            font-family: var(--font-sans);
-        }
-
-        /* Navigation Bar - Refined Minimalist */
-        nav {
-            background: white;
-            box-shadow: var(--shadow-sm);
-            position: sticky;
-            top: 0;
-            z-index: 50;
-        }
-
-        nav .px-4 {
-            padding: 0 var(--space-4);
-        }
-
-        nav .sm\:px-6 {
-            padding: 0 var(--space-6);
-        }
-
-        nav .lg\:px-8 {
-            padding: 0 var(--space-8);
-        }
-
-        /* Navigation flex layout */
-        nav .flex {
-            display: flex;
-        }
-
-        nav .flex.justify-between {
-            justify-content: space-between;
-        }
-
-        nav .flex.items-center {
-            align-items: center;
-        }
-
-        nav .h-16 {
-            height: 4rem;
-        }
-
-        /* Logo styling */
-        nav .bg-yellow-500 {
-            background-color: var(--color-warning);
-            color: white;
-            padding: var(--space-2) var(--space-3);
-            border-radius: var(--radius-md);
-            font-weight: var(--weight-bold);
-        }
-
-        nav a {
-            color: var(--color-neutral-dark);
-            text-decoration: none;
-            transition: all var(--transition-fast);
-        }
-
-        nav a:hover {
-            color: var(--color-primary);
-        }
-
-        /* Search bar */
-        nav input {
-            background: var(--color-neutral-light);
-            border: 1px solid var(--color-neutral-medium);
-            color: var(--color-neutral-dark);
-            padding: var(--space-2) var(--space-4);
-            border-radius: var(--radius-md);
-            font-size: var(--text-sm);
-        }
-
-        nav input:focus {
-            outline: none;
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
-        }
-
-        /* Sidebar */
-        aside.sidebar {
-            background: #2d2d2d;
-            color: white;
-            overflow-y: auto;
-        }
-
-        aside.sidebar a {
-            color: #ccc;
-        }
-
-        aside.sidebar a:hover {
-            background: #404040;
-            color: white;
-        }
-
-        aside.sidebar .submenu {
-            display: none;
-        }
-
-        aside.sidebar .submenu.block {
-            display: block;
-        }
-
-        /* Dropdown menus */
-        .hidden {
-            display: none;
-        }
-
-        .block {
-            display: block;
-        }
-
-        @media (max-width: 1023px) {
-            aside.sidebar {
-                position: fixed;
-                left: 0;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease-in-out;
-            }
-
-            aside.sidebar.open {
-                transform: translateX(0);
-            }
-        }
-    </style>
 </head>
 <body>
-    <!-- Navigation Bar -->
-    <nav>
-        <div class="px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <!-- Logo -->
-                <div class="flex items-center">
-                    <button id="sidebar-toggle" class="lg:hidden text-gray-600 hover:text-gray-900 mr-4">
-                        <i class="fas fa-bars text-xl"></i>
-                    </button>
-                    <a href="{% url 'dashboard' %}" class="flex items-center">
-                        <div class="bg-yellow-500 text-white px-3 py-2 rounded font-bold">HF</div>
-                        <span class="ml-3 font-bold text-gray-900 text-lg">Bijouterie Hafsa</span>
+    <!-- Sidebar Overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <!-- Close button for mobile -->
+        <button class="sidebar-close" onclick="closeSidebar()">
+            <i class="fas fa-times"></i>
+        </button>
+
+        <!-- Sidebar Header -->
+        <div class="sidebar-header">
+            <a href="{% url 'dashboard' %}" class="sidebar-brand">
+                <div class="sidebar-logo">HF</div>
+                <div class="sidebar-brand-text">
+                    <div class="sidebar-brand-name">Bijouterie Hafsa</div>
+                    <div class="sidebar-brand-subtitle">Gestion d'Entreprise</div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar-nav">
+            <!-- Main Section -->
+            <div class="nav-section">
+                <div class="nav-section-title">Menu Principal</div>
+
+                <!-- Dashboard -->
+                <div class="nav-item">
+                    <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                        <i class="fas fa-home nav-icon"></i>
+                        <span class="nav-text">Tableau de Bord</span>
                     </a>
                 </div>
 
-                <!-- Search Bar -->
-                <div class="flex-1 max-w-md mx-4 hidden sm:block">
-                    <input type="text" placeholder="Rechercher..."
-                        class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500">
-                </div>
-
-                <!-- User Menu -->
-                <div class="flex items-center space-x-4">
-                    <!-- Notifications -->
-                    <button class="relative text-gray-600 hover:text-gray-900">
-                        <i class="fas fa-bell text-lg"></i>
-                        <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-                    </button>
-
-                    <!-- User Dropdown -->
-                    <div class="relative" id="userDropdownContainer">
-                        <button id="userDropdownBtn" class="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none">
-                            <img src="https://ui-avatars.com/api/?name={{ user.first_name }}+{{ user.last_name }}&background=d4af37&color=fff"
-                                class="w-8 h-8 rounded-full">
-                            <span class="hidden md:inline text-sm font-medium">{{ user.first_name }}</span>
-                            <i class="fas fa-chevron-down text-xs"></i>
-                        </button>
-
-                        <!-- Dropdown Menu -->
-                        <div id="userDropdownMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 z-50">
-                            <a href="{% url 'users:profile' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
-                                <i class="fas fa-user-circle mr-2"></i> Mon Profil
-                            </a>
-                            <a href="{% url 'users:profile_edit' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
-                                <i class="fas fa-cog mr-2"></i> Paramètres
-                            </a>
-                            <hr class="my-2">
-                            <a href="{% url 'logout' %}" class="block px-4 py-2 text-sm text-red-700 hover:bg-gray-100 transition">
-                                <i class="fas fa-sign-out-alt mr-2"></i> Déconnexion
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <div class="flex">
-        <!-- Sidebar -->
-        <aside class="sidebar w-64 bg-gray-900 text-white h-screen overflow-y-auto fixed lg:sticky lg:top-0 transform lg:transform-none transition-transform duration-300 ease-in-out z-40">
-            <div class="p-6 border-b border-gray-700">
-                <h3 class="text-lg font-bold">Menu Principal</h3>
-            </div>
-
-            <nav class="p-4 space-y-2">
-                <!-- Dashboard -->
-                <a href="{% url 'dashboard' %}" class="block px-4 py-3 rounded-lg {% if request.resolver_match.url_name == 'dashboard' %}bg-yellow-500 text-white{% else %}text-gray-300 hover:bg-gray-800{% endif %}">
-                    <i class="fas fa-home mr-3"></i> Accueil
-                </a>
-
                 <!-- Products -->
-                <div class="space-y-2">
-                    <button class="w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 flex items-center justify-between group"
-                        onclick="this.parentElement.querySelector('.submenu').classList.toggle('hidden')">
-                        <span><i class="fas fa-gem mr-3"></i> Produits</span>
-                        <i class="fas fa-chevron-down group-hover:rotate-180 transition"></i>
-                    </button>
-                    <div class="submenu hidden space-y-1 ml-4">
-                        <a href="{% url 'products:inventory_dashboard' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Inventaire</a>
-                        <a href="{% url 'products:create' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Nouveau Produit</a>
-                        <a href="{% url 'products:batch_create' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Créer en Lot</a>
-                        <a href="{% url 'products:list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Tous les Produits</a>
-                    </div>
-                </div>
-
-                <!-- Suppliers -->
-                <div class="space-y-2">
-                    <button class="w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 flex items-center justify-between group"
-                        onclick="this.parentElement.querySelector('.submenu').classList.toggle('hidden')">
-                        <span><i class="fas fa-industry mr-3"></i> Fournisseurs</span>
-                        <i class="fas fa-chevron-down group-hover:rotate-180 transition"></i>
-                    </button>
-                    <div class="submenu hidden space-y-1 ml-4">
-                        <a href="{% url 'suppliers:list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Tous les Fournisseurs</a>
-                        <a href="{% url 'suppliers:create' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Nouveau Fournisseur</a>
+                <div class="nav-item {% if 'products' in request.path %}open{% endif %}" id="nav-products">
+                    <a href="#" class="nav-link" onclick="toggleSubmenu('nav-products'); return false;">
+                        <i class="fas fa-gem nav-icon"></i>
+                        <span class="nav-text">Produits</span>
+                        <i class="fas fa-chevron-right nav-chevron"></i>
+                    </a>
+                    <div class="nav-submenu">
+                        <a href="{% url 'products:inventory_dashboard' %}" class="nav-link {% if 'inventory' in request.path %}active{% endif %}">
+                            <span class="nav-text">Inventaire</span>
+                        </a>
+                        <a href="{% url 'products:list' %}" class="nav-link {% if request.resolver_match.url_name == 'list' and 'products' in request.path %}active{% endif %}">
+                            <span class="nav-text">Tous les Produits</span>
+                        </a>
+                        <a href="{% url 'products:create' %}" class="nav-link {% if 'create' in request.path and 'products' in request.path %}active{% endif %}">
+                            <span class="nav-text">Nouveau Produit</span>
+                        </a>
+                        <a href="{% url 'products:batch_create' %}" class="nav-link">
+                            <span class="nav-text">Ajout en Lot</span>
+                        </a>
                     </div>
                 </div>
 
                 <!-- Sales -->
-                <div class="space-y-2">
-                    <button class="w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 flex items-center justify-between group"
-                        onclick="this.parentElement.querySelector('.submenu').classList.toggle('hidden')">
-                        <span><i class="fas fa-shopping-cart mr-3"></i> Ventes</span>
-                        <i class="fas fa-chevron-down group-hover:rotate-180 transition"></i>
-                    </button>
-                    <div class="submenu hidden space-y-1 ml-4">
-                        <a href="{% url 'sales:invoice_create' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Nouvelle Facture</a>
-                        <a href="{% url 'sales:bulk_create' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Créer en Lot</a>
-                        <a href="{% url 'sales:invoice_list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Historique</a>
-                        <a href="{% url 'quotes:quote_list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Devis</a>
+                <div class="nav-item {% if 'sales' in request.path %}open{% endif %}" id="nav-sales">
+                    <a href="#" class="nav-link" onclick="toggleSubmenu('nav-sales'); return false;">
+                        <i class="fas fa-shopping-cart nav-icon"></i>
+                        <span class="nav-text">Ventes</span>
+                        <i class="fas fa-chevron-right nav-chevron"></i>
+                    </a>
+                    <div class="nav-submenu">
+                        <a href="{% url 'sales:invoice_create' %}" class="nav-link {% if 'create' in request.path and 'sales' in request.path %}active{% endif %}">
+                            <span class="nav-text">Nouvelle Facture</span>
+                        </a>
+                        <a href="{% url 'sales:bulk_create' %}" class="nav-link">
+                            <span class="nav-text">Facturation en Lot</span>
+                        </a>
+                        <a href="{% url 'sales:invoice_list' %}" class="nav-link {% if 'list' in request.path and 'sales' in request.path %}active{% endif %}">
+                            <span class="nav-text">Historique</span>
+                        </a>
                     </div>
                 </div>
 
                 <!-- Purchases -->
-                <div class="space-y-2">
-                    <button class="w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 flex items-center justify-between group"
-                        onclick="this.parentElement.querySelector('.submenu').classList.toggle('hidden')">
-                        <span><i class="fas fa-boxes mr-3"></i> Achats</span>
-                        <i class="fas fa-chevron-down group-hover:rotate-180 transition"></i>
-                    </button>
-                    <div class="submenu hidden space-y-1 ml-4">
-                        <a href="{% url 'purchases:purchase_order_list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Commandes</a>
-                        <a href="{% url 'purchases:purchase_invoice_list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Factures d'Achat</a>
-                        <a href="{% url 'purchases:consignment_list' %}" class="block px-4 py-2 text-gray-400 hover:text-white text-sm">Consignations</a>
+                <div class="nav-item {% if 'purchases' in request.path %}open{% endif %}" id="nav-purchases">
+                    <a href="#" class="nav-link" onclick="toggleSubmenu('nav-purchases'); return false;">
+                        <i class="fas fa-boxes nav-icon"></i>
+                        <span class="nav-text">Achats</span>
+                        <i class="fas fa-chevron-right nav-chevron"></i>
+                    </a>
+                    <div class="nav-submenu">
+                        <a href="{% url 'purchases:purchase_order_list' %}" class="nav-link">
+                            <span class="nav-text">Commandes</span>
+                        </a>
+                        <a href="{% url 'purchases:purchase_invoice_list' %}" class="nav-link">
+                            <span class="nav-text">Factures d'Achat</span>
+                        </a>
+                        <a href="{% url 'purchases:consignment_list' %}" class="nav-link">
+                            <span class="nav-text">Consignations</span>
+                        </a>
                     </div>
                 </div>
 
-                <!-- Clients -->
-                <a href="{% url 'sales:invoice_list' %}" class="block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800">
-                    <i class="fas fa-users mr-3"></i> Clients
-                </a>
-
-                <!-- Repairs -->
-                <a href="{% url 'repairs:repair_list' %}" class="block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800">
-                    <i class="fas fa-wrench mr-3"></i> Réparations
-                </a>
-
-                <!-- Quotes -->
-                <a href="{% url 'quotes:quote_list' %}" class="block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800">
-                    <i class="fas fa-file-invoice mr-3"></i> Devis
-                </a>
-
-                {% if user.is_staff %}
-                <!-- Admin Dashboard -->
-                <hr class="my-4 border-gray-700">
-                <a href="{% url 'admin_dashboard:home' %}" class="block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800">
-                    <i class="fas fa-sliders-h mr-3"></i> Administration
-                </a>
-                {% endif %}
-            </nav>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="flex-1 overflow-auto">
-            <!-- Breadcrumb -->
-            <div class="bg-white border-b border-gray-200 px-6 py-4">
-                <div class="flex items-center space-x-2 text-sm text-gray-600">
-                    <a href="{% url 'dashboard' %}" class="text-yellow-600 hover:text-yellow-700">Accueil</a>
-                    {% block breadcrumb %}{% endblock %}
+                <!-- Suppliers -->
+                <div class="nav-item {% if 'suppliers' in request.path %}open{% endif %}" id="nav-suppliers">
+                    <a href="#" class="nav-link" onclick="toggleSubmenu('nav-suppliers'); return false;">
+                        <i class="fas fa-industry nav-icon"></i>
+                        <span class="nav-text">Fournisseurs</span>
+                        <i class="fas fa-chevron-right nav-chevron"></i>
+                    </a>
+                    <div class="nav-submenu">
+                        <a href="{% url 'suppliers:list' %}" class="nav-link">
+                            <span class="nav-text">Tous les Fournisseurs</span>
+                        </a>
+                        <a href="{% url 'suppliers:create' %}" class="nav-link">
+                            <span class="nav-text">Nouveau Fournisseur</span>
+                        </a>
+                    </div>
                 </div>
             </div>
 
-            <!-- Page Header -->
-            <div class="px-6 py-6">
-                {% block page_header %}{% endblock %}
+            <!-- Services Section -->
+            <div class="nav-section">
+                <div class="nav-section-title">Services</div>
+
+                <!-- Quotes -->
+                <div class="nav-item {% if 'quotes' in request.path %}open{% endif %}" id="nav-quotes">
+                    <a href="#" class="nav-link" onclick="toggleSubmenu('nav-quotes'); return false;">
+                        <i class="fas fa-file-invoice nav-icon"></i>
+                        <span class="nav-text">Devis</span>
+                        <i class="fas fa-chevron-right nav-chevron"></i>
+                    </a>
+                    <div class="nav-submenu">
+                        <a href="{% url 'quotes:quote_list' %}" class="nav-link">
+                            <span class="nav-text">Tous les Devis</span>
+                        </a>
+                        <a href="{% url 'quotes:quote_create' %}" class="nav-link">
+                            <span class="nav-text">Nouveau Devis</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Repairs -->
+                <div class="nav-item {% if 'repairs' in request.path %}open{% endif %}" id="nav-repairs">
+                    <a href="#" class="nav-link" onclick="toggleSubmenu('nav-repairs'); return false;">
+                        <i class="fas fa-wrench nav-icon"></i>
+                        <span class="nav-text">Reparations</span>
+                        <i class="fas fa-chevron-right nav-chevron"></i>
+                    </a>
+                    <div class="nav-submenu">
+                        <a href="{% url 'repairs:repair_list' %}" class="nav-link">
+                            <span class="nav-text">Toutes les Reparations</span>
+                        </a>
+                        <a href="{% url 'repairs:repair_create' %}" class="nav-link">
+                            <span class="nav-text">Nouvelle Reparation</span>
+                        </a>
+                    </div>
+                </div>
+
             </div>
 
-            <!-- Content Area -->
-            <div class="px-6 pb-6">
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="mb-4 p-4 rounded-lg {% if message.tags %}{{ message.tags }}{% else %}bg-blue-100 text-blue-800{% endif %}">
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0">
-                                    <i class="fas {% if message.tags == 'bg-red-100 text-red-800' %}fa-exclamation-circle{% elif message.tags == 'bg-green-100 text-green-800' %}fa-check-circle{% else %}fa-info-circle{% endif %}"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p>{{ message }}</p>
-                                </div>
+            {% if user.is_staff %}
+            <!-- Admin Section -->
+            <div class="nav-section">
+                <div class="nav-section-title">Administration</div>
+
+                <div class="nav-item">
+                    <a href="{% url 'admin_dashboard:home' %}" class="nav-link {% if 'admin-dashboard' in request.path %}active{% endif %}">
+                        <i class="fas fa-sliders-h nav-icon"></i>
+                        <span class="nav-text">Panneau Admin</span>
+                    </a>
+                </div>
+
+                <div class="nav-item">
+                    <a href="{% url 'users:user_list' %}" class="nav-link {% if 'users' in request.path and 'list' in request.path %}active{% endif %}">
+                        <i class="fas fa-user-cog nav-icon"></i>
+                        <span class="nav-text">Utilisateurs</span>
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </nav>
+
+        <!-- Sidebar Footer -->
+        <div class="sidebar-footer">
+            <a href="{% url 'logout' %}" class="btn btn-ghost" style="width: 100%; justify-content: flex-start;">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Deconnexion</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Navigation Bar -->
+        <header class="navbar">
+            <div class="navbar-inner">
+                <div class="navbar-left">
+                    <!-- Mobile Menu Toggle -->
+                    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+
+                    <!-- Search Bar -->
+                    <div class="search-wrapper">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" class="search-input" placeholder="Rechercher produits, clients, factures...">
+                    </div>
+                </div>
+
+                <div class="navbar-right">
+                    <!-- Notifications -->
+                    <button class="navbar-action" title="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge-dot"></span>
+                    </button>
+
+                    <!-- Quick Add -->
+                    <a href="{% url 'sales:invoice_create' %}" class="navbar-action" title="Nouvelle Vente" style="display: none;">
+                        <i class="fas fa-plus"></i>
+                    </a>
+
+                    <!-- User Menu -->
+                    <div class="user-menu" id="userMenu">
+                        <button class="user-menu-trigger" onclick="toggleUserMenu()">
+                            <div class="user-avatar">
+                                {% if user.first_name %}{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}{% else %}{{ user.username|slice:":2"|upper }}{% endif %}
                             </div>
-                        </div>
-                    {% endfor %}
-                {% endif %}
+                            <div class="user-info">
+                                <div class="user-name">{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</div>
+                                <div class="user-role">{% if user.is_staff %}Administrateur{% else %}Utilisateur{% endif %}</div>
+                            </div>
+                            <i class="fas fa-chevron-down" style="color: var(--neutral-400); font-size: var(--text-xs);"></i>
+                        </button>
 
-                {% block content %}{% endblock %}
+                        <div class="dropdown-menu" id="userDropdown">
+                            <a href="{% url 'users:profile' %}" class="dropdown-item">
+                                <i class="fas fa-user-circle"></i>
+                                <span>Mon Profil</span>
+                            </a>
+                            <a href="{% url 'users:profile_edit' %}" class="dropdown-item">
+                                <i class="fas fa-cog"></i>
+                                <span>Parametres</span>
+                            </a>
+                            {% if user.is_staff %}
+                            <a href="{% url 'admin_dashboard:home' %}" class="dropdown-item">
+                                <i class="fas fa-sliders-h"></i>
+                                <span>Administration</span>
+                            </a>
+                            {% endif %}
+                            <div class="dropdown-divider"></div>
+                            <a href="{% url 'logout' %}" class="dropdown-item danger">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Deconnexion</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
+        </header>
+
+        <!-- Page Content -->
+        <main class="page-wrapper">
+            <!-- Breadcrumb -->
+            <nav class="breadcrumb">
+                <div class="breadcrumb-item">
+                    <a href="{% url 'dashboard' %}"><i class="fas fa-home"></i></a>
+                </div>
+                {% block breadcrumb %}{% endblock %}
+            </nav>
+
+            <!-- Page Header -->
+            {% block page_header %}{% endblock %}
+
+            <!-- Alerts -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert {% if message.tags == 'error' %}alert-error{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %} animate-slide-down">
+                        <i class="alert-icon fas {% if message.tags == 'error' %}fa-exclamation-circle{% elif message.tags == 'success' %}fa-check-circle{% elif message.tags == 'warning' %}fa-exclamation-triangle{% else %}fa-info-circle{% endif %}"></i>
+                        <div class="alert-content">
+                            <p class="alert-message">{{ message }}</p>
+                        </div>
+                        <button type="button" class="alert-close" onclick="this.parentElement.remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- Main Content -->
+            {% block content %}{% endblock %}
         </main>
     </div>
 
-    <!-- Overlay for sidebar on mobile -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden lg:hidden z-30"
-        onclick="document.querySelector('aside').classList.add('transform', '-translate-x-full'); this.classList.add('hidden')"></div>
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-bottom-nav">
+        <a href="{% url 'dashboard' %}" class="mobile-nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+            <i class="fas fa-home"></i>
+            <span>Accueil</span>
+        </a>
+        <a href="{% url 'products:list' %}" class="mobile-nav-item {% if 'products' in request.path %}active{% endif %}">
+            <i class="fas fa-gem"></i>
+            <span>Produits</span>
+        </a>
+        <a href="{% url 'sales:invoice_create' %}" class="mobile-nav-item" style="background: var(--primary-500); color: white; border-radius: var(--radius-full); margin: -10px 0;">
+            <i class="fas fa-plus"></i>
+            <span>Vendre</span>
+        </a>
+        <a href="{% url 'sales:invoice_list' %}" class="mobile-nav-item {% if 'sales' in request.path %}active{% endif %}">
+            <i class="fas fa-receipt"></i>
+            <span>Ventes</span>
+        </a>
+        <a href="#" class="mobile-nav-item" onclick="toggleSidebar(); return false;">
+            <i class="fas fa-bars"></i>
+            <span>Menu</span>
+        </a>
+    </nav>
 
     <!-- Bootstrap JS (for modals) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Mobile-Friendly Forms JavaScript (Phase 2) -->
+    <!-- Mobile-Friendly Forms JavaScript -->
     <script src="{% static 'js/mobile-forms.js' %}"></script>
 
-    <!-- Form Validation JavaScript (Phase 3) -->
+    <!-- Form Validation JavaScript -->
     <script src="{% static 'js/form-validation.js' %}"></script>
 
-    <!-- Field Dependencies JavaScript (Phase 3) -->
+    <!-- Field Dependencies JavaScript -->
     <script src="{% static 'js/field-dependencies.js' %}"></script>
 
     <script>
-        // Sidebar toggle
-        document.getElementById('sidebar-toggle')?.addEventListener('click', function() {
-            const sidebar = document.querySelector('aside');
-            const overlay = document.getElementById('sidebar-overlay');
-            sidebar.classList.toggle('transform');
-            sidebar.classList.toggle('-translate-x-full');
-            overlay.classList.toggle('hidden');
-        });
+        // Sidebar toggle functionality
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('show');
+            document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+        }
 
-        // Close sidebar when clicking overlay
-        document.getElementById('sidebar-overlay')?.addEventListener('click', function() {
-            const sidebar = document.querySelector('aside');
-            sidebar.classList.add('transform', '-translate-x-full');
-            this.classList.add('hidden');
-        });
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.remove('open');
+            overlay.classList.remove('show');
+            document.body.style.overflow = '';
+        }
 
-        // User dropdown menu toggle
-        document.addEventListener('DOMContentLoaded', function() {
-            const userDropdownBtn = document.getElementById('userDropdownBtn');
-            const userDropdownMenu = document.getElementById('userDropdownMenu');
-            const userDropdownContainer = document.getElementById('userDropdownContainer');
+        // Submenu toggle
+        function toggleSubmenu(navItemId) {
+            const navItem = document.getElementById(navItemId);
+            const wasOpen = navItem.classList.contains('open');
 
-            if (userDropdownBtn && userDropdownMenu) {
-                // Toggle dropdown on button click
-                userDropdownBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    userDropdownMenu.classList.toggle('hidden');
-                    userDropdownBtn.classList.toggle('text-yellow-500');
-                });
-
-                // Close dropdown when clicking outside
-                document.addEventListener('click', function(e) {
-                    if (!userDropdownContainer.contains(e.target)) {
-                        userDropdownMenu.classList.add('hidden');
-                        userDropdownBtn.classList.remove('text-yellow-500');
+            // Close all other submenus on mobile
+            if (window.innerWidth < 1024) {
+                document.querySelectorAll('.nav-item.open').forEach(item => {
+                    if (item.id !== navItemId) {
+                        item.classList.remove('open');
                     }
                 });
-
-                // Close dropdown when clicking a link
-                userDropdownMenu.querySelectorAll('a').forEach(link => {
-                    link.addEventListener('click', function() {
-                        userDropdownMenu.classList.add('hidden');
-                        userDropdownBtn.classList.remove('text-yellow-500');
-                    });
-                });
             }
+
+            navItem.classList.toggle('open');
+        }
+
+        // User dropdown toggle
+        function toggleUserMenu() {
+            const dropdown = document.getElementById('userDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const userMenu = document.getElementById('userMenu');
+            const dropdown = document.getElementById('userDropdown');
+
+            if (userMenu && !userMenu.contains(event.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
+
+        // Close sidebar on window resize if open
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 1023) {
+                closeSidebar();
+            }
+        });
+
+        // Handle escape key to close sidebar
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeSidebar();
+                document.getElementById('userDropdown').classList.remove('show');
+            }
+        });
+
+        // Auto-dismiss alerts after 5 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                setTimeout(function() {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    setTimeout(function() {
+                        alert.remove();
+                    }, 300);
+                }, 5000);
+            });
         });
     </script>
 

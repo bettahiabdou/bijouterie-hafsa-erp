@@ -1,210 +1,381 @@
 {% extends 'base.html' %}
 {% load humanize %}
 
-{% block content %}
-<div class="space-y-6">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Administration</h1>
-            <p class="text-gray-600 mt-2">Gérez votre système ERP depuis ce tableau de bord</p>
-        </div>
-        <div class="text-sm text-gray-600">
-            {{ request.user.full_name }}
+{% block title %}Administration - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Administration</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Administration</h1>
+                <p class="page-subtitle">Gerez votre systeme ERP depuis ce tableau de bord</p>
+            </div>
         </div>
     </div>
+{% endblock %}
 
+{% block content %}
     <!-- Quick Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- Users -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Utilisateurs</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_users }}</p>
-                    <p class="text-green-600 text-sm mt-2">{{ active_users }} actifs</p>
-                </div>
-                <div class="bg-blue-100 rounded-full p-3">
-                    <i class="fas fa-users text-blue-600 text-xl"></i>
-                </div>
+    <div class="stats-row mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Utilisateurs</div>
+                <div class="stat-value">{{ total_users }}</div>
+                <div class="stat-meta">{{ active_users }} actifs</div>
             </div>
         </div>
 
-        <!-- Clients -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Clients</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_clients }}</p>
-                </div>
-                <div class="bg-green-100 rounded-full p-3">
-                    <i class="fas fa-user-tie text-green-600 text-xl"></i>
-                </div>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Clients</div>
+                <div class="stat-value">{{ total_clients }}</div>
             </div>
         </div>
 
-        <!-- Produits -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Produits</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_products }}</p>
-                </div>
-                <div class="bg-purple-100 rounded-full p-3">
-                    <i class="fas fa-gem text-purple-600 text-xl"></i>
-                </div>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-gem"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Produits</div>
+                <div class="stat-value">{{ total_products }}</div>
             </div>
         </div>
 
-        <!-- Revenue -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Revenus Mois</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-2">{{ invoices_this_month|floatformat:0 }} MAD</p>
-                </div>
-                <div class="bg-yellow-100 rounded-full p-3">
-                    <i class="fas fa-chart-line text-yellow-600 text-xl"></i>
-                </div>
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Revenus Mois</div>
+                <div class="stat-value">{{ invoices_this_month|floatformat:0 }}</div>
+                <div class="stat-meta">MAD</div>
             </div>
         </div>
     </div>
 
     <!-- Admin Quick Actions -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- User Management -->
-        <a href="{% url 'admin_dashboard:user_list' %}" class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Gestion des Utilisateurs</h3>
-                    <p class="text-gray-600 text-sm mt-2">{{ total_users }} utilisateurs, {{ staff_count }} admins</p>
-                </div>
-                <div class="bg-blue-100 rounded-full p-3">
-                    <i class="fas fa-users-cog text-blue-600 text-xl"></i>
-                </div>
-            </div>
-        </a>
-
-        <!-- System Configuration -->
-        <a href="{% url 'admin_dashboard:configuration' %}" class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Configuration Système</h3>
-                    <p class="text-gray-600 text-sm mt-2">{{ metal_types }} types de métaux, {{ product_categories }} catégories</p>
-                </div>
-                <div class="bg-purple-100 rounded-full p-3">
-                    <i class="fas fa-cog text-purple-600 text-xl"></i>
+    <div class="quick-actions-grid mb-8">
+        <a href="{% url 'admin_dashboard:user_list' %}" class="card action-card animate-slide-up">
+            <div class="card-body">
+                <div class="action-card-content">
+                    <div class="action-card-text">
+                        <h3 class="action-card-title">Gestion des Utilisateurs</h3>
+                        <p class="action-card-desc">{{ total_users }} utilisateurs, {{ staff_count }} admins</p>
+                    </div>
+                    <div class="action-card-icon action-card-icon-primary">
+                        <i class="fas fa-users-cog"></i>
+                    </div>
                 </div>
             </div>
         </a>
 
-        <!-- Activity Log -->
-        <a href="{% url 'admin_dashboard:activity_log' %}" class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Journal d'Activité</h3>
-                    <p class="text-gray-600 text-sm mt-2">Voir toutes les actions système</p>
-                </div>
-                <div class="bg-green-100 rounded-full p-3">
-                    <i class="fas fa-history text-green-600 text-xl"></i>
+        <a href="{% url 'admin_dashboard:configuration' %}" class="card action-card animate-slide-up" style="animation-delay: 50ms;">
+            <div class="card-body">
+                <div class="action-card-content">
+                    <div class="action-card-text">
+                        <h3 class="action-card-title">Configuration Systeme</h3>
+                        <p class="action-card-desc">{{ metal_types }} types de metaux, {{ product_categories }} categories</p>
+                    </div>
+                    <div class="action-card-icon action-card-icon-accent">
+                        <i class="fas fa-cog"></i>
+                    </div>
                 </div>
             </div>
         </a>
 
-        <!-- System Status -->
-        <a href="{% url 'admin_dashboard:status' %}" class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">État du Système</h3>
-                    <p class="text-gray-600 text-sm mt-2">Diagnostics et santé du système</p>
+        <a href="{% url 'admin_dashboard:activity_log' %}" class="card action-card animate-slide-up" style="animation-delay: 100ms;">
+            <div class="card-body">
+                <div class="action-card-content">
+                    <div class="action-card-text">
+                        <h3 class="action-card-title">Journal d'Activite</h3>
+                        <p class="action-card-desc">Voir toutes les actions systeme</p>
+                    </div>
+                    <div class="action-card-icon action-card-icon-success">
+                        <i class="fas fa-history"></i>
+                    </div>
                 </div>
-                <div class="bg-yellow-100 rounded-full p-3">
-                    <i class="fas fa-heartbeat text-yellow-600 text-xl"></i>
+            </div>
+        </a>
+
+        <a href="{% url 'admin_dashboard:status' %}" class="card action-card animate-slide-up" style="animation-delay: 150ms;">
+            <div class="card-body">
+                <div class="action-card-content">
+                    <div class="action-card-text">
+                        <h3 class="action-card-title">Etat du Systeme</h3>
+                        <p class="action-card-desc">Diagnostics et sante du systeme</p>
+                    </div>
+                    <div class="action-card-icon action-card-icon-warning">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
                 </div>
             </div>
         </a>
     </div>
 
-    <!-- Today's Activity -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="lg:col-span-2">
-            <div class="bg-white rounded-lg shadow">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">Activité Récente</h3>
-                </div>
-                <div class="divide-y">
-                    {% for activity in recent_activities %}
-                    <div class="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
-                        <div>
-                            <p class="text-sm font-medium text-gray-900">
-                                <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs mr-2">
-                                    {{ activity.get_action_display }}
-                                </span>
-                                {{ activity.description }}
-                            </p>
-                            <p class="text-xs text-gray-600 mt-1">{{ activity.user.full_name }} • {{ activity.created_at|timesince }} ago</p>
-                        </div>
+    <!-- Today's Activity and System Health -->
+    <div class="dashboard-grid">
+        <!-- Recent Activity -->
+        <div class="card animate-slide-up" style="animation-delay: 200ms;">
+            <div class="card-header">
+                <h3><i class="fas fa-history mr-2"></i> Activite Recente</h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                {% if recent_activities %}
+                    <div class="activity-list">
+                        {% for activity in recent_activities %}
+                            <div class="activity-item">
+                                <div class="activity-content">
+                                    <span class="badge badge-info badge-sm">{{ activity.get_action_display }}</span>
+                                    <span class="activity-desc">{{ activity.description }}</span>
+                                </div>
+                                <span class="activity-meta">{{ activity.user.full_name }} - {{ activity.created_at|timesince }}</span>
+                            </div>
+                        {% endfor %}
                     </div>
-                    {% empty %}
-                    <div class="px-6 py-4 text-center text-gray-500">
-                        <p>Aucune activité récente</p>
+                {% else %}
+                    <div class="empty-state" style="padding: var(--space-6);">
+                        <i class="fas fa-inbox"></i>
+                        <p>Aucune activite recente</p>
                     </div>
-                    {% endfor %}
-                </div>
+                {% endif %}
             </div>
         </div>
 
         <!-- System Health -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">Santé du Système</h3>
+        <div class="card animate-slide-up" style="animation-delay: 250ms;">
+            <div class="card-header">
+                <h3><i class="fas fa-heartbeat mr-2"></i> Sante du Systeme</h3>
             </div>
-            <div class="px-6 py-4 space-y-4">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600">Réparations en cours</span>
-                    <span class="inline-block px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
-                        {{ pending_repairs }}
-                    </span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600">Commandes en attente</span>
-                    <span class="inline-block px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
-                        {{ pending_purchase_orders }}
-                    </span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600">Factures aujourd'hui</span>
-                    <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                        {{ invoices_today }}
-                    </span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600">Réparations aujourd'hui</span>
-                    <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                        {{ repairs_today }}
-                    </span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600">Statut</span>
-                    <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                        ✓ Normal
-                    </span>
+            <div class="card-body">
+                <div class="health-list">
+                    <div class="health-item">
+                        <span class="health-label">Reparations en cours</span>
+                        <span class="badge badge-warning">{{ pending_repairs }}</span>
+                    </div>
+                    <div class="health-item">
+                        <span class="health-label">Commandes en attente</span>
+                        <span class="badge badge-warning">{{ pending_purchase_orders }}</span>
+                    </div>
+                    <div class="health-item">
+                        <span class="health-label">Factures aujourd'hui</span>
+                        <span class="badge badge-success">{{ invoices_today }}</span>
+                    </div>
+                    <div class="health-item">
+                        <span class="health-label">Reparations aujourd'hui</span>
+                        <span class="badge badge-success">{{ repairs_today }}</span>
+                    </div>
+                    <div class="health-item">
+                        <span class="health-label">Statut</span>
+                        <span class="badge badge-success"><i class="fas fa-check mr-1"></i> Normal</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<style>
-    .bg-blue-100 { background-color: #dbeafe; }
-    .text-blue-600 { color: #2563eb; }
-    .bg-green-100 { background-color: #dcfce7; }
-    .text-green-600 { color: #16a34a; }
-    .bg-purple-100 { background-color: #e9d5ff; }
-    .text-purple-600 { color: #9333ea; }
-    .bg-yellow-100 { background-color: #fef3c7; }
-    .text-yellow-600 { color: #ca8a04; }
-    .bg-orange-100 { background-color: #fed7aa; }
-    .text-orange-800 { color: #92400e; }
-</style>
+    <style>
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+        }
+
+        /* Quick Actions Grid */
+        .quick-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        .action-card {
+            text-decoration: none;
+            color: inherit;
+            transition: all var(--transition-base);
+        }
+
+        .action-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .action-card-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .action-card-text {
+            flex: 1;
+        }
+
+        .action-card-title {
+            font-family: var(--font-display);
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+            margin-bottom: var(--space-1);
+        }
+
+        .action-card-desc {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .action-card-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--text-xl);
+            flex-shrink: 0;
+        }
+
+        .action-card-icon-primary {
+            background: var(--primary-50);
+            color: var(--primary-600);
+        }
+
+        .action-card-icon-accent {
+            background: var(--accent-50);
+            color: var(--accent-600);
+        }
+
+        .action-card-icon-success {
+            background: var(--success-50);
+            color: var(--success-600);
+        }
+
+        .action-card-icon-warning {
+            background: var(--warning-50);
+            color: var(--warning-600);
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: var(--space-6);
+        }
+
+        /* Activity List */
+        .activity-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .activity-item {
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-item:hover {
+            background: var(--neutral-50);
+        }
+
+        .activity-content {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+
+        .activity-desc {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        .activity-meta {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        /* Health List */
+        .health-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .health-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .health-item:last-child {
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .health-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            color: var(--neutral-400);
+        }
+
+        .empty-state i {
+            font-size: var(--text-3xl);
+            margin-bottom: var(--space-2);
+            display: block;
+        }
+
+        .empty-state p {
+            font-size: var(--text-sm);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .quick-actions-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .action-card-content {
+                flex-direction: column;
+                text-align: center;
+                gap: var(--space-3);
+            }
+
+            .action-card-icon {
+                order: -1;
+            }
+        }
+    </style>
 {% endblock %}

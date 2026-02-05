@@ -3,199 +3,426 @@
 {% block title %}{{ repair.reference }} - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'repairs:repair_list' %}">Réparations</a>
-    <span>/</span>
-    <span>{{ repair.reference }}</span>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'repairs:repair_list' %}" class="breadcrumb-item">Reparations</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ repair.reference }}</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">{{ repair.reference }}</h1>
-            <p class="text-gray-600 mt-1">Reçue le {{ repair.received_date|date:"d F Y" }}</p>
-        </div>
-        <div class="space-x-2">
-            <a href="{% url 'repairs:repair_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-                <i class="fas fa-arrow-left mr-2"></i> Retour
-            </a>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">{{ repair.reference }}</h1>
+                <p class="page-subtitle">Recue le {{ repair.received_date|date:"d F Y" }}</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'repairs:repair_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
         </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="detail-layout">
         <!-- Main Content -->
-        <div class="lg:col-span-2 space-y-6">
+        <div class="detail-main">
             <!-- Client Info -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Client</h2>
-                <div class="space-y-2">
-                    <p class="text-gray-900 font-bold text-lg">{{ repair.client.first_name }} {{ repair.client.last_name }}</p>
-                    <p class="text-gray-600">{{ repair.client.email }}</p>
-                    <p class="text-gray-600">{{ repair.client.phone }}</p>
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-user mr-2"></i> Client</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Nom</span>
+                            <span class="info-value font-semibold">{{ repair.client.first_name }} {{ repair.client.last_name }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Email</span>
+                            <span class="info-value">{{ repair.client.email|default:"-" }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Telephone</span>
+                            <span class="info-value">{{ repair.client.phone|default:"-" }}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Item Info -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Article</h2>
-                {% if repair.product %}
-                    <div class="space-y-2">
-                        <p class="text-gray-900 font-bold">{{ repair.product.reference }}</p>
-                        <p class="text-gray-600">{{ repair.product.name }}</p>
-                    </div>
-                {% elif repair.item_description %}
-                    <p class="text-gray-700">{{ repair.item_description }}</p>
-                {% else %}
-                    <p class="text-gray-500 italic">Non spécifié</p>
-                {% endif %}
-            </div>
-
-            <!-- Repair Details -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Détails de Réparation</h2>
-                <div class="space-y-4">
-                    <div>
-                        <p class="text-sm font-medium text-gray-700">Type de Réparation</p>
-                        <p class="text-gray-900 font-bold">{{ repair.repair_type.name }}</p>
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium text-gray-700">Problème Rapporté</p>
-                        <p class="text-gray-700">{{ repair.issue_description }}</p>
-                    </div>
-                    {% if repair.repair_notes %}
-                        <div>
-                            <p class="text-sm font-medium text-gray-700">Notes de Réparation</p>
-                            <p class="text-gray-700 whitespace-pre-line">{{ repair.repair_notes }}</p>
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-gem mr-2"></i> Article</h3>
+                </div>
+                <div class="card-body">
+                    {% if repair.product %}
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Reference</span>
+                                <span class="info-value font-semibold text-primary">{{ repair.product.reference }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Nom</span>
+                                <span class="info-value">{{ repair.product.name }}</span>
+                            </div>
                         </div>
+                    {% elif repair.item_description %}
+                        <p class="text-muted">{{ repair.item_description }}</p>
+                    {% else %}
+                        <p class="text-muted" style="font-style: italic;">Non specifie</p>
                     {% endif %}
                 </div>
             </div>
 
+            <!-- Repair Details -->
+            <div class="card animate-slide-up" style="animation-delay: 150ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-wrench mr-2"></i> Details de Reparation</h3>
+                </div>
+                <div class="card-body">
+                    <div class="repair-details">
+                        <div class="repair-detail-item">
+                            <span class="repair-detail-label">Type de Reparation</span>
+                            <span class="repair-detail-value font-semibold">{{ repair.repair_type.name }}</span>
+                        </div>
+                        <div class="repair-detail-item">
+                            <span class="repair-detail-label">Probleme Rapporte</span>
+                            <p class="repair-detail-text">{{ repair.issue_description }}</p>
+                        </div>
+                        {% if repair.repair_notes %}
+                            <div class="repair-detail-item">
+                                <span class="repair-detail-label">Notes de Reparation</span>
+                                <p class="repair-detail-text">{{ repair.repair_notes }}</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
             <!-- Costs Breakdown -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Coûts</h2>
-                <div class="space-y-3 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Coût d'évaluation:</span>
-                        <span class="font-medium">{{ repair.assessment_cost_dh }} DH</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Coût de main-d'œuvre:</span>
-                        <span class="font-medium">{{ repair.labor_cost_dh }} DH</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Coût des matériaux:</span>
-                        <span class="font-medium">{{ repair.material_cost_dh }} DH</span>
-                    </div>
-                    <hr>
-                    <div class="flex justify-between text-lg font-bold">
-                        <span>Coût Total:</span>
-                        <span class="text-green-600">{{ repair.total_cost_dh }} DH</span>
+            <div class="card animate-slide-up" style="animation-delay: 200ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-coins mr-2"></i> Couts</h3>
+                </div>
+                <div class="card-body">
+                    <div class="totals-list">
+                        <div class="total-row">
+                            <span>Cout d'evaluation</span>
+                            <span>{{ repair.assessment_cost_dh }} DH</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Cout de main-d'oeuvre</span>
+                            <span>{{ repair.labor_cost_dh }} DH</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Cout des materiaux</span>
+                            <span>{{ repair.material_cost_dh }} DH</span>
+                        </div>
+                        <div class="total-row total-final">
+                            <span>Cout Total</span>
+                            <span class="text-success">{{ repair.total_cost_dh }} DH</span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Sidebar -->
-        <div class="space-y-6">
+        <div class="detail-sidebar">
             <!-- Status -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Statut</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center mb-3">
-                        <span class="text-gray-600">Statut:</span>
-                        <span class="inline-block px-3 py-1 rounded-full text-sm font-medium
-                            {% if repair.status == 'received' %}bg-blue-100 text-blue-800
-                            {% elif repair.status == 'assessing' %}bg-purple-100 text-purple-800
-                            {% elif repair.status == 'approved' %}bg-green-100 text-green-800
-                            {% elif repair.status == 'in_progress' %}bg-yellow-100 text-yellow-800
-                            {% elif repair.status == 'completed' %}bg-cyan-100 text-cyan-800
-                            {% elif repair.status == 'delivered' %}bg-green-100 text-green-800
-                            {% elif repair.status == 'cancelled' %}bg-red-100 text-red-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ repair.get_status_display }}
-                        </span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Priorité:</span>
-                        <span class="inline-block px-3 py-1 rounded-full text-xs font-medium
-                            {% if repair.priority == 'low' %}bg-green-100 text-green-800
-                            {% elif repair.priority == 'medium' %}bg-yellow-100 text-yellow-800
-                            {% elif repair.priority == 'high' %}bg-orange-100 text-orange-800
-                            {% elif repair.priority == 'urgent' %}bg-red-100 text-red-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ repair.get_priority_display }}
-                        </span>
+            <div class="card animate-slide-up" style="animation-delay: 250ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle mr-2"></i> Statut</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Statut</span>
+                            <span class="badge {% if repair.status == 'received' %}badge-info{% elif repair.status == 'assessing' %}badge-accent{% elif repair.status == 'approved' %}badge-success{% elif repair.status == 'in_progress' %}badge-warning{% elif repair.status == 'completed' %}badge-info{% elif repair.status == 'delivered' %}badge-success{% elif repair.status == 'cancelled' %}badge-error{% else %}badge-neutral{% endif %}">
+                                {{ repair.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Priorite</span>
+                            <span class="badge {% if repair.priority == 'low' %}badge-success{% elif repair.priority == 'medium' %}badge-warning{% elif repair.priority == 'high' %}badge-accent{% elif repair.priority == 'urgent' %}badge-error{% else %}badge-neutral{% endif %}">
+                                {{ repair.get_priority_display }}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Timeline -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Calendrier</h3>
-                <div class="space-y-3 text-sm">
-                    <div>
-                        <p class="text-gray-600">Date de réception:</p>
-                        <p class="font-medium">{{ repair.received_date|date:"d/m/Y" }}</p>
-                    </div>
-                    <div>
-                        <p class="text-gray-600">Date d'achèvement estimée:</p>
-                        <p class="font-medium">{{ repair.estimated_completion_date|date:"d/m/Y" }}</p>
-                        {% if is_overdue %}
-                            <p class="text-red-600 text-xs mt-1">⚠️ {{ days_overdue }} jour(s) en retard</p>
+            <div class="card animate-slide-up" style="animation-delay: 300ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-calendar mr-2"></i> Calendrier</h3>
+                </div>
+                <div class="card-body">
+                    <div class="tracking-list">
+                        <div class="tracking-item">
+                            <span class="tracking-label">Date de reception</span>
+                            <span class="tracking-value">{{ repair.received_date|date:"d/m/Y" }}</span>
+                        </div>
+                        <div class="tracking-item">
+                            <span class="tracking-label">Date d'achevement estimee</span>
+                            <span class="tracking-value">{{ repair.estimated_completion_date|date:"d/m/Y" }}</span>
+                            {% if is_overdue %}
+                                <span class="text-error text-xs">{{ days_overdue }} jour(s) en retard</span>
+                            {% endif %}
+                        </div>
+                        {% if repair.completion_date %}
+                            <div class="tracking-item">
+                                <span class="tracking-label">Date d'achevement</span>
+                                <span class="tracking-value">{{ repair.completion_date|date:"d/m/Y" }}</span>
+                            </div>
+                        {% endif %}
+                        {% if repair.delivery_date %}
+                            <div class="tracking-item">
+                                <span class="tracking-label">Date de livraison</span>
+                                <span class="tracking-value">{{ repair.delivery_date|date:"d/m/Y" }}</span>
+                            </div>
                         {% endif %}
                     </div>
-                    {% if repair.completion_date %}
-                        <div>
-                            <p class="text-gray-600">Date d'achèvement:</p>
-                            <p class="font-medium">{{ repair.completion_date|date:"d/m/Y" }}</p>
-                        </div>
-                    {% endif %}
-                    {% if repair.delivery_date %}
-                        <div>
-                            <p class="text-gray-600">Date de livraison:</p>
-                            <p class="font-medium">{{ repair.delivery_date|date:"d/m/Y" }}</p>
-                        </div>
-                    {% endif %}
                 </div>
             </div>
 
             <!-- Assignment -->
             {% if repair.assigned_to %}
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-lg font-bold text-gray-900 mb-4">Assigné À</h3>
-                    <p class="text-gray-900 font-bold">{{ repair.assigned_to.name }}</p>
-                    <p class="text-gray-600 text-sm">{{ repair.assigned_to.contact_person }}</p>
+                <div class="card animate-slide-up" style="animation-delay: 350ms;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-user-cog mr-2"></i> Assigne A</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="tracking-list">
+                            <div class="tracking-item">
+                                <span class="tracking-label">Fournisseur</span>
+                                <span class="tracking-value font-semibold">{{ repair.assigned_to.name }}</span>
+                            </div>
+                            {% if repair.assigned_to.contact_person %}
+                                <div class="tracking-item">
+                                    <span class="tracking-label">Contact</span>
+                                    <span class="tracking-value">{{ repair.assigned_to.contact_person }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             {% endif %}
 
             <!-- Actions -->
             {% if repair.status in 'pending,received,assessing,approved,in_progress,completed' %}
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-                    <form method="post" class="space-y-2">
-                        {% csrf_token %}
-                        {% if repair.status == 'received' %}
-                            <button type="submit" name="action" value="approve" class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm">
-                                <i class="fas fa-check mr-1"></i> Approuver
-                            </button>
-                        {% elif repair.status == 'approved' %}
-                            <button type="submit" name="action" value="start" class="w-full px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded-lg text-sm">
-                                <i class="fas fa-play mr-1"></i> Commencer
-                            </button>
-                        {% elif repair.status == 'in_progress' %}
-                            <button type="submit" name="action" value="complete" class="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg text-sm">
-                                <i class="fas fa-check-double mr-1"></i> Terminer
-                            </button>
-                        {% elif repair.status == 'completed' %}
-                            <button type="submit" name="action" value="deliver" class="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-sm">
-                                <i class="fas fa-truck mr-1"></i> Livrer
-                            </button>
-                        {% endif %}
-                    </form>
+                <div class="card animate-slide-up" style="animation-delay: 400ms;">
+                    <div class="card-body">
+                        <form method="post" class="action-buttons">
+                            {% csrf_token %}
+                            {% if repair.status == 'received' %}
+                                <button type="submit" name="action" value="approve" class="btn btn-info btn-block">
+                                    <i class="fas fa-check"></i>
+                                    <span>Approuver</span>
+                                </button>
+                            {% elif repair.status == 'approved' %}
+                                <button type="submit" name="action" value="start" class="btn btn-warning btn-block">
+                                    <i class="fas fa-play"></i>
+                                    <span>Commencer</span>
+                                </button>
+                            {% elif repair.status == 'in_progress' %}
+                                <button type="submit" name="action" value="complete" class="btn btn-success btn-block">
+                                    <i class="fas fa-check-double"></i>
+                                    <span>Terminer</span>
+                                </button>
+                            {% elif repair.status == 'completed' %}
+                                <button type="submit" name="action" value="deliver" class="btn btn-accent btn-block">
+                                    <i class="fas fa-truck"></i>
+                                    <span>Livrer</span>
+                                </button>
+                            {% endif %}
+                        </form>
+                    </div>
                 </div>
             {% endif %}
         </div>
     </div>
+
+    <style>
+        /* Detail Layout */
+        .detail-layout {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: var(--space-6);
+        }
+
+        .detail-main {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        .detail-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        /* Info Grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .info-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .info-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+        }
+
+        /* Repair Details */
+        .repair-details {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .repair-detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .repair-detail-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .repair-detail-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+        }
+
+        .repair-detail-text {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+            white-space: pre-line;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* Status List */
+        .status-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .status-value {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+        }
+
+        /* Total Rows */
+        .totals-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-2) 0;
+            font-size: var(--text-sm);
+        }
+
+        .total-row.total-final {
+            font-size: var(--text-lg);
+            font-weight: var(--font-bold);
+            padding-top: var(--space-3);
+            margin-top: var(--space-2);
+            border-top: 2px solid var(--neutral-200);
+        }
+
+        /* Tracking List */
+        .tracking-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .tracking-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .tracking-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .tracking-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        /* Button Block */
+        .btn-block {
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .detail-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-sidebar {
+                order: -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 {% endblock %}

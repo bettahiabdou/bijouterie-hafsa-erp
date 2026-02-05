@@ -1,139 +1,263 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<div class="max-w-2xl">
-    <div class="bg-white rounded-lg shadow">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h1 class="text-2xl font-bold text-gray-900">
-                {% if is_create %}
-                Créer un Nouvel Utilisateur
-                {% else %}
-                Éditer Utilisateur
-                {% endif %}
-            </h1>
-        </div>
+{% block title %}{% if is_create %}Creer un Utilisateur{% else %}Editer Utilisateur{% endif %} - Bijouterie Hafsa ERP{% endblock %}
 
-        <form method="post" class="px-6 py-6 space-y-6">
-            {% csrf_token %}
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'admin_dashboard:home' %}" class="breadcrumb-item">Administration</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'admin_dashboard:user_list' %}" class="breadcrumb-item">Utilisateurs</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{% if is_create %}Creer{% else %}Editer{% endif %}</span>
+{% endblock %}
 
-            <!-- Username -->
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
             <div>
-                <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                    Nom d'utilisateur *
-                </label>
-                {{ form.username }}
-                {% if form.username.errors %}
-                <p class="text-red-600 text-sm mt-1">{{ form.username.errors }}</p>
-                {% endif %}
+                <h1 class="page-title">{% if is_create %}Creer un Nouvel Utilisateur{% else %}Editer Utilisateur{% endif %}</h1>
+                <p class="page-subtitle">{% if is_create %}Ajoutez un nouvel utilisateur au systeme{% else %}Modifiez les informations de l'utilisateur{% endif %}</p>
             </div>
-
-            <!-- Email -->
-            <div>
-                <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                    Email *
-                </label>
-                {{ form.email }}
-                {% if form.email.errors %}
-                <p class="text-red-600 text-sm mt-1">{{ form.email.errors }}</p>
-                {% endif %}
-            </div>
-
-            <!-- Names -->
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                        Prénom
-                    </label>
-                    {{ form.first_name }}
-                </div>
-                <div>
-                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                        Nom
-                    </label>
-                    {{ form.last_name }}
-                </div>
-            </div>
-
-            <!-- Role -->
-            <div>
-                <label for="{{ form.role.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                    Rôle *
-                </label>
-                {{ form.role }}
-                {% if form.role.errors %}
-                <p class="text-red-600 text-sm mt-1">{{ form.role.errors }}</p>
-                {% endif %}
-            </div>
-
-            <!-- Password -->
-            <div>
-                <label for="id_password" class="block text-sm font-medium text-gray-700 mb-2">
-                    {% if is_create %}
-                    Mot de passe *
-                    {% else %}
-                    Nouveau Mot de Passe (optionnel)
-                    {% endif %}
-                </label>
-                <input type="password" name="password" id="id_password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Mot de passe">
-                <p class="text-gray-600 text-xs mt-1">{{ form.password.help_text }}</p>
-            </div>
-
-            <!-- Confirm Password -->
-            <div>
-                <label for="id_password_confirm" class="block text-sm font-medium text-gray-700 mb-2">
-                    {% if is_create %}
-                    Confirmer le Mot de Passe *
-                    {% else %}
-                    Confirmer le Nouveau Mot de Passe
-                    {% endif %}
-                </label>
-                <input type="password" name="password_confirm" id="id_password_confirm" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Confirmer le mot de passe">
-            </div>
-
-            <!-- Active Status -->
-            <div class="flex items-center">
-                <input type="checkbox" id="{{ form.is_active.id_for_label }}" name="is_active" {% if form.is_active.value %}checked{% endif %} class="w-4 h-4 rounded">
-                <label for="{{ form.is_active.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700">
-                    Actif
-                </label>
-            </div>
-
-            <!-- Non-field Errors -->
-            {% if form.non_field_errors %}
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p class="text-red-800 text-sm">{{ form.non_field_errors }}</p>
-            </div>
-            {% endif %}
-
-            <!-- Buttons -->
-            <div class="flex justify-between pt-6">
-                <a href="{% url 'admin_dashboard:user_list' %}" class="text-gray-600 hover:text-gray-900">
-                    <i class="fas fa-arrow-left mr-2"></i> Retour
+            <div class="page-actions">
+                <a href="{% url 'admin_dashboard:user_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
                 </a>
-                <div class="space-x-4">
-                    <a href="{% url 'admin_dashboard:user_list' %}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                        Annuler
-                    </a>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                        {% if is_create %}
-                        <i class="fas fa-plus mr-2"></i> Créer Utilisateur
-                        {% else %}
-                        <i class="fas fa-save mr-2"></i> Mettre à Jour
-                        {% endif %}
-                    </button>
-                </div>
             </div>
-        </form>
+        </div>
     </div>
-</div>
+{% endblock %}
 
-<style>
-    input[type="text"],
-    input[type="email"],
-    input[type="password"],
-    select,
-    textarea {
-        @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500;
-    }
-</style>
+{% block content %}
+    <div class="form-container">
+        <div class="card animate-slide-up">
+            <div class="card-header">
+                <h3><i class="fas fa-user mr-2"></i> Informations de l'Utilisateur</h3>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <!-- Non-field Errors -->
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-error mb-6">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <div>
+                                {% for error in form.non_field_errors %}
+                                    <p>{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <!-- Username -->
+                    <div class="form-group">
+                        <label for="{{ form.username.id_for_label }}" class="form-label">
+                            Nom d'utilisateur <span class="required">*</span>
+                        </label>
+                        <input type="text" name="{{ form.username.name }}" id="{{ form.username.id_for_label }}"
+                               value="{{ form.username.value|default:'' }}"
+                               class="form-input {% if form.username.errors %}is-invalid{% endif %}"
+                               placeholder="Nom d'utilisateur">
+                        {% if form.username.errors %}
+                            <span class="form-error">{{ form.username.errors.0 }}</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Email -->
+                    <div class="form-group">
+                        <label for="{{ form.email.id_for_label }}" class="form-label">
+                            Email <span class="required">*</span>
+                        </label>
+                        <input type="email" name="{{ form.email.name }}" id="{{ form.email.id_for_label }}"
+                               value="{{ form.email.value|default:'' }}"
+                               class="form-input {% if form.email.errors %}is-invalid{% endif %}"
+                               placeholder="email@exemple.com">
+                        {% if form.email.errors %}
+                            <span class="form-error">{{ form.email.errors.0 }}</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Names Grid -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="{{ form.first_name.id_for_label }}" class="form-label">Prenom</label>
+                            <input type="text" name="{{ form.first_name.name }}" id="{{ form.first_name.id_for_label }}"
+                                   value="{{ form.first_name.value|default:'' }}"
+                                   class="form-input"
+                                   placeholder="Prenom">
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.last_name.id_for_label }}" class="form-label">Nom</label>
+                            <input type="text" name="{{ form.last_name.name }}" id="{{ form.last_name.id_for_label }}"
+                                   value="{{ form.last_name.value|default:'' }}"
+                                   class="form-input"
+                                   placeholder="Nom de famille">
+                        </div>
+                    </div>
+
+                    <!-- Role -->
+                    <div class="form-group">
+                        <label for="{{ form.role.id_for_label }}" class="form-label">
+                            Role <span class="required">*</span>
+                        </label>
+                        {{ form.role }}
+                        {% if form.role.errors %}
+                            <span class="form-error">{{ form.role.errors.0 }}</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Password -->
+                    <div class="form-group">
+                        <label for="id_password" class="form-label">
+                            {% if is_create %}
+                                Mot de passe <span class="required">*</span>
+                            {% else %}
+                                Nouveau Mot de Passe <span class="text-muted">(optionnel)</span>
+                            {% endif %}
+                        </label>
+                        <input type="password" name="password" id="id_password"
+                               class="form-input"
+                               placeholder="Mot de passe">
+                        <span class="form-hint">{{ form.password.help_text }}</span>
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div class="form-group">
+                        <label for="id_password_confirm" class="form-label">
+                            {% if is_create %}
+                                Confirmer le Mot de Passe <span class="required">*</span>
+                            {% else %}
+                                Confirmer le Nouveau Mot de Passe
+                            {% endif %}
+                        </label>
+                        <input type="password" name="password_confirm" id="id_password_confirm"
+                               class="form-input"
+                               placeholder="Confirmer le mot de passe">
+                    </div>
+
+                    <!-- Active Status -->
+                    <div class="form-group">
+                        <label class="form-checkbox">
+                            <input type="checkbox" name="is_active" {% if form.is_active.value %}checked{% endif %}>
+                            <span class="form-checkbox-label">Utilisateur actif</span>
+                        </label>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="form-actions">
+                        <a href="{% url 'admin_dashboard:user_list' %}" class="btn btn-secondary">
+                            Annuler
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if is_create %}
+                                <i class="fas fa-plus"></i>
+                                <span>Creer Utilisateur</span>
+                            {% else %}
+                                <i class="fas fa-save"></i>
+                                <span>Mettre a Jour</span>
+                            {% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .form-container {
+            max-width: 600px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--space-3);
+            margin-top: var(--space-6);
+            padding-top: var(--space-6);
+            border-top: 1px solid var(--neutral-200);
+        }
+
+        .required {
+            color: var(--error-500);
+        }
+
+        .form-hint {
+            display: block;
+            margin-top: var(--space-1);
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .form-checkbox {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            cursor: pointer;
+        }
+
+        .form-checkbox input {
+            width: 18px;
+            height: 18px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+        }
+
+        .form-checkbox-label {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-700);
+        }
+
+        .alert {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-3);
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+        }
+
+        .alert-error {
+            background: var(--error-50);
+            color: var(--error-700);
+            border: 1px solid var(--error-200);
+        }
+
+        .form-error {
+            display: block;
+            margin-top: var(--space-1);
+            font-size: var(--text-sm);
+            color: var(--error-500);
+        }
+
+        .is-invalid {
+            border-color: var(--error-500);
+        }
+
+        .is-invalid:focus {
+            border-color: var(--error-500);
+            box-shadow: 0 0 0 3px var(--error-100);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .form-actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
 {% endblock %}

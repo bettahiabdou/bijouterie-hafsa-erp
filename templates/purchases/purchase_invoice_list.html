@@ -3,138 +3,431 @@
 {% block title %}Factures d'Achat - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'purchases:purchase_invoice_list' %}">Factures d'Achat</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Factures d'Achat</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Factures d'Achat</h1>
-            <p class="text-gray-600 mt-1">Gestion des factures fournisseurs</p>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Factures d'Achat</h1>
+                <p class="page-subtitle">Gestion des factures fournisseurs</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'purchases:purchase_invoice_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>Nouvelle</span>
+                </a>
+            </div>
         </div>
-        <a href="{% url 'purchases:purchase_invoice_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-            <i class="fas fa-plus mr-2"></i> Nouvelle
-        </a>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-4 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fas fa-file-invoice"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total</div>
+                <div class="stat-value">{{ stats.total|default:"0" }}</div>
+                <div class="stat-meta">factures</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon error">
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Non Payees</div>
+                <div class="stat-value">{{ stats.unpaid|default:"0" }}</div>
+                <div class="stat-meta">factures</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Montant Total</div>
+                <div class="stat-value">{{ stats.total_amount|floatformat:0|default:"0" }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Solde Du</div>
+                <div class="stat-value">{{ stats.amount_due|floatformat:0|default:"0" }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
+        </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <!-- Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Total Factures</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.total }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Non Payées</p>
-            <p class="text-2xl font-bold text-red-600">{{ stats.unpaid }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Total Montant</p>
-            <p class="text-2xl font-bold text-blue-600">{{ stats.total_amount|floatformat:0 }} DH</p>
-        </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Solde Dû</p>
-            <p class="text-2xl font-bold text-orange-600">{{ stats.amount_due|floatformat:0 }} DH</p>
-        </div>
-    </div>
+    <div class="card animate-slide-up">
+        <!-- Filters -->
+        <div class="card-header filter-header">
+            <form method="get" class="filter-form">
+                <div class="filter-grid">
+                    <!-- Search -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Recherche</label>
+                        <input type="text" name="search" value="{{ search }}" placeholder="Ref ou Fournisseur..." class="form-input">
+                    </div>
 
-    <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-                <input type="text" name="search" value="{{ search }}" placeholder="Référence ou fournisseur"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Tous les statuts</option>
-                    {% for value, label in status_choices %}
-                        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <input type="date" name="date_from" value="{{ date_from }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div class="flex gap-2">
-                <input type="date" name="date_to" value="{{ date_to }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                    <i class="fas fa-search"></i>
-                </button>
-            </div>
-        </form>
-    </div>
+                    <!-- Status Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="">Tous</option>
+                            {% for value, label in status_choices %}
+                                <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-    <!-- Table -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b">
-                    <tr>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Référence</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Fournisseur</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Date</th>
-                        <th class="px-6 py-3 text-right font-medium text-gray-700">Montant Total</th>
-                        <th class="px-6 py-3 text-right font-medium text-gray-700">Solde Dû</th>
-                        <th class="px-6 py-3 text-center font-medium text-gray-700">Statut</th>
-                        <th class="px-6 py-3 text-center font-medium text-gray-700">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% for invoice in invoices %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-3 font-mono font-bold text-blue-600">{{ invoice.reference }}</td>
-                            <td class="px-6 py-3 text-gray-900">{{ invoice.supplier.name }}</td>
-                            <td class="px-6 py-3 text-gray-600">{{ invoice.date|date:"d/m/Y" }}</td>
-                            <td class="px-6 py-3 text-right font-bold text-gray-900">{{ invoice.total_amount|floatformat:0 }} DH</td>
-                            <td class="px-6 py-3 text-right font-bold {% if invoice.balance_due > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ invoice.balance_due|floatformat:0 }} DH</td>
-                            <td class="px-6 py-3 text-center">
-                                <span class="inline-block px-3 py-1 rounded-full text-xs font-medium
-                                    {% if invoice.status == 'draft' %}bg-gray-100 text-gray-800
-                                    {% elif invoice.status == 'confirmed' %}bg-blue-100 text-blue-800
-                                    {% elif invoice.status == 'partial' %}bg-yellow-100 text-yellow-800
-                                    {% elif invoice.status == 'paid' %}bg-green-100 text-green-800
-                                    {% elif invoice.status == 'cancelled' %}bg-red-100 text-red-800
-                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                    {{ invoice.get_status_display }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-3 text-center">
-                                <a href="{% url 'purchases:purchase_invoice_detail' invoice.reference %}" class="text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                            </td>
-                        </tr>
-                    {% empty %}
+                    <!-- Date From -->
+                    <div class="form-group hide-mobile" style="margin-bottom: 0;">
+                        <label class="form-label">Du</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" class="form-input">
+                    </div>
+
+                    <!-- Date To -->
+                    <div class="form-group hide-mobile" style="margin-bottom: 0;">
+                        <label class="form-label">Au</label>
+                        <input type="date" name="date_to" value="{{ date_to }}" class="form-input">
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <a href="{% url 'purchases:purchase_invoice_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Table - Desktop -->
+        <div class="card-body desktop-view" style="padding: 0;">
+            <div class="table-wrapper" style="border: none; border-radius: 0;">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-gray-500">
-                                Aucune facture trouvée
-                            </td>
+                            <th>Reference</th>
+                            <th>Fournisseur</th>
+                            <th>Date</th>
+                            <th style="text-align: right;">Montant</th>
+                            <th style="text-align: right;">Solde</th>
+                            <th style="text-align: center;">Statut</th>
+                            <th style="text-align: center;">Actions</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for invoice in invoices %}
+                            <tr style="cursor: pointer;" onclick="window.location='{% url 'purchases:purchase_invoice_detail' invoice.reference %}'">
+                                <td>
+                                    <a href="{% url 'purchases:purchase_invoice_detail' invoice.reference %}" class="font-semibold text-primary" onclick="event.stopPropagation();">
+                                        {{ invoice.reference }}
+                                    </a>
+                                </td>
+                                <td>{{ invoice.supplier.name }}</td>
+                                <td class="text-muted">{{ invoice.date|date:"d/m/Y" }}</td>
+                                <td style="text-align: right;" class="font-semibold">{{ invoice.total_amount|floatformat:0 }} DH</td>
+                                <td style="text-align: right;">
+                                    <span class="{% if invoice.balance_due > 0 %}text-error font-semibold{% else %}text-success{% endif %}">
+                                        {{ invoice.balance_due|floatformat:0 }} DH
+                                    </span>
+                                </td>
+                                <td style="text-align: center;">
+                                    <span class="badge {% if invoice.status == 'draft' %}badge-neutral{% elif invoice.status == 'confirmed' %}badge-info{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'paid' %}badge-success{% elif invoice.status == 'cancelled' %}badge-error{% else %}badge-neutral{% endif %}">
+                                        {{ invoice.get_status_display }}
+                                    </span>
+                                </td>
+                                <td style="text-align: center;" onclick="event.stopPropagation();">
+                                    <a href="{% url 'purchases:purchase_invoice_detail' invoice.reference %}" class="btn btn-ghost btn-sm btn-icon" title="Voir">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">
+                                            <i class="fas fa-file-invoice"></i>
+                                        </div>
+                                        <h4 class="empty-state-title">Aucune facture trouvee</h4>
+                                        <p class="empty-state-text">Commencez par creer une nouvelle facture.</p>
+                                        <a href="{% url 'purchases:purchase_invoice_create' %}" class="btn btn-primary">
+                                            <i class="fas fa-plus"></i> Nouvelle Facture
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
+
+        <!-- Cards - Mobile -->
+        <div class="card-body mobile-view">
+            <div class="invoice-cards">
+                {% for invoice in invoices %}
+                    <div class="invoice-card" onclick="window.location='{% url 'purchases:purchase_invoice_detail' invoice.reference %}'">
+                        <div class="invoice-card-header">
+                            <span class="invoice-card-ref">{{ invoice.reference }}</span>
+                            <span class="badge {% if invoice.status == 'draft' %}badge-neutral{% elif invoice.status == 'confirmed' %}badge-info{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'paid' %}badge-success{% elif invoice.status == 'cancelled' %}badge-error{% else %}badge-neutral{% endif %}">
+                                {{ invoice.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="invoice-card-client">
+                            <i class="fas fa-building"></i> {{ invoice.supplier.name }}
+                        </div>
+                        <div class="invoice-card-amounts">
+                            <div class="invoice-amount-item">
+                                <span class="invoice-amount-label">Montant</span>
+                                <span class="invoice-amount-value">{{ invoice.total_amount|floatformat:0 }} DH</span>
+                            </div>
+                            <div class="invoice-amount-item">
+                                <span class="invoice-amount-label">Solde</span>
+                                <span class="invoice-amount-value {% if invoice.balance_due > 0 %}text-error{% else %}text-success{% endif %}">
+                                    {{ invoice.balance_due|floatformat:0 }} DH
+                                </span>
+                            </div>
+                        </div>
+                        <div class="invoice-card-footer">
+                            <span class="invoice-card-date">
+                                <i class="fas fa-calendar"></i> {{ invoice.date|date:"d/m/Y" }}
+                            </span>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-state" style="padding: var(--space-6);">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-file-invoice"></i>
+                        </div>
+                        <h4 class="empty-state-title">Aucune facture trouvee</h4>
+                        <p class="empty-state-text">Commencez par creer une nouvelle facture.</p>
+                        <a href="{% url 'purchases:purchase_invoice_create' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Nouvelle Facture
+                        </a>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if invoices.has_other_pages %}
+            <div class="card-footer pagination-footer">
+                <div class="pagination-info">
+                    Page {{ invoices.number }} / {{ invoices.paginator.num_pages }}
+                </div>
+                <div class="pagination-buttons">
+                    {% if invoices.has_previous %}
+                        <a href="?page={{ invoices.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+
+                    {% if invoices.has_next %}
+                        <a href="?page={{ invoices.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
     </div>
 
-    <!-- Pagination -->
-    {% if invoices.has_other_pages %}
-        <div class="mt-6 flex justify-center gap-2">
-            {% if invoices.has_previous %}
-                <a href="?page=1{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Première</a>
-                <a href="?page={{ invoices.previous_page_number }}{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Précédente</a>
-            {% endif %}
+    <style>
+        /* Filter Styles */
+        .filter-header {
+            background: white;
+            padding: var(--space-4) var(--space-5);
+        }
 
-            <span class="px-3 py-2">Page {{ invoices.number }} sur {{ invoices.paginator.num_pages }}</span>
+        .filter-form {
+            width: 100%;
+            display: flex;
+            gap: var(--space-4);
+            align-items: flex-end;
+        }
 
-            {% if invoices.has_next %}
-                <a href="?page={{ invoices.next_page_number }}{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Suivante</a>
-                <a href="?page={{ invoices.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Dernière</a>
-            {% endif %}
-        </div>
-    {% endif %}
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            flex: 1;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Desktop/Mobile Toggle */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        .hide-mobile {
+            display: inline-block;
+        }
+
+        /* Invoice Cards */
+        .invoice-cards {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+            padding: var(--space-4);
+        }
+
+        .invoice-card {
+            background: var(--neutral-50);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .invoice-card:hover {
+            background: white;
+            border-color: var(--primary-300);
+            box-shadow: var(--shadow-md);
+        }
+
+        .invoice-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-2);
+        }
+
+        .invoice-card-ref {
+            font-weight: var(--font-bold);
+            color: var(--primary-600);
+            font-size: var(--text-sm);
+        }
+
+        .invoice-card-client {
+            color: var(--neutral-600);
+            font-size: var(--text-sm);
+            margin-bottom: var(--space-3);
+        }
+
+        .invoice-card-client i {
+            margin-right: var(--space-2);
+            color: var(--neutral-400);
+        }
+
+        .invoice-card-amounts {
+            display: flex;
+            gap: var(--space-4);
+            margin-bottom: var(--space-3);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-200);
+        }
+
+        .invoice-amount-item {
+            flex: 1;
+        }
+
+        .invoice-amount-label {
+            display: block;
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            margin-bottom: var(--space-1);
+        }
+
+        .invoice-amount-value {
+            font-weight: var(--font-bold);
+            font-size: var(--text-base);
+            color: var(--neutral-800);
+        }
+
+        .invoice-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .invoice-card-date {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .invoice-card-date i {
+            margin-right: var(--space-1);
+        }
+
+        /* Pagination */
+        .pagination-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pagination-info {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .pagination-buttons {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .filter-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filter-form {
+                flex-direction: column;
+                gap: var(--space-3);
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr 1fr;
+                width: 100%;
+            }
+
+            .filter-actions {
+                width: 100%;
+            }
+
+            .filter-actions .btn {
+                flex: 1;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+
+            .hide-mobile {
+                display: none !important;
+            }
+        }
+    </style>
 {% endblock %}

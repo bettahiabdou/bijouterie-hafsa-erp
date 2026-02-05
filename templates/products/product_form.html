@@ -1,273 +1,303 @@
 {% extends 'base.html' %}
 
-{% block title %}{% if product %}Modifier{% else %}Créer{% endif %} Produit - Bijouterie Hafsa ERP{% endblock %}
+{% block title %}{% if product %}Modifier{% else %}Creer{% endif %} Produit - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'products:list' %}">Produits</a>
-    <span>/</span>
-    <span>{% if product %}{{ product.reference }}{% else %}Nouveau{% endif %}</span>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:list' %}" class="breadcrumb-item">Produits</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{% if product %}{{ product.reference }}{% else %}Nouveau{% endif %}</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">
-                {% if product %}Modifier Produit{% else %}Créer Nouveau Produit{% endif %}
-            </h1>
-            {% if product %}
-                <p class="text-gray-600 mt-1">{{ product.reference }}</p>
-            {% endif %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">{% if product %}Modifier Produit{% else %}Nouveau Produit{% endif %}</h1>
+                {% if product %}
+                    <p class="page-subtitle">Reference: <strong>{{ product.reference }}</strong></p>
+                {% else %}
+                    <p class="page-subtitle">Remplissez les informations du nouveau produit</p>
+                {% endif %}
+            </div>
+            <div class="page-actions">
+                <a href="{% if product %}{% url 'products:detail' product.reference %}{% else %}{% url 'products:list' %}{% endif %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Annuler</span>
+                </a>
+            </div>
         </div>
-        <a href="{% if product %}{% url 'products:detail' product.reference %}{% else %}{% url 'products:list' %}{% endif %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-            <i class="fas fa-arrow-left mr-2"></i> Annuler
-        </a>
     </div>
 {% endblock %}
 
 {% block content %}
-    <form method="post" class="bg-white rounded-lg shadow-md p-4 md:p-6">
+    <form method="post" class="card animate-slide-up">
         {% csrf_token %}
 
         {% if form.non_field_errors %}
-            <div class="mb-6 p-4 bg-red-100 text-red-800 rounded-lg">
-                {% for error in form.non_field_errors %}
-                    <p>{{ error }}</p>
-                {% endfor %}
+            <div class="alert alert-error mb-6">
+                <i class="alert-icon fas fa-exclamation-circle"></i>
+                <div class="alert-content">
+                    {% for error in form.non_field_errors %}
+                        <p class="alert-message">{{ error }}</p>
+                    {% endfor %}
+                </div>
             </div>
         {% endif %}
 
-        <div class="form-grid-2 gap-6">
+        <div class="card-body">
             <!-- Basic Information -->
-            <div class="lg:col-span-2">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Informations de Base</h2>
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">
+                    <i class="fas fa-info-circle text-primary mr-2"></i>
+                    Informations de Base
+                </h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Reference</label>
+                        <input type="text" name="reference" value="{% if product %}{{ product.reference }}{% endif %}"
+                            readonly class="form-input" style="background: var(--neutral-100); color: var(--neutral-500);">
+                        <p class="form-help">{% if product %}Reference unique du produit{% else %}Generee automatiquement{% endif %}</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Type <span class="required">*</span></label>
+                        <select name="product_type" class="form-select" required>
+                            {% for value, label in product_types %}
+                                <option value="{{ value }}" {% if product.product_type == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Nom (Francais) <span class="required">*</span></label>
+                        <input type="text" name="name" value="{% if product %}{{ product.name }}{% endif %}" required class="form-input" placeholder="Nom du produit">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Nom (Arabe)</label>
+                        <input type="text" name="name_ar" value="{% if product %}{{ product.name_ar }}{% endif %}" class="form-input" dir="rtl" placeholder="اسم المنتج">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Categorie <span class="required">*</span></label>
+                        <select name="category" required class="form-select">
+                            <option value="">Selectionner une categorie</option>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}" {% if product.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Code-barres</label>
+                        <input type="text" name="barcode" value="{% if product %}{{ product.barcode }}{% endif %}" class="form-input" placeholder="Optionnel">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" rows="3" class="form-textarea" placeholder="Description du produit (optionnel)">{% if product %}{{ product.description }}{% endif %}</textarea>
+                </div>
             </div>
 
-            <!-- Reference (auto-generated) -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Référence</label>
-                <input type="text" name="reference" value="{% if product %}{{ product.reference }}{% endif %}"
-                    readonly class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">
-                <p class="text-xs text-gray-500 mt-1">{% if product %}Référence unique du produit{% else %}Généré automatiquement à la création{% endif %}</p>
-            </div>
+            <!-- Metal & Purity -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">
+                    <i class="fas fa-ring text-primary mr-2"></i>
+                    Metaux & Purete
+                </h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type de Metal</label>
+                        <select name="metal_type" class="form-select">
+                            <option value="">Non specifie</option>
+                            {% for metal in metals %}
+                                <option value="{{ metal.id }}" {% if product.metal_type_id == metal.id %}selected{% endif %}>{{ metal.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-            <!-- Type -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Type *</label>
-                <select name="product_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    {% for value, label in product_types %}
-                        <option value="{{ value }}" {% if product.product_type == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Nom FR -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Nom (Français) *</label>
-                <input type="text" name="name" value="{% if product %}{{ product.name }}{% endif %}" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-
-            <!-- Nom AR -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Nom (Arabe)</label>
-                <input type="text" name="name_ar" value="{% if product %}{{ product.name_ar }}{% endif %}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" dir="rtl">
-            </div>
-
-            <!-- Category -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Catégorie *</label>
-                <select name="category" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Sélectionner une catégorie</option>
-                    {% for category in categories %}
-                        <option value="{{ category.id }}" {% if product.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Description -->
-            <div class="lg:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                <textarea name="description" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">{% if product %}{{ product.description }}{% endif %}</textarea>
-            </div>
-
-            <!-- Metals & Purity -->
-            <h2 class="text-lg font-bold text-gray-900 mb-4 lg:col-span-2">Métaux & Pureté</h2>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Type de Métal</label>
-                <select name="metal_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Non spécifié</option>
-                    {% for metal in metals %}
-                        <option value="{{ metal.id }}" {% if product.metal_type_id == metal.id %}selected{% endif %}>{{ metal.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Pureté</label>
-                <select name="metal_purity" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Non spécifiée</option>
-                    {% for purity in purities %}
-                        <option value="{{ purity.id }}" {% if product.metal_purity_id == purity.id %}selected{% endif %}>{{ purity.name }}</option>
-                    {% endfor %}
-                </select>
+                    <div class="form-group">
+                        <label class="form-label">Purete</label>
+                        <select name="metal_purity" class="form-select">
+                            <option value="">Non specifiee</option>
+                            {% for purity in purities %}
+                                <option value="{{ purity.id }}" {% if product.metal_purity_id == purity.id %}selected{% endif %}>{{ purity.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
             </div>
 
             <!-- Weight -->
-            <h2 class="text-lg font-bold text-gray-900 mb-4 lg:col-span-2">Poids</h2>
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">
+                    <i class="fas fa-balance-scale text-primary mr-2"></i>
+                    Poids
+                </h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Poids Brut (g) <span class="required">*</span></label>
+                        <input type="number" name="gross_weight" value="{% if product %}{{ product.gross_weight }}{% else %}0{% endif %}"
+                            step="0.001" min="0" required class="form-input">
+                    </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Poids Brut (g) *</label>
-                <input type="number" name="gross_weight" value="{% if product %}{{ product.gross_weight }}{% else %}0{% endif %}"
-                    step="0.001" min="0" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Poids Net (g)</label>
-                <input type="number" id="net_weight" name="net_weight" value="{% if product %}{{ product.net_weight }}{% else %}0{% endif %}"
-                    step="0.001" min="0" onchange="calculateCosts()"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="form-group">
+                        <label class="form-label">Poids Net (g)</label>
+                        <input type="number" id="net_weight" name="net_weight" value="{% if product %}{{ product.net_weight }}{% else %}0{% endif %}"
+                            step="0.001" min="0" onchange="calculateCosts()" class="form-input">
+                    </div>
+                </div>
             </div>
 
             <!-- Pricing -->
-            <h2 class="text-lg font-bold text-gray-900 mb-4 lg:col-span-2">Tarification</h2>
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">
+                    <i class="fas fa-tags text-primary mr-2"></i>
+                    Tarification
+                </h2>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Prix d'Achat/g (DH) *</label>
-                <input type="number" id="purchase_price_per_gram" name="purchase_price_per_gram" value="{% if product %}{{ product.purchase_price_per_gram }}{% else %}0{% endif %}"
-                    step="0.01" min="0" required onchange="calculateCosts()"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">Prix d'Achat/g (DH) <span class="required">*</span></label>
+                        <input type="number" id="purchase_price_per_gram" name="purchase_price_per_gram"
+                            value="{% if product %}{{ product.purchase_price_per_gram }}{% else %}0{% endif %}"
+                            step="0.01" min="0" required onchange="calculateCosts()" class="form-input">
+                    </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Coût du Métal (DH)</label>
-                <input type="number" id="metal_cost" name="metal_cost" value="{% if product %}{{ product.metal_cost }}{% else %}0{% endif %}"
-                    step="0.01" min="0" readonly
-                    class="w-full px-4 py-2 bg-blue-50 border border-blue-300 rounded-lg text-blue-700 font-semibold">
-                <p class="text-xs text-gray-500 mt-1">Calculé = Poids Net × Prix/g</p>
-            </div>
+                    <div class="form-group">
+                        <label class="form-label">Cout du Metal (DH)</label>
+                        <input type="number" id="metal_cost" name="metal_cost"
+                            value="{% if product %}{{ product.metal_cost }}{% else %}0{% endif %}"
+                            step="0.01" min="0" readonly class="form-input"
+                            style="background: var(--info-50); border-color: var(--info-500); color: var(--info-700); font-weight: 600;">
+                        <p class="form-help">Calcule = Poids Net x Prix/g</p>
+                    </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Main d'Œuvre (DH)</label>
-                <input type="number" id="labor_cost" name="labor_cost" value="{% if product %}{{ product.labor_cost }}{% else %}0{% endif %}"
-                    step="0.01" min="0" onchange="calculateCosts()"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Coût des Pierres (DH)</label>
-                <input type="number" id="stone_cost" name="stone_cost" value="{% if product %}{{ product.stone_cost }}{% else %}0{% endif %}"
-                    step="0.01" min="0" onchange="calculateCosts()"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Autres Coûts (DH)</label>
-                <input type="number" id="other_cost" name="other_cost" value="{% if product %}{{ product.other_cost }}{% else %}0{% endif %}"
-                    step="0.01" min="0" onchange="calculateCosts()"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-
-            <div class="lg:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Coût Total (DH)</label>
-                <input type="number" id="total_cost" name="total_cost" value="{% if product %}{{ product.total_cost }}{% else %}0{% endif %}"
-                    step="0.01" min="0" readonly
-                    class="w-full px-4 py-2 bg-green-50 border border-green-300 rounded-lg text-green-700 font-bold text-lg">
-                <p class="text-xs text-gray-500 mt-1">Calculé automatiquement = Coût Métal + Main d'œuvre + Pierres + Autres</p>
-            </div>
-
-            <!-- Margin Settings -->
-            <div class="lg:col-span-2">
-                <h3 class="text-base font-bold text-gray-900 mb-3">Calcul du Prix de Vente</h3>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Type de Marge</label>
-                <select id="margin_type" name="margin_type" onchange="calculateSellingPrice()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="percentage" selected>Pourcentage (%)</option>
-                    <option value="fixed">Montant Fixe (DH)</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Valeur de Marge</label>
-                <div class="flex items-center gap-2">
-                    <input type="number" id="margin_value" name="margin_value" value="{% if product %}{{ product.margin_value }}{% else %}25{% endif %}"
-                        step="0.01" min="0" onchange="calculateSellingPrice()"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <span id="margin_unit" class="text-gray-600 font-medium whitespace-nowrap">%</span>
+                    <div class="form-group">
+                        <label class="form-label">Main d'Oeuvre (DH)</label>
+                        <input type="number" id="labor_cost" name="labor_cost"
+                            value="{% if product %}{{ product.labor_cost }}{% else %}0{% endif %}"
+                            step="0.01" min="0" onchange="calculateCosts()" class="form-input">
+                    </div>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Marge à appliquer au coût total</p>
-            </div>
 
-            <div class="lg:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Prix de Vente Calculé (DH)</label>
-                <input type="number" id="selling_price" name="selling_price" value="{% if product %}{{ product.selling_price }}{% else %}0{% endif %}"
-                    step="0.01" min="0" readonly
-                    class="w-full px-4 py-2 bg-orange-50 border border-orange-300 rounded-lg text-orange-700 font-bold text-lg">
-                <p class="text-xs text-gray-500 mt-1">Calculé automatiquement = Coût Total + Marge</p>
-            </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">Cout des Pierres (DH)</label>
+                        <input type="number" id="stone_cost" name="stone_cost"
+                            value="{% if product %}{{ product.stone_cost }}{% else %}0{% endif %}"
+                            step="0.01" min="0" onchange="calculateCosts()" class="form-input">
+                    </div>
 
-            <div class="lg:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Prix Minimum (DH) *</label>
-                <input type="number" name="minimum_price" value="{% if product %}{{ product.minimum_price }}{% else %}0{% endif %}"
-                    step="0.01" min="0" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <p class="text-xs text-gray-500 mt-1">Prix minimum en dessous duquel une approbation est nécessaire</p>
-            </div>
+                    <div class="form-group">
+                        <label class="form-label">Autres Couts (DH)</label>
+                        <input type="number" id="other_cost" name="other_cost"
+                            value="{% if product %}{{ product.other_cost }}{% else %}0{% endif %}"
+                            step="0.01" min="0" onchange="calculateCosts()" class="form-input">
+                    </div>
 
-            <!-- Bank Account -->
-            <div class="lg:col-span-2">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Paiement</h2>
-            </div>
+                    <div class="form-group">
+                        <label class="form-label">Cout Total (DH)</label>
+                        <input type="number" id="total_cost" name="total_cost"
+                            value="{% if product %}{{ product.total_cost }}{% else %}0{% endif %}"
+                            step="0.01" min="0" readonly class="form-input"
+                            style="background: var(--success-50); border-color: var(--success-500); color: var(--success-700); font-weight: 700; font-size: var(--text-lg);">
+                    </div>
+                </div>
 
-            <div class="lg:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Compte Bancaire</label>
-                <select name="bank_account" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Sélectionner un compte</option>
-                    {% load static %}
-                    {% for bank_account in bank_accounts %}
-                        <option value="{{ bank_account.id }}" {% if product.bank_account_id == bank_account.id %}selected{% endif %}>
-                            {{ bank_account.bank_name }} - {{ bank_account.account_name }}
-                        </option>
-                    {% endfor %}
-                </select>
-                <p class="text-xs text-gray-500 mt-1">Compte à partir duquel ce produit a été acheté</p>
+                <!-- Margin Settings -->
+                <div class="p-4 rounded-lg mt-4" style="background: var(--neutral-50); border: 1px solid var(--neutral-200);">
+                    <h3 class="font-semibold mb-4">Calcul du Prix de Vente</h3>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label class="form-label">Type de Marge</label>
+                            <select id="margin_type" name="margin_type" onchange="calculateSellingPrice()" class="form-select">
+                                <option value="percentage" selected>Pourcentage (%)</option>
+                                <option value="fixed">Montant Fixe (DH)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Valeur de Marge</label>
+                            <div class="flex items-center gap-2">
+                                <input type="number" id="margin_value" name="margin_value"
+                                    value="{% if product %}{{ product.margin_value }}{% else %}25{% endif %}"
+                                    step="0.01" min="0" onchange="calculateSellingPrice()" class="form-input">
+                                <span id="margin_unit" class="text-muted font-medium" style="white-space: nowrap;">%</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Prix de Vente (DH)</label>
+                            <input type="number" id="selling_price" name="selling_price"
+                                value="{% if product %}{{ product.selling_price }}{% else %}0{% endif %}"
+                                step="0.01" min="0" readonly class="form-input"
+                                style="background: var(--primary-50); border-color: var(--primary-500); color: var(--primary-700); font-weight: 700; font-size: var(--text-lg);">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row mt-4">
+                    <div class="form-group">
+                        <label class="form-label">Prix Minimum (DH) <span class="required">*</span></label>
+                        <input type="number" name="minimum_price" value="{% if product %}{{ product.minimum_price }}{% else %}0{% endif %}"
+                            step="0.01" min="0" required class="form-input">
+                        <p class="form-help">Prix minimum en dessous duquel une approbation est necessaire</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Compte Bancaire</label>
+                        <select name="bank_account" class="form-select">
+                            <option value="">Selectionner un compte</option>
+                            {% for bank_account in bank_accounts %}
+                                <option value="{{ bank_account.id }}" {% if product.bank_account_id == bank_account.id %}selected{% endif %}>
+                                    {{ bank_account.bank_name }} - {{ bank_account.account_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <p class="form-help">Compte a partir duquel ce produit a ete achete</p>
+                    </div>
+                </div>
             </div>
 
             <!-- Status (if editing) -->
             {% if product %}
-                <h2 class="text-lg font-bold text-gray-900 mb-4 lg:col-span-2">Statut</h2>
-
-                <div class="lg:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-                    <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">
+                    <i class="fas fa-toggle-on text-primary mr-2"></i>
+                    Statut
+                </h2>
+                <div class="form-group">
+                    <label class="form-label">Statut du Produit</label>
+                    <select name="status" class="form-select">
                         {% for value, label in statuses %}
                             <option value="{{ value }}" {% if product.status == value %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>
+            </div>
             {% endif %}
         </div>
 
         <!-- Form Actions -->
-        <div class="mt-8 flex gap-4">
-            <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center">
-                <i class="fas fa-save mr-2"></i>
-                {% if product %}Mettre à Jour{% else %}Créer{% endif %}
-            </button>
-            <a href="{% if product %}{% url 'products:detail' product.reference %}{% else %}{% url 'products:list' %}{% endif %}"
-                class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg">
+        <div class="card-footer">
+            <a href="{% if product %}{% url 'products:detail' product.reference %}{% else %}{% url 'products:list' %}{% endif %}" class="btn btn-secondary">
                 Annuler
             </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i>
+                <span>{% if product %}Mettre a Jour{% else %}Creer Produit{% endif %}</span>
+            </button>
         </div>
     </form>
 
     <script>
-        // Auto-calculate costs when form values change
         function calculateCosts() {
             const netWeight = parseFloat(document.getElementById('net_weight').value) || 0;
             const pricePerGram = parseFloat(document.getElementById('purchase_price_per_gram').value) || 0;
@@ -275,19 +305,15 @@
             const stoneCost = parseFloat(document.getElementById('stone_cost').value) || 0;
             const otherCost = parseFloat(document.getElementById('other_cost').value) || 0;
 
-            // Calculate metal cost
             const metalCost = netWeight * pricePerGram;
             document.getElementById('metal_cost').value = metalCost.toFixed(2);
 
-            // Calculate total cost
             const totalCost = metalCost + laborCost + stoneCost + otherCost;
             document.getElementById('total_cost').value = totalCost.toFixed(2);
 
-            // Calculate selling price based on total cost
             calculateSellingPrice();
         }
 
-        // Calculate selling price based on margin
         function calculateSellingPrice() {
             const totalCost = parseFloat(document.getElementById('total_cost').value) || 0;
             const marginType = document.getElementById('margin_type').value;
@@ -295,22 +321,17 @@
 
             let sellingPrice;
             if (marginType === 'percentage') {
-                // Percentage margin: Selling Price = Cost × (1 + margin%)
                 sellingPrice = totalCost * (1 + marginValue / 100);
             } else {
-                // Fixed amount margin: Selling Price = Cost + margin amount
                 sellingPrice = totalCost + marginValue;
             }
 
             document.getElementById('selling_price').value = sellingPrice.toFixed(2);
         }
 
-        // Update margin unit display when type changes
         document.addEventListener('DOMContentLoaded', function() {
-            // Initial calculation
             calculateCosts();
 
-            // Update margin unit when type changes
             const marginTypeSelect = document.getElementById('margin_type');
             const marginUnit = document.getElementById('margin_unit');
 

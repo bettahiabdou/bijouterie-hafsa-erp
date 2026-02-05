@@ -1,393 +1,508 @@
 {% extends 'base.html' %}
 
-{% block title %}Créer Produits en Lot - Bijouterie Hafsa ERP{% endblock %}
+{% block title %}Creer Produits en Lot - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'products:list' %}">Produits</a>
-    <span>/</span>
-    <span>Créer en Lot</span>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:list' %}" class="breadcrumb-item">Produits</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Creer en Lot</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Créer Produits en Lot</h1>
-            <p class="text-gray-600 mt-1">Ajouter plusieurs produits à la fois avec les mêmes paramètres</p>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Creer Produits en Lot</h1>
+                <p class="page-subtitle">Ajouter plusieurs produits a la fois avec les memes parametres</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'products:list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Annuler</span>
+                </a>
+            </div>
         </div>
-        <a href="{% url 'products:list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-            <i class="fas fa-arrow-left mr-2"></i> Annuler
-        </a>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="batch-form-container">
-        <!-- Main Form -->
-        <div class="batch-form-wrapper">
-            <form method="post" class="bg-white rounded-lg shadow-md p-6">
-                {% csrf_token %}
+    <form method="post" class="card animate-slide-up">
+        {% csrf_token %}
 
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="mb-6 p-4 {% if message.tags %}bg-{{ message.tags }}-100 text-{{ message.tags }}-800{% else %}bg-blue-100 text-blue-800{% endif %} rounded-lg">
-                            {{ message }}
-                        </div>
+        {% if form.non_field_errors %}
+            <div class="alert alert-error mb-6">
+                <i class="alert-icon fas fa-exclamation-circle"></i>
+                <div class="alert-content">
+                    {% for error in form.non_field_errors %}
+                        <p class="alert-message">{{ error }}</p>
                     {% endfor %}
-                {% endif %}
+                </div>
+            </div>
+        {% endif %}
 
-                <div>
-                    <!-- Common Parameters (Only truly shared fields) -->
-                    <div class="batch-form-section">
-                        <h2 class="text-lg font-bold text-gray-900 mb-4">Paramètres Communs</h2>
-                        <p class="text-sm text-gray-600 mb-6">Ces paramètres s'appliquent à tous les produits du lot. Les champs spécifiques à chaque produit (Catégorie, Type, Métal, Pureté, Compte) seront remplis dans le tableau ci-dessous.</p>
+        <div class="card-body">
+            <!-- Common Parameters -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">
+                    <i class="fas fa-sliders-h text-primary mr-2"></i>
+                    Parametres Communs
+                </h2>
+                <p class="text-sm text-muted mb-6">Ces parametres s'appliquent a tous les produits du lot. Les champs specifiques a chaque produit seront remplis dans le tableau ci-dessous.</p>
 
-                        <!-- Pricing Section -->
-                        <h3 class="text-base font-bold text-gray-900 mb-4">Prix Unitaire (par gramme)</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Prix d'Achat/g (DH) *</label>
-                                <input type="number" id="purchase_price_per_gram" name="purchase_price_per_gram" value="0"
-                                    step="0.01" min="0" required onchange="calculatePreview()"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Main d'Œuvre (DH)</label>
-                                <input type="number" id="labor_cost" name="labor_cost" value="0"
-                                    step="0.01" min="0" onchange="calculatePreview()"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Pierres (DH)</label>
-                                <input type="number" id="stone_cost" name="stone_cost" value="0"
-                                    step="0.01" min="0" onchange="calculatePreview()"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Autres Coûts (DH)</label>
-                                <input type="number" id="other_cost" name="other_cost" value="0"
-                                    step="0.01" min="0" onchange="calculatePreview()"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            </div>
-                        </div>
-
-                        <!-- Margin Settings -->
-                        <h3 class="text-base font-bold text-gray-900 mb-4">Marge sur Prix de Vente</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Type de Marge</label>
-                                <select id="margin_type_batch" name="margin_type" onchange="calculatePreview()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <option value="percentage" selected>Pourcentage (%)</option>
-                                    <option value="fixed">Montant Fixe (DH)</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Valeur de Marge</label>
-                                <div class="flex items-center gap-2">
-                                    <input type="number" id="margin_value_batch" name="margin_value" value="25"
-                                        step="0.01" min="0" onchange="calculatePreview()"
-                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <span id="margin_unit_batch" class="text-gray-600 font-medium whitespace-nowrap">%</span>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-1">Marge à appliquer au coût total de chaque produit</p>
-                            </div>
-                        </div>
+                <!-- Pricing Section -->
+                <h3 class="font-semibold mb-4">Prix Unitaire (par gramme)</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Prix d'Achat/g (DH) <span class="required">*</span></label>
+                        <input type="number" id="purchase_price_per_gram" name="purchase_price_per_gram" value="0"
+                            step="0.01" min="0" required onchange="calculatePreview()" class="form-input">
                     </div>
 
-                    <!-- Dynamic Product Entry - Table Format -->
-                    <div class="batch-form-section">
-                        <h2 class="text-lg font-bold text-gray-900 mb-4">Produits à Créer</h2>
-                        <p class="text-sm text-gray-600 mb-4">Remplissez le tableau ci-dessous avec les produits. Cliquez sur le ▼ pour voir et modifier les détails supplémentaires (Métal, Pureté, Compte, Coût). Chaque produit recevra une référence unique générée automatiquement.</p>
+                    <div class="form-group">
+                        <label class="form-label">Main d'Oeuvre (DH)</label>
+                        <input type="number" id="labor_cost" name="labor_cost" value="0"
+                            step="0.01" min="0" onchange="calculatePreview()" class="form-input">
+                    </div>
+                </div>
 
-                        <div class="overflow-x-auto">
-                            <table class="batch-table">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 30px;"></th>
-                                        <th>Produit</th>
-                                        <th>Catégorie *</th>
-                                        <th>Type *</th>
-                                        <th>Poids Net (g) *</th>
-                                        <th>Prix Vente (DH)</th>
-                                        <th style="width: 50px;">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="products_list">
-                                    <!-- Template row (will be cloned for new rows) -->
-                                    <tr class="product_item">
-                                        <td>
-                                            <button type="button" class="expand-toggle" title="Afficher détails">▼</button>
-                                        </td>
-                                        <td>
-                                            <input type="text" name="product_name" class="product_name w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                placeholder="Produit 1" onchange="calculatePreview()">
-                                        </td>
-                                        <td>
-                                            <select name="product_category" class="product_category w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required>
-                                                <option value="">--Sélect--</option>
-                                                {% for category in categories %}
-                                                    <option value="{{ category.id }}">{{ category.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <select name="product_type" class="product_type w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required>
-                                                {% for value, label in product_types %}
-                                                    <option value="{{ value }}" {% if value == 'finished' %}selected{% endif %}>{{ label }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <input type="number" name="product_weight" class="product_weight w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                step="0.001" min="0" required onchange="calculatePreview()">
-                                        </td>
-                                        <td>
-                                            <input type="number" name="product_selling_price" class="product_selling_price w-full px-2 py-1 bg-orange-50 border border-orange-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                step="0.01" min="0" onchange="calculatePreview()" placeholder="Auto">
-                                        </td>
-                                        <td style="text-align: center;">
-                                            <button type="button" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm remove_product" style="display:none;" title="Supprimer">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <!-- Detail row template (hidden by default) -->
-                                    <tr class="detail-row" style="display: none;">
-                                        <td colspan="7">
-                                            <div class="detail-content">
-                                                <div class="detail-field">
-                                                    <label>Métal</label>
-                                                    <select name="product_metal_type" class="product_metal_type">
-                                                        <option value="">--Aucun--</option>
-                                                        {% for metal in metals %}
-                                                            <option value="{{ metal.id }}" {% if metal.name == 'Or' %}selected{% endif %}>{{ metal.name }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
-                                                <div class="detail-field">
-                                                    <label>Pureté</label>
-                                                    <select name="product_purity" class="product_purity">
-                                                        <option value="">--Aucune--</option>
-                                                        {% for purity in purities %}
-                                                            <option value="{{ purity.id }}" {% if purity.name == 'Or 18 carats' %}selected{% endif %}>{{ purity.name }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
-                                                <div class="detail-field">
-                                                    <label>Fournisseur</label>
-                                                    <select name="product_supplier" class="product_supplier">
-                                                        <option value="">--Aucun--</option>
-                                                        {% for supplier in suppliers %}
-                                                            <option value="{{ supplier.id }}">{{ supplier.name }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
-                                                <div class="detail-field">
-                                                    <label>Compte Bancaire</label>
-                                                    <select name="product_bank_account" class="product_bank_account">
-                                                        <option value="">--Aucun--</option>
-                                                        {% for bank in bank_accounts %}
-                                                            <option value="{{ bank.id }}">{{ bank.bank_name }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
-                                                <div class="detail-field">
-                                                    <label>Coût Total (DH)</label>
-                                                    <input type="number" name="product_total_cost" class="product_total_cost" step="0.01" min="0" readonly style="background-color: #ecfdf5; color: #065f46;">
-                                                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Pierres (DH)</label>
+                        <input type="number" id="stone_cost" name="stone_cost" value="0"
+                            step="0.01" min="0" onchange="calculatePreview()" class="form-input">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Autres Couts (DH)</label>
+                        <input type="number" id="other_cost" name="other_cost" value="0"
+                            step="0.01" min="0" onchange="calculatePreview()" class="form-input">
+                    </div>
+                </div>
+
+                <!-- Margin Settings -->
+                <div class="p-4 rounded-lg mt-6" style="background: var(--neutral-50); border: 1px solid var(--neutral-200);">
+                    <h3 class="font-semibold mb-4">Marge sur Prix de Vente</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Type de Marge</label>
+                            <select id="margin_type_batch" name="margin_type" onchange="calculatePreview()" class="form-select">
+                                <option value="percentage" selected>Pourcentage (%)</option>
+                                <option value="fixed">Montant Fixe (DH)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Valeur de Marge</label>
+                            <div class="flex items-center gap-2">
+                                <input type="number" id="margin_value_batch" name="margin_value" value="25"
+                                    step="0.01" min="0" onchange="calculatePreview()" class="form-input">
+                                <span id="margin_unit_batch" class="text-muted font-medium" style="white-space: nowrap;">%</span>
+                            </div>
+                            <p class="form-help">Marge a appliquer au cout total de chaque produit</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamic Product Entry Table -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">
+                    <i class="fas fa-list text-primary mr-2"></i>
+                    Produits a Creer
+                </h2>
+                <p class="text-sm text-muted mb-4">Remplissez le tableau ci-dessous avec les produits. Cliquez sur le &#9660; pour voir et modifier les details supplementaires.</p>
+
+                <!-- Desktop View -->
+                <div class="desktop-view">
+                    <div class="table-wrapper">
+                        <table class="table" id="batch_table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;"></th>
+                                    <th>Produit</th>
+                                    <th>Categorie <span class="required">*</span></th>
+                                    <th>Type <span class="required">*</span></th>
+                                    <th>Poids Net (g) <span class="required">*</span></th>
+                                    <th>Prix Vente (DH)</th>
+                                    <th style="width: 60px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="products_list">
+                                <!-- Template row -->
+                                <tr class="product_item">
+                                    <td>
+                                        <button type="button" class="btn btn-ghost btn-sm expand-toggle" title="Afficher details">
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <input type="text" name="product_name" class="product_name form-input" placeholder="Produit 1" onchange="calculatePreview()">
+                                    </td>
+                                    <td>
+                                        <select name="product_category" class="product_category form-select">
+                                            <option value="">--Select--</option>
+                                            {% for category in categories %}
+                                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="product_type" class="product_type form-select">
+                                            {% for value, label in product_types %}
+                                                <option value="{{ value }}" {% if value == 'finished' %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" name="product_weight" class="product_weight form-input"
+                                            step="0.001" min="0" onchange="calculatePreview()">
+                                    </td>
+                                    <td>
+                                        <input type="number" name="product_selling_price" class="product_selling_price form-input"
+                                            step="0.01" min="0" onchange="calculatePreview()" placeholder="Auto"
+                                            style="background: var(--accent-50); border-color: var(--accent-300);">
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <button type="button" class="btn btn-ghost btn-sm remove_product" style="display:none; color: var(--error-500);" title="Supprimer">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <!-- Detail row template -->
+                                <tr class="detail-row" style="display: none;">
+                                    <td colspan="7" style="background: var(--neutral-50); padding: var(--space-4);">
+                                        <div class="grid" style="grid-template-columns: repeat(5, 1fr); gap: var(--space-4);">
+                                            <div class="form-group" style="margin-bottom: 0;">
+                                                <label class="form-label">Metal</label>
+                                                <select name="product_metal_type" class="product_metal_type form-select">
+                                                    <option value="">--Aucun--</option>
+                                                    {% for metal in metals %}
+                                                        <option value="{{ metal.id }}" {% if metal.name == 'Or' %}selected{% endif %}>{{ metal.name }}</option>
+                                                    {% endfor %}
+                                                </select>
                                             </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                            <div class="form-group" style="margin-bottom: 0;">
+                                                <label class="form-label">Purete</label>
+                                                <select name="product_purity" class="product_purity form-select">
+                                                    <option value="">--Aucune--</option>
+                                                    {% for purity in purities %}
+                                                        <option value="{{ purity.id }}" {% if purity.name == 'Or 18 carats' %}selected{% endif %}>{{ purity.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="form-group" style="margin-bottom: 0;">
+                                                <label class="form-label">Fournisseur</label>
+                                                <select name="product_supplier" class="product_supplier form-select">
+                                                    <option value="">--Aucun--</option>
+                                                    {% for supplier in suppliers %}
+                                                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="form-group" style="margin-bottom: 0;">
+                                                <label class="form-label">Compte Bancaire</label>
+                                                <select name="product_bank_account" class="product_bank_account form-select">
+                                                    <option value="">--Aucun--</option>
+                                                    {% for bank in bank_accounts %}
+                                                        <option value="{{ bank.id }}">{{ bank.bank_name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="form-group" style="margin-bottom: 0;">
+                                                <label class="form-label">Cout Total (DH)</label>
+                                                <input type="number" name="product_total_cost" class="product_total_cost form-input" step="0.01" min="0" readonly
+                                                    style="background: var(--success-50); border-color: var(--success-300); color: var(--success-700); font-weight: 600;">
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Mobile View -->
+                <div class="mobile-view">
+                    <div class="mobile-products-list" id="mobile_products_list">
+                        <!-- Template mobile card -->
+                        <div class="mobile-product-card product_item_mobile" data-index="0">
+                            <div class="mobile-product-header">
+                                <span class="mobile-product-number">Produit #1</span>
+                                <button type="button" class="btn btn-error btn-sm remove_product_mobile" style="display: none;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <div class="mobile-product-form">
+                                <div class="form-group">
+                                    <label class="form-label">Nom du Produit</label>
+                                    <input type="text" name="product_name" class="product_name_mobile form-input" placeholder="Produit 1">
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Categorie *</label>
+                                        <select name="product_category" class="product_category_mobile form-select">
+                                            <option value="">--Select--</option>
+                                            {% for category in categories %}
+                                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Type *</label>
+                                        <select name="product_type" class="product_type_mobile form-select">
+                                            {% for value, label in product_types %}
+                                                <option value="{{ value }}" {% if value == 'finished' %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Poids Net (g) *</label>
+                                        <input type="number" name="product_weight" class="product_weight_mobile form-input"
+                                            step="0.001" min="0">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Prix Vente (DH)</label>
+                                        <input type="number" name="product_selling_price" class="product_selling_price_mobile form-input form-input-highlight"
+                                            step="0.01" min="0" placeholder="Auto">
+                                    </div>
+                                </div>
+                                <!-- Expandable details -->
+                                <details class="mobile-product-details">
+                                    <summary class="mobile-details-toggle">
+                                        <i class="fas fa-chevron-down"></i>
+                                        <span>Details supplementaires</span>
+                                    </summary>
+                                    <div class="mobile-details-content">
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label class="form-label">Metal</label>
+                                                <select name="product_metal_type" class="product_metal_type_mobile form-select">
+                                                    <option value="">--Aucun--</option>
+                                                    {% for metal in metals %}
+                                                        <option value="{{ metal.id }}" {% if metal.name == 'Or' %}selected{% endif %}>{{ metal.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="form-label">Purete</label>
+                                                <select name="product_purity" class="product_purity_mobile form-select">
+                                                    <option value="">--Aucune--</option>
+                                                    {% for purity in purities %}
+                                                        <option value="{{ purity.id }}" {% if purity.name == 'Or 18 carats' %}selected{% endif %}>{{ purity.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label class="form-label">Fournisseur</label>
+                                                <select name="product_supplier" class="product_supplier_mobile form-select">
+                                                    <option value="">--Aucun--</option>
+                                                    {% for supplier in suppliers %}
+                                                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="form-label">Compte Bancaire</label>
+                                                <select name="product_bank_account" class="product_bank_account_mobile form-select">
+                                                    <option value="">--Aucun--</option>
+                                                    {% for bank in bank_accounts %}
+                                                        <option value="{{ bank.id }}">{{ bank.bank_name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Cout Total (DH)</label>
+                                            <input type="number" name="product_total_cost" class="product_total_cost_mobile form-input" step="0.01" min="0" readonly
+                                                style="background: var(--success-50); border-color: var(--success-300); color: var(--success-700); font-weight: 600;">
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
                         </div>
-
-                        <button type="button" id="add_product_btn" class="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center text-sm">
-                            <i class="fas fa-plus mr-2"></i> Ajouter une Ligne
-                        </button>
-                    </div>
-
-                    <!-- Summary -->
-                    <div class="batch-form-section mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <h3 class="font-bold text-blue-900 mb-2">Résumé</h3>
-                        <p class="text-sm text-blue-800">
-                            <strong id="total_products">1</strong> produit(s) à créer
-                        </p>
-                        <p class="text-sm text-blue-800 mt-2">
-                            Coût total estimé: <strong id="total_estimated_cost">0.00</strong> DH
-                        </p>
                     </div>
                 </div>
 
-                <!-- Form Actions -->
-                <div class="mt-8 flex gap-4 justify-start">
-                    <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center">
-                        <i class="fas fa-save mr-2"></i> Créer les Produits
-                    </button>
-                    <a href="{% url 'products:list' %}" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg">
-                        Annuler
-                    </a>
-                </div>
-            </form>
+                <button type="button" id="add_product_btn" class="btn btn-secondary mt-4">
+                    <i class="fas fa-plus"></i>
+                    <span>Ajouter une Ligne</span>
+                </button>
+            </div>
+
+            <!-- Summary -->
+            <div class="p-4 rounded-lg" style="background: var(--info-50); border: 1px solid var(--info-200);">
+                <h3 class="font-semibold mb-2" style="color: var(--info-700);">
+                    <i class="fas fa-calculator mr-2"></i> Resume
+                </h3>
+                <p class="text-sm" style="color: var(--info-600);">
+                    <strong id="total_products">1</strong> produit(s) a creer
+                </p>
+                <p class="text-sm mt-2" style="color: var(--info-600);">
+                    Cout total estime: <strong id="total_estimated_cost">0.00</strong> DH
+                </p>
+            </div>
         </div>
-    </div>
 
-    <!-- Help Section (Below Form) -->
-    <div class="batch-form-container mt-6">
-        <div class="batch-form-wrapper">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Aide et Conseils</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-600">
-                    <div>
-                        <h4 class="font-bold text-gray-900 mb-2">Paramètres Communs</h4>
-                        <p>Les paramètres communs s'appliquent à tous les produits de ce lot.</p>
-                    </div>
-                    <div>
-                        <h4 class="font-bold text-gray-900 mb-2">Coût Automatique</h4>
-                        <p>Le coût total de chaque produit = (Poids × Prix/g) + Main d'œuvre + Pierres + Autres</p>
-                    </div>
-                    <div>
-                        <h4 class="font-bold text-gray-900 mb-2">Exemple</h4>
-                        <p>Si poids=10g, prix/g=800 DH, main d'œuvre=100 DH:</p>
-                        <p class="font-mono text-blue-600">(10 × 800) + 100 = 8100 DH</p>
-                    </div>
-                    <div>
-                        <h4 class="font-bold text-gray-900 mb-2">💡 Prix de Vente</h4>
-                        <p>Vous pouvez modifier le prix de vente pour chaque produit individuellement en cliquant sur le détail (▼) du produit.</p>
-                    </div>
+        <!-- Form Actions -->
+        <div class="card-footer">
+            <a href="{% url 'products:list' %}" class="btn btn-secondary">
+                Annuler
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i>
+                <span>Creer les Produits</span>
+            </button>
+        </div>
+    </form>
+
+    <!-- Help Section -->
+    <div class="card mt-6 animate-slide-up" style="animation-delay: 100ms;">
+        <div class="card-header">
+            <h3><i class="fas fa-question-circle mr-2"></i> Aide et Conseils</h3>
+        </div>
+        <div class="card-body">
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <h4 class="font-semibold mb-2">Parametres Communs</h4>
+                    <p class="text-sm text-muted">Les parametres communs s'appliquent a tous les produits de ce lot.</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-2">Cout Automatique</h4>
+                    <p class="text-sm text-muted">Le cout total de chaque produit = (Poids x Prix/g) + Main d'oeuvre + Pierres + Autres</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-2">Exemple</h4>
+                    <p class="text-sm text-muted">Si poids=10g, prix/g=800 DH, main d'oeuvre=100 DH:</p>
+                    <p class="font-mono text-primary">(10 x 800) + 100 = 8100 DH</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-2">Prix de Vente</h4>
+                    <p class="text-sm text-muted">Vous pouvez modifier le prix de vente pour chaque produit individuellement en cliquant sur le detail du produit.</p>
                 </div>
             </div>
         </div>
     </div>
 
     <style>
-        /* Centered layout container */
-        .batch-form-container {
-            display: flex;
-            justify-content: center;
-            padding: 0;
+        /* Desktop/Mobile Views */
+        .desktop-view {
+            display: block;
         }
 
-        .batch-form-wrapper {
-            width: 100%;
-            max-width: 1200px;
-            padding: 0 20px;
+        .mobile-view {
+            display: none;
         }
 
-        /* Form sections with better spacing */
-        .batch-form-section {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        .batch-form-section:last-child {
-            border-bottom: none;
-        }
-
-        /* Table styling */
-        .batch-table {
-            width: 100%;
-            margin: 20px 0;
-            border-collapse: collapse;
-        }
-
-        .batch-table th,
-        .batch-table td {
-            padding: 12px 8px;
-            text-align: left;
-        }
-
-        .batch-table th {
-            background-color: #f3f4f6;
-            border-bottom: 2px solid #d1d5db;
-            font-weight: 600;
-        }
-
-        .batch-table td {
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        .batch-table tbody tr:hover {
-            background-color: #f9fafb;
-        }
-
-        /* Detail row styling */
-        .detail-row {
-            background-color: #f9fafb;
-        }
-
-        .detail-content {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            padding: 20px;
-            background-color: #f9fafb;
-            border-radius: 4px;
-        }
-
-        .detail-field {
+        /* Mobile Product Cards */
+        .mobile-products-list {
             display: flex;
             flex-direction: column;
+            gap: var(--space-4);
         }
 
-        .detail-field label {
-            font-weight: 600;
-            margin-bottom: 6px;
-            font-size: 0.9em;
-            color: #374151;
+        .mobile-product-card {
+            background: white;
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
         }
 
-        .detail-field input,
-        .detail-field select {
-            padding: 8px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            font-size: 0.9em;
+        .mobile-product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-4);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-200);
         }
 
-        /* Expand toggle button */
-        .expand-toggle {
+        .mobile-product-number {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .mobile-product-form {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .mobile-product-details {
+            margin-top: var(--space-3);
+        }
+
+        .mobile-details-toggle {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
             cursor: pointer;
-            background: none;
-            border: none;
-            padding: 4px 8px;
-            font-size: 0.9em;
-            color: #6b7280;
-            hover: color #111827;
-            transition: color 0.2s;
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
         }
 
-        .expand-toggle:hover {
-            color: #111827;
+        .mobile-details-toggle:hover {
+            background: var(--neutral-100);
         }
 
-        /* Responsive adjustments */
+        .mobile-details-toggle i {
+            transition: transform 0.2s ease;
+        }
+
+        .mobile-product-details[open] .mobile-details-toggle i {
+            transform: rotate(180deg);
+        }
+
+        .mobile-details-content {
+            padding: var(--space-4);
+            margin-top: var(--space-3);
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .form-input-highlight {
+            background: var(--accent-50) !important;
+            border-color: var(--accent-300) !important;
+        }
+
+        /* Mobile Responsive */
         @media (max-width: 768px) {
-            .batch-form-wrapper {
-                padding: 0 10px;
+            .desktop-view {
+                display: none;
             }
 
-            .detail-content {
+            .mobile-view {
+                display: block;
+            }
+
+            .form-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: var(--space-3);
+            }
+
+            .grid-cols-2 {
                 grid-template-columns: 1fr;
-            }
-
-            .batch-table {
-                font-size: 0.85em;
-            }
-
-            .batch-table th,
-            .batch-table td {
-                padding: 8px 4px;
             }
         }
     </style>
 
     <script>
+        // Mobile functionality
+        const mobileProductsList = document.getElementById('mobile_products_list');
+        const mobileTemplateCard = document.querySelector('.product_item_mobile');
+        let mobileProductCount = 1;
+
         // Setup expand/collapse for detail rows
         function setupExpandToggle(item) {
             const toggleBtn = item.querySelector('.expand-toggle');
@@ -399,14 +514,27 @@
                     e.preventDefault();
                     const isHidden = detailRow.style.display === 'none';
                     detailRow.style.display = isHidden ? 'table-row' : 'none';
-                    toggleBtn.textContent = isHidden ? '▲' : '▼';
+                    const icon = toggleBtn.querySelector('i');
+                    icon.classList.toggle('fa-chevron-down', !isHidden);
+                    icon.classList.toggle('fa-chevron-up', isHidden);
                 });
             }
         }
 
-        // Add product row
+        // Add product row - handles both desktop and mobile views
         document.getElementById('add_product_btn').addEventListener('click', function(e) {
             e.preventDefault();
+
+            // Check if we're in mobile view
+            if (window.innerWidth <= 768) {
+                addMobileProductCard();
+            } else {
+                addDesktopProductRow();
+            }
+        });
+
+        // Add desktop product row
+        function addDesktopProductRow() {
             const productsList = document.getElementById('products_list');
             const templateRow = document.querySelector('.product_item');
             const newMainRow = templateRow.cloneNode(true);
@@ -422,6 +550,13 @@
             });
             newDetailRow.style.display = 'none';
 
+            // Reset expand toggle icon
+            const icon = newMainRow.querySelector('.expand-toggle i');
+            if (icon) {
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+
             // Append both rows
             productsList.appendChild(newMainRow);
             productsList.appendChild(newDetailRow);
@@ -431,9 +566,78 @@
             setupExpandToggle(newMainRow);
             updateRemoveButtons();
             calculatePreview();
-        });
+        }
 
-        // Remove product row (remove both main and detail rows)
+        // Add mobile product card
+        function addMobileProductCard() {
+            mobileProductCount++;
+            const newCard = mobileTemplateCard.cloneNode(true);
+
+            // Update card number
+            newCard.setAttribute('data-index', mobileProductCount - 1);
+            newCard.querySelector('.mobile-product-number').textContent = 'Produit #' + mobileProductCount;
+
+            // Clear input values
+            newCard.querySelectorAll('input').forEach(input => {
+                input.value = '';
+            });
+            newCard.querySelectorAll('select').forEach(select => {
+                // Reset to first option or default
+                if (select.classList.contains('product_type_mobile')) {
+                    // Keep finished as default
+                    select.value = 'finished';
+                } else {
+                    select.selectedIndex = 0;
+                }
+            });
+
+            // Close details section
+            const details = newCard.querySelector('details');
+            if (details) {
+                details.removeAttribute('open');
+            }
+
+            // Show remove button
+            const removeBtn = newCard.querySelector('.remove_product_mobile');
+            if (removeBtn) {
+                removeBtn.style.display = 'inline-flex';
+                removeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    removeMobileProduct(this);
+                });
+            }
+
+            // Add change listeners for calculation
+            newCard.querySelectorAll('input, select').forEach(input => {
+                input.addEventListener('change', calculatePreview);
+            });
+
+            // Append card
+            mobileProductsList.appendChild(newCard);
+            updateRemoveButtons();
+            calculatePreview();
+        }
+
+        // Remove mobile product card
+        function removeMobileProduct(btn) {
+            const card = btn.closest('.product_item_mobile');
+            card.remove();
+            updateMobileProductNumbers();
+            updateRemoveButtons();
+            calculatePreview();
+        }
+
+        // Update mobile product numbers after removal
+        function updateMobileProductNumbers() {
+            const cards = document.querySelectorAll('.product_item_mobile');
+            cards.forEach((card, index) => {
+                card.setAttribute('data-index', index);
+                card.querySelector('.mobile-product-number').textContent = 'Produit #' + (index + 1);
+            });
+            mobileProductCount = cards.length;
+        }
+
+        // Remove product row
         function removeProduct(btn) {
             const mainRow = btn.closest('.product_item');
             const detailRow = mainRow.nextElementSibling;
@@ -455,13 +659,11 @@
                 });
             }
 
-            // Attach change listeners to inputs and selects
             const inputs = item.querySelectorAll('input, select');
             inputs.forEach(input => {
                 input.addEventListener('change', calculatePreview);
             });
 
-            // Also attach to detail row fields
             const detailRow = item.nextElementSibling;
             if (detailRow && detailRow.classList.contains('detail-row')) {
                 const detailInputs = detailRow.querySelectorAll('input, select');
@@ -471,25 +673,34 @@
             }
         }
 
-        // Update remove buttons visibility
+        // Update remove buttons visibility for both views
         function updateRemoveButtons() {
-            const items = document.querySelectorAll('.product_item');
-            items.forEach(item => {
+            // Desktop view
+            const desktopItems = document.querySelectorAll('.product_item');
+            desktopItems.forEach(item => {
                 const removeBtn = item.querySelector('.remove_product');
                 if (removeBtn) {
-                    removeBtn.style.display = items.length > 1 ? 'block' : 'none';
+                    removeBtn.style.display = desktopItems.length > 1 ? 'inline-flex' : 'none';
+                }
+            });
+
+            // Mobile view
+            const mobileItems = document.querySelectorAll('.product_item_mobile');
+            mobileItems.forEach(item => {
+                const removeBtn = item.querySelector('.remove_product_mobile');
+                if (removeBtn) {
+                    removeBtn.style.display = mobileItems.length > 1 ? 'inline-flex' : 'none';
                 }
             });
         }
 
-        // Calculate costs and selling prices
+        // Calculate costs and selling prices for both desktop and mobile views
         function calculatePreview() {
             const pricePerGram = parseFloat(document.getElementById('purchase_price_per_gram').value) || 0;
             const laborCost = parseFloat(document.getElementById('labor_cost').value) || 0;
             const stoneCost = parseFloat(document.getElementById('stone_cost').value) || 0;
             const otherCost = parseFloat(document.getElementById('other_cost').value) || 0;
 
-            // Get margin settings
             const marginType = document.getElementById('margin_type_batch').value;
             const marginValue = parseFloat(document.getElementById('margin_value_batch').value) || 0;
 
@@ -497,55 +708,92 @@
             let productCount = 0;
             let rowNumber = 0;
 
-            document.querySelectorAll('.product_item').forEach((item, index) => {
-                const weight = parseFloat(item.querySelector('.product_weight').value) || 0;
+            const isMobile = window.innerWidth <= 768;
 
-                // Skip empty rows
-                if (weight <= 0) {
-                    return;
-                }
+            if (isMobile) {
+                // Mobile view calculation
+                document.querySelectorAll('.product_item_mobile').forEach((card, index) => {
+                    const weight = parseFloat(card.querySelector('.product_weight_mobile').value) || 0;
 
-                rowNumber++;
-                const metalCost = weight * pricePerGram;
-                const totalCost = metalCost + laborCost + stoneCost + otherCost;
+                    if (weight <= 0) {
+                        return;
+                    }
 
-                // Update total cost in detail row
-                const detailRow = item.nextElementSibling;
-                if (detailRow && detailRow.classList.contains('detail-row')) {
-                    detailRow.querySelector('.product_total_cost').value = totalCost.toFixed(2);
-                }
+                    rowNumber++;
+                    const metalCost = weight * pricePerGram;
+                    const totalCost = metalCost + laborCost + stoneCost + otherCost;
 
-                // Calculate selling price based on margin
-                let sellingPriceCalc;
-                if (marginType === 'percentage') {
-                    sellingPriceCalc = totalCost * (1 + marginValue / 100);
-                } else {
-                    sellingPriceCalc = totalCost + marginValue;
-                }
+                    // Update total cost in mobile details
+                    const totalCostInput = card.querySelector('.product_total_cost_mobile');
+                    if (totalCostInput) {
+                        totalCostInput.value = totalCost.toFixed(2);
+                    }
 
-                // Update selling price field
-                const finalPrice = item.querySelector('.product_selling_price');
+                    let sellingPriceCalc;
+                    if (marginType === 'percentage') {
+                        sellingPriceCalc = totalCost * (1 + marginValue / 100);
+                    } else {
+                        sellingPriceCalc = totalCost + marginValue;
+                    }
 
-                // Only auto-fill if user hasn't entered an override
-                if (!finalPrice.value || finalPrice.value === '') {
-                    finalPrice.value = sellingPriceCalc.toFixed(2);
-                    finalPrice.classList.remove('bg-white', 'border-blue-300');
-                    finalPrice.classList.add('bg-orange-50', 'border-orange-300');
-                } else {
-                    // User has overridden - show white background
-                    finalPrice.classList.remove('bg-orange-50', 'border-orange-300');
-                    finalPrice.classList.add('bg-white', 'border-blue-300');
-                }
+                    const finalPrice = card.querySelector('.product_selling_price_mobile');
+                    if (finalPrice && (!finalPrice.value || finalPrice.value === '')) {
+                        finalPrice.value = sellingPriceCalc.toFixed(2);
+                    }
 
-                // Auto-generate product name if empty
-                const productNameInput = item.querySelector('.product_name');
-                if (!productNameInput.value || productNameInput.value.trim() === '') {
-                    productNameInput.value = `Produit ${rowNumber}`;
-                }
+                    const productNameInput = card.querySelector('.product_name_mobile');
+                    if (productNameInput && (!productNameInput.value || productNameInput.value.trim() === '')) {
+                        productNameInput.value = `Produit ${rowNumber}`;
+                    }
 
-                totalEstimated += totalCost;
-                productCount++;
-            });
+                    totalEstimated += totalCost;
+                    productCount++;
+                });
+            } else {
+                // Desktop view calculation
+                document.querySelectorAll('.product_item').forEach((item, index) => {
+                    const weight = parseFloat(item.querySelector('.product_weight').value) || 0;
+
+                    if (weight <= 0) {
+                        return;
+                    }
+
+                    rowNumber++;
+                    const metalCost = weight * pricePerGram;
+                    const totalCost = metalCost + laborCost + stoneCost + otherCost;
+
+                    const detailRow = item.nextElementSibling;
+                    if (detailRow && detailRow.classList.contains('detail-row')) {
+                        detailRow.querySelector('.product_total_cost').value = totalCost.toFixed(2);
+                    }
+
+                    let sellingPriceCalc;
+                    if (marginType === 'percentage') {
+                        sellingPriceCalc = totalCost * (1 + marginValue / 100);
+                    } else {
+                        sellingPriceCalc = totalCost + marginValue;
+                    }
+
+                    const finalPrice = item.querySelector('.product_selling_price');
+
+                    if (!finalPrice.value || finalPrice.value === '') {
+                        finalPrice.value = sellingPriceCalc.toFixed(2);
+                        finalPrice.style.background = 'var(--accent-50)';
+                        finalPrice.style.borderColor = 'var(--accent-300)';
+                    } else {
+                        finalPrice.style.background = 'white';
+                        finalPrice.style.borderColor = 'var(--primary-300)';
+                    }
+
+                    const productNameInput = item.querySelector('.product_name');
+                    if (!productNameInput.value || productNameInput.value.trim() === '') {
+                        productNameInput.value = `Produit ${rowNumber}`;
+                    }
+
+                    totalEstimated += totalCost;
+                    productCount++;
+                });
+            }
 
             document.getElementById('total_products').textContent = productCount;
             document.getElementById('total_estimated_cost').textContent = totalEstimated.toFixed(2);
@@ -558,18 +806,43 @@
             marginUnit.textContent = marginTypeSelect.value === 'percentage' ? '%' : 'DH';
         }
 
+        // Attach event listeners to mobile product cards
+        function attachMobileEventListeners(card) {
+            const removeBtn = card.querySelector('.remove_product_mobile');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    removeMobileProduct(this);
+                });
+            }
+
+            const inputs = card.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                input.addEventListener('change', calculatePreview);
+            });
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            // Setup all product rows
+            // Desktop view initialization
             document.querySelectorAll('.product_item').forEach(item => {
                 attachEventListeners(item);
                 setupExpandToggle(item);
             });
 
+            // Mobile view initialization
+            document.querySelectorAll('.product_item_mobile').forEach(card => {
+                attachMobileEventListeners(card);
+            });
+
             updateRemoveButtons();
             calculatePreview();
 
-            // Update margin unit when type changes
+            // Recalculate on window resize
+            window.addEventListener('resize', function() {
+                calculatePreview();
+            });
+
             const marginTypeSelect = document.getElementById('margin_type_batch');
             if (marginTypeSelect) {
                 marginTypeSelect.addEventListener('change', function() {

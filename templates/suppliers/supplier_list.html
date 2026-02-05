@@ -1,463 +1,578 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Fournisseurs{% endblock %}
+{% block title %}Fournisseurs - Bijouterie Hafsa ERP{% endblock %}
 
-{% block extra_css %}
-<style>
-    .supplier-card {
-        background: white;
-        border-radius: var(--radius-lg);
-        padding: var(--space-6);
-        margin-bottom: var(--space-3);
-        border: 1px solid var(--color-neutral-medium);
-        transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
-    }
-
-    .supplier-card:hover {
-        box-shadow: var(--shadow-md);
-        border-color: var(--color-primary);
-    }
-
-    .supplier-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: start;
-        margin-bottom: var(--space-3);
-    }
-
-    .supplier-name {
-        font-size: 1.125rem;
-        font-weight: var(--weight-semibold);
-        color: var(--color-neutral-dark);
-        text-decoration: none;
-        font-family: var(--font-serif);
-    }
-
-    .supplier-name:hover {
-        color: var(--color-primary);
-    }
-
-    .supplier-type-badge {
-        display: inline-block;
-        padding: var(--space-1) var(--space-3);
-        border-radius: var(--radius-md);
-        font-size: 0.825rem;
-        font-weight: var(--weight-semibold);
-        text-transform: uppercase;
-        letter-spacing: var(--tracking-wide);
-        margin-right: var(--space-2);
-    }
-
-    .supplier-type-material { background-color: rgba(122, 159, 184, 0.15); color: #7a9fb8; }
-    .supplier-type-artisan { background-color: rgba(183, 110, 121, 0.15); color: var(--color-primary); }
-    .supplier-type-other { background-color: rgba(168, 157, 149, 0.1); color: var(--color-neutral-gray); }
-
-    .supplier-info {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: var(--space-4);
-        margin-bottom: var(--space-3);
-    }
-
-    .info-item {
-        font-size: 0.875rem;
-        color: var(--color-neutral-gray);
-    }
-
-    .info-label {
-        font-weight: var(--weight-semibold);
-        color: var(--color-neutral-dark);
-        display: block;
-        margin-bottom: var(--space-1);
-    }
-
-    .info-value {
-        color: var(--color-neutral-black);
-    }
-
-    .supplier-actions {
-        display: flex;
-        gap: var(--space-2);
-        justify-content: flex-end;
-    }
-
-    .btn-small {
-        padding: var(--space-2) var(--space-3);
-        font-size: 0.825rem;
-        border-radius: var(--radius-md);
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-1);
-        transition: all var(--transition-fast);
-        border: none;
-        cursor: pointer;
-        font-weight: var(--weight-semibold);
-    }
-
-    .btn-primary-small {
-        background-color: var(--color-primary);
-        color: white;
-    }
-
-    .btn-primary-small:hover {
-        background-color: var(--color-primary-dark);
-        transform: translateY(-1px);
-        box-shadow: var(--shadow-md);
-    }
-
-    .btn-secondary-small {
-        background-color: var(--color-neutral-medium);
-        color: var(--color-neutral-dark);
-    }
-
-    .btn-secondary-small:hover {
-        background-color: var(--color-neutral-light);
-    }
-
-    .btn-danger-small {
-        background-color: var(--color-error);
-        color: white;
-    }
-
-    .btn-danger-small:hover {
-        background-color: #a84a47;
-    }
-
-    .active-badge {
-        display: inline-block;
-        padding: var(--space-1) var(--space-2);
-        border-radius: var(--radius-sm);
-        font-size: 0.75rem;
-        font-weight: var(--weight-semibold);
-        text-transform: uppercase;
-        letter-spacing: var(--tracking-wide);
-    }
-
-    .active-true {
-        background-color: rgba(124, 179, 66, 0.15);
-        color: #7cb342;
-    }
-
-    .active-false {
-        background-color: rgba(200, 90, 84, 0.15);
-        color: #c85a54;
-    }
-
-    .filter-section {
-        background: white;
-        border-radius: var(--radius-lg);
-        padding: var(--space-6);
-        margin-bottom: var(--space-8);
-        border: 1px solid var(--color-neutral-medium);
-    }
-
-    .filter-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: var(--space-4);
-    }
-
-    .filter-group {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .filter-group label {
-        font-weight: var(--weight-semibold);
-        margin-bottom: var(--space-2);
-        color: var(--color-neutral-dark);
-        font-size: 0.875rem;
-        text-transform: uppercase;
-        letter-spacing: var(--tracking-wide);
-    }
-
-    .filter-group select,
-    .filter-group input {
-        padding: var(--space-2) var(--space-3);
-        border: 1px solid var(--color-neutral-medium);
-        border-radius: var(--radius-md);
-        font-size: 0.875rem;
-        transition: border-color var(--transition-fast);
-    }
-
-    .filter-group input:focus,
-    .filter-group select:focus {
-        outline: none;
-        border-color: var(--color-primary);
-        box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
-    }
-
-    .filter-actions {
-        display: flex;
-        gap: var(--space-2);
-        align-items: flex-end;
-    }
-
-    .filter-actions button {
-        padding: var(--space-2) var(--space-4);
-        border: none;
-        border-radius: var(--radius-md);
-        font-weight: var(--weight-semibold);
-        cursor: pointer;
-        transition: all var(--transition-fast);
-    }
-
-    .pagination {
-        display: flex;
-        justify-content: center;
-        gap: var(--space-1);
-        margin-top: var(--space-8);
-    }
-
-    .pagination a, .pagination span {
-        padding: var(--space-2) var(--space-3);
-        border: 1px solid var(--color-neutral-medium);
-        border-radius: var(--radius-md);
-        text-decoration: none;
-        color: var(--color-neutral-dark);
-        font-size: 0.875rem;
-        transition: all var(--transition-fast);
-    }
-
-    .pagination a:hover {
-        background-color: var(--color-neutral-light);
-        border-color: var(--color-primary);
-    }
-
-    .pagination .current {
-        background-color: var(--color-primary);
-        color: white;
-        border-color: var(--color-primary);
-        font-weight: var(--weight-semibold);
-    }
-
-    .no-results {
-        text-align: center;
-        padding: var(--space-12);
-        color: var(--color-neutral-gray);
-    }
-
-    .no-results i {
-        font-size: 3rem;
-        color: var(--color-neutral-medium);
-        margin-bottom: var(--space-4);
-        opacity: 0.5;
-    }
-
-    .no-results h3 {
-        font-size: 1.25rem;
-        font-weight: var(--weight-semibold);
-        color: var(--color-neutral-dark);
-        font-family: var(--font-serif);
-    }
-
-    .results-count {
-        background: rgba(183, 110, 121, 0.05);
-        border: 1px solid rgba(183, 110, 121, 0.15);
-        border-radius: var(--radius-md);
-        padding: var(--space-3);
-        margin-bottom: var(--space-4);
-        font-size: 0.875rem;
-        color: var(--color-neutral-dark);
-    }
-
-    .results-count strong {
-        color: var(--color-primary);
-        font-weight: var(--weight-semibold);
-    }
-</style>
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Fournisseurs</span>
 {% endblock %}
 
 {% block page_header %}
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <h1 style="margin-bottom: 0.5rem; font-family: var(--font-serif); color: var(--color-neutral-black);">Fournisseurs</h1>
-            <p style="margin: 0; font-size: var(--text-sm); color: var(--color-neutral-gray);">Gérez vos fournisseurs et leurs informations</p>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Fournisseurs</h1>
+                <p class="page-subtitle">Gerez vos fournisseurs et leurs informations</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'suppliers:create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>Nouveau Fournisseur</span>
+                </a>
+            </div>
         </div>
-        <a href="{% url 'suppliers:create' %}" style="display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-6); background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light)); color: white; border-radius: var(--radius-md); text-decoration: none; font-weight: var(--weight-semibold); font-size: var(--text-sm); text-transform: uppercase; letter-spacing: var(--tracking-wide); transition: all var(--transition-fast);" onmouseover="this.style.background='linear-gradient(135deg, var(--color-primary-dark), var(--color-primary))'; this.style.boxShadow='var(--shadow-hover)'; this.style.transform='translateY(-2px)'" onmouseout="this.style.background='linear-gradient(135deg, var(--color-primary), var(--color-primary-light))'; this.style.boxShadow='none'; this.style.transform='translateY(0)'">
-            <i class="fas fa-plus"></i> Nouveau Fournisseur
-        </a>
     </div>
 {% endblock %}
 
 {% block content %}
-<div style="max-width: 1200px; margin: 0 auto; padding: 0 var(--space-4);">
-    <!-- Messages -->
-    {% if messages %}
-        {% for message in messages %}
-            <div style="margin-bottom: var(--space-6); padding: var(--space-4); background-color: {% if message.tags == 'success' %}rgba(124, 179, 66, 0.1){% elif message.tags == 'error' %}rgba(200, 90, 84, 0.1){% else %}rgba(122, 159, 184, 0.1){% endif %}; color: {% if message.tags == 'success' %}#7cb342{% elif message.tags == 'error' %>#c85a54{% else %>#7a9fb8{% endif %}; border-radius: var(--radius-md); border: 1px solid {% if message.tags == 'success' %}rgba(124, 179, 66, 0.3){% elif message.tags == 'error' %}rgba(200, 90, 84, 0.3){% else %}rgba(122, 159, 184, 0.3){% endif %};">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
-
     <!-- Filter Section -->
-    <div class="filter-section">
-        <form method="get" class="filter-grid">
-            <div class="filter-group">
-                <label for="search">Rechercher</label>
-                <input type="text" id="search" name="search" placeholder="Nom, code, email..." value="{{ search_query }}" class="w-full">
-            </div>
+    <div class="card mb-6 animate-slide-up">
+        <div class="card-header">
+            <h3><i class="fas fa-filter mr-2"></i> Filtres</h3>
+        </div>
+        <div class="card-body">
+            <form method="get" class="filter-form">
+                <div class="filter-grid">
+                    <div class="form-group">
+                        <label class="form-label">Rechercher</label>
+                        <input type="text" name="search" placeholder="Nom, code, email..." value="{{ search_query }}" class="form-input">
+                    </div>
 
-            <div class="filter-group">
-                <label for="type">Type</label>
-                <select id="type" name="type" class="w-full">
-                    <option value="">-- Tous les types --</option>
-                    {% for value, label in supplier_types %}
-                        <option value="{{ value }}" {% if value == current_type %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select name="type" class="form-select">
+                            <option value="">-- Tous les types --</option>
+                            {% for value, label in supplier_types %}
+                                <option value="{{ value }}" {% if value == current_type %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-            <div class="filter-group">
-                <label for="city">Ville</label>
-                <select id="city" name="city" class="w-full">
-                    <option value="">-- Toutes les villes --</option>
-                    {% for city in cities %}
-                        <option value="{{ city }}" {% if city == current_city %}selected{% endif %}>{{ city }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+                    <div class="form-group">
+                        <label class="form-label">Ville</label>
+                        <select name="city" class="form-select">
+                            <option value="">-- Toutes les villes --</option>
+                            {% for city in cities %}
+                                <option value="{{ city }}" {% if city == current_city %}selected{% endif %}>{{ city }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-            <div class="filter-group">
-                <label for="active">Statut</label>
-                <select id="active" name="active" class="w-full">
-                    <option value="">-- Tous les statuts --</option>
-                    <option value="true" {% if current_active == 'true' %}selected{% endif %}>Actif</option>
-                    <option value="false" {% if current_active == 'false' %}selected{% endif %}>Inactif</option>
-                </select>
-            </div>
+                    <div class="form-group">
+                        <label class="form-label">Statut</label>
+                        <select name="active" class="form-select">
+                            <option value="">-- Tous les statuts --</option>
+                            <option value="true" {% if current_active == 'true' %}selected{% endif %}>Actif</option>
+                            <option value="false" {% if current_active == 'false' %}selected{% endif %}>Inactif</option>
+                        </select>
+                    </div>
+                </div>
 
-            <div class="filter-actions">
-                <button type="submit" style="background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light)); color: white;">
-                    <i class="fas fa-search mr-2"></i> Filtrer
-                </button>
-                <a href="{% url 'suppliers:list' %}" style="background-color: var(--color-neutral-medium); color: var(--color-neutral-dark); padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); text-decoration: none; display: inline-flex; align-items: center; font-weight: var(--weight-semibold);">
-                    <i class="fas fa-redo mr-2"></i> Réinitialiser
-                </a>
-            </div>
-        </form>
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i>
+                        <span>Filtrer</span>
+                    </button>
+                    <a href="{% url 'suppliers:list' %}" class="btn btn-secondary">
+                        <i class="fas fa-redo"></i>
+                        <span>Reinitialiser</span>
+                    </a>
+                </div>
+            </form>
+        </div>
     </div>
 
-    <!-- Suppliers List -->
+    <!-- Results Count -->
     {% if suppliers %}
-        <div class="results-count">
-            <strong>{{ page_obj.paginator.count }}</strong> fournisseur(s) trouvé(s)
+        <div class="alert alert-info mb-6">
+            <i class="fas fa-info-circle"></i>
+            <div>
+                <strong>{{ page_obj.paginator.count }}</strong> fournisseur(s) trouve(s)
+            </div>
         </div>
+    {% endif %}
 
-        <div>
-            {% for supplier in suppliers %}
-                <div class="supplier-card">
-                    <div class="supplier-header">
-                        <div>
-                            <a href="{% url 'suppliers:detail' code=supplier.code %}" class="supplier-name">
-                                {{ supplier.name }}
-                            </a>
-                            {% if supplier.name_ar %}
-                                <div class="text-sm text-gray-500 mt-1">{{ supplier.name_ar }}</div>
-                            {% endif %}
-                            <div class="mt-2">
-                                <span class="supplier-type-badge supplier-type-{{ supplier.supplier_type }}">
-                                    {{ supplier.get_supplier_type_display }}
-                                </span>
-                                <span class="active-badge active-{{ supplier.is_active|lower }}">
-                                    {% if supplier.is_active %}Actif{% else %}Inactif{% endif %}
-                                </span>
-                            </div>
+    <!-- Desktop Table View -->
+    <div class="card desktop-view animate-slide-up">
+        <div class="card-body" style="padding: 0;">
+            {% if suppliers %}
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Fournisseur</th>
+                                <th>Type</th>
+                                <th>Contact</th>
+                                <th>Ville</th>
+                                <th style="text-align: center;">Achats</th>
+                                <th style="text-align: center;">Statut</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for supplier in suppliers %}
+                                <tr class="clickable-row" onclick="window.location='{% url 'suppliers:detail' code=supplier.code %}'">
+                                    <td>
+                                        <div class="supplier-info">
+                                            <span class="supplier-name">{{ supplier.name }}</span>
+                                            {% if supplier.name_ar %}
+                                                <span class="supplier-name-ar" dir="rtl">{{ supplier.name_ar }}</span>
+                                            {% endif %}
+                                            <span class="supplier-code">{{ supplier.code }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if supplier.supplier_type == 'material' %}badge-info{% elif supplier.supplier_type == 'artisan' %}badge-accent{% else %}badge-neutral{% endif %}">
+                                            {{ supplier.get_supplier_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="contact-info">
+                                            {% if supplier.phone %}
+                                                <span><i class="fas fa-phone"></i> {{ supplier.phone }}</span>
+                                            {% endif %}
+                                            {% if supplier.email %}
+                                                <span><i class="fas fa-envelope"></i> {{ supplier.email }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td class="text-muted">{{ supplier.city|default:"-" }}</td>
+                                    <td style="text-align: center;">
+                                        <span class="badge badge-neutral">{{ supplier.purchase_count }}</span>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <span class="badge {% if supplier.is_active %}badge-success{% else %}badge-error{% endif %}">
+                                            {% if supplier.is_active %}Actif{% else %}Inactif{% endif %}
+                                        </span>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <div class="table-actions" onclick="event.stopPropagation();">
+                                            <a href="{% url 'suppliers:detail' code=supplier.code %}" class="btn btn-ghost btn-sm" title="Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'suppliers:edit' code=supplier.code %}" class="btn btn-ghost btn-sm" title="Editer">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'suppliers:delete' code=supplier.code %}" class="btn btn-ghost btn-sm btn-danger" title="Supprimer">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="card-body">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-truck"></i>
                         </div>
-                    </div>
-
-                    <div class="supplier-info">
-                        {% if supplier.phone %}
-                            <div class="info-item">
-                                <span class="info-label"><i class="fas fa-phone mr-2"></i>Téléphone</span>
-                                <span class="info-value">{{ supplier.phone }}</span>
-                            </div>
-                        {% endif %}
-
-                        {% if supplier.email %}
-                            <div class="info-item">
-                                <span class="info-label"><i class="fas fa-envelope mr-2"></i>Email</span>
-                                <span class="info-value">{{ supplier.email }}</span>
-                            </div>
-                        {% endif %}
-
-                        {% if supplier.city %}
-                            <div class="info-item">
-                                <span class="info-label"><i class="fas fa-map-marker-alt mr-2"></i>Ville</span>
-                                <span class="info-value">{{ supplier.city }}</span>
-                            </div>
-                        {% endif %}
-
-                        <div class="info-item">
-                            <span class="info-label"><i class="fas fa-file-invoice mr-2"></i>Achats</span>
-                            <span class="info-value">{{ supplier.purchase_count }}</span>
-                        </div>
-
-                        <div class="info-item">
-                            <span class="info-label"><i class="fas fa-coins mr-2"></i>Paiements</span>
-                            <span class="info-value">{{ supplier.payment_count }}</span>
-                        </div>
-                    </div>
-
-                    <div class="supplier-actions">
-                        <a href="{% url 'suppliers:detail' code=supplier.code %}" class="btn-small btn-primary-small">
-                            <i class="fas fa-eye"></i> Détails
-                        </a>
-                        <a href="{% url 'suppliers:edit' code=supplier.code %}" class="btn-small btn-secondary-small">
-                            <i class="fas fa-edit"></i> Éditer
-                        </a>
-                        <a href="{% url 'suppliers:delete' code=supplier.code %}" class="btn-small btn-danger-small">
-                            <i class="fas fa-trash"></i> Supprimer
+                        <h4 class="empty-state-title">Aucun fournisseur trouve</h4>
+                        <p class="empty-state-text">Commencez par creer un nouveau fournisseur</p>
+                        <a href="{% url 'suppliers:create' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Creer un fournisseur
                         </a>
                     </div>
                 </div>
-            {% endfor %}
+            {% endif %}
         </div>
+    </div>
 
-        <!-- Pagination -->
-        {% if page_obj.has_other_pages %}
-            <div class="pagination">
-                {% if page_obj.has_previous %}
-                    <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}">
-                        <i class="fas fa-angle-double-left"></i>
-                    </a>
-                    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}">
-                        <i class="fas fa-angle-left"></i>
-                    </a>
-                {% endif %}
+    <!-- Mobile Card View -->
+    <div class="mobile-view">
+        {% if suppliers %}
+            {% for supplier in suppliers %}
+                <div class="card mobile-card animate-slide-up" style="animation-delay: {{ forloop.counter0 }}0ms;">
+                    <div class="card-body">
+                        <div class="mobile-card-header">
+                            <div class="mobile-supplier-info">
+                                <a href="{% url 'suppliers:detail' code=supplier.code %}" class="mobile-supplier-name">
+                                    {{ supplier.name }}
+                                </a>
+                                {% if supplier.name_ar %}
+                                    <span class="mobile-supplier-name-ar" dir="rtl">{{ supplier.name_ar }}</span>
+                                {% endif %}
+                            </div>
+                            <span class="badge {% if supplier.is_active %}badge-success{% else %}badge-error{% endif %}">
+                                {% if supplier.is_active %}Actif{% else %}Inactif{% endif %}
+                            </span>
+                        </div>
 
-                {% for num in page_obj.paginator.page_range %}
-                    {% if page_obj.number == num %}
-                        <span class="current">{{ num }}</span>
-                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                        <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}">
-                            {{ num }}
+                        <div class="mobile-badges">
+                            <span class="badge {% if supplier.supplier_type == 'material' %}badge-info{% elif supplier.supplier_type == 'artisan' %}badge-accent{% else %}badge-neutral{% endif %}">
+                                {{ supplier.get_supplier_type_display }}
+                            </span>
+                            <span class="badge badge-neutral">{{ supplier.purchase_count }} achats</span>
+                        </div>
+
+                        <div class="mobile-card-body">
+                            {% if supplier.phone %}
+                                <div class="mobile-card-row">
+                                    <span class="mobile-card-label"><i class="fas fa-phone"></i> Telephone</span>
+                                    <span class="mobile-card-value">{{ supplier.phone }}</span>
+                                </div>
+                            {% endif %}
+                            {% if supplier.email %}
+                                <div class="mobile-card-row">
+                                    <span class="mobile-card-label"><i class="fas fa-envelope"></i> Email</span>
+                                    <span class="mobile-card-value">{{ supplier.email }}</span>
+                                </div>
+                            {% endif %}
+                            {% if supplier.city %}
+                                <div class="mobile-card-row">
+                                    <span class="mobile-card-label"><i class="fas fa-map-marker-alt"></i> Ville</span>
+                                    <span class="mobile-card-value">{{ supplier.city }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mobile-card-actions">
+                            <a href="{% url 'suppliers:detail' code=supplier.code %}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-eye"></i>
+                                <span>Details</span>
+                            </a>
+                            <a href="{% url 'suppliers:edit' code=supplier.code %}" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-edit"></i>
+                                <span>Editer</span>
+                            </a>
+                            <a href="{% url 'suppliers:delete' code=supplier.code %}" class="btn btn-ghost btn-sm btn-danger">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="card">
+                <div class="card-body">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-truck"></i>
+                        </div>
+                        <h4 class="empty-state-title">Aucun fournisseur trouve</h4>
+                        <p class="empty-state-text">Commencez par creer un nouveau fournisseur</p>
+                        <a href="{% url 'suppliers:create' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Creer un fournisseur
                         </a>
-                    {% endif %}
-                {% endfor %}
-
-                {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}">
-                        <i class="fas fa-angle-right"></i>
-                    </a>
-                    <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}">
-                        <i class="fas fa-angle-double-right"></i>
-                    </a>
-                {% endif %}
+                    </div>
+                </div>
             </div>
         {% endif %}
-    {% else %}
-        <div class="no-results">
-            <i class="fas fa-inbox"></i>
-            <h3 class="no-results h3">Aucun fournisseur trouvé</h3>
-            <p style="margin: var(--space-2) 0; color: var(--color-neutral-gray);">Commencez par créer un nouveau fournisseur</p>
-            <a href="{% url 'suppliers:create' %}" style="display: inline-block; margin-top: var(--space-4); padding: var(--space-3) var(--space-6); background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light)); color: white; text-decoration: none; border-radius: var(--radius-md); font-weight: var(--weight-semibold);">
-                <i class="fas fa-plus mr-2"></i> Créer un fournisseur
-            </a>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+        <div class="pagination-wrapper">
+            {% if page_obj.has_previous %}
+                <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                    <span class="btn btn-primary btn-sm">{{ num }}</span>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}" class="btn btn-ghost btn-sm">
+                        {{ num }}
+                    </a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_active %}&active={{ current_active }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            {% endif %}
         </div>
     {% endif %}
-</div>
+
+    <style>
+        /* Filter Form */
+        .filter-form {
+            margin-bottom: 0;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
+
+        .filter-grid .form-group {
+            margin-bottom: 0;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Alert */
+        .alert {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-3) var(--space-4);
+            border-radius: var(--radius-md);
+        }
+
+        .alert-info {
+            background: var(--info-50);
+            color: var(--info-700);
+            border: 1px solid var(--info-200);
+        }
+
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: var(--neutral-50);
+            border-bottom: 2px solid var(--neutral-200);
+        }
+
+        .data-table th {
+            padding: var(--space-3) var(--space-4);
+            text-align: left;
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-600);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table td {
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+            vertical-align: middle;
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--neutral-50);
+        }
+
+        .clickable-row {
+            cursor: pointer;
+        }
+
+        /* Supplier Info */
+        .supplier-info {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .supplier-name {
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+        }
+
+        .supplier-name-ar {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .supplier-code {
+            font-size: var(--text-xs);
+            color: var(--neutral-400);
+        }
+
+        /* Contact Info */
+        .contact-info {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+            font-size: var(--text-sm);
+        }
+
+        .contact-info i {
+            width: 16px;
+            color: var(--neutral-400);
+            margin-right: var(--space-1);
+        }
+
+        /* Table Actions */
+        .table-actions {
+            display: flex;
+            gap: var(--space-1);
+            justify-content: flex-end;
+        }
+
+        .btn-danger {
+            color: var(--error-500);
+        }
+
+        .btn-danger:hover {
+            color: var(--error-600);
+            background: var(--error-50);
+        }
+
+        /* Mobile Card Styles */
+        .mobile-card {
+            margin-bottom: var(--space-3);
+        }
+
+        .mobile-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: var(--space-3);
+        }
+
+        .mobile-supplier-info {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .mobile-supplier-name {
+            font-family: var(--font-display);
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+            text-decoration: none;
+            font-size: var(--text-lg);
+        }
+
+        .mobile-supplier-name:hover {
+            text-decoration: underline;
+        }
+
+        .mobile-supplier-name-ar {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .mobile-badges {
+            display: flex;
+            gap: var(--space-2);
+            margin-bottom: var(--space-3);
+        }
+
+        .mobile-card-body {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .mobile-card-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mobile-card-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .mobile-card-label i {
+            margin-right: var(--space-1);
+        }
+
+        .mobile-card-value {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-700);
+        }
+
+        .mobile-card-actions {
+            display: flex;
+            gap: var(--space-2);
+            margin-top: var(--space-3);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-8);
+        }
+
+        .empty-state-icon {
+            font-size: var(--text-4xl);
+            color: var(--neutral-300);
+            margin-bottom: var(--space-4);
+        }
+
+        .empty-state-title {
+            font-family: var(--font-display);
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-700);
+            margin-bottom: var(--space-2);
+        }
+
+        .empty-state-text {
+            color: var(--neutral-500);
+            margin-bottom: var(--space-4);
+        }
+
+        /* Pagination */
+        .pagination-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--space-2);
+            margin-top: var(--space-6);
+            flex-wrap: wrap;
+        }
+
+        /* Desktop/Mobile Views */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 1023px) {
+            .filter-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-actions {
+                flex-direction: column;
+            }
+
+            .filter-actions .btn {
+                width: 100%;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+        }
+    </style>
 {% endblock %}

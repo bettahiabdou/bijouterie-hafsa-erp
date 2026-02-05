@@ -3,143 +3,478 @@
 {% block title %}Devis - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'quotes:quote_list' %}">Devis</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Devis</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Devis</h1>
-            <p class="text-gray-600 mt-1">Gestion des devis clients</p>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Devis</h1>
+                <p class="page-subtitle">Gestion des devis clients</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'quotes:quote_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>Nouveau Devis</span>
+                </a>
+            </div>
         </div>
-        <a href="{% url 'quotes:quote_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-            <i class="fas fa-plus mr-2"></i> Nouveau
-        </a>
     </div>
 {% endblock %}
 
 {% block content %}
     <!-- Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Total Devis</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.total }}</p>
+    <div class="stats-row mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Devis</div>
+                <div class="stat-value">{{ stats.total|default:"0" }}</div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Envoyés</p>
-            <p class="text-2xl font-bold text-blue-600">{{ stats.sent }}</p>
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fas fa-paper-plane"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Envoyes</div>
+                <div class="stat-value">{{ stats.sent|default:"0" }}</div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Acceptés</p>
-            <p class="text-2xl font-bold text-green-600">{{ stats.accepted }}</p>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Acceptes</div>
+                <div class="stat-value">{{ stats.accepted|default:"0" }}</div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Montant Total</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.total_amount|floatformat:0 }} DH</p>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Montant Total</div>
+                <div class="stat-value">{{ stats.total_amount|floatformat:0|default:"0" }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Expirés</p>
-            <p class="text-2xl font-bold text-red-600">{{ stats.expired }}</p>
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Expires</div>
+                <div class="stat-value">{{ stats.expired|default:"0" }}</div>
+            </div>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-                <input type="text" name="search" value="{{ search }}" placeholder="Référence ou client"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Tous les statuts</option>
-                    {% for value, label in status_choices %}
-                        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <input type="date" name="date_from" value="{{ date_from }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div class="flex gap-2">
-                <input type="date" name="date_to" value="{{ date_to }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                    <i class="fas fa-search"></i>
-                </button>
-            </div>
-        </form>
+    <div class="card mb-6 animate-slide-up">
+        <div class="card-header">
+            <h3><i class="fas fa-filter mr-2"></i> Filtres</h3>
+        </div>
+        <div class="card-body">
+            <form method="get" class="filter-form">
+                <div class="filter-grid">
+                    <div class="form-group">
+                        <label class="form-label">Rechercher</label>
+                        <input type="text" name="search" value="{{ search }}" placeholder="Reference ou client" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="">Tous les statuts</option>
+                            {% for value, label in status_choices %}
+                                <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date debut</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date fin</label>
+                        <input type="date" name="date_to" value="{{ date_to }}" class="form-input">
+                    </div>
+                    <div class="form-group filter-actions-group">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="filter-actions-inline">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            <a href="{% url 'quotes:quote_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-redo"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 
-    <!-- Table -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b">
-                    <tr>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Référence</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Client</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Date</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Valide jusqu'au</th>
-                        <th class="px-6 py-3 text-right font-medium text-gray-700">Montant</th>
-                        <th class="px-6 py-3 text-center font-medium text-gray-700">Statut</th>
-                        <th class="px-6 py-3 text-center font-medium text-gray-700">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% for quote in quotes %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-3 font-mono font-bold text-blue-600">{{ quote.reference }}</td>
-                            <td class="px-6 py-3 text-gray-900">{{ quote.client.first_name }} {{ quote.client.last_name }}</td>
-                            <td class="px-6 py-3 text-gray-600">{{ quote.issued_date|date:"d/m/Y" }}</td>
-                            <td class="px-6 py-3 text-gray-600">{{ quote.valid_until_date|date:"d/m/Y" }}</td>
-                            <td class="px-6 py-3 text-right font-bold text-gray-900">{{ quote.total_amount_dh|floatformat:0 }} DH</td>
-                            <td class="px-6 py-3 text-center">
-                                <span class="inline-block px-3 py-1 rounded-full text-xs font-medium
-                                    {% if quote.status == 'draft' %}bg-gray-100 text-gray-800
-                                    {% elif quote.status == 'sent' %}bg-blue-100 text-blue-800
-                                    {% elif quote.status == 'accepted' %}bg-green-100 text-green-800
-                                    {% elif quote.status == 'rejected' %}bg-red-100 text-red-800
-                                    {% elif quote.status == 'expired' %}bg-yellow-100 text-yellow-800
-                                    {% elif quote.status == 'converted' %}bg-purple-100 text-purple-800
-                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                    {{ quote.get_status_display }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-3 text-center">
-                                <a href="{% url 'quotes:quote_detail' quote.reference %}" class="text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                            </td>
-                        </tr>
-                    {% empty %}
+    <!-- Desktop Table View -->
+    <div class="card animate-slide-up desktop-view" style="animation-delay: 100ms;">
+        <div class="card-body" style="padding: 0;">
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-gray-500">
-                                Aucun devis trouvé
-                            </td>
+                            <th>Reference</th>
+                            <th>Client</th>
+                            <th>Date</th>
+                            <th>Valide jusqu'au</th>
+                            <th style="text-align: right;">Montant</th>
+                            <th style="text-align: center;">Statut</th>
+                            <th style="text-align: center;">Actions</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for quote in quotes %}
+                            <tr class="clickable-row" onclick="window.location='{% url 'quotes:quote_detail' quote.reference %}'">
+                                <td>
+                                    <span class="font-semibold text-primary">{{ quote.reference }}</span>
+                                </td>
+                                <td>{{ quote.client.first_name }} {{ quote.client.last_name }}</td>
+                                <td class="text-muted">{{ quote.issued_date|date:"d/m/Y" }}</td>
+                                <td class="text-muted">{{ quote.valid_until_date|date:"d/m/Y" }}</td>
+                                <td style="text-align: right;" class="font-semibold">{{ quote.total_amount_dh|floatformat:0 }} DH</td>
+                                <td style="text-align: center;">
+                                    <span class="badge {% if quote.status == 'draft' %}badge-neutral{% elif quote.status == 'sent' %}badge-info{% elif quote.status == 'accepted' %}badge-success{% elif quote.status == 'rejected' %}badge-error{% elif quote.status == 'expired' %}badge-warning{% elif quote.status == 'converted' %}badge-accent{% else %}badge-neutral{% endif %}">
+                                        {{ quote.get_status_display }}
+                                    </span>
+                                </td>
+                                <td style="text-align: center;">
+                                    <a href="{% url 'quotes:quote_detail' quote.reference %}" class="btn btn-ghost btn-sm" onclick="event.stopPropagation();">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">
+                                            <i class="fas fa-file-alt"></i>
+                                        </div>
+                                        <h4 class="empty-state-title">Aucun devis trouve</h4>
+                                        <p class="empty-state-text">Commencez par creer un nouveau devis</p>
+                                        <a href="{% url 'quotes:quote_create' %}" class="btn btn-primary">
+                                            <i class="fas fa-plus"></i> Nouveau Devis
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
+    </div>
+
+    <!-- Mobile Card View -->
+    <div class="mobile-view">
+        {% for quote in quotes %}
+            <div class="card mobile-card animate-slide-up" style="animation-delay: {{ forloop.counter0 }}0ms;">
+                <a href="{% url 'quotes:quote_detail' quote.reference %}" class="mobile-card-link">
+                    <div class="card-body">
+                        <div class="mobile-card-header">
+                            <span class="mobile-card-ref">{{ quote.reference }}</span>
+                            <span class="badge {% if quote.status == 'draft' %}badge-neutral{% elif quote.status == 'sent' %}badge-info{% elif quote.status == 'accepted' %}badge-success{% elif quote.status == 'rejected' %}badge-error{% elif quote.status == 'expired' %}badge-warning{% elif quote.status == 'converted' %}badge-accent{% else %}badge-neutral{% endif %}">
+                                {{ quote.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="mobile-card-body">
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">Client</span>
+                                <span class="mobile-card-value">{{ quote.client.first_name }} {{ quote.client.last_name }}</span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">Date</span>
+                                <span class="mobile-card-value">{{ quote.issued_date|date:"d/m/Y" }}</span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">Valide jusqu'au</span>
+                                <span class="mobile-card-value">{{ quote.valid_until_date|date:"d/m/Y" }}</span>
+                            </div>
+                        </div>
+                        <div class="mobile-card-footer">
+                            <span class="mobile-card-amount">{{ quote.total_amount_dh|floatformat:0 }} DH</span>
+                            <i class="fas fa-chevron-right mobile-card-arrow"></i>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        {% empty %}
+            <div class="card">
+                <div class="card-body">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <h4 class="empty-state-title">Aucun devis trouve</h4>
+                        <p class="empty-state-text">Commencez par creer un nouveau devis</p>
+                        <a href="{% url 'quotes:quote_create' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Nouveau Devis
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
     </div>
 
     <!-- Pagination -->
     {% if quotes.has_other_pages %}
-        <div class="mt-6 flex justify-center gap-2">
+        <div class="pagination-wrapper">
             {% if quotes.has_previous %}
-                <a href="?page=1{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Première</a>
-                <a href="?page={{ quotes.previous_page_number }}{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Précédente</a>
+                <a href="?page=1{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+                <a href="?page={{ quotes.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
             {% endif %}
 
-            <span class="px-3 py-2">Page {{ quotes.number }} sur {{ quotes.paginator.num_pages }}</span>
+            <span class="btn btn-secondary btn-sm pagination-info">
+                Page {{ quotes.number }} / {{ quotes.paginator.num_pages }}
+            </span>
 
             {% if quotes.has_next %}
-                <a href="?page={{ quotes.next_page_number }}{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Suivante</a>
-                <a href="?page={{ quotes.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Dernière</a>
+                <a href="?page={{ quotes.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="?page={{ quotes.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
             {% endif %}
         </div>
     {% endif %}
+
+    <style>
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: var(--space-4);
+        }
+
+        /* Filter Form */
+        .filter-form {
+            margin-bottom: 0;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: var(--space-4);
+        }
+
+        .filter-grid .form-group {
+            margin-bottom: 0;
+        }
+
+        .filter-actions-inline {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: var(--neutral-50);
+            border-bottom: 2px solid var(--neutral-200);
+        }
+
+        .data-table th {
+            padding: var(--space-3) var(--space-4);
+            text-align: left;
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-600);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table td {
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--neutral-50);
+        }
+
+        .clickable-row {
+            cursor: pointer;
+        }
+
+        /* Mobile Card Styles */
+        .mobile-card {
+            margin-bottom: var(--space-3);
+        }
+
+        .mobile-card-link {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .mobile-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-3);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .mobile-card-ref {
+            font-family: var(--font-display);
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+        }
+
+        .mobile-card-body {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .mobile-card-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mobile-card-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .mobile-card-value {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-700);
+        }
+
+        .mobile-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: var(--space-3);
+            padding-top: var(--space-3);
+            border-top: 1px solid var(--neutral-100);
+        }
+
+        .mobile-card-amount {
+            font-size: var(--text-lg);
+            font-weight: var(--font-bold);
+            color: var(--neutral-800);
+        }
+
+        .mobile-card-arrow {
+            color: var(--neutral-400);
+        }
+
+        /* Pagination */
+        .pagination-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--space-2);
+            margin-top: var(--space-6);
+        }
+
+        .pagination-info {
+            cursor: default;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-8);
+        }
+
+        .empty-state-icon {
+            font-size: var(--text-4xl);
+            color: var(--neutral-300);
+            margin-bottom: var(--space-4);
+        }
+
+        .empty-state-title {
+            font-family: var(--font-display);
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-700);
+            margin-bottom: var(--space-2);
+        }
+
+        .empty-state-text {
+            color: var(--neutral-500);
+            margin-bottom: var(--space-4);
+        }
+
+        /* Desktop/Mobile Views */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .filter-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-actions-inline {
+                width: 100%;
+            }
+
+            .filter-actions-inline .btn {
+                flex: 1;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+        }
+    </style>
 {% endblock %}

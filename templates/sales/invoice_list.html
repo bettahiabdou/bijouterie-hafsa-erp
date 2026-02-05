@@ -3,614 +3,447 @@
 {% block title %}Factures de Vente - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <span>Ventes</span>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Ventes</span>
 {% endblock %}
 
 {% block page_header %}
-    <style>
-        /* Sales Page Header - Refined Minimalist */
-        .sales-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: var(--space-8);
-            gap: var(--space-6);
-        }
-
-        .sales-header h1 {
-            font-family: var(--font-serif);
-            font-size: var(--text-4xl);
-            color: var(--color-neutral-black);
-            font-weight: var(--weight-normal);
-            margin: 0;
-        }
-
-        .sales-header-subtitle {
-            font-size: var(--text-sm);
-            color: var(--color-neutral-gray);
-            margin-top: var(--space-2);
-        }
-
-        .new-invoice-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--space-2);
-            padding: var(--space-3) var(--space-4);
-            background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
-            color: white;
-            text-decoration: none;
-            border-radius: var(--radius-md);
-            font-weight: var(--weight-semibold);
-            font-size: var(--text-sm);
-            text-transform: uppercase;
-            letter-spacing: var(--tracking-wide);
-            transition: all var(--transition-fast);
-            min-height: 2.75rem;
-            white-space: nowrap;
-        }
-
-        .new-invoice-btn:hover {
-            background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
-            box-shadow: var(--shadow-hover);
-            transform: translateY(-2px);
-            color: white;
-            text-decoration: none;
-        }
-
-        /* KPI Cards - Refined */
-        .kpi-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: var(--space-6);
-            margin-bottom: var(--space-8);
-        }
-
-        .kpi-card-sales {
-            background: white;
-            border-radius: var(--radius-lg);
-            padding: var(--space-6);
-            box-shadow: var(--shadow-sm);
-            transition: all var(--transition-fast);
-            border-left: 4px solid var(--color-primary);
-        }
-
-        .kpi-card-sales:hover {
-            box-shadow: var(--shadow-md);
-            transform: translateY(-2px);
-        }
-
-        .kpi-label-sales {
-            font-size: var(--text-sm);
-            color: var(--color-neutral-gray);
-            text-transform: uppercase;
-            letter-spacing: var(--tracking-wide);
-            font-weight: var(--weight-semibold);
-            margin-bottom: var(--space-2);
-        }
-
-        .kpi-value-sales {
-            font-size: var(--text-3xl);
-            font-family: var(--font-serif);
-            color: var(--color-primary);
-            font-weight: var(--weight-normal);
-            margin: 0;
-        }
-
-        @media (max-width: 767px) {
-            .sales-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .new-invoice-btn {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .kpi-cards {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-
-    <div class="sales-header">
-        <div>
-            <h1>Factures de Vente</h1>
-            <p class="sales-header-subtitle">Gestion des ventes et des factures</p>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Factures de Vente</h1>
+                <p class="page-subtitle">Gestion des ventes et des factures</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:bulk_create' %}" class="btn btn-secondary hide-mobile">
+                    <i class="fas fa-layer-group"></i>
+                    <span>En Lot</span>
+                </a>
+                <a href="{% url 'sales:invoice_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>Nouvelle</span>
+                </a>
+            </div>
         </div>
-        <a href="{% url 'sales:invoice_create' %}" class="new-invoice-btn">
-            <i class="fas fa-plus"></i> Nouvelle Facture
-        </a>
     </div>
 
     <!-- KPI Cards -->
-    <div class="kpi-cards">
-        <div class="kpi-card-sales">
-            <div class="kpi-label-sales">Aujourd'hui</div>
-            <p class="kpi-value-sales">{{ stats.today }} DH</p>
+    <div class="grid grid-cols-4 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-calendar-day"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Aujourd'hui</div>
+                <div class="stat-value">{{ stats.today|default:"0" }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
         </div>
-        <div class="kpi-card-sales">
-            <div class="kpi-label-sales">Ce Mois</div>
-            <p class="kpi-value-sales">{{ stats.month }} DH</p>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-calendar-alt"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Ce Mois</div>
+                <div class="stat-value">{{ stats.month|default:"0" }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
         </div>
-        <div class="kpi-card-sales">
-            <div class="kpi-label-sales">Total Factures</div>
-            <p class="kpi-value-sales">{{ stats.total_invoices }}</p>
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fas fa-file-invoice"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total</div>
+                <div class="stat-value">{{ stats.total_invoices|default:"0" }}</div>
+                <div class="stat-meta">factures</div>
+            </div>
         </div>
-        <div class="kpi-card-sales">
-            <div class="kpi-label-sales">Chiffre d'Affaires</div>
-            <p class="kpi-value-sales">{{ stats.total_revenue }} DH</p>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">CA Total</div>
+                <div class="stat-value">{{ stats.total_revenue|default:"0" }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
         </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <style>
-        /* Invoice List Styling - Refined Minimalist */
-        .invoice-list-container {
-            background: white;
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-sm);
-            overflow: hidden;
-        }
-
-        .filter-section {
-            border-bottom: 1px solid var(--color-neutral-medium);
-            padding: var(--space-6);
-        }
-
-        .filter-form {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: var(--space-4);
-        }
-
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .filter-group label {
-            font-size: var(--text-sm);
-            font-weight: var(--weight-semibold);
-            color: var(--color-neutral-dark);
-            text-transform: uppercase;
-            letter-spacing: var(--tracking-wide);
-            margin-bottom: var(--space-2);
-        }
-
-        .filter-group input,
-        .filter-group select {
-            padding: var(--space-3) var(--space-4);
-            border: 1px solid var(--color-neutral-medium);
-            border-radius: var(--radius-md);
-            font-size: var(--text-base);
-            color: var(--color-neutral-dark);
-            background: white;
-            transition: all var(--transition-fast);
-        }
-
-        .filter-group input:focus,
-        .filter-group select:focus {
-            outline: none;
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
-        }
-
-        .filter-buttons {
-            display: flex;
-            gap: var(--space-2);
-            margin-top: var(--space-4);
-            flex-wrap: wrap;
-        }
-
-        .filter-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--space-2);
-            padding: var(--space-3) var(--space-4);
-            border-radius: var(--radius-md);
-            font-weight: var(--weight-semibold);
-            font-size: var(--text-sm);
-            text-decoration: none;
-            transition: all var(--transition-fast);
-            min-height: 2.75rem;
-            border: none;
-            cursor: pointer;
-        }
-
-        .filter-btn-primary {
-            background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
-            color: white;
-        }
-
-        .filter-btn-primary:hover {
-            background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
-            box-shadow: var(--shadow-hover);
-        }
-
-        .filter-btn-secondary {
-            background: var(--color-neutral-light);
-            color: var(--color-neutral-dark);
-            border: 1px solid var(--color-neutral-medium);
-        }
-
-        .filter-btn-secondary:hover {
-            background: var(--color-neutral-medium);
-            text-decoration: none;
-        }
-
-        @media (max-width: 767px) {
-            .filter-form {
-                grid-template-columns: 1fr;
-            }
-
-            .filter-buttons {
-                width: 100%;
-            }
-
-            .filter-btn {
-                width: 100%;
-                justify-content: center;
-            }
-        }
-    </style>
-
-    <div class="invoice-list-container">
+    <div class="card animate-slide-up">
         <!-- Filters -->
-        <div class="filter-section">
+        <div class="card-header filter-header">
             <form method="get" class="filter-form">
-                <!-- Search -->
-                <div class="filter-group">
-                    <label>Recherche</label>
-                    <input type="text" name="search" value="{{ search_query }}" placeholder="Ref ou Client...">
+                <div class="filter-grid">
+                    <!-- Search -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Recherche</label>
+                        <input type="text" name="search" value="{{ search_query }}" placeholder="Ref ou Client..." class="form-input">
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="">Tous</option>
+                            {% for value, label in statuses %}
+                                <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Date From -->
+                    <div class="form-group hide-mobile" style="margin-bottom: 0;">
+                        <label class="form-label">Du</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" class="form-input">
+                    </div>
+
+                    <!-- Date To -->
+                    <div class="form-group hide-mobile" style="margin-bottom: 0;">
+                        <label class="form-label">Au</label>
+                        <input type="date" name="date_to" value="{{ date_to }}" class="form-input">
+                    </div>
                 </div>
 
-                <!-- Status Filter -->
-                <div class="filter-group">
-                    <label>Statut</label>
-                    <select name="status">
-                        <option value="">Tous</option>
-                        {% for value, label in statuses %}
-                            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Date From -->
-                <div class="filter-group">
-                    <label>Du</label>
-                    <input type="date" name="date_from" value="{{ date_from }}">
-                </div>
-
-                <!-- Date To -->
-                <div class="filter-group">
-                    <label>Au</label>
-                    <input type="date" name="date_to" value="{{ date_to }}">
-                </div>
-
-                <div class="filter-buttons">
-                    <button type="submit" class="filter-btn filter-btn-primary">
-                        <i class="fas fa-search"></i> Filtrer
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i>
                     </button>
-                    <a href="{% url 'sales:invoice_list' %}" class="filter-btn filter-btn-secondary">
-                        <i class="fas fa-times"></i> Réinitialiser
+                    <a href="{% url 'sales:invoice_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i>
                     </a>
                 </div>
             </form>
         </div>
 
-        <!-- Invoices Table -->
-        <style>
-            /* Sales Table - Refined Minimalist */
-            .sales-table-wrapper {
-                overflow-x: auto;
-            }
-
-            .sales-table {
-                width: 100%;
-                font-size: var(--text-sm);
-                border-collapse: collapse;
-            }
-
-            .sales-table thead {
-                background: var(--color-neutral-light);
-                border-bottom: 2px solid var(--color-neutral-medium);
-            }
-
-            .sales-table thead th {
-                text-align: left;
-                padding: var(--space-4);
-                color: var(--color-neutral-dark);
-                font-weight: var(--weight-semibold);
-                text-transform: uppercase;
-                letter-spacing: var(--tracking-wide);
-                font-size: var(--text-xs);
-            }
-
-            .sales-table tbody tr {
-                border-bottom: 1px solid var(--color-neutral-medium);
-                transition: background-color var(--transition-fast);
-            }
-
-            .sales-table tbody tr:hover {
-                background-color: rgba(183, 110, 121, 0.03);
-                box-shadow: inset 0 0 0 1px rgba(183, 110, 121, 0.1);
-            }
-
-            .sales-table tbody td {
-                padding: var(--space-4);
-                color: var(--color-neutral-dark);
-            }
-
-            .invoice-reference {
-                font-family: var(--font-serif);
-                font-weight: var(--weight-semibold);
-                color: var(--color-primary);
-                text-decoration: none;
-                transition: color var(--transition-fast);
-            }
-
-            .invoice-reference:hover {
-                color: var(--color-primary-dark);
-                text-decoration: underline;
-            }
-
-            .invoice-amount {
-                font-family: var(--font-serif);
-                font-weight: var(--weight-semibold);
-                color: var(--color-neutral-black);
-            }
-
-            .invoice-balance-due {
-                font-family: var(--font-serif);
-                font-weight: var(--weight-semibold);
-            }
-
-            .invoice-balance-due.overdue {
-                color: var(--color-error);
-            }
-
-            .invoice-balance-due.settled {
-                color: var(--color-success);
-            }
-
-            .invoice-client {
-                color: var(--color-neutral-dark);
-            }
-
-            .invoice-client-empty {
-                color: var(--color-neutral-gray);
-                font-style: italic;
-            }
-
-            .invoice-date {
-                color: var(--color-neutral-gray);
-                font-size: var(--text-sm);
-            }
-
-            .status-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: var(--space-2);
-                padding: var(--space-2) var(--space-3);
-                border-radius: var(--radius-md);
-                font-size: var(--text-xs);
-                font-weight: var(--weight-semibold);
-                text-transform: uppercase;
-                letter-spacing: var(--tracking-wide);
-            }
-
-            .status-badge.unpaid {
-                background: rgba(200, 90, 84, 0.1);
-                color: var(--color-error);
-            }
-
-            .status-badge.partial {
-                background: rgba(212, 169, 55, 0.1);
-                color: var(--color-warning);
-            }
-
-            .status-badge.paid {
-                background: rgba(124, 179, 66, 0.1);
-                color: var(--color-success);
-            }
-
-            .table-action-link {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 2.25rem;
-                height: 2.25rem;
-                border-radius: var(--radius-md);
-                color: var(--color-primary);
-                text-decoration: none;
-                transition: all var(--transition-fast);
-                background: transparent;
-            }
-
-            .table-action-link:hover {
-                background: rgba(183, 110, 121, 0.1);
-                color: var(--color-primary-dark);
-            }
-
-            .table-empty-state {
-                padding: var(--space-12) var(--space-4);
-                text-align: center;
-            }
-
-            .table-empty-icon {
-                font-size: 2rem;
-                color: var(--color-neutral-gray);
-                opacity: 0.5;
-                margin-bottom: var(--space-4);
-            }
-
-            .table-empty-message {
-                color: var(--color-neutral-gray);
-                font-size: var(--text-sm);
-            }
-
-            @media (max-width: 767px) {
-                .sales-table {
-                    font-size: var(--text-xs);
-                }
-
-                .sales-table tbody td {
-                    padding: var(--space-2) var(--space-3);
-                }
-
-                .sales-table thead th {
-                    padding: var(--space-2) var(--space-3);
-                    font-size: var(--text-xs);
-                }
-            }
-        </style>
-
-        <div class="sales-table-wrapper">
-            <table class="sales-table">
-                <thead>
-                    <tr>
-                        <th>Référence</th>
-                        <th>Client</th>
-                        <th>Montant</th>
-                        <th>Payé</th>
-                        <th>Solde</th>
-                        <th>Date</th>
-                        <th>Statut</th>
-                        <th style="text-align: center;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for invoice in invoices %}
+        <!-- Invoices Table - Desktop -->
+        <div class="card-body desktop-view" style="padding: 0;">
+            <div class="table-wrapper" style="border: none; border-radius: 0;">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td>
-                                <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="invoice-reference">{{ invoice.reference }}</a>
-                            </td>
-                            <td class="invoice-client">
-                                {% if invoice.client %}
-                                    {{ invoice.client.first_name }} {{ invoice.client.last_name }}
-                                {% else %}
-                                    <span class="invoice-client-empty">Vente sans client</span>
-                                {% endif %}
-                            </td>
-                            <td class="invoice-amount">{{ invoice.total_amount }} DH</td>
-                            <td>{{ invoice.amount_paid }} DH</td>
-                            <td class="invoice-balance-due {% if invoice.balance_due > 0 %}overdue{% else %}settled{% endif %}">
-                                {{ invoice.balance_due }} DH
-                            </td>
-                            <td class="invoice-date">{{ invoice.date|date:"d/m/Y" }}</td>
-                            <td>
-                                <span class="status-badge {% if invoice.status == 'unpaid' %}unpaid{% elif invoice.status == 'partial' %}partial{% elif invoice.status == 'paid' %}paid{% endif %}"
-                                   {% if invoice.status == 'unpaid' %}aria-label="Statut: Non payée"
-                                   {% elif invoice.status == 'partial' %}aria-label="Statut: Partiellement payée"
-                                   {% elif invoice.status == 'paid' %}aria-label="Statut: Payée"{% endif %}>
-                                    {% if invoice.status == 'unpaid' %}<i class="fas fa-circle-xmark"></i>
-                                    {% elif invoice.status == 'partial' %}<i class="fas fa-hourglass-half"></i>
-                                    {% elif invoice.status == 'paid' %}<i class="fas fa-circle-check"></i>{% endif %}
-                                    {{ invoice.get_status_display }}
+                            <th>Reference</th>
+                            <th>Client</th>
+                            <th>Montant</th>
+                            <th>Paye</th>
+                            <th>Solde</th>
+                            <th>Date</th>
+                            <th>Statut</th>
+                            <th style="text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for invoice in invoices %}
+                            <tr style="cursor: pointer;" onclick="window.location='{% url 'sales:invoice_detail' invoice.reference %}'">
+                                <td>
+                                    <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="font-semibold text-primary" onclick="event.stopPropagation();">
+                                        {{ invoice.reference }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if invoice.client %}
+                                        {{ invoice.client.first_name }} {{ invoice.client.last_name }}
+                                    {% else %}
+                                        <span class="text-muted" style="font-style: italic;">Vente anonyme</span>
+                                    {% endif %}
+                                </td>
+                                <td class="font-semibold">{{ invoice.total_amount }} DH</td>
+                                <td>{{ invoice.amount_paid }} DH</td>
+                                <td>
+                                    <span class="{% if invoice.balance_due > 0 %}text-error font-semibold{% else %}text-success{% endif %}">
+                                        {{ invoice.balance_due }} DH
+                                    </span>
+                                </td>
+                                <td class="text-muted">{{ invoice.date|date:"d/m/Y" }}</td>
+                                <td>
+                                    <span class="badge {% if invoice.status == 'unpaid' %}badge-error{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'paid' %}badge-success{% else %}badge-neutral{% endif %}">
+                                        {{ invoice.get_status_display }}
+                                    </span>
+                                </td>
+                                <td style="text-align: center;" onclick="event.stopPropagation();">
+                                    <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-ghost btn-sm btn-icon" title="Voir">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">
+                                            <i class="fas fa-file-invoice"></i>
+                                        </div>
+                                        <h4 class="empty-state-title">Aucune facture trouvee</h4>
+                                        <p class="empty-state-text">Commencez par creer votre premiere facture.</p>
+                                        <a href="{% url 'sales:invoice_create' %}" class="btn btn-primary">
+                                            <i class="fas fa-plus"></i> Nouvelle Facture
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Invoice Cards - Mobile -->
+        <div class="card-body mobile-view">
+            <div class="invoice-cards">
+                {% for invoice in invoices %}
+                    <div class="invoice-card" onclick="window.location='{% url 'sales:invoice_detail' invoice.reference %}'">
+                        <div class="invoice-card-header">
+                            <span class="invoice-card-ref">{{ invoice.reference }}</span>
+                            <span class="badge {% if invoice.status == 'unpaid' %}badge-error{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'paid' %}badge-success{% else %}badge-neutral{% endif %}">
+                                {{ invoice.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="invoice-card-client">
+                            {% if invoice.client %}
+                                <i class="fas fa-user"></i> {{ invoice.client.first_name }} {{ invoice.client.last_name }}
+                            {% else %}
+                                <i class="fas fa-user-slash"></i> Vente anonyme
+                            {% endif %}
+                        </div>
+                        <div class="invoice-card-amounts">
+                            <div class="invoice-amount-item">
+                                <span class="invoice-amount-label">Total</span>
+                                <span class="invoice-amount-value">{{ invoice.total_amount }} DH</span>
+                            </div>
+                            <div class="invoice-amount-item">
+                                <span class="invoice-amount-label">Solde</span>
+                                <span class="invoice-amount-value {% if invoice.balance_due > 0 %}text-error{% else %}text-success{% endif %}">
+                                    {{ invoice.balance_due }} DH
                                 </span>
-                            </td>
-                            <td style="text-align: center;">
-                                <a href="{% url 'sales:invoice_detail' invoice.reference %}"
-                                   aria-label="Voir les détails de la facture {{ invoice.reference }}"
-                                   title="Voir les détails"
-                                   class="table-action-link">
-                                    <i class="fas fa-eye"></i>
-                                    <span class="sr-only">Voir</span>
-                                </a>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="8" class="table-empty-state">
-                                <div class="table-empty-icon">
-                                    <i class="fas fa-file-invoice"></i>
-                                </div>
-                                <p class="table-empty-message">Aucune facture trouvée</p>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            </div>
+                        </div>
+                        <div class="invoice-card-footer">
+                            <span class="invoice-card-date">
+                                <i class="fas fa-calendar"></i> {{ invoice.date|date:"d/m/Y" }}
+                            </span>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-state" style="padding: var(--space-6);">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-file-invoice"></i>
+                        </div>
+                        <h4 class="empty-state-title">Aucune facture trouvee</h4>
+                        <p class="empty-state-text">Commencez par creer votre premiere facture.</p>
+                        <a href="{% url 'sales:invoice_create' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Nouvelle Facture
+                        </a>
+                    </div>
+                {% endfor %}
+            </div>
         </div>
 
         <!-- Pagination -->
-        <style>
-            .pagination-section {
-                border-top: 1px solid var(--color-neutral-medium);
-                padding: var(--space-4) var(--space-6);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                flex-wrap: wrap;
-                gap: var(--space-4);
-            }
-
-            .pagination-info {
-                font-size: var(--text-sm);
-                color: var(--color-neutral-gray);
-            }
-
-            .pagination-links {
-                display: flex;
-                gap: var(--space-2);
-                flex-wrap: wrap;
-            }
-
-            .pagination-link {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                padding: var(--space-2) var(--space-3);
-                border: 1px solid var(--color-neutral-medium);
-                border-radius: var(--radius-md);
-                background: white;
-                color: var(--color-neutral-dark);
-                text-decoration: none;
-                font-size: var(--text-sm);
-                font-weight: var(--weight-medium);
-                transition: all var(--transition-fast);
-                min-height: 2.25rem;
-                min-width: 2.25rem;
-            }
-
-            .pagination-link:hover {
-                background: var(--color-neutral-light);
-                border-color: var(--color-primary);
-                color: var(--color-primary);
-            }
-
-            @media (max-width: 767px) {
-                .pagination-section {
-                    flex-direction: column;
-                    align-items: flex-start;
-                }
-
-                .pagination-links {
-                    width: 100%;
-                }
-            }
-        </style>
-
         {% if page_obj.has_other_pages %}
-            <div class="pagination-section">
+            <div class="card-footer pagination-footer">
                 <div class="pagination-info">
-                    Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                    Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
                 </div>
-                <div class="pagination-links">
+                <div class="pagination-buttons">
                     {% if page_obj.has_previous %}
-                        <a href="?page=1" class="pagination-link" title="Première page">Première</a>
-                        <a href="?page={{ page_obj.previous_page_number }}" class="pagination-link" title="Page précédente">Précédente</a>
+                        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
                     {% endif %}
 
                     {% if page_obj.has_next %}
-                        <a href="?page={{ page_obj.next_page_number }}" class="pagination-link" title="Page suivante">Suivante</a>
-                        <a href="?page={{ page_obj.paginator.num_pages }}" class="pagination-link" title="Dernière page">Dernière</a>
+                        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
                     {% endif %}
                 </div>
             </div>
         {% endif %}
     </div>
+
+    <style>
+        /* Filter Styles */
+        .filter-header {
+            background: white;
+            padding: var(--space-4) var(--space-5);
+        }
+
+        .filter-form {
+            width: 100%;
+            display: flex;
+            gap: var(--space-4);
+            align-items: flex-end;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            flex: 1;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Desktop/Mobile Toggle */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        .hide-mobile {
+            display: inline-block;
+        }
+
+        /* Invoice Cards */
+        .invoice-cards {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+            padding: var(--space-4);
+        }
+
+        .invoice-card {
+            background: var(--neutral-50);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .invoice-card:hover {
+            background: white;
+            border-color: var(--primary-300);
+            box-shadow: var(--shadow-md);
+        }
+
+        .invoice-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-2);
+        }
+
+        .invoice-card-ref {
+            font-weight: var(--font-bold);
+            color: var(--primary-600);
+            font-size: var(--text-sm);
+        }
+
+        .invoice-card-client {
+            color: var(--neutral-600);
+            font-size: var(--text-sm);
+            margin-bottom: var(--space-3);
+        }
+
+        .invoice-card-client i {
+            margin-right: var(--space-2);
+            color: var(--neutral-400);
+        }
+
+        .invoice-card-amounts {
+            display: flex;
+            gap: var(--space-4);
+            margin-bottom: var(--space-3);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-200);
+        }
+
+        .invoice-amount-item {
+            flex: 1;
+        }
+
+        .invoice-amount-label {
+            display: block;
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            margin-bottom: var(--space-1);
+        }
+
+        .invoice-amount-value {
+            font-weight: var(--font-bold);
+            font-size: var(--text-base);
+            color: var(--neutral-800);
+        }
+
+        .invoice-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .invoice-card-date {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .invoice-card-date i {
+            margin-right: var(--space-1);
+        }
+
+        /* Pagination */
+        .pagination-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pagination-info {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .pagination-buttons {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .filter-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filter-form {
+                flex-direction: column;
+                gap: var(--space-3);
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr 1fr;
+                width: 100%;
+            }
+
+            .filter-actions {
+                width: 100%;
+            }
+
+            .filter-actions .btn {
+                flex: 1;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+
+            .hide-mobile {
+                display: none !important;
+            }
+        }
+    </style>
 {% endblock %}

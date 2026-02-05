@@ -3,114 +3,415 @@
 {% block title %}Gestion des Utilisateurs - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'users:user_list' %}">Utilisateurs</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Utilisateurs</span>
 {% endblock %}
 
 {% block page_header %}
-    <div>
-        <h1 class="text-3xl font-bold text-gray-900">Gestion des Utilisateurs</h1>
-        <p class="text-gray-600 mt-1">Administration des comptes utilisateurs</p>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Gestion des Utilisateurs</h1>
+                <p class="page-subtitle">Administration des comptes utilisateurs</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-3 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total</div>
+                <div class="stat-value">{{ stats.total|default:"0" }}</div>
+                <div class="stat-meta">utilisateurs</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Actifs</div>
+                <div class="stat-value">{{ stats.active|default:"0" }}</div>
+                <div class="stat-meta">utilisateurs</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon error">
+                <i class="fas fa-user-times"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Inactifs</div>
+                <div class="stat-value">{{ stats.inactive|default:"0" }}</div>
+                <div class="stat-meta">utilisateurs</div>
+            </div>
+        </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <!-- Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Total Utilisateurs</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.total }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Actifs</p>
-            <p class="text-2xl font-bold text-green-600">{{ stats.active }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Inactifs</p>
-            <p class="text-2xl font-bold text-red-600">{{ stats.inactive }}</p>
-        </div>
-    </div>
+    <div class="card animate-slide-up">
+        <!-- Filters -->
+        <div class="card-header filter-header">
+            <form method="get" class="filter-form">
+                <div class="filter-grid filter-grid-2">
+                    <!-- Search -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Recherche</label>
+                        <input type="text" name="search" value="{{ search }}" placeholder="Nom ou email..." class="form-input">
+                    </div>
 
-    <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <form method="get" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div>
-                <input type="text" name="search" value="{{ search }}" placeholder="Nom ou email"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Tous les statuts</option>
-                    <option value="active" {% if status == 'active' %}selected{% endif %}>Actifs</option>
-                    <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactifs</option>
-                </select>
-            </div>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                <i class="fas fa-search mr-2"></i> Chercher
-            </button>
-        </form>
-    </div>
+                    <!-- Status Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="">Tous</option>
+                            <option value="active" {% if status == 'active' %}selected{% endif %}>Actifs</option>
+                            <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactifs</option>
+                        </select>
+                    </div>
+                </div>
 
-    <!-- Table -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b">
-                    <tr>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Nom</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Email</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Nom d'utilisateur</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Date d'adhésion</th>
-                        <th class="px-6 py-3 text-center font-medium text-gray-700">Statut</th>
-                        <th class="px-6 py-3 text-center font-medium text-gray-700">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% for user in users %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-3 font-medium text-gray-900">{{ user.get_full_name }}</td>
-                            <td class="px-6 py-3 text-gray-600">{{ user.email }}</td>
-                            <td class="px-6 py-3 text-gray-600">{{ user.username }}</td>
-                            <td class="px-6 py-3 text-gray-600">{{ user.date_joined|date:"d/m/Y" }}</td>
-                            <td class="px-6 py-3 text-center">
-                                {% if user.is_active %}
-                                    <span class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Actif</span>
-                                {% else %}
-                                    <span class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Inactif</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-3 text-center space-x-2">
-                                <a href="{% url 'users:user_detail' user.id %}" class="text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                            </td>
-                        </tr>
-                    {% empty %}
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <a href="{% url 'users:user_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Table - Desktop -->
+        <div class="card-body desktop-view" style="padding: 0;">
+            <div class="table-wrapper" style="border: none; border-radius: 0;">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-gray-500">
-                                Aucun utilisateur trouvé
-                            </td>
+                            <th>Nom</th>
+                            <th>Email</th>
+                            <th class="hide-mobile">Nom d'utilisateur</th>
+                            <th class="hide-mobile">Date d'adhesion</th>
+                            <th style="text-align: center;">Statut</th>
+                            <th style="text-align: center;">Actions</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                            <tr style="cursor: pointer;" onclick="window.location='{% url 'users:user_detail' user.id %}'">
+                                <td>
+                                    <div class="user-cell">
+                                        <div class="user-avatar">
+                                            {{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+                                        </div>
+                                        <span class="font-semibold">{{ user.get_full_name }}</span>
+                                    </div>
+                                </td>
+                                <td class="text-muted">{{ user.email }}</td>
+                                <td class="text-muted hide-mobile">{{ user.username }}</td>
+                                <td class="text-muted hide-mobile">{{ user.date_joined|date:"d/m/Y" }}</td>
+                                <td style="text-align: center;">
+                                    {% if user.is_active %}
+                                        <span class="badge badge-success">Actif</span>
+                                    {% else %}
+                                        <span class="badge badge-error">Inactif</span>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: center;" onclick="event.stopPropagation();">
+                                    <a href="{% url 'users:user_detail' user.id %}" class="btn btn-ghost btn-sm btn-icon" title="Voir">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">
+                                            <i class="fas fa-users"></i>
+                                        </div>
+                                        <h4 class="empty-state-title">Aucun utilisateur trouve</h4>
+                                        <p class="empty-state-text">Aucun utilisateur ne correspond a vos criteres.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
+
+        <!-- Cards - Mobile -->
+        <div class="card-body mobile-view">
+            <div class="user-cards">
+                {% for user in users %}
+                    <div class="user-card" onclick="window.location='{% url 'users:user_detail' user.id %}'">
+                        <div class="user-card-header">
+                            <div class="user-card-avatar">
+                                {{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+                            </div>
+                            <div class="user-card-info">
+                                <div class="user-card-name">{{ user.get_full_name }}</div>
+                                <div class="user-card-username">@{{ user.username }}</div>
+                            </div>
+                            {% if user.is_active %}
+                                <span class="badge badge-success">Actif</span>
+                            {% else %}
+                                <span class="badge badge-error">Inactif</span>
+                            {% endif %}
+                        </div>
+                        <div class="user-card-details">
+                            <div class="user-card-detail">
+                                <i class="fas fa-envelope"></i>
+                                <span>{{ user.email }}</span>
+                            </div>
+                            <div class="user-card-detail">
+                                <i class="fas fa-calendar"></i>
+                                <span>Membre depuis {{ user.date_joined|date:"d/m/Y" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-state" style="padding: var(--space-6);">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h4 class="empty-state-title">Aucun utilisateur trouve</h4>
+                        <p class="empty-state-text">Aucun utilisateur ne correspond a vos criteres.</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if users.has_other_pages %}
+            <div class="card-footer pagination-footer">
+                <div class="pagination-info">
+                    Page {{ users.number }} / {{ users.paginator.num_pages }}
+                </div>
+                <div class="pagination-buttons">
+                    {% if users.has_previous %}
+                        <a href="?page={{ users.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+
+                    {% if users.has_next %}
+                        <a href="?page={{ users.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
     </div>
 
-    <!-- Pagination -->
-    {% if users.has_other_pages %}
-        <div class="mt-6 flex justify-center gap-2">
-            {% if users.has_previous %}
-                <a href="?page=1" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Première</a>
-                <a href="?page={{ users.previous_page_number }}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Précédente</a>
-            {% endif %}
+    <style>
+        /* Filter Styles */
+        .filter-header {
+            background: white;
+            padding: var(--space-4) var(--space-5);
+        }
 
-            <span class="px-3 py-2">Page {{ users.number }} sur {{ users.paginator.num_pages }}</span>
+        .filter-form {
+            width: 100%;
+            display: flex;
+            gap: var(--space-4);
+            align-items: flex-end;
+        }
 
-            {% if users.has_next %}
-                <a href="?page={{ users.next_page_number }}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Suivante</a>
-                <a href="?page={{ users.paginator.num_pages }}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Dernière</a>
-            {% endif %}
-        </div>
-    {% endif %}
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            flex: 1;
+        }
+
+        .filter-grid-2 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* User Avatar in Table */
+        .user-cell {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-full);
+            background: linear-gradient(135deg, var(--primary-100) 0%, var(--primary-200) 100%);
+            color: var(--primary-700);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: var(--font-bold);
+            font-size: var(--text-sm);
+        }
+
+        /* Desktop/Mobile Toggle */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        .hide-mobile {
+            display: table-cell;
+        }
+
+        /* User Cards */
+        .user-cards {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+            padding: var(--space-4);
+        }
+
+        .user-card {
+            background: var(--neutral-50);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .user-card:hover {
+            background: white;
+            border-color: var(--primary-300);
+            box-shadow: var(--shadow-md);
+        }
+
+        .user-card-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            margin-bottom: var(--space-3);
+        }
+
+        .user-card-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-full);
+            background: linear-gradient(135deg, var(--primary-100) 0%, var(--primary-200) 100%);
+            color: var(--primary-700);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: var(--font-bold);
+            font-size: var(--text-base);
+            flex-shrink: 0;
+        }
+
+        .user-card-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-card-name {
+            font-weight: var(--font-bold);
+            color: var(--neutral-800);
+            font-size: var(--text-base);
+        }
+
+        .user-card-username {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .user-card-details {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+            padding-top: var(--space-3);
+            border-top: 1px solid var(--neutral-200);
+        }
+
+        .user-card-detail {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .user-card-detail i {
+            color: var(--neutral-400);
+            width: 16px;
+        }
+
+        /* Pagination */
+        .pagination-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pagination-info {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .pagination-buttons {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .filter-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filter-form {
+                flex-direction: column;
+                gap: var(--space-3);
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr 1fr;
+                width: 100%;
+            }
+
+            .filter-grid-2 {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .filter-actions {
+                width: 100%;
+            }
+
+            .filter-actions .btn {
+                flex: 1;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+
+            .hide-mobile {
+                display: none !important;
+            }
+        }
+    </style>
 {% endblock %}

@@ -3,150 +3,481 @@
 {% block title %}Bons de Commande - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'purchases:purchase_order_list' %}">Bons de Commande</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Bons de Commande</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Bons de Commande</h1>
-            <p class="text-gray-600 mt-1">Gestion des commandes fournisseurs</p>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Bons de Commande</h1>
+                <p class="page-subtitle">Gestion des commandes fournisseurs</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'purchases:purchase_order_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>Nouvelle Commande</span>
+                </a>
+            </div>
         </div>
-        <a href="{% url 'purchases:purchase_order_create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-            <i class="fas fa-plus mr-2"></i> Nouveau
-        </a>
     </div>
 {% endblock %}
 
 {% block content %}
     <!-- Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Total</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.total }}</p>
+    <div class="stats-row mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-shopping-basket"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total</div>
+                <div class="stat-value">{{ stats.total|default:"0" }}</div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Brouillons</p>
-            <p class="text-2xl font-bold text-gray-600">{{ stats.draft }}</p>
+        <div class="stat-card">
+            <div class="stat-icon neutral">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Brouillons</div>
+                <div class="stat-value">{{ stats.draft|default:"0" }}</div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">En attente</p>
-            <p class="text-2xl font-bold text-yellow-600">{{ stats.pending }}</p>
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">En attente</div>
+                <div class="stat-value">{{ stats.pending|default:"0" }}</div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Approuvés</p>
-            <p class="text-2xl font-bold text-green-600">{{ stats.approved }}</p>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Approuves</div>
+                <div class="stat-value">{{ stats.approved|default:"0" }}</div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-4">
-            <p class="text-gray-600 text-sm font-medium">Montant Total</p>
-            <p class="text-2xl font-bold text-blue-600">{{ stats.total_amount|floatformat:0 }} DH</p>
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Montant Total</div>
+                <div class="stat-value">{{ stats.total_amount|floatformat:0|default:"0" }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-                <input type="text" name="search" value="{{ search }}" placeholder="Référence ou fournisseur"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Tous les statuts</option>
-                    {% for value, label in status_choices %}
-                        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <select name="order_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Tous les types</option>
-                    {% for value, label in type_choices %}
-                        <option value="{{ value }}" {% if order_type == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <input type="date" name="date_from" value="{{ date_from }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div class="flex gap-2">
-                <input type="date" name="date_to" value="{{ date_to }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                    <i class="fas fa-search"></i>
-                </button>
-            </div>
-        </form>
+    <div class="card mb-6 animate-slide-up">
+        <div class="card-header">
+            <h3><i class="fas fa-filter mr-2"></i> Filtres</h3>
+        </div>
+        <div class="card-body">
+            <form method="get" class="filter-form">
+                <div class="filter-grid">
+                    <div class="form-group">
+                        <label class="form-label">Rechercher</label>
+                        <input type="text" name="search" value="{{ search }}" placeholder="Reference ou fournisseur" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="">Tous les statuts</option>
+                            {% for value, label in status_choices %}
+                                <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select name="order_type" class="form-select">
+                            <option value="">Tous les types</option>
+                            {% for value, label in type_choices %}
+                                <option value="{{ value }}" {% if order_type == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date debut</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date fin</label>
+                        <div class="filter-actions-inline">
+                            <input type="date" name="date_to" value="{{ date_to }}" class="form-input">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 
-    <!-- Table -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b">
-                    <tr>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Référence</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Fournisseur</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Type</th>
-                        <th class="px-6 py-3 text-left font-medium text-gray-700">Date</th>
-                        <th class="px-6 py-3 text-right font-medium text-gray-700">Montant</th>
-                        <th class="px-6 py-3 text-center font-medium text-gray-700">Statut</th>
-                        <th class="px-6 py-3 text-center font-medium text-gray-700">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% for order in orders %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-3 font-mono font-bold text-blue-600">{{ order.reference }}</td>
-                            <td class="px-6 py-3 text-gray-900">{{ order.supplier.name }}</td>
-                            <td class="px-6 py-3 text-gray-600">{{ order.get_order_type_display }}</td>
-                            <td class="px-6 py-3 text-gray-600">{{ order.date|date:"d/m/Y" }}</td>
-                            <td class="px-6 py-3 text-right font-bold text-gray-900">{{ order.total_amount|floatformat:0 }} DH</td>
-                            <td class="px-6 py-3 text-center">
-                                <span class="inline-block px-3 py-1 rounded-full text-xs font-medium
-                                    {% if order.status == 'draft' %}bg-gray-100 text-gray-800
-                                    {% elif order.status == 'pending' %}bg-yellow-100 text-yellow-800
-                                    {% elif order.status == 'approved' %}bg-green-100 text-green-800
-                                    {% elif order.status == 'received' %}bg-blue-100 text-blue-800
-                                    {% elif order.status == 'cancelled' %}bg-red-100 text-red-800
-                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                    {{ order.get_status_display }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-3 text-center">
-                                <a href="{% url 'purchases:purchase_order_detail' order.reference %}" class="text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                            </td>
-                        </tr>
-                    {% empty %}
+    <!-- Desktop Table View -->
+    <div class="card animate-slide-up desktop-view" style="animation-delay: 100ms;">
+        <div class="card-body" style="padding: 0;">
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-gray-500">
-                                Aucun bon de commande trouvé
-                            </td>
+                            <th>Reference</th>
+                            <th>Fournisseur</th>
+                            <th>Type</th>
+                            <th>Date</th>
+                            <th style="text-align: right;">Montant</th>
+                            <th style="text-align: center;">Statut</th>
+                            <th style="text-align: center;">Actions</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                            <tr class="clickable-row" onclick="window.location='{% url 'purchases:purchase_order_detail' order.reference %}'">
+                                <td>
+                                    <span class="font-semibold text-primary">{{ order.reference }}</span>
+                                </td>
+                                <td>{{ order.supplier.name }}</td>
+                                <td class="text-muted">{{ order.get_order_type_display }}</td>
+                                <td class="text-muted">{{ order.date|date:"d/m/Y" }}</td>
+                                <td style="text-align: right;" class="font-semibold">{{ order.total_amount|floatformat:0 }} DH</td>
+                                <td style="text-align: center;">
+                                    <span class="badge {% if order.status == 'draft' %}badge-neutral{% elif order.status == 'pending' %}badge-warning{% elif order.status == 'approved' %}badge-success{% elif order.status == 'received' %}badge-info{% elif order.status == 'cancelled' %}badge-error{% else %}badge-neutral{% endif %}">
+                                        {{ order.get_status_display }}
+                                    </span>
+                                </td>
+                                <td style="text-align: center;">
+                                    <a href="{% url 'purchases:purchase_order_detail' order.reference %}" class="btn btn-ghost btn-sm" onclick="event.stopPropagation();">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">
+                                            <i class="fas fa-shopping-basket"></i>
+                                        </div>
+                                        <h4 class="empty-state-title">Aucun bon de commande trouve</h4>
+                                        <p class="empty-state-text">Commencez par creer une nouvelle commande</p>
+                                        <a href="{% url 'purchases:purchase_order_create' %}" class="btn btn-primary">
+                                            <i class="fas fa-plus"></i> Nouvelle Commande
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
+    </div>
+
+    <!-- Mobile Card View -->
+    <div class="mobile-view">
+        {% for order in orders %}
+            <div class="card mobile-card animate-slide-up" style="animation-delay: {{ forloop.counter0 }}0ms;">
+                <a href="{% url 'purchases:purchase_order_detail' order.reference %}" class="mobile-card-link">
+                    <div class="card-body">
+                        <div class="mobile-card-header">
+                            <span class="mobile-card-ref">{{ order.reference }}</span>
+                            <span class="badge {% if order.status == 'draft' %}badge-neutral{% elif order.status == 'pending' %}badge-warning{% elif order.status == 'approved' %}badge-success{% elif order.status == 'received' %}badge-info{% elif order.status == 'cancelled' %}badge-error{% else %}badge-neutral{% endif %}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="mobile-card-body">
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">Fournisseur</span>
+                                <span class="mobile-card-value">{{ order.supplier.name }}</span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">Type</span>
+                                <span class="mobile-card-value">{{ order.get_order_type_display }}</span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">Date</span>
+                                <span class="mobile-card-value">{{ order.date|date:"d/m/Y" }}</span>
+                            </div>
+                        </div>
+                        <div class="mobile-card-footer">
+                            <span class="mobile-card-amount">{{ order.total_amount|floatformat:0 }} DH</span>
+                            <i class="fas fa-chevron-right mobile-card-arrow"></i>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        {% empty %}
+            <div class="card">
+                <div class="card-body">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-shopping-basket"></i>
+                        </div>
+                        <h4 class="empty-state-title">Aucun bon de commande trouve</h4>
+                        <p class="empty-state-text">Commencez par creer une nouvelle commande</p>
+                        <a href="{% url 'purchases:purchase_order_create' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Nouvelle Commande
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
     </div>
 
     <!-- Pagination -->
     {% if orders.has_other_pages %}
-        <div class="mt-6 flex justify-center gap-2">
+        <div class="pagination-wrapper">
             {% if orders.has_previous %}
-                <a href="?page=1{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Première</a>
-                <a href="?page={{ orders.previous_page_number }}{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Précédente</a>
+                <a href="?page=1{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+                <a href="?page={{ orders.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
             {% endif %}
 
-            <span class="px-3 py-2">Page {{ orders.number }} sur {{ orders.paginator.num_pages }}</span>
+            <span class="btn btn-secondary btn-sm pagination-info">
+                Page {{ orders.number }} / {{ orders.paginator.num_pages }}
+            </span>
 
             {% if orders.has_next %}
-                <a href="?page={{ orders.next_page_number }}{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Suivante</a>
-                <a href="?page={{ orders.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}" class="px-3 py-2 bg-white border rounded-lg hover:bg-gray-50">Dernière</a>
+                <a href="?page={{ orders.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="?page={{ orders.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
             {% endif %}
         </div>
     {% endif %}
+
+    <style>
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: var(--space-4);
+        }
+
+        /* Filter Form */
+        .filter-form {
+            margin-bottom: 0;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: var(--space-4);
+        }
+
+        .filter-grid .form-group {
+            margin-bottom: 0;
+        }
+
+        .filter-actions-inline {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        .filter-actions-inline .form-input {
+            flex: 1;
+        }
+
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: var(--neutral-50);
+            border-bottom: 2px solid var(--neutral-200);
+        }
+
+        .data-table th {
+            padding: var(--space-3) var(--space-4);
+            text-align: left;
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-600);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table td {
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--neutral-50);
+        }
+
+        .clickable-row {
+            cursor: pointer;
+        }
+
+        /* Mobile Card Styles */
+        .mobile-card {
+            margin-bottom: var(--space-3);
+        }
+
+        .mobile-card-link {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .mobile-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-3);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .mobile-card-ref {
+            font-family: var(--font-display);
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+        }
+
+        .mobile-card-body {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .mobile-card-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mobile-card-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .mobile-card-value {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-700);
+        }
+
+        .mobile-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: var(--space-3);
+            padding-top: var(--space-3);
+            border-top: 1px solid var(--neutral-100);
+        }
+
+        .mobile-card-amount {
+            font-size: var(--text-lg);
+            font-weight: var(--font-bold);
+            color: var(--neutral-800);
+        }
+
+        .mobile-card-arrow {
+            color: var(--neutral-400);
+        }
+
+        /* Pagination */
+        .pagination-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--space-2);
+            margin-top: var(--space-6);
+        }
+
+        .pagination-info {
+            cursor: default;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-8);
+        }
+
+        .empty-state-icon {
+            font-size: var(--text-4xl);
+            color: var(--neutral-300);
+            margin-bottom: var(--space-4);
+        }
+
+        .empty-state-title {
+            font-family: var(--font-display);
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-700);
+            margin-bottom: var(--space-2);
+        }
+
+        .empty-state-text {
+            color: var(--neutral-500);
+            margin-bottom: var(--space-4);
+        }
+
+        /* Desktop/Mobile Views */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .filter-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-actions-inline {
+                flex-direction: column;
+            }
+
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+        }
+    </style>
 {% endblock %}

@@ -23,16 +23,8 @@
         required: false, // Optional field
         message: 'Client is required'
       },
-      '[name="product_id"]': {
-        required: true,
-        message: 'Un produit est obligatoire'
-      },
-      '[name="quantity"]': {
-        required: true,
-        min: 0.001,
-        message: 'La quantité doit être positive',
-        messageMin: 'La quantité doit être supérieure à 0'
-      },
+      // Note: product_id and quantity validation removed - handled by individual form validation
+      // to support desktop/mobile dual views with same field names
       '[name="product_weight"]': {
         required: true,
         min: 0,
@@ -122,10 +114,49 @@
     },
 
     /**
+     * Check if an element is visible (not hidden by CSS)
+     */
+    isElementVisible: function(element) {
+      if (!element) return false;
+
+      // Quick check: if element is inside a desktop-view or mobile-view container,
+      // check if that container is currently visible based on viewport width
+      const desktopView = element.closest('.desktop-view');
+      const mobileView = element.closest('.mobile-view');
+      const isMobileViewport = window.innerWidth <= 768;
+
+      // If in desktop-view but we're on mobile viewport, skip validation
+      if (desktopView && isMobileViewport) {
+        return false;
+      }
+
+      // If in mobile-view but we're on desktop viewport, skip validation
+      if (mobileView && !isMobileViewport) {
+        return false;
+      }
+
+      // Also check computed style for other hidden elements
+      let el = element;
+      while (el) {
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none') {
+          return false;
+        }
+        el = el.parentElement;
+      }
+      return true;
+    },
+
+    /**
      * Validate a single field
      */
     validate: function(field) {
       if (!field) return true;
+
+      // Skip hidden fields (e.g., desktop/mobile toggle views)
+      if (!FormValidator.isElementVisible(field)) {
+        return true;
+      }
 
       const selector = FormValidator.getFieldSelector(field);
       const rule = FormValidator.rules[selector];

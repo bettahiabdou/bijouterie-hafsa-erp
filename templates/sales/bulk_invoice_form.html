@@ -1,341 +1,668 @@
 {% extends 'base.html' %}
 
-{% block title %}Créer Factures en Lot - Bijouterie Hafsa ERP{% endblock %}
+{% block title %}Creer Factures en Lot - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <a href="{% url 'sales:invoice_list' %}">Factures</a>
-    <span>/</span>
-    <span>Créer en Lot</span>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_list' %}" class="breadcrumb-item">Factures</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Creer en Lot</span>
 {% endblock %}
 
 {% block page_header %}
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Créer Factures en Lot</h1>
-            <p class="text-gray-600 mt-1">Ajouter plusieurs factures à la fois</p>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Creer Factures en Lot</h1>
+                <p class="page-subtitle">Ajouter plusieurs factures a la fois</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:invoice_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Annuler</span>
+                </a>
+            </div>
         </div>
-        <a href="{% url 'sales:invoice_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-            <i class="fas fa-arrow-left mr-2"></i> Annuler
-        </a>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="batch-form-container">
-        <!-- Main Form -->
-        <div class="batch-form-wrapper">
-            <form method="post" class="bg-white rounded-lg shadow-md p-6">
-                {% csrf_token %}
+    <form method="post" class="bulk-form">
+        {% csrf_token %}
 
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="mb-6 p-4 {% if message.tags %}bg-{{ message.tags }}-100 text-{{ message.tags }}-800{% else %}bg-blue-100 text-blue-800{% endif %} rounded-lg">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} mb-6 animate-slide-up">
+                    <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
 
-                <div>
-                    <!-- Information Section -->
-                    <div class="batch-form-section">
-                        <h2 class="text-lg font-bold text-gray-900 mb-4">Information</h2>
-                        <p class="text-sm text-gray-600 mb-6">Puisque chaque facture de vente a des clients et produits différents, chaque ligne du tableau ci-dessous représente une facture complète avec :</p>
-                        <ul class="list-disc list-inside text-sm text-gray-600 space-y-2 mb-6">
-                            <li>Sélection du client (optionnel pour les ventes sans client/walk-in)</li>
-                            <li>Sélection du produit et quantité</li>
-                            <li>Méthode de paiement et référence (optionnels)</li>
-                            <li>Montant payé à la création (optionnel, pour paiement partiel/total à la création)</li>
-                        </ul>
-                    </div>
+        <!-- Information Section -->
+        <div class="card mb-6 animate-slide-up">
+            <div class="card-header">
+                <h3><i class="fas fa-info-circle mr-2"></i> Information</h3>
+            </div>
+            <div class="card-body">
+                <p class="info-text mb-4">
+                    Chaque ligne du tableau ci-dessous represente une facture complete avec :
+                </p>
+                <ul class="info-list">
+                    <li><i class="fas fa-check text-success"></i> Selection du client (optionnel pour les ventes sans client/walk-in)</li>
+                    <li><i class="fas fa-check text-success"></i> Selection du produit et quantite</li>
+                    <li><i class="fas fa-check text-success"></i> Methode de paiement et reference (optionnels)</li>
+                    <li><i class="fas fa-check text-success"></i> Montant paye a la creation (optionnel)</li>
+                </ul>
+            </div>
+        </div>
 
-                    <!-- Dynamic Invoice Entry - Table Format -->
-                    <div class="batch-form-section">
-                        <h2 class="text-lg font-bold text-gray-900 mb-4">Factures à Créer</h2>
-                        <p class="text-sm text-gray-600 mb-4">Remplissez le tableau ci-dessous avec les factures. Chaque facture recevra une référence unique générée automatiquement.</p>
-
-                        <div class="overflow-x-auto">
-                            <table class="batch-table">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 30px;"></th>
-                                        <th>Client *</th>
-                                        <th>Produit *</th>
-                                        <th>Quantité *</th>
-                                        <th>Prix Vente (DH)</th>
-                                        <th>Méthode Paiement</th>
-                                        <th>Montant Payé (DH)</th>
-                                        <th style="width: 50px;">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="invoices_list">
-                                    <!-- Template row (will be cloned for new rows) -->
-                                    <tr class="invoice_item">
-                                        <td>
-                                            <button type="button" class="expand-toggle" title="Afficher détails" style="background: none; border: none; cursor: pointer; font-size: 1.2em;">▼</button>
-                                        </td>
-                                        <td>
-                                            <select name="client_id" class="client_id w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                                                <option value="">-- Vente sans client (Walk-in) --</option>
-                                                {% for client in clients %}
-                                                    <option value="{{ client.id }}">{{ client.first_name }} {{ client.last_name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <select name="product_id" class="product_id w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required>
-                                                <option value="">-- Sélectionner un produit --</option>
-                                                {% for product in products %}
-                                                    <option value="{{ product.id }}" data-price="{{ product.selling_price }}">{{ product.reference }} - {{ product.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <input type="number" name="quantity" class="quantity w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                step="0.01" min="0.01" value="1" required>
-                                        </td>
-                                        <td>
-                                            <input type="number" name="selling_price" class="selling_price w-full px-2 py-1 bg-orange-50 border border-orange-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                step="0.01" min="0" placeholder="Auto">
-                                        </td>
-                                        <td>
-                                            <select name="payment_method" class="payment_method w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                                                <option value="">-- Aucune --</option>
-                                                {% for method in payment_methods %}
-                                                    <option value="{{ method.id }}" data-name="{{ method.name|lower }}">{{ method.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <input type="number" name="amount_paid" class="amount_paid w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                step="0.01" min="0" placeholder="0.00">
-                                        </td>
-                                        <td style="text-align: center;">
-                                            <button type="button" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm remove_invoice" style="display:none;" title="Supprimer">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <!-- Detail row template (hidden by default) -->
-                                    <tr class="detail-row" style="display: none;">
-                                        <td colspan="8">
-                                            <div class="detail-content">
-                                                <div class="detail-field">
-                                                    <label>Référence de Paiement *</label>
-                                                    <input type="text" name="payment_reference" class="payment_reference w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                        placeholder="N° chèque, référence virement, n° de carte, etc.">
-                                                    <p class="text-xs text-gray-500 mt-1">Requis pour: virement bancaire, chèque, carte bancaire, paiement mobile</p>
+        <!-- Invoice Entry Table -->
+        <div class="card mb-6 animate-slide-up" style="animation-delay: 50ms;">
+            <div class="card-header">
+                <h3><i class="fas fa-file-invoice mr-2"></i> Factures a Creer</h3>
+                <span class="badge badge-primary" id="total_invoices_badge">1 facture(s)</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <!-- Desktop View -->
+                <div class="desktop-view">
+                    <div class="table-container">
+                        <table class="data-table batch-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;"></th>
+                                    <th>Client</th>
+                                    <th>Produit *</th>
+                                    <th style="width: 100px;">Quantite *</th>
+                                    <th style="width: 130px;">Prix Vente (DH)</th>
+                                    <th>Methode Paiement</th>
+                                    <th style="width: 130px;">Montant Paye</th>
+                                    <th style="width: 60px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoices_list">
+                                <!-- Template row -->
+                                <tr class="invoice_item">
+                                    <td>
+                                        <button type="button" class="btn btn-ghost btn-sm expand-toggle" title="Afficher details">
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <select name="client_id" class="client_id form-select form-select-sm">
+                                            <option value="">-- Vente sans client --</option>
+                                            {% for client in clients %}
+                                                <option value="{{ client.id }}">{{ client.first_name }} {{ client.last_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="product_id" class="product_id form-select form-select-sm">
+                                            <option value="">-- Produit --</option>
+                                            {% for product in products %}
+                                                <option value="{{ product.id }}" data-price="{{ product.selling_price }}">{{ product.reference }} - {{ product.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" name="quantity" class="quantity form-input form-input-sm"
+                                            step="0.01" min="0.01" value="1">
+                                    </td>
+                                    <td>
+                                        <input type="number" name="selling_price" class="selling_price form-input form-input-sm form-input-highlight"
+                                            step="0.01" min="0" placeholder="Auto">
+                                    </td>
+                                    <td>
+                                        <select name="payment_method" class="payment_method form-select form-select-sm">
+                                            <option value="">-- Aucune --</option>
+                                            {% for method in payment_methods %}
+                                                <option value="{{ method.id }}" data-name="{{ method.name|lower }}">{{ method.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" name="amount_paid" class="amount_paid form-input form-input-sm"
+                                            step="0.01" min="0" placeholder="0.00">
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <button type="button" class="btn btn-error btn-sm remove_invoice" style="display: none;">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <!-- Detail row template -->
+                                <tr class="detail-row" style="display: none;">
+                                    <td colspan="8">
+                                        <div class="detail-content">
+                                            <div class="detail-grid">
+                                                <div class="form-group payment-reference-field" style="display: none;">
+                                                    <label class="form-label">Reference de Paiement *</label>
+                                                    <input type="text" name="payment_reference" class="payment_reference form-input"
+                                                        placeholder="N° cheque, reference virement, n° de carte...">
+                                                    <p class="form-hint">Requis pour: virement bancaire, cheque, carte bancaire, paiement mobile</p>
                                                 </div>
-                                                <div class="detail-field bank-account-field" style="display: none;">
-                                                    <label>Compte Bancaire (Virement)</label>
-                                                    <select name="bank_account" class="bank_account w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                                                        <option value="">-- Sélectionner un compte --</option>
+                                                <div class="form-group bank-account-field" style="display: none;">
+                                                    <label class="form-label">Compte Bancaire (Virement)</label>
+                                                    <select name="bank_account" class="bank_account form-select">
+                                                        <option value="">-- Selectionner un compte --</option>
                                                         {% for bank in bank_accounts %}
                                                             <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_number }}</option>
                                                         {% endfor %}
                                                     </select>
-                                                    <p class="text-xs text-gray-500 mt-1">Compte bancaire pour le virement</p>
+                                                    <p class="form-hint">Compte bancaire pour le virement</p>
                                                 </div>
-                                                <div class="detail-field">
-                                                    <label>Remise (DH)</label>
-                                                    <input type="number" name="discount_amount" class="discount_amount w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                <div class="form-group">
+                                                    <label class="form-label">Remise (DH)</label>
+                                                    <input type="number" name="discount_amount" class="discount_amount form-input"
                                                         step="0.01" min="0" value="0">
-                                                    <p class="text-xs text-gray-500 mt-1">Remise automatique ou manuelle (calculée si prix modifié)</p>
+                                                    <p class="form-hint">Remise automatique ou manuelle (calculee si prix modifie)</p>
                                                 </div>
                                             </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Mobile View -->
+                <div class="mobile-view">
+                    <div class="mobile-invoices" id="mobile_invoices_list">
+                        <!-- Template mobile card -->
+                        <div class="mobile-invoice-card invoice_item_mobile" data-index="0">
+                            <div class="mobile-invoice-header">
+                                <span class="mobile-invoice-number">Facture #1</span>
+                                <button type="button" class="btn btn-error btn-sm remove_invoice_mobile" style="display: none;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <div class="mobile-invoice-form">
+                                <div class="form-group">
+                                    <label class="form-label">Client</label>
+                                    <select name="client_id" class="client_id_mobile form-select">
+                                        <option value="">-- Vente sans client --</option>
+                                        {% for client in clients %}
+                                            <option value="{{ client.id }}">{{ client.first_name }} {{ client.last_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Produit *</label>
+                                    <select name="product_id" class="product_id_mobile form-select">
+                                        <option value="">-- Selectionner --</option>
+                                        {% for product in products %}
+                                            <option value="{{ product.id }}" data-price="{{ product.selling_price }}">{{ product.reference }} - {{ product.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Quantite *</label>
+                                        <input type="number" name="quantity" class="quantity_mobile form-input"
+                                            step="0.01" min="0.01" value="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Prix (DH)</label>
+                                        <input type="number" name="selling_price" class="selling_price_mobile form-input"
+                                            step="0.01" min="0" placeholder="Auto">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Methode Paiement</label>
+                                    <select name="payment_method" class="payment_method_mobile form-select">
+                                        <option value="">-- Aucune --</option>
+                                        {% for method in payment_methods %}
+                                            <option value="{{ method.id }}" data-name="{{ method.name|lower }}">{{ method.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group bank-account-field-mobile" style="display: none;">
+                                    <label class="form-label">Compte Bancaire</label>
+                                    <select name="bank_account" class="bank_account_mobile form-select">
+                                        <option value="">-- Selectionner --</option>
+                                        {% for bank in bank_accounts %}
+                                            <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_number }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group payment-reference-field-mobile" style="display: none;">
+                                    <label class="form-label">Reference Paiement</label>
+                                    <input type="text" name="payment_reference" class="payment_reference_mobile form-input"
+                                        placeholder="N° cheque, reference virement...">
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Montant Paye</label>
+                                        <input type="number" name="amount_paid" class="amount_paid_mobile form-input"
+                                            step="0.01" min="0" placeholder="0.00">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Remise (DH)</label>
+                                        <input type="number" name="discount_amount" class="discount_amount_mobile form-input"
+                                            step="0.01" min="0" value="0">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-
-                        <button type="button" id="add_invoice_btn" class="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center text-sm">
-                            <i class="fas fa-plus mr-2"></i> Ajouter une Ligne
-                        </button>
-                    </div>
-
-                    <!-- Summary -->
-                    <div class="batch-form-section mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <h3 class="font-bold text-blue-900 mb-2">Résumé</h3>
-                        <p class="text-sm text-blue-800">
-                            <strong id="total_invoices">1</strong> facture(s) à créer
-                        </p>
                     </div>
                 </div>
 
-                <!-- Form Actions -->
-                <div class="mt-8 flex gap-4 justify-start">
-                    <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center">
-                        <i class="fas fa-save mr-2"></i> Créer les Factures
+                <div class="card-footer">
+                    <button type="button" id="add_invoice_btn" class="btn btn-secondary">
+                        <i class="fas fa-plus"></i>
+                        <span>Ajouter une Ligne</span>
                     </button>
-                    <a href="{% url 'sales:invoice_list' %}" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg">
-                        Annuler
-                    </a>
                 </div>
-            </form>
+            </div>
         </div>
-    </div>
 
-    <!-- Help Section (Below Form) -->
-    <div class="batch-form-container mt-6">
-        <div class="batch-form-wrapper">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Aide et Conseils</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-600">
+        <!-- Summary -->
+        <div class="card mb-6 animate-slide-up" style="animation-delay: 100ms;">
+            <div class="card-body summary-box">
+                <div class="summary-content">
+                    <i class="fas fa-receipt"></i>
                     <div>
-                        <h4 class="font-bold text-gray-900 mb-2">Champs Obligatoires</h4>
-                        <ul class="list-disc list-inside space-y-1">
-                            <li>Client (optionnel - vente sans client)</li>
-                            <li>Produit (doit être disponible)</li>
-                            <li>Quantité (doit être positive)</li>
-                        </ul>
+                        <strong>Resume</strong>
+                        <p><span id="total_invoices">1</span> facture(s) a creer</p>
                     </div>
-                    <div>
-                        <h4 class="font-bold text-gray-900 mb-2">Champs Optionnels</h4>
-                        <ul class="list-disc list-inside space-y-1">
-                            <li>Prix Vente (utilise le prix du produit par défaut)</li>
-                            <li>Méthode Paiement & Référence</li>
-                            <li>Montant Payé (crée facture partiellement/totalement payée)</li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 class="font-bold text-gray-900 mb-2">Références Générées Automatiquement</h4>
-                        <p>Chaque facture reçoit une référence unique au format INV-YYYYMMDD-XXXX générée automatiquement lors de la création.</p>
-                    </div>
-                    <div>
-                        <h4 class="font-bold text-gray-900 mb-2">Statut de la Facture</h4>
-                        <ul class="list-disc list-inside space-y-1">
-                            <li>Défaut: Non payée</li>
-                            <li>Si montant payé = total: Payée</li>
-                            <li>Si montant payé > 0 et < total: Partiellement payée</li>
-                        </ul>
-                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions animate-slide-up" style="animation-delay: 150ms;">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i>
+                <span>Creer les Factures</span>
+            </button>
+            <a href="{% url 'sales:invoice_list' %}" class="btn btn-secondary">
+                Annuler
+            </a>
+        </div>
+    </form>
+
+    <!-- Help Section -->
+    <div class="card mt-8 animate-slide-up" style="animation-delay: 200ms;">
+        <div class="card-header">
+            <h3><i class="fas fa-question-circle mr-2"></i> Aide et Conseils</h3>
+        </div>
+        <div class="card-body">
+            <div class="help-grid">
+                <div class="help-item">
+                    <h4><i class="fas fa-asterisk text-error"></i> Champs Obligatoires</h4>
+                    <ul>
+                        <li>Client (optionnel - vente sans client)</li>
+                        <li>Produit (doit etre disponible)</li>
+                        <li>Quantite (doit etre positive)</li>
+                    </ul>
+                </div>
+                <div class="help-item">
+                    <h4><i class="fas fa-cog text-info"></i> Champs Optionnels</h4>
+                    <ul>
+                        <li>Prix Vente (utilise le prix du produit)</li>
+                        <li>Methode Paiement & Reference</li>
+                        <li>Montant Paye</li>
+                    </ul>
+                </div>
+                <div class="help-item">
+                    <h4><i class="fas fa-hashtag text-accent"></i> References</h4>
+                    <p>Chaque facture recoit une reference unique au format INV-YYYYMMDD-XXXX generee automatiquement.</p>
+                </div>
+                <div class="help-item">
+                    <h4><i class="fas fa-tag text-success"></i> Statut Facture</h4>
+                    <ul>
+                        <li>Defaut: Non payee</li>
+                        <li>Si paye = total: Payee</li>
+                        <li>Si paye partiel: Partiellement payee</li>
+                    </ul>
                 </div>
             </div>
         </div>
     </div>
 
     <style>
-        .batch-form-container {
-            display: flex;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .batch-form-wrapper {
-            width: 100%;
+        /* Bulk Form */
+        .bulk-form {
             max-width: 1400px;
+            margin: 0 auto;
         }
 
-        .batch-form-section {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #e0e0e0;
+        /* Info List */
+        .info-text {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
         }
 
-        .batch-form-section:last-child {
-            border-bottom: none;
+        .info-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
         }
 
-        .batch-table {
+        .info-list li {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .data-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
         }
 
-        .batch-table th {
-            background-color: #f3f4f6;
-            border: 1px solid #d1d5db;
-            padding: 12px;
+        .data-table thead {
+            background: var(--neutral-50);
+            border-bottom: 2px solid var(--neutral-200);
+        }
+
+        .data-table th {
+            padding: var(--space-3) var(--space-2);
             text-align: left;
-            font-weight: 600;
-            font-size: 0.875rem;
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-600);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
         }
 
-        .batch-table td {
-            border: 1px solid #d1d5db;
-            padding: 10px;
+        .data-table td {
+            padding: var(--space-2);
+            border-bottom: 1px solid var(--neutral-100);
+            vertical-align: middle;
         }
 
-        .batch-table tbody tr:hover {
-            background-color: #f9fafb;
+        .data-table tbody tr.invoice_item:hover {
+            background: var(--neutral-50);
         }
 
-        .batch-table select,
-        .batch-table input {
-            width: 100%;
-            padding: 6px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            font-size: 0.875rem;
+        /* Small form elements */
+        .form-select-sm,
+        .form-input-sm {
+            padding: var(--space-2);
+            font-size: var(--text-sm);
+            min-width: 0;
+            border: 1px solid var(--neutral-300);
+            border-radius: var(--radius-md);
+            background: white;
         }
 
-        .batch-table select:focus,
-        .batch-table input:focus {
+        .form-select-sm:focus,
+        .form-input-sm:focus {
             outline: none;
-            ring: 2px;
-            ring-color: #3b82f6;
-            border-color: #3b82f6;
+            border-color: var(--primary-400);
+            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
         }
 
+        .form-input-highlight {
+            background: var(--warning-50);
+            border-color: var(--warning-300);
+        }
+
+        /* Detail Row */
         .detail-row {
-            background-color: #f9fafb;
+            background: var(--neutral-50);
+        }
+
+        .detail-row td {
+            padding: 0;
         }
 
         .detail-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            padding: 20px;
-            background-color: #f3f4f6;
-            border-radius: 6px;
+            padding: var(--space-4);
+            background: var(--neutral-100);
+            border-radius: var(--radius-md);
+            margin: var(--space-2);
         }
 
-        .detail-field {
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-4);
+        }
+
+        /* Expand Toggle */
+        .expand-toggle {
+            color: var(--primary-500);
+            transition: transform var(--transition-fast);
+        }
+
+        .expand-toggle.expanded i {
+            transform: rotate(180deg);
+        }
+
+        /* Summary */
+        .summary-box {
+            background: var(--info-50);
+            border: 1px solid var(--info-200);
+            border-radius: var(--radius-md);
+        }
+
+        .summary-content {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            color: var(--info-700);
+        }
+
+        .summary-content i {
+            font-size: var(--text-xl);
+        }
+
+        .summary-content strong {
+            display: block;
+        }
+
+        .summary-content p {
+            font-size: var(--text-sm);
+            margin: 0;
+        }
+
+        /* Form Actions */
+        .form-actions {
+            display: flex;
+            gap: var(--space-3);
+        }
+
+        /* Form Elements */
+        .form-group {
             display: flex;
             flex-direction: column;
+            gap: var(--space-2);
         }
 
-        .detail-field label {
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 8px;
-            font-size: 0.875rem;
+        .form-label {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-700);
         }
 
-        .detail-field input,
-        .detail-field select {
-            width: 100%;
-            padding: 8px 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            font-size: 0.875rem;
-            font-family: inherit;
+        .form-input,
+        .form-select {
+            padding: var(--space-3) var(--space-4);
+            border: 1px solid var(--neutral-300);
+            border-radius: var(--radius-md);
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+            background: white;
+            transition: all var(--transition-fast);
         }
 
-        .detail-field input:focus,
-        .detail-field select:focus {
+        .form-input:focus,
+        .form-select:focus {
             outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: var(--primary-400);
+            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
         }
 
-        .detail-field p {
-            font-size: 0.75rem;
-            color: #6b7280;
-            margin-top: 6px;
+        .form-hint {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
         }
 
-        .bank-account-field {
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-3);
+        }
+
+        /* Help Grid */
+        .help-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-6);
+        }
+
+        .help-item h4 {
+            font-size: var(--text-sm);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+            margin-bottom: var(--space-2);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .help-item ul {
+            list-style: disc;
+            padding-left: var(--space-5);
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .help-item ul li {
+            margin-bottom: var(--space-1);
+        }
+
+        .help-item p {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        /* Mobile Invoice Cards */
+        .mobile-invoices {
+            display: flex;
             flex-direction: column;
+            gap: var(--space-4);
+            padding: var(--space-4);
+        }
+
+        .mobile-invoice-card {
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .mobile-invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-4);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-200);
+        }
+
+        .mobile-invoice-number {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .mobile-invoice-form {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        /* Alert */
+        .alert {
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            font-size: var(--text-sm);
+        }
+
+        .alert-success {
+            background: var(--success-50);
+            color: var(--success-700);
+            border: 1px solid var(--success-200);
+        }
+
+        .alert-error {
+            background: var(--error-50);
+            color: var(--error-700);
+            border: 1px solid var(--error-200);
+        }
+
+        .alert-info {
+            background: var(--info-50);
+            color: var(--info-700);
+            border: 1px solid var(--info-200);
+        }
+
+        /* Desktop/Mobile Views */
+        .desktop-view {
+            display: block;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .desktop-view {
+                display: none;
+            }
+
+            .mobile-view {
+                display: block;
+            }
+
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .help-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .form-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
         }
     </style>
 
     <script>
+        // Desktop functionality
         const templateRow = document.querySelector('.invoice_item');
         const invoicesList = document.getElementById('invoices_list');
         const addInvoiceBtn = document.getElementById('add_invoice_btn');
         const totalInvoicesEl = document.getElementById('total_invoices');
+        const totalInvoicesBadge = document.getElementById('total_invoices_badge');
+
+        // Mobile functionality
+        const mobileInvoicesList = document.getElementById('mobile_invoices_list');
+        const mobileTemplateCard = document.querySelector('.invoice_item_mobile');
+        let mobileInvoiceCount = 1;
 
         // Handle expand/collapse toggle for detail rows
         function attachExpandToggleHandler(row) {
@@ -347,45 +674,205 @@
                     e.preventDefault();
                     const isHidden = detailRow.style.display === 'none';
                     detailRow.style.display = isHidden ? 'table-row' : 'none';
-                    this.textContent = isHidden ? '▲' : '▼';
+                    expandBtn.classList.toggle('expanded', isHidden);
                 });
             }
         }
 
-        // Handle conditional bank account field visibility
+        // Handle conditional field visibility based on payment method (desktop)
         function attachPaymentMethodHandler(row) {
             const paymentMethodSelect = row.querySelector('.payment_method');
             const detailRow = row.nextElementSibling;
 
             if (!paymentMethodSelect || !detailRow) return;
 
-            function updateBankAccountFieldVisibility() {
-                const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
-                const methodName = selectedOption.getAttribute('data-name') || '';
-                const bankAccountField = detailRow.querySelector('.bank-account-field');
+            const bankAccountField = detailRow.querySelector('.bank-account-field');
+            const paymentRefField = detailRow.querySelector('.payment-reference-field');
 
+            function updateFieldsVisibility() {
+                const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
+                const methodName = (selectedOption.getAttribute('data-name') || '').toLowerCase();
+                const hasPaymentMethod = paymentMethodSelect.value !== '';
+
+                // Check payment method type
+                const isVirement = methodName.includes('virement') || methodName.includes('bank');
+                const isEspece = methodName.includes('espece') || methodName.includes('cash') || methodName.includes('espèce');
+                const needsReference = hasPaymentMethod && !isEspece;
+
+                // Show bank account field only for virement
                 if (bankAccountField) {
-                    // Show bank account field if payment method is virement (dynamic check)
-                    const isVirement = methodName.includes('virement') || methodName.includes('bank');
-                    bankAccountField.style.display = isVirement ? 'flex' : 'none';
-                    console.log(`Row payment method: ${methodName}, showing bank field: ${isVirement}`);
+                    bankAccountField.style.display = isVirement ? 'block' : 'none';
+                }
+
+                // Show payment reference for all methods except espèce (cash)
+                if (paymentRefField) {
+                    paymentRefField.style.display = needsReference ? 'block' : 'none';
+                }
+
+                console.log('Payment method: ' + methodName + ', needs reference: ' + needsReference + ', is virement: ' + isVirement);
+            }
+
+            paymentMethodSelect.addEventListener('change', updateFieldsVisibility);
+            updateFieldsVisibility();
+        }
+
+        // Handle conditional field visibility based on payment method (mobile)
+        function attachMobilePaymentMethodHandler(card) {
+            const paymentMethodSelect = card.querySelector('.payment_method_mobile');
+            const bankAccountField = card.querySelector('.bank-account-field-mobile');
+            const paymentRefField = card.querySelector('.payment-reference-field-mobile');
+
+            if (!paymentMethodSelect) return;
+
+            function updateFieldsVisibility() {
+                const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
+                const methodName = (selectedOption.getAttribute('data-name') || '').toLowerCase();
+                const hasPaymentMethod = paymentMethodSelect.value !== '';
+
+                // Check payment method type
+                const isVirement = methodName.includes('virement') || methodName.includes('bank');
+                const isEspece = methodName.includes('espece') || methodName.includes('cash') || methodName.includes('espèce');
+                const needsReference = hasPaymentMethod && !isEspece;
+
+                // Show bank account field only for virement
+                if (bankAccountField) {
+                    bankAccountField.style.display = isVirement ? 'block' : 'none';
+                }
+
+                // Show payment reference for all methods except espèce (cash)
+                if (paymentRefField) {
+                    paymentRefField.style.display = needsReference ? 'block' : 'none';
                 }
             }
 
-            paymentMethodSelect.addEventListener('change', updateBankAccountFieldVisibility);
-            // Initial check
-            updateBankAccountFieldVisibility();
+            paymentMethodSelect.addEventListener('change', updateFieldsVisibility);
+            updateFieldsVisibility();
         }
 
-        // Add new invoice row
+        // Handle product price change and auto-remise calculation
+        function attachProductPriceHandler(row, isDesktop = true) {
+            const productSelect = row.querySelector(isDesktop ? '.product_id' : '.product_id_mobile');
+            const priceInput = row.querySelector(isDesktop ? '.selling_price' : '.selling_price_mobile');
+            const amountPaidInput = row.querySelector(isDesktop ? '.amount_paid' : '.amount_paid_mobile');
+            const quantityInput = row.querySelector(isDesktop ? '.quantity' : '.quantity_mobile');
+            const discountInput = isDesktop
+                ? row.nextElementSibling?.querySelector('.discount_amount')
+                : row.querySelector('.discount_amount_mobile');
+
+            if (!productSelect || !priceInput) return;
+
+            // Set price when product changes
+            productSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const price = selectedOption.getAttribute('data-price');
+
+                if (price) {
+                    const normalizedPrice = price.replace(',', '.');
+                    priceInput.value = normalizedPrice;
+                    priceInput.placeholder = price;
+                    if (discountInput) discountInput.value = '0';
+
+                    // Auto-fill amount paid with the selling price (full payment by default)
+                    const quantity = parseFloat(quantityInput?.value) || 1;
+                    const totalAmount = parseFloat(normalizedPrice) * quantity;
+                    if (amountPaidInput) {
+                        amountPaidInput.value = totalAmount.toFixed(2);
+                    }
+                }
+            });
+
+            // Update quantity - recalculate total and amount paid
+            if (quantityInput) {
+                quantityInput.addEventListener('change', function() {
+                    const quantity = parseFloat(this.value) || 1;
+                    const price = parseFloat(priceInput.value) || 0;
+                    const totalAmount = price * quantity;
+
+                    // Update amount paid to match new total (full payment)
+                    if (amountPaidInput && price > 0) {
+                        amountPaidInput.value = totalAmount.toFixed(2);
+                    }
+                });
+            }
+
+            // Calculate remise when price is changed manually
+            priceInput.addEventListener('change', function() {
+                const selectedOption = productSelect.options[productSelect.selectedIndex];
+                const originalPrice = selectedOption.getAttribute('data-price');
+                const newPrice = this.value;
+                const quantity = parseFloat(quantityInput?.value) || 1;
+
+                if (originalPrice && newPrice) {
+                    const origPriceTrimmed = parseFloat(originalPrice.replace(',', '.'));
+                    const newPriceTrimmed = parseFloat(newPrice);
+                    const difference = origPriceTrimmed - newPriceTrimmed;
+
+                    // Auto-calculate remise
+                    if (discountInput) {
+                        if (difference > 0) {
+                            // Remise = (original price - new price) * quantity
+                            discountInput.value = (difference * quantity).toFixed(2);
+                            console.log('Remise auto-calculee: ' + (difference * quantity).toFixed(2) + ' DH');
+                        } else {
+                            discountInput.value = '0';
+                        }
+                    }
+
+                    // Auto-fill amount paid with the new selling price (full payment)
+                    const totalAmount = newPriceTrimmed * quantity;
+                    if (amountPaidInput) {
+                        amountPaidInput.value = totalAmount.toFixed(2);
+                        console.log('Montant paye auto-rempli: ' + totalAmount.toFixed(2) + ' DH');
+                    }
+                }
+            });
+
+            // Calculate remise when amount paid is changed manually
+            if (amountPaidInput) {
+                amountPaidInput.addEventListener('change', function() {
+                    const selectedOption = productSelect.options[productSelect.selectedIndex];
+                    const originalPrice = selectedOption.getAttribute('data-price');
+                    const quantity = parseFloat(quantityInput?.value) || 1;
+                    const amountPaid = parseFloat(this.value) || 0;
+
+                    if (originalPrice) {
+                        const origPriceTrimmed = parseFloat(originalPrice.replace(',', '.'));
+                        const totalOriginal = origPriceTrimmed * quantity;
+                        const remise = totalOriginal - amountPaid;
+
+                        // Auto-calculate remise based on difference between original total and amount paid
+                        if (discountInput) {
+                            if (remise > 0) {
+                                discountInput.value = remise.toFixed(2);
+                                console.log('Remise auto-calculee (montant paye): ' + remise.toFixed(2) + ' DH');
+                            } else {
+                                discountInput.value = '0';
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Add new invoice row (desktop)
         addInvoiceBtn.addEventListener('click', function(e) {
             e.preventDefault();
+
+            // Check if we're in mobile view
+            if (window.innerWidth <= 768) {
+                addMobileInvoiceCard();
+            } else {
+                addDesktopInvoiceRow();
+            }
+        });
+
+        function addDesktopInvoiceRow() {
             const newRow = templateRow.cloneNode(true);
             const newDetailRow = templateRow.nextElementSibling.cloneNode(true);
 
             // Reset values in cloned row - CRITICAL: Reset ALL input fields
             newRow.querySelectorAll('input').forEach(input => {
-                // Only set quantity to 1, all others (including amount_paid) must be empty
+                // Only set quantity to 1, all others (including amount_paid, selling_price) must be empty
                 if (input.name === 'quantity') {
                     input.value = '1';
                 } else {
@@ -398,22 +885,33 @@
 
             // Reset values in cloned detail row - explicitly reset all fields
             newDetailRow.querySelectorAll('input').forEach(input => {
-                input.value = '';  // Clear payment_reference
+                if (input.name === 'discount_amount') {
+                    input.value = '0';
+                } else {
+                    input.value = '';  // Clear payment_reference
+                }
             });
             newDetailRow.querySelectorAll('select').forEach(select => {
                 select.value = '';  // Clear bank_account
             });
-            // DO NOT hide bank account field - let attachPaymentMethodHandler manage visibility
+
+            // Hide detail row and bank account field
+            newDetailRow.style.display = 'none';
             const newBankAccountField = newDetailRow.querySelector('.bank-account-field');
             if (newBankAccountField) {
-                // Set initial state based on payment method
                 newBankAccountField.style.display = 'none';
             }
 
-            // Show remove button if this isn't the first row
+            // Reset expand toggle
+            const expandBtn = newRow.querySelector('.expand-toggle');
+            if (expandBtn) {
+                expandBtn.classList.remove('expanded');
+            }
+
+            // Show remove button
             const removeBtn = newRow.querySelector('.remove_invoice');
             if (invoicesList.querySelectorAll('.invoice_item').length > 0) {
-                removeBtn.style.display = 'inline-block';
+                removeBtn.style.display = 'inline-flex';
             }
 
             // Add remove button functionality
@@ -424,62 +922,87 @@
                 updateSummary();
             });
 
-            // Update product price when product selection changes
-            newRow.querySelector('.product_id').addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const price = selectedOption.getAttribute('data-price');
-                const priceInput = newRow.querySelector('.selling_price');
-                const discountInput = newRow.nextElementSibling.querySelector('.discount_amount');
-
-                // Set as VALUE (not placeholder) so it's submitted with form
-                if (price && !priceInput.value) {
-                    // Convert comma to dot for number input (13875,00 -> 13875.00)
-                    const normalizedPrice = price.replace(',', '.');
-                    priceInput.value = normalizedPrice;
-                    // Also set placeholder for visual clarity
-                    priceInput.placeholder = price;
-                    // Reset discount when product changes
-                    if (discountInput) discountInput.value = '0';
-                }
-            });
-
-            // Update remise when price is changed manually
-            newRow.querySelector('.selling_price').addEventListener('change', function() {
-                const productSelect = newRow.querySelector('.product_id');
-                const selectedOption = productSelect.options[productSelect.selectedIndex];
-                const originalPrice = selectedOption.getAttribute('data-price');
-                const newPrice = this.value;
-                const discountInput = newRow.nextElementSibling.querySelector('.discount_amount');
-
-                if (originalPrice && newPrice && discountInput) {
-                    // Convert comma to dot for calculation
-                    const origPriceTrimmed = parseFloat(originalPrice.replace(',', '.'));
-                    const newPriceTrimmed = parseFloat(newPrice);
-
-                    // Calculate difference (remise) if price is lower
-                    const difference = origPriceTrimmed - newPriceTrimmed;
-                    if (difference > 0) {
-                        discountInput.value = difference.toFixed(2);
-                        console.log(`Remise auto-calculée: ${difference.toFixed(2)} DH (${origPriceTrimmed.toFixed(2)} -> ${newPriceTrimmed.toFixed(2)})`);
-                    } else if (difference < 0) {
-                        // If price is higher, no remise
-                        discountInput.value = '0';
-                    }
-                }
-            });
-
-            // Append rows to DOM FIRST so that nextElementSibling works
+            // Append rows to DOM
             invoicesList.appendChild(newRow);
             invoicesList.appendChild(newDetailRow);
 
-            // THEN attach handlers (after DOM elements are connected)
+            // Attach handlers after DOM insertion
             attachExpandToggleHandler(newRow);
             attachPaymentMethodHandler(newRow);
+            attachProductPriceHandler(newRow, true);
 
             updateSummary();
-        });
+        }
 
-        // Remove button for existing rows
+        function addMobileInvoiceCard() {
+            mobileInvoiceCount++;
+            const newCard = mobileTemplateCard.cloneNode(true);
+
+            // Update card number
+            newCard.setAttribute('data-index', mobileInvoiceCount - 1);
+            newCard.querySelector('.mobile-invoice-number').textContent = 'Facture #' + mobileInvoiceCount;
+
+            // Reset values - CRITICAL: Reset ALL input fields
+            newCard.querySelectorAll('input').forEach(input => {
+                // Only set quantity to 1, discount to 0, all others must be empty
+                if (input.name === 'quantity') {
+                    input.value = '1';
+                } else if (input.name === 'discount_amount') {
+                    input.value = '0';
+                } else {
+                    input.value = '';  // Clear selling_price, amount_paid, payment_reference
+                }
+            });
+            newCard.querySelectorAll('select').forEach(select => {
+                select.value = '';  // Clear client, product, payment_method, bank_account
+            });
+
+            // Hide bank account field
+            const bankAccountField = newCard.querySelector('.bank-account-field-mobile');
+            if (bankAccountField) {
+                bankAccountField.style.display = 'none';
+            }
+
+            // Show remove button
+            const removeBtn = newCard.querySelector('.remove_invoice_mobile');
+            removeBtn.style.display = 'inline-flex';
+
+            // Add remove functionality
+            removeBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                newCard.remove();
+                updateMobileNumbers();
+                updateSummary();
+            });
+
+            // Append to list
+            mobileInvoicesList.appendChild(newCard);
+
+            // Attach handlers
+            attachMobilePaymentMethodHandler(newCard);
+            attachProductPriceHandler(newCard, false);
+
+            updateSummary();
+        }
+
+        function updateMobileNumbers() {
+            const cards = mobileInvoicesList.querySelectorAll('.invoice_item_mobile');
+            cards.forEach((card, index) => {
+                card.setAttribute('data-index', index);
+                card.querySelector('.mobile-invoice-number').textContent = 'Facture #' + (index + 1);
+
+                // Show/hide remove buttons
+                const removeBtn = card.querySelector('.remove_invoice_mobile');
+                if (cards.length > 1) {
+                    removeBtn.style.display = 'inline-flex';
+                } else {
+                    removeBtn.style.display = 'none';
+                }
+            });
+            mobileInvoiceCount = cards.length;
+        }
+
+        // Remove button for existing desktop rows
         document.querySelectorAll('.remove_invoice').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -493,13 +1016,23 @@
             });
         });
 
-        // Show remove button for first row if there are multiple rows
+        // Show remove button for rows if there are multiple
         function showRemoveButtons() {
             const rows = invoicesList.querySelectorAll('.invoice_item');
-            rows.forEach((row, index) => {
+            rows.forEach((row) => {
                 const removeBtn = row.querySelector('.remove_invoice');
                 if (rows.length > 1) {
-                    removeBtn.style.display = 'inline-block';
+                    removeBtn.style.display = 'inline-flex';
+                } else {
+                    removeBtn.style.display = 'none';
+                }
+            });
+
+            const mobileCards = mobileInvoicesList.querySelectorAll('.invoice_item_mobile');
+            mobileCards.forEach((card) => {
+                const removeBtn = card.querySelector('.remove_invoice_mobile');
+                if (mobileCards.length > 1) {
+                    removeBtn.style.display = 'inline-flex';
                 } else {
                     removeBtn.style.display = 'none';
                 }
@@ -508,79 +1041,67 @@
 
         // Update summary
         function updateSummary() {
-            const rows = invoicesList.querySelectorAll('.invoice_item');
-            totalInvoicesEl.textContent = rows.length;
+            const desktopRows = invoicesList.querySelectorAll('.invoice_item').length;
+            const mobileCards = mobileInvoicesList.querySelectorAll('.invoice_item_mobile').length;
+
+            // Use the count from the visible view
+            const count = window.innerWidth <= 768 ? mobileCards : desktopRows;
+
+            totalInvoicesEl.textContent = count;
+            totalInvoicesBadge.textContent = count + ' facture(s)';
             showRemoveButtons();
         }
-
-        // Update product price when product selection changes
-        document.querySelectorAll('.product_id').forEach(select => {
-            select.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const price = selectedOption.getAttribute('data-price');
-                const mainRow = this.closest('.invoice_item');
-                const priceInput = mainRow.querySelector('.selling_price');
-                const discountInput = mainRow.nextElementSibling?.querySelector('.discount_amount');
-
-                // Set as VALUE (not placeholder) so it's submitted with form
-                if (price && !priceInput.value) {
-                    // Convert comma to dot for number input (13875,00 -> 13875.00)
-                    const normalizedPrice = price.replace(',', '.');
-                    priceInput.value = normalizedPrice;
-                    // Also set placeholder for visual clarity
-                    priceInput.placeholder = price;
-                    // Reset discount when product changes
-                    if (discountInput) discountInput.value = '0';
-                }
-            });
-
-            // Update remise when price is changed manually
-            const mainRow = select.closest('.invoice_item');
-            mainRow.querySelector('.selling_price').addEventListener('change', function() {
-                const selectedOption = select.options[select.selectedIndex];
-                const originalPrice = selectedOption.getAttribute('data-price');
-                const newPrice = this.value;
-                const discountInput = mainRow.nextElementSibling?.querySelector('.discount_amount');
-
-                if (originalPrice && newPrice && discountInput) {
-                    // Convert comma to dot for calculation
-                    const origPriceTrimmed = parseFloat(originalPrice.replace(',', '.'));
-                    const newPriceTrimmed = parseFloat(newPrice);
-
-                    // Calculate difference (remise) if price is lower
-                    const difference = origPriceTrimmed - newPriceTrimmed;
-                    if (difference > 0) {
-                        discountInput.value = difference.toFixed(2);
-                        console.log(`Remise auto-calculée: ${difference.toFixed(2)} DH (${origPriceTrimmed.toFixed(2)} -> ${newPriceTrimmed.toFixed(2)})`);
-                    } else if (difference < 0) {
-                        // If price is higher, no remise
-                        discountInput.value = '0';
-                    }
-                }
-            });
-        });
 
         // Attach handlers to initial rows
         document.querySelectorAll('.invoice_item').forEach(row => {
             attachExpandToggleHandler(row);
             attachPaymentMethodHandler(row);
+            attachProductPriceHandler(row, true);
+        });
+
+        // Attach handlers to initial mobile cards
+        document.querySelectorAll('.invoice_item_mobile').forEach(card => {
+            attachMobilePaymentMethodHandler(card);
+            attachProductPriceHandler(card, false);
         });
 
         // Validate form before submission
         document.querySelector('form').addEventListener('submit', function(e) {
-            const rows = document.querySelectorAll('.invoice_item');
+            const isDesktop = window.innerWidth > 768;
+            const rows = isDesktop
+                ? document.querySelectorAll('.invoice_item')
+                : document.querySelectorAll('.invoice_item_mobile');
+
             const products = [];
             const references = [];
             let hasError = false;
 
             rows.forEach((row, idx) => {
-                const productSelect = row.querySelector('.product_id');
-                const productId = productSelect.value;
+                const productSelect = row.querySelector(isDesktop ? '.product_id' : '.product_id_mobile');
+                const quantityInput = row.querySelector(isDesktop ? '.quantity' : '.quantity_mobile');
+                const productId = productSelect?.value;
+                const quantity = quantityInput?.value;
+
+                // Check required fields - product is required
+                if (!productId) {
+                    alert('Erreur ligne ' + (idx + 1) + ': Veuillez selectionner un produit.');
+                    e.preventDefault();
+                    hasError = true;
+                    return;
+                }
+
+                // Check required fields - quantity is required
+                if (!quantity || parseFloat(quantity) <= 0) {
+                    alert('Erreur ligne ' + (idx + 1) + ': Veuillez entrer une quantite valide.');
+                    e.preventDefault();
+                    hasError = true;
+                    return;
+                }
 
                 // Check for duplicate products
                 if (productId) {
                     if (products.includes(productId)) {
-                        alert(`⚠️ Erreur ligne ${idx + 1}: Le même produit ne peut pas être sélectionné deux fois. Choisissez des produits différents.`);
+                        alert('Erreur ligne ' + (idx + 1) + ': Le meme produit ne peut pas etre selectionne deux fois.');
                         e.preventDefault();
                         hasError = true;
                         return;
@@ -588,14 +1109,20 @@
                     products.push(productId);
                 }
 
-                // Check for duplicate payment references (if payment method is set)
-                const paymentMethodSelect = row.querySelector('.payment_method');
-                const detailRow = row.nextElementSibling;
-                const paymentRef = detailRow.querySelector('.payment_reference')?.value;
+                // Check for duplicate payment references
+                const paymentMethodSelect = row.querySelector(isDesktop ? '.payment_method' : '.payment_method_mobile');
+                let paymentRef;
 
-                if (paymentMethodSelect.value && paymentRef) {
+                if (isDesktop) {
+                    const detailRow = row.nextElementSibling;
+                    paymentRef = detailRow?.querySelector('.payment_reference')?.value;
+                } else {
+                    paymentRef = row.querySelector('.payment_reference_mobile')?.value;
+                }
+
+                if (paymentMethodSelect?.value && paymentRef) {
                     if (references.includes(paymentRef)) {
-                        alert(`⚠️ Erreur ligne ${idx + 1}: La référence de paiement "${paymentRef}" est déjà utilisée. Utilisez une référence unique.`);
+                        alert('Erreur ligne ' + (idx + 1) + ': La reference de paiement "' + paymentRef + '" est deja utilisee.');
                         e.preventDefault();
                         hasError = true;
                         return;
@@ -607,6 +1134,11 @@
             if (hasError) {
                 e.preventDefault();
             }
+        });
+
+        // Handle window resize to sync counts
+        window.addEventListener('resize', function() {
+            updateSummary();
         });
 
         // Initialize summary
