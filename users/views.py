@@ -266,7 +266,7 @@ def user_edit(request, user_id):
         return redirect('users:user_detail', user_id=user.id)
 
     context = {
-        'user': user,
+        'edit_user': user,
         'role_choices': User.Role.choices if hasattr(User, 'Role') else [],
     }
     return render(request, 'users/user_edit.html', context)

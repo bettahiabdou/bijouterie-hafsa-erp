@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Modifier {{ user.get_full_name }} - Bijouterie Hafsa ERP{% endblock %}
+{% block title %}Modifier {{ edit_user.get_full_name }} - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
     <span class="breadcrumb-separator">/</span>
@@ -14,7 +14,7 @@
         <div class="page-header-inner">
             <div>
                 <h1 class="page-title">Modifier Utilisateur</h1>
-                <p class="page-subtitle">{{ user.get_full_name }}</p>
+                <p class="page-subtitle">{{ edit_user.get_full_name }}</p>
             </div>
             <div class="page-actions">
                 <a href="{% url 'users:user_list' %}" class="btn btn-secondary">
@@ -38,23 +38,23 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="form-label">Prenom</label>
-                            <input type="text" name="first_name" value="{{ user.first_name }}" class="form-input">
+                            <input type="text" name="first_name" value="{{ edit_user.first_name }}" class="form-input">
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">Nom</label>
-                            <input type="text" name="last_name" value="{{ user.last_name }}" class="form-input">
+                            <input type="text" name="last_name" value="{{ edit_user.last_name }}" class="form-input">
                         </div>
 
                         <div class="form-group form-group-full">
                             <label class="form-label">Email</label>
-                            <input type="email" name="email" value="{{ user.email }}" class="form-input">
+                            <input type="email" name="email" value="{{ edit_user.email }}" class="form-input">
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">Statut</label>
                             <div class="checkbox-wrapper">
-                                <input type="checkbox" name="is_active" id="is_active" {% if user.is_active %}checked{% endif %} class="form-checkbox">
+                                <input type="checkbox" name="is_active" id="is_active" {% if edit_user.is_active %}checked{% endif %} class="form-checkbox">
                                 <label for="is_active" class="checkbox-label">Compte actif</label>
                             </div>
                             <p class="form-hint">Les comptes inactifs ne peuvent pas se connecter</p>
@@ -70,20 +70,20 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="form-label">Telegram Chat ID</label>
-                            <input type="text" name="telegram_chat_id" value="{{ user.telegram_chat_id|default:'' }}" class="form-input" placeholder="Ex: 123456789">
+                            <input type="text" name="telegram_chat_id" value="{{ edit_user.telegram_chat_id|default:'' }}" class="form-input" placeholder="Ex: 123456789">
                             <p class="form-hint">ID unique du chat Telegram de l'utilisateur</p>
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">Nom d'utilisateur Telegram</label>
-                            <input type="text" name="telegram_username" value="{{ user.telegram_username|default:'' }}" class="form-input" placeholder="Ex: username (sans @)">
+                            <input type="text" name="telegram_username" value="{{ edit_user.telegram_username|default:'' }}" class="form-input" placeholder="Ex: username (sans @)">
                             <p class="form-hint">Username Telegram sans le @</p>
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">Verification Telegram</label>
                             <div class="checkbox-wrapper">
-                                <input type="checkbox" name="is_telegram_verified" id="is_telegram_verified" {% if user.is_telegram_verified %}checked{% endif %} class="form-checkbox">
+                                <input type="checkbox" name="is_telegram_verified" id="is_telegram_verified" {% if edit_user.is_telegram_verified %}checked{% endif %} class="form-checkbox">
                                 <label for="is_telegram_verified" class="checkbox-label">Compte Telegram verifie</label>
                             </div>
                             <p class="form-hint">Cochez si le compte Telegram a ete verifie</p>
@@ -113,15 +113,15 @@
                     <div class="account-info">
                         <div class="account-info-item">
                             <span class="account-info-label">Nom d'utilisateur</span>
-                            <span class="account-info-value">{{ user.username }}</span>
+                            <span class="account-info-value">{{ edit_user.username }}</span>
                         </div>
                         <div class="account-info-item">
                             <span class="account-info-label">Date d'adhesion</span>
-                            <span class="account-info-value">{{ user.date_joined|date:"d/m/Y" }}</span>
+                            <span class="account-info-value">{{ edit_user.date_joined|date:"d/m/Y" }}</span>
                         </div>
                         <div class="account-info-item">
                             <span class="account-info-label">Derniere connexion</span>
-                            <span class="account-info-value">{{ user.last_login|date:"d/m/Y H:i"|default:"Jamais" }}</span>
+                            <span class="account-info-value">{{ edit_user.last_login|date:"d/m/Y H:i"|default:"Jamais" }}</span>
                         </div>
                     </div>
                 </div>
@@ -133,14 +133,14 @@
                 </div>
                 <div class="card-body">
                     <div class="status-display">
-                        {% if user.is_active %}
+                        {% if edit_user.is_active %}
                             <span class="badge badge-success">Actif</span>
                         {% else %}
                             <span class="badge badge-error">Inactif</span>
                         {% endif %}
-                        {% if user.is_superuser %}
+                        {% if edit_user.is_superuser %}
                             <span class="badge badge-accent">Super Admin</span>
-                        {% elif user.is_staff %}
+                        {% elif edit_user.is_staff %}
                             <span class="badge badge-info">Staff</span>
                         {% endif %}
                     </div>
