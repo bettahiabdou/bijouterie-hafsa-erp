@@ -106,6 +106,27 @@ class User(AbstractUser):
         default=False
     )
 
+    # Telegram integration for salespeople
+    telegram_chat_id = models.CharField(
+        _('Telegram Chat ID'),
+        max_length=50,
+        blank=True,
+        unique=True,
+        null=True,
+        help_text=_('ID Telegram pour recevoir/envoyer des messages via le bot')
+    )
+    telegram_username = models.CharField(
+        _('Nom d\'utilisateur Telegram'),
+        max_length=100,
+        blank=True,
+        help_text=_('Username Telegram (sans @)')
+    )
+    is_telegram_verified = models.BooleanField(
+        _('Telegram vérifié'),
+        default=False,
+        help_text=_('Le compte Telegram a été vérifié et lié')
+    )
+
     objects = UserManager()
 
     class Meta:
