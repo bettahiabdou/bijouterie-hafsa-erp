@@ -53,26 +53,27 @@
                         <!-- Main Image Display -->
                         <div class="product-gallery">
                             <div class="gallery-main" id="mainImageContainer">
-                                {% if product.main_image %}
-                                    <img src="{{ product.main_image.url }}" alt="{{ product.name }}" id="mainImage" onclick="openLightbox(this.src)">
-                                {% elif images %}
+                                {% if images %}
                                     <img src="{{ images.0.image.url }}" alt="{{ product.name }}" id="mainImage" onclick="openLightbox(this.src)">
+                                {% elif product.main_image %}
+                                    <img src="{{ product.main_image.url }}" alt="{{ product.name }}" id="mainImage" onclick="openLightbox(this.src)">
                                 {% endif %}
                             </div>
 
-                            <!-- Thumbnails -->
-                            {% if images or product.main_image %}
+                            <!-- Thumbnails - show ProductImages only to avoid duplicates -->
+                            {% if images %}
                             <div class="gallery-thumbnails">
-                                {% if product.main_image %}
-                                    <div class="thumbnail-item active" onclick="changeMainImage('{{ product.main_image.url }}', this)">
-                                        <img src="{{ product.main_image.url }}" alt="Main">
-                                    </div>
-                                {% endif %}
                                 {% for image in images %}
-                                    <div class="thumbnail-item {% if not product.main_image and forloop.first %}active{% endif %}" onclick="changeMainImage('{{ image.image.url }}', this)">
+                                    <div class="thumbnail-item {% if forloop.first %}active{% endif %}" onclick="changeMainImage('{{ image.image.url }}', this)">
                                         <img src="{{ image.image.url }}" alt="Image {{ forloop.counter }}">
                                     </div>
                                 {% endfor %}
+                            </div>
+                            {% elif product.main_image %}
+                            <div class="gallery-thumbnails">
+                                <div class="thumbnail-item active" onclick="changeMainImage('{{ product.main_image.url }}', this)">
+                                    <img src="{{ product.main_image.url }}" alt="Main">
+                                </div>
                             </div>
                             {% endif %}
                         </div>
