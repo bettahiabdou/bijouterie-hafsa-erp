@@ -182,6 +182,36 @@
                 </div>
             </div>
             {% endif %}
+
+            <!-- Photos (from Telegram) -->
+            {% if invoice.photos.exists %}
+            <div class="card animate-slide-up" style="animation-delay: 200ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-camera mr-2"></i> Photos</h3>
+                    <span class="badge badge-neutral">{{ invoice.photos.count }} photo{{ invoice.photos.count|pluralize }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="photos-grid">
+                        {% for photo in invoice.photos.all %}
+                            <div class="photo-item">
+                                <a href="{{ photo.image.url }}" target="_blank" class="photo-link">
+                                    <img src="{{ photo.image.url }}" alt="Photo {{ forloop.counter }}" class="photo-thumbnail">
+                                    <div class="photo-overlay">
+                                        <i class="fas fa-expand"></i>
+                                    </div>
+                                </a>
+                                {% if photo.caption %}
+                                    <p class="photo-caption">{{ photo.caption }}</p>
+                                {% endif %}
+                                <span class="photo-type badge badge-sm {% if photo.photo_type == 'product' %}badge-info{% elif photo.photo_type == 'invoice' %}badge-warning{% elif photo.photo_type == 'payment' %}badge-success{% else %}badge-neutral{% endif %}">
+                                    {{ photo.get_photo_type_display }}
+                                </span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Sidebar -->
@@ -540,6 +570,75 @@
             white-space: pre-line;
             color: var(--neutral-700);
             line-height: 1.6;
+        }
+
+        /* Photos Grid */
+        .photos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: var(--space-4);
+        }
+
+        .photo-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .photo-link {
+            position: relative;
+            display: block;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            aspect-ratio: 1;
+            background: var(--neutral-100);
+        }
+
+        .photo-thumbnail {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform var(--transition-base);
+        }
+
+        .photo-link:hover .photo-thumbnail {
+            transform: scale(1.05);
+        }
+
+        .photo-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity var(--transition-base);
+        }
+
+        .photo-overlay i {
+            color: white;
+            font-size: var(--text-xl);
+        }
+
+        .photo-link:hover .photo-overlay {
+            opacity: 1;
+        }
+
+        .photo-caption {
+            font-size: var(--text-xs);
+            color: var(--neutral-600);
+            line-height: 1.4;
+        }
+
+        .photo-type {
+            align-self: flex-start;
+        }
+
+        @media (max-width: 768px) {
+            .photos-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         /* Info List */

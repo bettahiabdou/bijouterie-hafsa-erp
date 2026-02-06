@@ -133,17 +133,52 @@
             </div>
             <div class="card-body" style="padding: 0;">
                 {% if recent_activities %}
-                    <div class="activity-list">
-                        {% for activity in recent_activities %}
-                            <div class="activity-item">
-                                <div class="activity-content">
-                                    <span class="badge badge-info badge-sm">{{ activity.get_action_display }}</span>
-                                    <span class="activity-desc">{{ activity.description }}</span>
-                                </div>
-                                <span class="activity-meta">{{ activity.user.full_name }} - {{ activity.created_at|timesince }}</span>
-                            </div>
-                        {% endfor %}
-                    </div>
+                    <table class="activity-table">
+                        <thead>
+                            <tr>
+                                <th>Action</th>
+                                <th>Objet</th>
+                                <th>Utilisateur</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for activity in recent_activities %}
+                                <tr class="activity-row">
+                                    <td>
+                                        {% if activity.action == 'create' %}
+                                            <span class="badge badge-success">{{ activity.get_action_display }}</span>
+                                        {% elif activity.action == 'update' %}
+                                            <span class="badge badge-warning">{{ activity.get_action_display }}</span>
+                                        {% elif activity.action == 'delete' %}
+                                            <span class="badge badge-danger">{{ activity.get_action_display }}</span>
+                                        {% elif activity.action == 'view' %}
+                                            <span class="badge badge-info">{{ activity.get_action_display }}</span>
+                                        {% else %}
+                                            <span class="badge badge-secondary">{{ activity.get_action_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="activity-object">
+                                        {% if activity.object_repr %}
+                                            {{ activity.object_repr|truncatechars:40 }}
+                                        {% elif activity.model_name %}
+                                            {{ activity.model_name }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="activity-user">
+                                        {% if activity.user %}
+                                            {{ activity.user.get_full_name|default:activity.user.username }}
+                                        {% else %}
+                                            Systeme
+                                        {% endif %}
+                                    </td>
+                                    <td class="activity-time">{{ activity.created_at|date:"d/m/Y H:i" }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 {% else %}
                     <div class="empty-state" style="padding: var(--space-6);">
                         <i class="fas fa-inbox"></i>
@@ -272,42 +307,64 @@
             gap: var(--space-6);
         }
 
-        /* Activity List */
-        .activity-list {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .activity-item {
-            padding: var(--space-4);
-            border-bottom: 1px solid var(--neutral-100);
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-2);
-        }
-
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-item:hover {
-            background: var(--neutral-50);
-        }
-
-        .activity-content {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-        }
-
-        .activity-desc {
+        /* Activity Table */
+        .activity-table {
+            width: 100%;
+            border-collapse: collapse;
             font-size: var(--text-sm);
+        }
+
+        .activity-table thead {
+            background: var(--neutral-50);
+            border-bottom: 2px solid var(--neutral-200);
+        }
+
+        .activity-table th {
+            padding: var(--space-3) var(--space-4);
+            text-align: left;
+            font-weight: var(--font-semibold);
+            color: var(--neutral-600);
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .activity-table td {
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--neutral-100);
             color: var(--neutral-700);
         }
 
-        .activity-meta {
-            font-size: var(--text-xs);
+        .activity-row:hover {
+            background: var(--neutral-50);
+        }
+
+        .activity-row:last-child td {
+            border-bottom: none;
+        }
+
+        .activity-object {
+            font-weight: var(--font-medium);
+            color: var(--neutral-800);
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .activity-user {
+            color: var(--neutral-600);
+        }
+
+        .activity-time {
             color: var(--neutral-500);
+            font-size: var(--text-xs);
+            white-space: nowrap;
+        }
+
+        .badge-secondary {
+            background: var(--neutral-500);
+            color: #ffffff;
         }
 
         /* Health List */
