@@ -214,6 +214,20 @@ def batch_product_create(request):
                         product.selling_price = selling_price_override
                         product.save(update_fields=['selling_price'])
 
+                    # Handle image upload for this product (if any)
+                    product_images = request.FILES.getlist(f'product_image_{i}')
+                    for img_file in product_images:
+                        ProductImage.objects.create(
+                            product=product,
+                            image=img_file,
+                            is_primary=True,
+                            display_order=0
+                        )
+                        # Set as main_image
+                        if not product.main_image:
+                            product.main_image = img_file
+                            product.save(update_fields=['main_image'])
+
                     # Log activity
                     ActivityLog.objects.create(
                         user=request.user,
@@ -351,6 +365,20 @@ def product_create(request):
             # Save product - this triggers auto-generation and calculations in save() method
             product.save()
 
+            # Handle image uploads
+            images = request.FILES.getlist('images')
+            for i, image_file in enumerate(images):
+                ProductImage.objects.create(
+                    product=product,
+                    image=image_file,
+                    is_primary=(i == 0 and not product.main_image),  # First image is primary if no main_image
+                    display_order=i
+                )
+                # Set first image as main_image if not set
+                if i == 0 and not product.main_image:
+                    product.main_image = image_file
+                    product.save(update_fields=['main_image'])
+
             # Log activity
             ActivityLog.objects.create(
                 user=request.user,
@@ -415,6 +443,32 @@ def product_edit(request, reference):
                 product.bank_account_id = request.POST.get('bank_account')
 
             product.save()
+
+            # Handle image deletions
+            delete_main_image = request.POST.get('delete_main_image')
+            if delete_main_image and product.main_image:
+                product.main_image.delete(save=False)
+                product.main_image = None
+                product.save(update_fields=['main_image'])
+
+            delete_image_ids = request.POST.getlist('delete_images')
+            if delete_image_ids:
+                ProductImage.objects.filter(id__in=delete_image_ids, product=product).delete()
+
+            # Handle new image uploads
+            images = request.FILES.getlist('images')
+            existing_count = product.images.count()
+            for i, image_file in enumerate(images):
+                ProductImage.objects.create(
+                    product=product,
+                    image=image_file,
+                    is_primary=False,
+                    display_order=existing_count + i
+                )
+                # Set as main_image if none exists
+                if not product.main_image:
+                    product.main_image = image_file
+                    product.save(update_fields=['main_image'])
 
             # Log activity
             ActivityLog.objects.create(

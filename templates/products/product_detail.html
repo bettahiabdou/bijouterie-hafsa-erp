@@ -43,23 +43,51 @@
     <div class="detail-layout">
         <!-- Main Content -->
         <div class="detail-main">
-            <!-- Images -->
-            {% if images %}
+            <!-- Product Images Gallery -->
             <div class="card animate-slide-up">
                 <div class="card-header">
-                    <h3><i class="fas fa-images mr-2"></i> Images</h3>
+                    <h3><i class="fas fa-images mr-2"></i> Images du Produit</h3>
                 </div>
                 <div class="card-body">
-                    <div class="images-grid">
-                        {% for image in images %}
-                            <div class="image-item">
-                                <img src="{{ image.image.url }}" alt="{{ image.alt_text }}">
+                    {% if product.main_image or images %}
+                        <!-- Main Image Display -->
+                        <div class="product-gallery">
+                            <div class="gallery-main" id="mainImageContainer">
+                                {% if product.main_image %}
+                                    <img src="{{ product.main_image.url }}" alt="{{ product.name }}" id="mainImage" onclick="openLightbox(this.src)">
+                                {% elif images %}
+                                    <img src="{{ images.0.image.url }}" alt="{{ product.name }}" id="mainImage" onclick="openLightbox(this.src)">
+                                {% endif %}
                             </div>
-                        {% endfor %}
-                    </div>
+
+                            <!-- Thumbnails -->
+                            {% if images or product.main_image %}
+                            <div class="gallery-thumbnails">
+                                {% if product.main_image %}
+                                    <div class="thumbnail-item active" onclick="changeMainImage('{{ product.main_image.url }}', this)">
+                                        <img src="{{ product.main_image.url }}" alt="Main">
+                                    </div>
+                                {% endif %}
+                                {% for image in images %}
+                                    <div class="thumbnail-item {% if not product.main_image and forloop.first %}active{% endif %}" onclick="changeMainImage('{{ image.image.url }}', this)">
+                                        <img src="{{ image.image.url }}" alt="Image {{ forloop.counter }}">
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <!-- No Images Placeholder -->
+                        <div class="no-images-placeholder">
+                            <i class="fas fa-image"></i>
+                            <p>Aucune image disponible</p>
+                            <a href="{% url 'products:edit' product.reference %}" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-upload"></i> Ajouter des images
+                            </a>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
-            {% endif %}
 
             <!-- Description -->
             {% if product.description %}
@@ -293,7 +321,130 @@
             gap: var(--space-6);
         }
 
-        /* Images Grid */
+        /* Product Gallery */
+        .product-gallery {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .gallery-main {
+            aspect-ratio: 4/3;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            background: var(--neutral-100);
+            cursor: zoom-in;
+        }
+
+        .gallery-main img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: transform var(--transition-normal);
+        }
+
+        .gallery-main:hover img {
+            transform: scale(1.02);
+        }
+
+        .gallery-thumbnails {
+            display: flex;
+            gap: var(--space-2);
+            overflow-x: auto;
+            padding-bottom: var(--space-2);
+        }
+
+        .thumbnail-item {
+            width: 80px;
+            height: 80px;
+            flex-shrink: 0;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all var(--transition-fast);
+        }
+
+        .thumbnail-item:hover {
+            border-color: var(--primary-300);
+        }
+
+        .thumbnail-item.active {
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 2px var(--primary-100);
+        }
+
+        .thumbnail-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .no-images-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-8);
+            background: var(--neutral-50);
+            border-radius: var(--radius-lg);
+            border: 2px dashed var(--neutral-300);
+        }
+
+        .no-images-placeholder i {
+            font-size: 3rem;
+            color: var(--neutral-300);
+            margin-bottom: var(--space-3);
+        }
+
+        .no-images-placeholder p {
+            color: var(--neutral-500);
+            margin-bottom: var(--space-4);
+        }
+
+        /* Lightbox */
+        .lightbox {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 100000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lightbox.active {
+            display: flex;
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: var(--space-4);
+            right: var(--space-4);
+            background: white;
+            border: none;
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-full);
+            font-size: var(--text-xl);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100001;
+        }
+
+        .lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: var(--radius-lg);
+        }
+
+        /* Images Grid (fallback) */
         .images-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -652,6 +803,14 @@
         </div>
     </div>
 
+    <!-- Image Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <button class="lightbox-close" onclick="closeLightbox()">
+            <i class="fas fa-times"></i>
+        </button>
+        <img src="" alt="Full size image" id="lightboxImage" onclick="event.stopPropagation()">
+    </div>
+
     <script>
         function printLabel() {
             document.getElementById('printModal').style.display = 'flex';
@@ -661,10 +820,30 @@
             document.getElementById('printModal').style.display = 'none';
         }
 
+        // Gallery functions
+        function changeMainImage(src, thumbnail) {
+            document.getElementById('mainImage').src = src;
+            // Update active state
+            document.querySelectorAll('.thumbnail-item').forEach(t => t.classList.remove('active'));
+            thumbnail.classList.add('active');
+        }
+
+        function openLightbox(src) {
+            document.getElementById('lightboxImage').src = src;
+            document.getElementById('lightbox').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
         // Close modal on escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closePrintModal();
+                closeLightbox();
             }
         });
     </script>

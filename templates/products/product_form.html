@@ -31,7 +31,7 @@
 {% endblock %}
 
 {% block content %}
-    <form method="post" class="card animate-slide-up">
+    <form method="post" enctype="multipart/form-data" class="card animate-slide-up">
         {% csrf_token %}
 
         {% if form.non_field_errors %}
@@ -46,6 +46,58 @@
         {% endif %}
 
         <div class="card-body">
+            <!-- Images Section -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">
+                    <i class="fas fa-images text-primary mr-2"></i>
+                    Images du Produit
+                </h2>
+
+                <!-- Current Images (edit mode) -->
+                {% if product and product.images.all %}
+                    <div class="current-images mb-4">
+                        <label class="form-label">Images actuelles</label>
+                        <div class="images-grid">
+                            {% if product.main_image %}
+                                <div class="image-item main-image">
+                                    <img src="{{ product.main_image.url }}" alt="Image principale">
+                                    <span class="image-badge">Principale</span>
+                                    <label class="image-delete">
+                                        <input type="checkbox" name="delete_main_image" value="1">
+                                        <i class="fas fa-trash"></i>
+                                    </label>
+                                </div>
+                            {% endif %}
+                            {% for image in product.images.all %}
+                                <div class="image-item">
+                                    <img src="{{ image.image.url }}" alt="Image produit">
+                                    {% if image.is_primary %}<span class="image-badge">Principale</span>{% endif %}
+                                    <label class="image-delete">
+                                        <input type="checkbox" name="delete_images" value="{{ image.id }}">
+                                        <i class="fas fa-trash"></i>
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <p class="form-help mt-2">Cochez pour supprimer une image</p>
+                    </div>
+                {% endif %}
+
+                <!-- Upload New Images -->
+                <div class="image-upload-section">
+                    <label class="form-label">{% if product %}Ajouter des images{% else %}Images du produit{% endif %}</label>
+                    <div class="image-upload-area" id="imageUploadArea">
+                        <input type="file" name="images" id="imageInput" multiple accept="image/*" class="image-input">
+                        <div class="upload-placeholder">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Glissez vos images ici ou cliquez pour selectionner</p>
+                            <span class="upload-hint">JPG, PNG - Max 5MB par image</span>
+                        </div>
+                    </div>
+                    <div class="image-preview-grid" id="imagePreviewGrid"></div>
+                </div>
+            </div>
+
             <!-- Basic Information -->
             <div class="mb-8">
                 <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">
@@ -297,6 +349,208 @@
         </div>
     </form>
 
+    <style>
+        /* Image Upload Styles */
+        .current-images {
+            margin-bottom: var(--space-4);
+        }
+
+        .images-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: var(--space-3);
+        }
+
+        .image-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            border: 2px solid var(--neutral-200);
+        }
+
+        .image-item.main-image {
+            border-color: var(--primary-500);
+        }
+
+        .image-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .image-badge {
+            position: absolute;
+            top: var(--space-1);
+            left: var(--space-1);
+            background: var(--primary-500);
+            color: white;
+            font-size: var(--text-xs);
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+        }
+
+        .image-delete {
+            position: absolute;
+            top: var(--space-1);
+            right: var(--space-1);
+            width: 28px;
+            height: 28px;
+            background: var(--error-500);
+            color: white;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity var(--transition-fast);
+        }
+
+        .image-delete:hover {
+            opacity: 1;
+        }
+
+        .image-delete input {
+            display: none;
+        }
+
+        .image-delete:has(input:checked) {
+            background: var(--error-700);
+            opacity: 1;
+        }
+
+        .image-delete:has(input:checked)::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border: 2px solid var(--error-500);
+            border-radius: var(--radius-full);
+        }
+
+        .image-item:has(.image-delete input:checked) {
+            opacity: 0.5;
+            border-color: var(--error-500);
+        }
+
+        /* Upload Area */
+        .image-upload-area {
+            position: relative;
+            border: 2px dashed var(--neutral-300);
+            border-radius: var(--radius-lg);
+            padding: var(--space-8);
+            text-align: center;
+            transition: all var(--transition-fast);
+            cursor: pointer;
+        }
+
+        .image-upload-area:hover,
+        .image-upload-area.dragover {
+            border-color: var(--primary-500);
+            background: var(--primary-50);
+        }
+
+        .image-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-placeholder {
+            pointer-events: none;
+        }
+
+        .upload-placeholder i {
+            font-size: 3rem;
+            color: var(--neutral-400);
+            margin-bottom: var(--space-3);
+        }
+
+        .upload-placeholder p {
+            color: var(--neutral-600);
+            margin-bottom: var(--space-1);
+        }
+
+        .upload-hint {
+            font-size: var(--text-xs);
+            color: var(--neutral-400);
+        }
+
+        /* Image Preview */
+        .image-preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: var(--space-3);
+            margin-top: var(--space-4);
+        }
+
+        .image-preview-grid:empty {
+            display: none;
+        }
+
+        .preview-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            border: 2px solid var(--success-300);
+            background: var(--neutral-100);
+        }
+
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .preview-remove {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 24px;
+            height: 24px;
+            background: var(--error-500);
+            color: white;
+            border: none;
+            border-radius: var(--radius-full);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--text-xs);
+        }
+
+        .preview-name {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            font-size: var(--text-xs);
+            padding: 2px 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .images-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .image-upload-area {
+                padding: var(--space-6);
+            }
+
+            .upload-placeholder i {
+                font-size: 2rem;
+            }
+        }
+    </style>
+
     <script>
         function calculateCosts() {
             const netWeight = parseFloat(document.getElementById('net_weight').value) || 0;
@@ -329,6 +583,7 @@
             document.getElementById('selling_price').value = sellingPrice.toFixed(2);
         }
 
+        // Image upload handling
         document.addEventListener('DOMContentLoaded', function() {
             calculateCosts();
 
@@ -338,6 +593,51 @@
             if (marginTypeSelect) {
                 marginTypeSelect.addEventListener('change', function() {
                     marginUnit.textContent = this.value === 'percentage' ? '%' : 'DH';
+                });
+            }
+
+            // Image upload preview
+            const imageInput = document.getElementById('imageInput');
+            const imageUploadArea = document.getElementById('imageUploadArea');
+            const previewGrid = document.getElementById('imagePreviewGrid');
+
+            if (imageInput) {
+                imageInput.addEventListener('change', function() {
+                    previewGrid.innerHTML = '';
+                    const files = Array.from(this.files);
+
+                    files.forEach((file, index) => {
+                        if (file.type.startsWith('image/')) {
+                            const reader = new FileReader();
+                            reader.onload = function(e) {
+                                const div = document.createElement('div');
+                                div.className = 'preview-item';
+                                div.innerHTML = `
+                                    <img src="${e.target.result}" alt="Preview">
+                                    <span class="preview-name">${file.name}</span>
+                                `;
+                                previewGrid.appendChild(div);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                });
+
+                // Drag and drop
+                imageUploadArea.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    this.classList.add('dragover');
+                });
+
+                imageUploadArea.addEventListener('dragleave', function() {
+                    this.classList.remove('dragover');
+                });
+
+                imageUploadArea.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('dragover');
+                    imageInput.files = e.dataTransfer.files;
+                    imageInput.dispatchEvent(new Event('change'));
                 });
             }
         });
