@@ -1,0 +1,1016 @@
+{% extends 'base.html' %}
+
+{% block title %}Compléter Facture {{ invoice.reference }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_list' %}" class="breadcrumb-item">Ventes</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:pending_invoices' %}" class="breadcrumb-item">En Attente</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ invoice.reference }}</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Compléter la Facture</h1>
+                <p class="page-subtitle">{{ invoice.reference }} - Créé par {{ invoice.seller.get_full_name|default:invoice.seller.username }}</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:pending_invoices' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="completion-layout">
+        <!-- Left: Photos -->
+        <div class="photos-panel card">
+            <div class="card-header">
+                <h3><i class="fas fa-images mr-2"></i> Photos ({{ photos.count }})</h3>
+            </div>
+            <div class="card-body">
+                <div class="photos-grid">
+                    {% for photo in photos %}
+                        <div class="photo-item" onclick="openPhotoModal('{{ photo.image.url }}')">
+                            <img src="{{ photo.image.url }}" alt="Photo {{ forloop.counter }}">
+                            <div class="photo-overlay">
+                                <i class="fas fa-expand"></i>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="no-photos-large">
+                            <i class="fas fa-image"></i>
+                            <p>Aucune photo attachée</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Entry Form -->
+        <div class="entry-panel">
+            <!-- Invoice Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle mr-2"></i> Informations</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Référence</label>
+                            <span class="font-mono">{{ invoice.reference }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Vendeur</label>
+                            <span>{{ invoice.seller.get_full_name|default:invoice.seller.username }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Créé le</label>
+                            <span>{{ invoice.created_at|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Notes</label>
+                            <span>{{ invoice.notes|default:"-" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Product Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3><i class="fas fa-plus-circle mr-2"></i> Ajouter un Article</h3>
+                </div>
+                <div class="card-body">
+                    <!-- Search existing product -->
+                    <div class="form-group">
+                        <label class="form-label">Rechercher un produit existant</label>
+                        <div class="search-product-wrapper">
+                            <input type="text" id="product-search" class="form-input"
+                                   placeholder="Tapez référence ou nom du produit...">
+                            <div id="search-results" class="search-results"></div>
+                        </div>
+                    </div>
+
+                    <div class="divider-text">ou</div>
+
+                    <!-- Quick create button -->
+                    <button type="button" class="btn btn-secondary btn-block" onclick="openQuickCreateModal()">
+                        <i class="fas fa-bolt"></i>
+                        <span>Création Rapide d'Article</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Current Items -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3><i class="fas fa-list mr-2"></i> Articles ({{ items.count }})</h3>
+                </div>
+                <div class="card-body">
+                    {% if items %}
+                        <div class="items-list">
+                            {% for item in items %}
+                                <div class="item-row">
+                                    <div class="item-info">
+                                        <span class="item-ref">{{ item.product.reference }}</span>
+                                        <span class="item-name">{{ item.product.name|default:item.product.category.name }}</span>
+                                        {% if item.original_price and item.negotiated_price and item.original_price != item.negotiated_price %}
+                                            <span class="item-discount-badge">
+                                                <del class="original-price">{{ item.original_price|floatformat:2 }}</del>
+                                                <i class="fas fa-arrow-right"></i>
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="item-price">
+                                        {{ item.unit_price|floatformat:2 }} DH
+                                    </div>
+                                    <form method="post" class="item-remove-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="remove_item">
+                                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                                        <button type="submit" class="btn btn-ghost btn-sm text-error" title="Retirer">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <!-- Totals Section -->
+                        <div class="items-totals">
+                            <div class="totals-row">
+                                <span class="totals-label">Sous-total</span>
+                                <span class="totals-value" id="subtotal-display">{{ invoice.subtotal|floatformat:2 }} DH</span>
+                            </div>
+                            <div class="totals-row discount-row" id="discount-row" {% if invoice.discount_amount <= 0 %}style="display: none;"{% endif %}>
+                                <span class="totals-label"><i class="fas fa-tag"></i> Remise</span>
+                                <span class="totals-value text-success" id="discount-display">-{{ invoice.discount_amount|floatformat:2 }} DH</span>
+                            </div>
+                            <div class="totals-row total-row">
+                                <span class="totals-label"><strong>Total</strong></span>
+                                <span class="totals-value total-amount" id="total-display"><strong>{{ invoice.total_amount|floatformat:2 }} DH</strong></span>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="empty-items">
+                            <i class="fas fa-shopping-cart"></i>
+                            <p>Aucun article ajouté</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Finalize Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-check-circle mr-2"></i> Finaliser</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="complete-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="complete">
+
+                        <div class="form-group">
+                            <label class="form-label">Client (optionnel)</label>
+                            <select name="client_id" class="form-select">
+                                <option value="">-- Vente anonyme --</option>
+                                {% for client in clients %}
+                                    <option value="{{ client.id }}">{{ client.full_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Mode de paiement</label>
+                            <select name="payment_method" id="payment-method-select" class="form-select" onchange="updatePaymentFields()">
+                                <option value="" data-name="">-- Sélectionner --</option>
+                                {% for pm in payment_methods %}
+                                    <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Reference field - hidden for Espèces -->
+                        <div class="form-group" id="reference-group" style="display: none;">
+                            <label class="form-label">Référence de paiement</label>
+                            <input type="text" name="payment_reference" id="payment-reference" class="form-input" placeholder="Numéro de chèque, transaction, etc.">
+                        </div>
+
+                        <!-- Bank account - only for Virement Bancaire -->
+                        <div class="form-group" id="bank-account-group" style="display: none;">
+                            <label class="form-label">Compte bancaire</label>
+                            <select name="bank_account" class="form-select">
+                                <option value="">-- Sélectionner --</option>
+                                {% for ba in bank_accounts %}
+                                    <option value="{{ ba.id }}">{{ ba.bank_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Amount Paid -->
+                        <div class="form-group">
+                            <label class="form-label">Montant payé (DH)</label>
+                            <input type="number" name="amount_paid" id="amount-paid" class="form-input"
+                                   step="0.01" min="0" value="{{ invoice.total_amount|floatformat:2 }}"
+                                   oninput="updatePaymentStatus()">
+                            <div id="payment-status-hint" class="form-hint"></div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success btn-block btn-lg" {% if not items %}disabled{% endif %}>
+                            <i class="fas fa-check"></i>
+                            <span>Valider la Facture</span>
+                        </button>
+
+                        {% if not items %}
+                            <p class="text-center text-muted mt-2">
+                                <small>Ajoutez au moins un article pour valider</small>
+                            </p>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Modal -->
+    <div id="photo-modal" class="photo-modal" onclick="closePhotoModal()">
+        <span class="photo-modal-close">&times;</span>
+        <img id="photo-modal-img" src="" alt="Photo agrandie">
+    </div>
+
+    <!-- Quick Create Modal -->
+    <div id="quick-create-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-bolt mr-2"></i> Création Rapide d'Article</h3>
+                <button type="button" class="modal-close" onclick="closeQuickCreateModal()">&times;</button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="quick_create_product">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Catégorie <span class="required">*</span></label>
+                            <select name="quick_category" class="form-select" required>
+                                <option value="">-- Sélectionner --</option>
+                                {% for cat in categories %}
+                                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Type de métal</label>
+                            <select name="quick_metal_type" class="form-select" id="quick-metal-type">
+                                <option value="">-- Aucun --</option>
+                                {% for metal in metals %}
+                                    <option value="{{ metal.id }}">{{ metal.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Pureté</label>
+                            <select name="quick_purity" class="form-select">
+                                <option value="">-- Aucune --</option>
+                                {% for purity in purities %}
+                                    <option value="{{ purity.id }}">{{ purity.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Poids (g) <span class="required">*</span></label>
+                            <input type="number" name="quick_weight" class="form-input" step="0.001" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Prix de Vente (DH) <span class="required">*</span></label>
+                            <input type="number" name="quick_selling_price" class="form-input" step="0.01" min="0" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeQuickCreateModal()">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i>
+                        Créer & Ajouter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Product Modal (for search results) -->
+    <div id="add-product-modal" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3>Ajouter à la Facture</h3>
+                <button type="button" class="modal-close" onclick="closeAddProductModal()">&times;</button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_item">
+                <input type="hidden" name="product_id" id="add-product-id">
+                <input type="hidden" name="original_price" id="add-original-price">
+                <div class="modal-body">
+                    <div class="product-preview" id="product-preview"></div>
+                    <div class="form-group">
+                        <label class="form-label">Quantité</label>
+                        <input type="number" name="quantity" id="add-quantity" class="form-input" value="1" min="1" step="1" onchange="calculateDiscount()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Prix Original (DH)</label>
+                        <input type="text" id="add-original-price-display" class="form-input" readonly disabled>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Prix de Vente (DH)</label>
+                        <input type="number" name="selling_price" id="add-selling-price" class="form-input" step="0.01" min="0" oninput="calculateDiscount()">
+                    </div>
+                    <div class="form-group" id="discount-group" style="display: none;">
+                        <label class="form-label">Remise</label>
+                        <div class="discount-display" id="discount-display"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddProductModal()">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i>
+                        Ajouter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        .completion-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-6);
+            align-items: start;
+        }
+
+        .photos-panel {
+            position: sticky;
+            top: var(--space-4);
+        }
+
+        .photos-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-3);
+        }
+
+        .photo-item {
+            position: relative;
+            aspect-ratio: 1;
+            cursor: pointer;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+
+        .photo-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s;
+        }
+
+        .photo-item:hover img {
+            transform: scale(1.05);
+        }
+
+        .photo-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .photo-overlay i {
+            color: white;
+            font-size: var(--text-2xl);
+        }
+
+        .photo-item:hover .photo-overlay {
+            opacity: 1;
+        }
+
+        .no-photos-large {
+            grid-column: span 2;
+            padding: var(--space-8);
+            text-align: center;
+            color: var(--neutral-400);
+        }
+
+        .no-photos-large i {
+            font-size: 3rem;
+            margin-bottom: var(--space-4);
+        }
+
+        /* Photo Modal */
+        .photo-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            align-items: center;
+            justify-content: center;
+            cursor: zoom-out;
+        }
+
+        .photo-modal.active {
+            display: flex;
+        }
+
+        .photo-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }
+
+        .photo-modal-close {
+            position: absolute;
+            top: var(--space-4);
+            right: var(--space-4);
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+        }
+
+        /* Search */
+        .search-product-wrapper {
+            position: relative;
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            max-height: 350px;
+            overflow-y: scroll;
+            z-index: 100;
+            display: none;
+        }
+
+        .search-results.active {
+            display: block;
+        }
+
+        .search-result-item {
+            padding: var(--space-3) var(--space-4);
+            cursor: pointer;
+            border-bottom: 1px solid var(--neutral-100);
+            transition: background 0.15s;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .search-result-item:hover {
+            background: var(--primary-50);
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-name {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+            font-size: var(--text-base);
+        }
+
+        .search-result-ref {
+            font-family: var(--font-mono);
+            font-size: var(--text-xs);
+            color: var(--primary-600);
+            background: var(--primary-50);
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+            display: inline-block;
+        }
+
+        .search-result-details {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .search-result-price {
+            font-weight: var(--font-semibold);
+            color: var(--success-600);
+            font-size: var(--text-sm);
+        }
+
+        .discount-display {
+            padding: var(--space-3);
+            border-radius: var(--radius-md);
+            font-weight: var(--font-semibold);
+        }
+
+        .discount-display.positive {
+            background: var(--success-50);
+            color: var(--success-700);
+            border: 1px solid var(--success-200);
+        }
+
+        .discount-display.negative {
+            background: var(--error-50);
+            color: var(--error-700);
+            border: 1px solid var(--error-200);
+        }
+
+        .discount-display.zero {
+            background: var(--neutral-50);
+            color: var(--neutral-600);
+            border: 1px solid var(--neutral-200);
+        }
+
+        #add-original-price-display {
+            background: var(--neutral-100);
+            color: var(--neutral-600);
+        }
+
+        .modal-body .form-group {
+            margin-bottom: var(--space-4);
+        }
+
+        .modal-body .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .divider-text {
+            text-align: center;
+            color: var(--neutral-400);
+            margin: var(--space-4) 0;
+            position: relative;
+        }
+
+        .divider-text::before,
+        .divider-text::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: var(--neutral-200);
+        }
+
+        .divider-text::before {
+            left: 0;
+        }
+
+        .divider-text::after {
+            right: 0;
+        }
+
+        /* Items List */
+        .items-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .item-row {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-3);
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
+        }
+
+        .item-info {
+            flex: 1;
+        }
+
+        .item-ref {
+            font-family: var(--font-mono);
+            font-weight: var(--font-semibold);
+            color: var(--primary-700);
+        }
+
+        .item-name {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            margin-left: var(--space-2);
+        }
+
+        .item-price {
+            font-weight: var(--font-semibold);
+        }
+
+        .items-total {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--space-4);
+            margin-top: var(--space-3);
+            background: var(--primary-50);
+            border-radius: var(--radius-md);
+        }
+
+        .total-amount {
+            font-size: var(--text-lg);
+            font-weight: var(--font-bold);
+            color: var(--primary-700);
+        }
+
+        /* Items Totals Section */
+        .items-totals {
+            margin-top: var(--space-4);
+            padding-top: var(--space-4);
+            border-top: 1px solid var(--neutral-200);
+        }
+
+        .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--space-2) 0;
+        }
+
+        .totals-row.discount-row {
+            color: var(--success-600);
+        }
+
+        .totals-row.total-row {
+            padding-top: var(--space-3);
+            margin-top: var(--space-2);
+            border-top: 2px solid var(--neutral-300);
+        }
+
+        .totals-row.total-row .totals-value {
+            font-size: var(--text-lg);
+            color: var(--primary-700);
+        }
+
+        .item-discount-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: var(--text-xs);
+            color: var(--neutral-400);
+        }
+
+        .item-discount-badge .original-price {
+            color: var(--neutral-400);
+        }
+
+        .item-discount-badge i {
+            font-size: 8px;
+        }
+
+        .empty-items {
+            text-align: center;
+            padding: var(--space-6);
+            color: var(--neutral-400);
+        }
+
+        .empty-items i {
+            font-size: 2rem;
+            margin-bottom: var(--space-2);
+        }
+
+        /* Info Grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        .info-item label {
+            display: block;
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            margin-bottom: var(--space-1);
+        }
+
+        .info-item span {
+            font-weight: var(--font-medium);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-xl);
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-sm {
+            max-width: 400px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--neutral-200);
+        }
+
+        .modal-header h3 {
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--neutral-400);
+        }
+
+        .modal-body {
+            padding: var(--space-6);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--space-3);
+            padding: var(--space-4) var(--space-6);
+            border-top: 1px solid var(--neutral-200);
+        }
+
+        .product-preview {
+            padding: var(--space-4);
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-4);
+        }
+
+        @media (max-width: 1024px) {
+            .completion-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .photos-panel {
+                position: relative;
+                top: 0;
+            }
+        }
+    </style>
+
+    <script>
+        // Get invoice total from the displayed value or calculate from items
+        function getInvoiceTotal() {
+            // Try to get from the total display element
+            const totalDisplay = document.getElementById('total-display');
+            if (totalDisplay) {
+                const text = totalDisplay.textContent.replace(/[^\d.,]/g, '').replace(',', '.');
+                const parsed = parseFloat(text);
+                if (!isNaN(parsed) && parsed > 0) {
+                    return parsed;
+                }
+            }
+            // Fallback to template variable
+            return {{ invoice.total_amount|default:0 }};
+        }
+
+        // Payment Status Hint
+        function updatePaymentStatus() {
+            const invoiceTotal = getInvoiceTotal();
+            const amountPaid = parseFloat(document.getElementById('amount-paid').value) || 0;
+            const hint = document.getElementById('payment-status-hint');
+
+            if (amountPaid >= invoiceTotal && invoiceTotal > 0) {
+                hint.innerHTML = '<span style="color: var(--success-600);"><i class="fas fa-check-circle"></i> Payée intégralement</span>';
+            } else if (amountPaid > 0 && invoiceTotal > 0) {
+                const remaining = invoiceTotal - amountPaid;
+                hint.innerHTML = '<span style="color: var(--warning-600);"><i class="fas fa-exclamation-circle"></i> Partiellement payée - Reste: ' + remaining.toFixed(2) + ' DH</span>';
+            } else if (invoiceTotal > 0) {
+                hint.innerHTML = '<span style="color: var(--error-600);"><i class="fas fa-times-circle"></i> Non payée</span>';
+            } else {
+                hint.innerHTML = '<span style="color: var(--neutral-500);"><i class="fas fa-info-circle"></i> Ajoutez des articles pour calculer le total</span>';
+            }
+        }
+
+        // Initialize payment status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updatePaymentStatus();
+        });
+
+        // Payment Method Fields Logic
+        function updatePaymentFields() {
+            const select = document.getElementById('payment-method-select');
+            const selectedOption = select.options[select.selectedIndex];
+            const paymentName = selectedOption.getAttribute('data-name') || '';
+
+            const referenceGroup = document.getElementById('reference-group');
+            const bankAccountGroup = document.getElementById('bank-account-group');
+
+            // Hide all by default
+            referenceGroup.style.display = 'none';
+            bankAccountGroup.style.display = 'none';
+
+            if (!paymentName) {
+                // No payment method selected
+                return;
+            }
+
+            // Check payment type
+            const isEspeces = paymentName.includes('espèce') || paymentName.includes('espece') || paymentName === 'cash';
+            const isVirement = paymentName.includes('virement');
+
+            if (isEspeces) {
+                // Cash - no reference, no bank account
+                referenceGroup.style.display = 'none';
+                bankAccountGroup.style.display = 'none';
+            } else if (isVirement) {
+                // Bank transfer - show reference AND bank account
+                referenceGroup.style.display = 'block';
+                bankAccountGroup.style.display = 'block';
+            } else {
+                // Other (cheque, card, etc.) - show only reference
+                referenceGroup.style.display = 'block';
+                bankAccountGroup.style.display = 'none';
+            }
+        }
+
+        // Photo Modal
+        function openPhotoModal(url) {
+            document.getElementById('photo-modal-img').src = url;
+            document.getElementById('photo-modal').classList.add('active');
+        }
+
+        function closePhotoModal() {
+            document.getElementById('photo-modal').classList.remove('active');
+        }
+
+        // Quick Create Modal
+        function openQuickCreateModal() {
+            document.getElementById('quick-create-modal').classList.add('active');
+        }
+
+        function closeQuickCreateModal() {
+            document.getElementById('quick-create-modal').classList.remove('active');
+        }
+
+        // Add Product Modal
+        let currentProductOriginalPrice = 0;
+
+        function openAddProductModal(product) {
+            document.getElementById('add-product-id').value = product.id;
+            document.getElementById('add-original-price').value = product.selling_price;
+            document.getElementById('add-original-price-display').value = parseFloat(product.selling_price).toFixed(2) + ' DH';
+            document.getElementById('add-selling-price').value = product.selling_price;
+            document.getElementById('add-quantity').value = 1;
+            currentProductOriginalPrice = parseFloat(product.selling_price);
+
+            document.getElementById('product-preview').innerHTML = `
+                <div><strong>${product.name || product.category || 'Produit'}</strong></div>
+                <div class="search-result-ref" style="margin: 4px 0;">${product.reference}</div>
+                <div>${product.category} ${product.metal ? '• ' + product.metal : ''} ${product.purity || ''} ${product.weight ? '• ' + product.weight + 'g' : ''}</div>
+            `;
+
+            // Reset discount display
+            document.getElementById('discount-group').style.display = 'none';
+
+            document.getElementById('add-product-modal').classList.add('active');
+        }
+
+        function closeAddProductModal() {
+            document.getElementById('add-product-modal').classList.remove('active');
+        }
+
+        function calculateDiscount() {
+            const originalPrice = currentProductOriginalPrice;
+            const sellingPrice = parseFloat(document.getElementById('add-selling-price').value) || 0;
+            const quantity = parseInt(document.getElementById('add-quantity').value) || 1;
+
+            const totalOriginal = originalPrice * quantity;
+            const totalSelling = sellingPrice * quantity;
+            const discount = totalOriginal - totalSelling;
+            const discountPercent = totalOriginal > 0 ? ((discount / totalOriginal) * 100) : 0;
+
+            const discountGroup = document.getElementById('discount-group');
+            const discountDisplay = document.getElementById('discount-display');
+
+            if (discount !== 0) {
+                discountGroup.style.display = 'block';
+
+                if (discount > 0) {
+                    discountDisplay.className = 'discount-display positive';
+                    discountDisplay.innerHTML = `<i class="fas fa-tag"></i> Remise: ${discount.toFixed(2)} DH (${discountPercent.toFixed(1)}%)`;
+                } else {
+                    discountDisplay.className = 'discount-display negative';
+                    discountDisplay.innerHTML = `<i class="fas fa-arrow-up"></i> Majoration: ${Math.abs(discount).toFixed(2)} DH (${Math.abs(discountPercent).toFixed(1)}%)`;
+                }
+            } else {
+                discountDisplay.className = 'discount-display zero';
+                discountDisplay.innerHTML = `<i class="fas fa-check"></i> Prix catalogue`;
+                discountGroup.style.display = 'block';
+            }
+        }
+
+        // Product Search
+        let searchTimeout;
+        const searchInput = document.getElementById('product-search');
+        const searchResults = document.getElementById('search-results');
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+
+            if (query.length < 2) {
+                searchResults.classList.remove('active');
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                const url = `/sales/api/search-products/?q=${encodeURIComponent(query)}`;
+                console.log('Searching:', url);
+                fetch(url)
+                    .then(response => {
+                        console.log('Response status:', response.status);
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Products found:', data.products.length);
+                        if (data.products && data.products.length > 0) {
+                            searchResults.innerHTML = data.products.map(p => `
+                                <div class="search-result-item" onclick='openAddProductModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
+                                    <div class="search-result-name">${p.name || p.category || 'Produit'}</div>
+                                    <div class="search-result-details">
+                                        <span class="search-result-ref">${p.reference}</span>
+                                        ${p.category ? ' • ' + p.category : ''}
+                                        ${p.metal ? ' • ' + p.metal : ''}
+                                        ${p.purity ? ' ' + p.purity : ''}
+                                        ${p.weight ? ' • ' + p.weight + 'g' : ''}
+                                    </div>
+                                    <div class="search-result-price">${p.selling_price} DH</div>
+                                </div>
+                            `).join('');
+                            searchResults.classList.add('active');
+                        } else {
+                            searchResults.innerHTML = '<div class="search-result-item">Aucun produit trouvé</div>';
+                            searchResults.classList.add('active');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Search error:', error);
+                        searchResults.innerHTML = '<div class="search-result-item text-error">Erreur de recherche</div>';
+                        searchResults.classList.add('active');
+                    });
+            }, 300);
+        });
+
+        // Close search results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.classList.remove('active');
+            }
+        });
+
+        // Close modals on escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closePhotoModal();
+                closeQuickCreateModal();
+                closeAddProductModal();
+            }
+        });
+    </script>
+{% endblock %}

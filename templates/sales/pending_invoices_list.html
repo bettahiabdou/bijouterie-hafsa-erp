@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+
+{% block title %}Factures en Attente - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_list' %}" class="breadcrumb-item">Ventes</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">En Attente</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">
+                    <i class="fas fa-clock text-warning mr-2"></i>
+                    Factures en Attente de Saisie
+                </h1>
+                <p class="page-subtitle">Factures créées via Telegram en attente de complétion</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:invoice_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-list"></i>
+                    <span>Toutes les Factures</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- Stats Cards -->
+    <div class="stats-grid mb-6">
+        <div class="stat-card stat-warning">
+            <div class="stat-icon">
+                <i class="fas fa-hourglass-half"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats.total_pending }}</span>
+                <span class="stat-label">En attente</span>
+            </div>
+        </div>
+        <div class="stat-card stat-info">
+            <div class="stat-icon">
+                <i class="fas fa-calendar-day"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats.today_pending }}</span>
+                <span class="stat-label">Aujourd'hui</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="card mb-6">
+        <div class="card-body">
+            <form method="get" class="flex gap-4 items-end flex-wrap">
+                <div class="form-group mb-0" style="flex: 1; min-width: 200px;">
+                    <label class="form-label">Rechercher</label>
+                    <input type="text" name="search" value="{{ search_query }}"
+                           placeholder="Référence, vendeur..." class="form-input">
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i>
+                    <span>Rechercher</span>
+                </button>
+                {% if search_query %}
+                    <a href="{% url 'sales:pending_invoices' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i>
+                        <span>Effacer</span>
+                    </a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Invoices Grid -->
+    {% if invoices %}
+        <div class="pending-invoices-grid">
+            {% for invoice in invoices %}
+                <div class="pending-invoice-card card animate-slide-up" style="animation-delay: {{ forloop.counter0|divisibleby:50 }}ms;">
+                    <div class="card-body">
+                        <!-- Header -->
+                        <div class="pending-invoice-header">
+                            <div>
+                                <h3 class="pending-invoice-ref">{{ invoice.reference }}</h3>
+                                <p class="pending-invoice-meta">
+                                    <i class="fas fa-user"></i> {{ invoice.seller.get_full_name|default:invoice.seller.username }}
+                                </p>
+                            </div>
+                            <span class="badge badge-warning">Brouillon</span>
+                        </div>
+
+                        <!-- Photos Preview -->
+                        <div class="pending-invoice-photos">
+                            {% for photo in invoice.photos.all|slice:":4" %}
+                                <div class="photo-thumb" style="background-image: url('{{ photo.image.url }}');">
+                                    {% if forloop.counter == 4 and invoice.photos.count > 4 %}
+                                        <div class="photo-more">+{{ invoice.photos.count|add:"-4" }}</div>
+                                    {% endif %}
+                                </div>
+                            {% empty %}
+                                <div class="no-photos">
+                                    <i class="fas fa-image"></i>
+                                    <span>Pas de photos</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Info -->
+                        <div class="pending-invoice-info">
+                            <div class="info-item">
+                                <i class="fas fa-camera"></i>
+                                <span>{{ invoice.photos.count }} photo(s)</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="fas fa-clock"></i>
+                                <span>{{ invoice.created_at|date:"d/m H:i" }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="pending-invoice-actions">
+                            <a href="{% url 'sales:pending_invoice_complete' invoice.reference %}" class="btn btn-primary btn-block">
+                                <i class="fas fa-edit"></i>
+                                <span>Compléter la saisie</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if invoices.has_other_pages %}
+            <div class="pagination-wrapper mt-6">
+                <nav class="pagination">
+                    {% if invoices.has_previous %}
+                        <a href="?page={{ invoices.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="pagination-link">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+
+                    <span class="pagination-info">
+                        Page {{ invoices.number }} sur {{ invoices.paginator.num_pages }}
+                    </span>
+
+                    {% if invoices.has_next %}
+                        <a href="?page={{ invoices.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="pagination-link">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </nav>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-check-circle empty-state-icon" style="color: var(--success-500);"></i>
+            <h3 class="empty-state-title">Aucune facture en attente</h3>
+            <p class="empty-state-text">Toutes les factures ont été traitées</p>
+        </div>
+    {% endif %}
+
+    <style>
+        .pending-invoices-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: var(--space-4);
+        }
+
+        .pending-invoice-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .pending-invoice-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .pending-invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: var(--space-4);
+        }
+
+        .pending-invoice-ref {
+            font-family: var(--font-display);
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--primary-700);
+            margin: 0;
+        }
+
+        .pending-invoice-meta {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            margin-top: var(--space-1);
+        }
+
+        .pending-invoice-meta i {
+            margin-right: var(--space-1);
+        }
+
+        .pending-invoice-photos {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-2);
+            margin-bottom: var(--space-4);
+        }
+
+        .photo-thumb {
+            aspect-ratio: 1;
+            background-size: cover;
+            background-position: center;
+            border-radius: var(--radius-md);
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .photo-thumb:hover {
+            transform: scale(1.05);
+        }
+
+        .photo-more {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: var(--font-semibold);
+            border-radius: var(--radius-md);
+        }
+
+        .no-photos {
+            grid-column: span 4;
+            padding: var(--space-6);
+            background: var(--neutral-100);
+            border-radius: var(--radius-md);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-2);
+            color: var(--neutral-400);
+        }
+
+        .no-photos i {
+            font-size: var(--text-2xl);
+        }
+
+        .pending-invoice-info {
+            display: flex;
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
+            padding: var(--space-3);
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .info-item i {
+            color: var(--neutral-400);
+        }
+
+        .pending-invoice-actions {
+            margin-top: auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: var(--space-4);
+        }
+
+        @media (max-width: 768px) {
+            .pending-invoices-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .pending-invoice-photos {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+{% endblock %}

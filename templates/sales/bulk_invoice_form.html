@@ -1075,8 +1075,11 @@
             const products = [];
             const references = [];
             let hasError = false;
+            let errorMessages = [];
 
             rows.forEach((row, idx) => {
+                if (hasError) return; // Stop processing if error found
+
                 const productSelect = row.querySelector(isDesktop ? '.product_id' : '.product_id_mobile');
                 const quantityInput = row.querySelector(isDesktop ? '.quantity' : '.quantity_mobile');
                 const productId = productSelect?.value;
@@ -1084,55 +1087,53 @@
 
                 // Check required fields - product is required
                 if (!productId) {
-                    alert('Erreur ligne ' + (idx + 1) + ': Veuillez selectionner un produit.');
-                    e.preventDefault();
+                    errorMessages.push('Ligne ' + (idx + 1) + ': Veuillez selectionner un produit.');
                     hasError = true;
                     return;
                 }
 
                 // Check required fields - quantity is required
                 if (!quantity || parseFloat(quantity) <= 0) {
-                    alert('Erreur ligne ' + (idx + 1) + ': Veuillez entrer une quantite valide.');
-                    e.preventDefault();
+                    errorMessages.push('Ligne ' + (idx + 1) + ': Veuillez entrer une quantite valide.');
                     hasError = true;
                     return;
                 }
 
-                // Check for duplicate products
+                // Check for duplicate products in the same form
                 if (productId) {
                     if (products.includes(productId)) {
-                        alert('Erreur ligne ' + (idx + 1) + ': Le meme produit ne peut pas etre selectionne deux fois.');
-                        e.preventDefault();
+                        const productName = productSelect.options[productSelect.selectedIndex]?.text || productId;
+                        errorMessages.push('Ligne ' + (idx + 1) + ': Le produit "' + productName + '" est deja selectionne dans une autre ligne.');
                         hasError = true;
                         return;
                     }
                     products.push(productId);
                 }
 
-                // Check for duplicate payment references
+                // Check for duplicate payment references in the same form
                 const paymentMethodSelect = row.querySelector(isDesktop ? '.payment_method' : '.payment_method_mobile');
                 let paymentRef;
 
                 if (isDesktop) {
                     const detailRow = row.nextElementSibling;
-                    paymentRef = detailRow?.querySelector('.payment_reference')?.value;
+                    paymentRef = detailRow?.querySelector('.payment_reference')?.value?.trim();
                 } else {
-                    paymentRef = row.querySelector('.payment_reference_mobile')?.value;
+                    paymentRef = row.querySelector('.payment_reference_mobile')?.value?.trim();
                 }
 
                 if (paymentMethodSelect?.value && paymentRef) {
-                    if (references.includes(paymentRef)) {
-                        alert('Erreur ligne ' + (idx + 1) + ': La reference de paiement "' + paymentRef + '" est deja utilisee.');
-                        e.preventDefault();
+                    if (references.includes(paymentRef.toLowerCase())) {
+                        errorMessages.push('Ligne ' + (idx + 1) + ': La reference de paiement "' + paymentRef + '" est deja utilisee dans une autre ligne.');
                         hasError = true;
                         return;
                     }
-                    references.push(paymentRef);
+                    references.push(paymentRef.toLowerCase());
                 }
             });
 
-            if (hasError) {
+            if (hasError && errorMessages.length > 0) {
                 e.preventDefault();
+                alert('Erreurs de validation:\n\n' + errorMessages.join('\n'));
             }
         });
 

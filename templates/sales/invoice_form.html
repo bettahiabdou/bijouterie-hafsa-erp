@@ -1,518 +1,161 @@
 {% extends 'base.html' %}
 {% load humanize %}
 
-{% block title %}{% if form.instance.pk %}Éditer Facture{% else %}Nouvelle Facture{% endif %} - Bijouterie Hafsa ERP{% endblock %}
+{% block title %}{% if form.instance.pk %}Editer Facture{% else %}Nouvelle Facture{% endif %} - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
-    <span>/</span>
-    <span><a href="{% url 'sales:invoice_list' %}" class="text-blue-600 hover:text-blue-700">Factures</a></span>
-    <span>/</span>
-    <span>{% if form.instance.pk %}Éditer{% else %}Nouvelle{% endif %}</span>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_list' %}" class="breadcrumb-item">Factures</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{% if form.instance.pk %}Editer{% else %}Nouvelle{% endif %}</span>
 {% endblock %}
 
 {% block page_header %}
-    <style>
-        /* Invoice Form Header - Refined Minimalist */
-        .invoice-header {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-4);
-        }
-
-        .invoice-header h1 {
-            font-family: var(--font-serif);
-            font-size: var(--text-4xl);
-            color: var(--color-neutral-black);
-            font-weight: var(--weight-normal);
-            margin: 0;
-        }
-
-        .invoice-header p {
-            font-size: var(--text-sm);
-            color: var(--color-neutral-gray);
-            margin: 0;
-        }
-
-        .breadcrumb a {
-            color: var(--color-primary);
-            text-decoration: none;
-            transition: color var(--transition-fast);
-        }
-
-        .breadcrumb a:hover {
-            color: var(--color-primary-dark);
-            text-decoration: underline;
-        }
-    </style>
-
-    <div class="invoice-header">
-        <h1>
-            {% if form.instance.pk %}
-                Éditer Facture #{{ form.instance.reference }}
-            {% else %}
-                Créer une Nouvelle Facture
-            {% endif %}
-        </h1>
-        <p>Complétez les détails de la facture de vente</p>
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">
+                    {% if form.instance.pk %}
+                        Editer Facture #{{ form.instance.reference }}
+                    {% else %}
+                        Creer une Nouvelle Facture
+                    {% endif %}
+                </h1>
+                <p class="page-subtitle">Completez les details de la facture de vente</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:invoice_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Annuler</span>
+                </a>
+            </div>
+        </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <style>
-        /* Invoice Form Container - Refined Minimalist */
-        .invoice-form-container {
-            display: grid;
-            grid-template-columns: 1fr 350px;
-            gap: var(--space-8);
-        }
+    <form method="post" action="{% url 'sales:invoice_create' %}" class="invoice-form">
+        {% csrf_token %}
 
-        .invoice-form-main {
-            background: white;
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-sm);
-            padding: var(--space-6);
-        }
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} mb-6 animate-slide-up">
+                    <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
 
-        .invoice-form {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-6);
-        }
+        <!-- Display Form Errors -->
+        {% if form.non_field_errors %}
+            <div class="alert alert-error mb-6">
+                <i class="fas fa-exclamation-circle"></i>
+                {% for error in form.non_field_errors %}
+                    {{ error }}
+                {% endfor %}
+            </div>
+        {% endif %}
 
-        /* Error Display */
-        .form-error-alert {
-            background: rgba(200, 90, 84, 0.1);
-            border: 1px solid var(--color-error);
-            border-radius: var(--radius-md);
-            padding: var(--space-4);
-            margin-bottom: var(--space-4);
-        }
-
-        .form-error-alert-title {
-            color: var(--color-error);
-            font-weight: var(--weight-semibold);
-            margin-bottom: var(--space-2);
-        }
-
-        .form-error-alert-message {
-            color: var(--color-error);
-            font-size: var(--text-sm);
-        }
-
-        /* Form Sections */
-        .form-section-wrapper {
-            border-bottom: 1px solid var(--color-neutral-medium);
-            padding-bottom: var(--space-6);
-        }
-
-        .form-section-wrapper:last-of-type {
-            border-bottom: none;
-        }
-
-        .form-section-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: var(--space-4);
-            gap: var(--space-4);
-        }
-
-        .form-section-title {
-            font-family: var(--font-serif);
-            font-size: var(--text-2xl);
-            color: var(--color-neutral-black);
-            font-weight: var(--weight-normal);
-            margin: 0;
-        }
-
-        .form-section-toggle {
-            display: none;
-        }
-
-        @media (max-width: 767px) {
-            .invoice-form-container {
-                grid-template-columns: 1fr;
-            }
-
-            .form-section-toggle {
-                display: block;
-                background: none;
-                border: none;
-                cursor: pointer;
-                padding: 0;
-                color: var(--color-neutral-gray);
-            }
-
-            .form-section-toggle:focus {
-                outline: none;
-            }
-        }
-    </style>
-
-    <div class="invoice-form-container">
-        <!-- Main Form -->
-        <div class="invoice-form-main">
-            <form method="post" action="{% url 'sales:invoice_create' %}" class="invoice-form">
-                {% csrf_token %}
-
-                <!-- Display Form Errors -->
-                {% if form.non_field_errors %}
-                    <div class="form-error-alert">
-                        <p class="form-error-alert-title">Erreurs:</p>
-                        {% for error in form.non_field_errors %}
-                            <p class="form-error-alert-message">{{ error }}</p>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-
+        <div class="invoice-layout">
+            <!-- Main Form Column -->
+            <div class="invoice-main">
                 <!-- Client Section -->
-                <div class="form-section-wrapper">
-                    <style>
-                        .add-client-btn {
-                            display: inline-flex;
-                            align-items: center;
-                            gap: var(--space-2);
-                            padding: var(--space-2) var(--space-3);
-                            background: rgba(183, 110, 121, 0.1);
-                            color: var(--color-primary);
-                            border: 1px solid var(--color-primary);
-                            border-radius: var(--radius-md);
-                            font-size: var(--text-sm);
-                            font-weight: var(--weight-semibold);
-                            text-decoration: none;
-                            cursor: pointer;
-                            transition: all var(--transition-fast);
-                            min-height: 2.25rem;
-                        }
-
-                        .add-client-btn:hover {
-                            background: var(--color-primary);
-                            color: white;
-                        }
-
-                        .form-input-wrapper {
-                            display: flex;
-                            flex-direction: column;
-                            gap: var(--space-2);
-                        }
-
-                        .form-input-wrapper select {
-                            padding: var(--space-3) var(--space-4);
-                            border: 1px solid var(--color-neutral-medium);
-                            border-radius: var(--radius-md);
-                            font-size: var(--text-base);
-                            color: var(--color-neutral-dark);
-                            background: white;
-                            transition: all var(--transition-fast);
-                        }
-
-                        .form-input-wrapper select:focus {
-                            outline: none;
-                            border-color: var(--color-primary);
-                            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
-                        }
-
-                        .form-help-text {
-                            font-size: var(--text-xs);
-                            color: var(--color-neutral-gray);
-                        }
-
-                        .form-error-text {
-                            font-size: var(--text-sm);
-                            color: var(--color-error);
-                        }
-                    </style>
-
-                    <div class="form-section-header">
-                        <h2 class="form-section-title">Client</h2>
-                        <button type="button" class="add-client-btn"
+                <div class="card mb-6 animate-slide-up">
+                    <div class="card-header">
+                        <h3><i class="fas fa-user mr-2"></i> Client</h3>
+                        <button type="button" class="btn btn-secondary btn-sm"
                                 data-bs-toggle="modal" data-bs-target="#addClientModal">
-                            <i class="fas fa-plus"></i> Nouveau
+                            <i class="fas fa-plus"></i>
+                            <span>Nouveau</span>
                         </button>
                     </div>
-
-                    <div id="clientContent" class="form-input-wrapper">
-                        {{ form.client }}
-                        <p class="form-help-text">Laissez vide pour une vente sans client (walk-in)</p>
-                        {% if form.client.errors %}
-                            <p class="form-error-text">{{ form.client.errors.0 }}</p>
-                        {% endif %}
+                    <div class="card-body">
+                        <div class="form-group">
+                            {{ form.client }}
+                            <p class="form-hint">Laissez vide pour une vente sans client (walk-in)</p>
+                            {% if form.client.errors %}
+                                <p class="form-error">{{ form.client.errors.0 }}</p>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
 
-                <!-- Essential Info Section -->
-                <div class="form-section-wrapper">
-                    <style>
-                        .form-grid-2 {
-                            display: grid;
-                            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                            gap: var(--space-4);
-                        }
-
-                        .form-group {
-                            display: flex;
-                            flex-direction: column;
-                            gap: var(--space-2);
-                        }
-
-                        .form-group label {
-                            font-size: var(--text-sm);
-                            font-weight: var(--weight-semibold);
-                            color: var(--color-neutral-dark);
-                            text-transform: uppercase;
-                            letter-spacing: var(--tracking-wide);
-                        }
-
-                        .form-group input,
-                        .form-group select {
-                            padding: var(--space-3) var(--space-4);
-                            border: 1px solid var(--color-neutral-medium);
-                            border-radius: var(--radius-md);
-                            font-size: var(--text-base);
-                            color: var(--color-neutral-dark);
-                            background: white;
-                            transition: all var(--transition-fast);
-                        }
-
-                        .form-group input:focus,
-                        .form-group select:focus {
-                            outline: none;
-                            border-color: var(--color-primary);
-                            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
-                        }
-
-                        .form-group input[type="number"] {
-                            font-family: var(--font-serif);
-                        }
-                    </style>
-
-                    <h2 class="form-section-title">Paramètres</h2>
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label for="{{ form.tax_rate.id_for_label }}">TVA (%)</label>
-                            {{ form.tax_rate }}
-                            {% if form.tax_rate.errors %}
-                                <p class="form-error-text">{{ form.tax_rate.errors.0 }}</p>
-                            {% endif %}
-                        </div>
-                        <div class="form-group">
-                            <label for="{{ form.payment_method.id_for_label }}">Méthode de Paiement</label>
-                            {{ form.payment_method }}
-                            {% if form.payment_method.errors %}
-                                <p class="form-error-text">{{ form.payment_method.errors.0 }}</p>
-                            {% endif %}
-                        </div>
+                <!-- Parameters Section -->
+                <div class="card mb-6 animate-slide-up" style="animation-delay: 50ms;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-cog mr-2"></i> Parametres</h3>
                     </div>
+                    <div class="card-body">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="{{ form.tax_rate.id_for_label }}">TVA (%)</label>
+                                {{ form.tax_rate }}
+                                {% if form.tax_rate.errors %}
+                                    <p class="form-error">{{ form.tax_rate.errors.0 }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="{{ form.payment_method.id_for_label }}">Methode de Paiement</label>
+                                {{ form.payment_method }}
+                                {% if form.payment_method.errors %}
+                                    <p class="form-error">{{ form.payment_method.errors.0 }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
 
-                    <!-- Conditional Payment Reference (for bank transfer, cheque, mobile payment, cards) -->
-                    <div id="paymentRefSection" class="hidden" style="margin-top: var(--space-4);">
-                        <div class="form-group">
-                            <label for="paymentReference">
-                                Référence de Paiement <span style="color: var(--color-error);">*</span>
+                        <!-- Conditional Payment Reference -->
+                        <div id="paymentRefSection" class="form-group mt-4" style="display: none;">
+                            <label class="form-label" for="paymentReference">
+                                Reference de Paiement <span class="text-error">*</span>
                             </label>
                             <input type="text" id="paymentReference" name="payment_reference"
-                                   placeholder="N° de chèque, référence virement, n° de carte...">
-                            <p class="form-help-text">
-                                Obligatoire pour virement, chèque, paiement mobile ou carte
-                            </p>
+                                   class="form-input" placeholder="N° de cheque, reference virement, n° de carte...">
+                            <p class="form-hint">Obligatoire pour virement, cheque, paiement mobile ou carte</p>
                         </div>
-                    </div>
 
-                    <!-- Conditional Bank Account (for bank transfer only) -->
-                    <div id="bankAccountSection" class="hidden" style="margin-top: var(--space-4);">
-                        <div class="form-group">
-                            <label for="bankAccount">
-                                Compte Bancaire <span style="color: var(--color-error);">*</span>
+                        <!-- Conditional Bank Account -->
+                        <div id="bankAccountSection" class="form-group mt-4" style="display: none;">
+                            <label class="form-label" for="bankAccount">
+                                Compte Bancaire <span class="text-error">*</span>
                             </label>
-                            <select id="bankAccount" name="bank_account">
-                                <option value="">-- Sélectionnez un compte --</option>
+                            <select id="bankAccount" name="bank_account" class="form-select">
+                                <option value="">-- Selectionnez un compte --</option>
                                 {% for bank in bank_accounts %}
                                     <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_number }}</option>
                                 {% endfor %}
                             </select>
-                            <p class="form-help-text">
-                                Sélectionnez le compte bancaire pour ce virement
-                            </p>
+                            <p class="form-hint">Selectionnez le compte bancaire pour ce virement</p>
                         </div>
-                    </div>
 
-                    <div style="margin-top: var(--space-4);">
-                        <p class="form-help-text">
-                            <i class="fas fa-info-circle" style="margin-right: var(--space-2);"></i>
-                            Remises appliquées par produit • Livraison configurée après création
-                        </p>
+                        <div class="info-hint mt-4">
+                            <i class="fas fa-info-circle"></i>
+                            Remises appliquees par produit - Livraison configuree apres creation
+                        </div>
                     </div>
                 </div>
 
-                <!-- Items Section -->
-                <div class="form-section-wrapper">
-                    <style>
-                        .add-item-btn {
-                            display: inline-flex;
-                            align-items: center;
-                            gap: var(--space-2);
-                            padding: var(--space-3) var(--space-4);
-                            background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
-                            color: white;
-                            border: none;
-                            border-radius: var(--radius-md);
-                            font-weight: var(--weight-semibold);
-                            font-size: var(--text-sm);
-                            text-transform: uppercase;
-                            letter-spacing: var(--tracking-wide);
-                            cursor: pointer;
-                            transition: all var(--transition-fast);
-                            min-height: 2.75rem;
-                        }
-
-                        .add-item-btn:hover {
-                            background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
-                            box-shadow: var(--shadow-hover);
-                            transform: translateY(-2px);
-                        }
-
-                        .items-container {
-                            display: flex;
-                            flex-direction: column;
-                            gap: var(--space-4);
-                            margin-bottom: var(--space-4);
-                        }
-
-                        .empty-state {
-                            background: var(--color-neutral-light);
-                            border: 1px solid var(--color-neutral-medium);
-                            border-radius: var(--radius-md);
-                            padding: var(--space-6);
-                            text-align: center;
-                        }
-
-                        .empty-state-icon {
-                            font-size: 2rem;
-                            color: var(--color-neutral-gray);
-                            opacity: 0.5;
-                            margin-bottom: var(--space-2);
-                        }
-
-                        .empty-state-text {
-                            color: var(--color-neutral-gray);
-                            font-size: var(--text-sm);
-                        }
-                    </style>
-
-                    <div class="form-section-header">
-                        <h2 class="form-section-title">Articles</h2>
-                        <button type="button" class="add-item-btn" id="addItemBtn">
-                            <i class="fas fa-plus"></i> Ajouter
+                <!-- Articles Section -->
+                <div class="card mb-6 animate-slide-up" style="animation-delay: 100ms;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-shopping-cart mr-2"></i> Articles</h3>
+                        <button type="button" class="btn btn-primary btn-sm" id="addItemBtn">
+                            <i class="fas fa-plus"></i>
+                            <span>Ajouter</span>
                         </button>
                     </div>
+                    <div class="card-body">
+                        <!-- Items List -->
+                        <div id="itemsContainer" class="items-container">
+                            <!-- Items will be added here dynamically -->
+                        </div>
 
-                    <!-- Items List -->
-                    <div id="itemsContainer" class="items-container">
-                        <!-- Items will be added here dynamically -->
-                    </div>
-
-                    <!-- Add Item Form (Hidden by default) -->
-                    <style>
-                        .add-item-form {
-                            background: var(--color-neutral-light);
-                            border: 1px solid var(--color-neutral-medium);
-                            border-radius: var(--radius-md);
-                            padding: var(--space-4);
-                        }
-
-                        .add-item-form h3 {
-                            font-size: var(--text-lg);
-                            font-weight: var(--weight-semibold);
-                            color: var(--color-neutral-dark);
-                            margin-bottom: var(--space-4);
-                        }
-
-                        .add-item-fields {
-                            display: flex;
-                            flex-direction: column;
-                            gap: var(--space-3);
-                        }
-
-                        .item-calculation-box {
-                            background: white;
-                            padding: var(--space-4);
-                            border-radius: var(--radius-md);
-                            border: 1px solid var(--color-neutral-medium);
-                            margin-bottom: var(--space-3);
-                        }
-
-                        .item-calc-row {
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: baseline;
-                            font-size: var(--text-sm);
-                            margin-bottom: var(--space-2);
-                        }
-
-                        .item-calc-row:last-child {
-                            margin-bottom: 0;
-                            border-top: 1px solid var(--color-neutral-medium);
-                            padding-top: var(--space-2);
-                            font-weight: var(--weight-semibold);
-                        }
-
-                        .item-calc-value {
-                            font-family: var(--font-serif);
-                            font-weight: var(--weight-semibold);
-                            color: var(--color-primary);
-                        }
-
-                        .item-buttons {
-                            display: grid;
-                            grid-template-columns: 1fr 1fr;
-                            gap: var(--space-2);
-                        }
-
-                        .item-btn {
-                            padding: var(--space-3) var(--space-4);
-                            border: none;
-                            border-radius: var(--radius-md);
-                            font-weight: var(--weight-semibold);
-                            font-size: var(--text-sm);
-                            cursor: pointer;
-                            transition: all var(--transition-fast);
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            gap: var(--space-2);
-                            min-height: 2.5rem;
-                        }
-
-                        .item-btn-confirm {
-                            background: var(--color-success);
-                            color: white;
-                        }
-
-                        .item-btn-confirm:hover {
-                            background: var(--color-success);
-                            opacity: 0.9;
-                            transform: translateY(-1px);
-                            box-shadow: var(--shadow-sm);
-                        }
-
-                        .item-btn-cancel {
-                            background: var(--color-neutral-medium);
-                            color: var(--color-neutral-dark);
-                        }
-
-                        .item-btn-cancel:hover {
-                            background: var(--color-neutral-medium);
-                            opacity: 0.8;
-                        }
-                    </style>
-
-                    <div id="addItemSection" class="add-item-form hidden">
-                        <h3>Ajouter un Nouvel Article</h3>
-                        <div class="add-item-fields">
+                        <!-- Add Item Form (Hidden by default) -->
+                        <div id="addItemSection" class="add-item-form" style="display: none;">
+                            <h4 class="mb-4"><i class="fas fa-plus-circle mr-2"></i> Ajouter un Nouvel Article</h4>
                             <div class="form-group">
-                                <label for="product_id">Produit *</label>
-                                <select id="product_id" required>
-                                    <option value="">-- Sélectionnez un produit --</option>
+                                <label class="form-label" for="product_id">Produit *</label>
+                                <select id="product_id" class="form-select" required>
+                                    <option value="">-- Selectionnez un produit --</option>
                                     {% for product in products %}
                                         <option value="{{ product.id }}" data-price="{{ product.selling_price }}">
                                             {{ product.reference }} - {{ product.name }}
@@ -520,481 +163,198 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="form-grid-2">
+                            <div class="form-row">
                                 <div class="form-group">
-                                    <label for="quantity">Quantité *</label>
-                                    <input type="number" id="quantity" step="0.001" min="0.001" value="1" required>
+                                    <label class="form-label" for="quantity">Quantite *</label>
+                                    <input type="number" id="quantity" class="form-input" step="0.001" min="0.001" value="1" required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="unit_price">Prix Unitaire (DH)</label>
-                                    <input type="number" id="unit_price" step="0.01" min="0" readonly style="background: var(--color-neutral-light);">
-                                    <p class="form-help-text">Auto-détecté du produit</p>
+                                    <label class="form-label" for="unit_price">Prix de Vente (DH) *</label>
+                                    <input type="number" id="unit_price" class="form-input" step="0.01" min="0" required>
+                                    <p class="form-hint">Modifiable pour appliquer une remise</p>
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label for="discount_amount">Remise (DH)</label>
-                                <input type="number" id="discount_amount" step="0.01" min="0" value="0">
+                            <div class="form-group" id="originalPriceInfo" style="display: none;">
+                                <div class="price-comparison">
+                                    <span class="original-price-label">Prix catalogue:</span>
+                                    <span class="original-price-value" id="catalogPrice">0.00 DH</span>
+                                    <span class="discount-badge" id="discountBadge" style="display: none;">-<span id="discountPercent">0</span>%</span>
+                                </div>
                             </div>
-                            <div class="item-calculation-box">
-                                <div class="item-calc-row">
+
+                            <!-- Calculation Box -->
+                            <div class="calculation-box">
+                                <div class="calc-row">
                                     <span>Sous-total:</span>
-                                    <span class="item-calc-value"><span id="subtotal_display">0.00</span> DH</span>
+                                    <span class="calc-value"><span id="subtotal_display">0.00</span> DH</span>
                                 </div>
-                                <div class="item-calc-row">
+                                <div class="calc-row">
                                     <span>Remise:</span>
-                                    <span class="item-calc-value">-<span id="discount_display">0.00</span> DH</span>
+                                    <span class="calc-value text-error">-<span id="discount_display">0.00</span> DH</span>
                                 </div>
-                                <div class="item-calc-row" style="color: var(--color-primary);">
+                                <div class="calc-row calc-total">
                                     <span>Total de l'article:</span>
-                                    <span id="estimated_total">0.00 DH</span>
+                                    <span id="estimated_total" class="text-primary">0.00 DH</span>
                                 </div>
                             </div>
-                            <div class="item-buttons">
-                                <button type="button" id="confirmItemBtn" class="item-btn item-btn-confirm">
+
+                            <div class="item-actions">
+                                <button type="button" id="confirmItemBtn" class="btn btn-success">
                                     <i class="fas fa-check"></i> Ajouter
                                 </button>
-                                <button type="button" id="cancelItemBtn" class="item-btn item-btn-cancel">
+                                <button type="button" id="cancelItemBtn" class="btn btn-secondary">
                                     Annuler
                                 </button>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Empty State -->
-                    <div id="emptyState" class="empty-state">
-                        <div class="empty-state-icon">
-                            <i class="fas fa-inbox"></i>
+                        <!-- Empty State -->
+                        <div id="emptyState" class="empty-state">
+                            <div class="empty-state-icon">
+                                <i class="fas fa-inbox"></i>
+                            </div>
+                            <p>Aucun article ajoute. Cliquez sur "Ajouter" pour commencer.</p>
                         </div>
-                        <p class="empty-state-text">
-                            Aucun article ajouté. Cliquez sur "Ajouter un Article" pour commencer.
-                        </p>
                     </div>
                 </div>
 
-                <!-- Payment Amount Section -->
-                <div class="form-section-wrapper">
-                    <h2 class="form-section-title">Paiement à la Création</h2>
-                    <div class="form-group">
-                        <label for="amountPaidInput">Montant Payé (Optionnel)</label>
-                        <input type="number" name="amount_paid" id="amountPaidInput"
-                               step="0.01" min="0" value="0" placeholder="0.00">
-                        <p class="form-help-text">
-                            Montant payé lors de la création de la facture
-                        </p>
+                <!-- Payment Section -->
+                <div class="card mb-6 animate-slide-up" style="animation-delay: 150ms;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-money-bill-wave mr-2"></i> Paiement a la Creation</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label" for="amountPaidInput">Montant Paye (Optionnel)</label>
+                            <input type="number" name="amount_paid" id="amountPaidInput" class="form-input"
+                                   step="0.01" min="0" value="0" placeholder="0.00">
+                            <p class="form-hint">Montant paye lors de la creation de la facture</p>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Notes Section -->
-                <div class="form-section-wrapper">
-                    <h2 class="form-section-title">Notes</h2>
-                    <div class="form-group">
-                        <label for="{{ form.notes.id_for_label }}">Observations</label>
-                        {{ form.notes }}
-                        {% if form.notes.errors %}
-                            <p class="form-error-text">{{ form.notes.errors.0 }}</p>
-                        {% endif %}
+                <div class="card mb-6 animate-slide-up" style="animation-delay: 200ms;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-sticky-note mr-2"></i> Notes</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.notes.id_for_label }}">Observations</label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <p class="form-error">{{ form.notes.errors.0 }}</p>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
 
-                <!-- Submit Buttons -->
-                <style>
-                    .form-actions {
-                        display: flex;
-                        gap: var(--space-4);
-                        padding-top: var(--space-6);
-                        border-top: 1px solid var(--color-neutral-medium);
-                    }
-
-                    .form-submit-btn {
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: var(--space-2);
-                        padding: var(--space-3) var(--space-4);
-                        border: none;
-                        border-radius: var(--radius-md);
-                        font-weight: var(--weight-semibold);
-                        font-size: var(--text-sm);
-                        text-transform: uppercase;
-                        letter-spacing: var(--tracking-wide);
-                        text-decoration: none;
-                        cursor: pointer;
-                        transition: all var(--transition-fast);
-                        min-height: 2.75rem;
-                        flex: 1;
-                    }
-
-                    .form-submit-btn-primary {
-                        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
-                        color: white;
-                    }
-
-                    .form-submit-btn-primary:hover {
-                        background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
-                        box-shadow: var(--shadow-hover);
-                        transform: translateY(-2px);
-                    }
-
-                    .form-submit-btn-secondary {
-                        background: var(--color-neutral-light);
-                        color: var(--color-neutral-dark);
-                        border: 1px solid var(--color-neutral-medium);
-                    }
-
-                    .form-submit-btn-secondary:hover {
-                        background: var(--color-neutral-medium);
-                        text-decoration: none;
-                    }
-
-                    @media (max-width: 767px) {
-                        .form-actions {
-                            flex-direction: column;
-                        }
-
-                        .form-submit-btn {
-                            width: 100%;
-                        }
-                    }
-                </style>
-
-                <div class="form-actions">
-                    <button type="submit" class="form-submit-btn form-submit-btn-primary">
+                <!-- Form Actions -->
+                <div class="form-actions animate-slide-up" style="animation-delay: 250ms;">
+                    <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i>
-                        {% if form.instance.pk %}Mettre à jour{% else %}Créer la Facture{% endif %}
+                        <span>{% if form.instance.pk %}Mettre a jour{% else %}Creer la Facture{% endif %}</span>
                     </button>
-                    <a href="{% url 'sales:invoice_list' %}" class="form-submit-btn form-submit-btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Annuler
+                    <a href="{% url 'sales:invoice_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i>
+                        <span>Annuler</span>
                     </a>
                 </div>
-            </form>
-        </div>
+            </div>
 
-        <!-- Info Panel / Sidebar -->
-        <style>
-            /* Invoice Form Sidebar */
-            .invoice-sidebar {
-                display: flex;
-                flex-direction: column;
-                gap: var(--space-6);
-            }
-
-            .sidebar-card {
-                background: white;
-                border-radius: var(--radius-lg);
-                box-shadow: var(--shadow-sm);
-                padding: var(--space-6);
-            }
-
-            .sidebar-title {
-                font-size: var(--text-lg);
-                font-weight: var(--weight-semibold);
-                color: var(--color-neutral-dark);
-                margin-bottom: var(--space-4);
-            }
-
-            .reference-box {
-                background: var(--color-neutral-light);
-                padding: var(--space-4);
-                border-radius: var(--radius-md);
-                text-align: center;
-            }
-
-            .reference-label {
-                font-size: var(--text-xs);
-                color: var(--color-neutral-gray);
-                text-transform: uppercase;
-                letter-spacing: var(--tracking-wide);
-                margin-bottom: var(--space-2);
-            }
-
-            .reference-value {
-                font-family: var(--font-serif);
-                font-size: var(--text-xl);
-                font-weight: var(--weight-semibold);
-                color: var(--color-neutral-black);
-            }
-
-            .reference-date {
-                font-size: var(--text-xs);
-                color: var(--color-neutral-gray);
-                margin-top: var(--space-3);
-            }
-
-            .help-box {
-                background: rgba(124, 179, 66, 0.1);
-                border: 1px solid var(--color-success);
-                border-radius: var(--radius-md);
-                padding: var(--space-6);
-            }
-
-            .help-box-title {
-                font-size: var(--text-lg);
-                font-weight: var(--weight-semibold);
-                color: var(--color-success);
-                margin-bottom: var(--space-3);
-            }
-
-            .help-list {
-                list-style: none;
-                padding: 0;
-                margin: 0;
-                display: flex;
-                flex-direction: column;
-                gap: var(--space-2);
-            }
-
-            .help-list li {
-                font-size: var(--text-sm);
-                color: var(--color-success);
-            }
-
-            .help-list i {
-                margin-right: var(--space-2);
-                color: var(--color-success);
-            }
-
-            .summary-box {
-                border-top: 1px solid var(--color-neutral-medium);
-                padding-top: var(--space-4);
-            }
-
-            .summary-row {
-                background: var(--color-neutral-light);
-                padding: var(--space-4);
-                border-radius: var(--radius-md);
-                margin-bottom: var(--space-3);
-            }
-
-            .summary-row:last-of-type {
-                margin-bottom: 0;
-            }
-
-            .summary-label {
-                font-size: var(--text-sm);
-                color: var(--color-neutral-dark);
-                margin-bottom: var(--space-2);
-            }
-
-            .summary-value {
-                font-family: var(--font-serif);
-                font-size: var(--text-2xl);
-                font-weight: var(--weight-normal);
-                color: var(--color-primary);
-            }
-
-            .status-indicator {
-                font-size: var(--text-xs);
-                color: var(--color-neutral-gray);
-                padding-top: var(--space-2);
-                border-top: 1px solid var(--color-neutral-medium);
-            }
-
-            .status-indicator i {
-                margin-right: var(--space-1);
-            }
-
-            .existing-status {
-                display: flex;
-                flex-direction: column;
-                gap: var(--space-3);
-            }
-
-            .status-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                font-size: var(--text-sm);
-            }
-
-            .status-row strong {
-                font-weight: var(--weight-semibold);
-                color: var(--color-neutral-dark);
-            }
-
-            .status-row-value {
-                font-family: var(--font-serif);
-                font-weight: var(--weight-semibold);
-                color: var(--color-primary);
-            }
-
-            @media (max-width: 767px) {
-                .invoice-sidebar {
-                    display: none;
-                }
-            }
-        </style>
-
-        <div class="invoice-sidebar">
-            <!-- Reference Info -->
-            <div class="sidebar-card">
-                <h3 class="sidebar-title">Référence</h3>
-                <div class="reference-box">
-                    <div class="reference-label">Numéro de Facture</div>
-                    <p class="reference-value">
+            <!-- Sidebar -->
+            <div class="invoice-sidebar">
+                <!-- Reference Card -->
+                <div class="card mb-6 animate-slide-up">
+                    <div class="card-header">
+                        <h3>Reference</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="reference-box">
+                            <span class="reference-label">Numero de Facture</span>
+                            <span class="reference-value">
+                                {% if form.instance.pk %}
+                                    {{ form.instance.reference }}
+                                {% else %}
+                                    Auto-genere
+                                {% endif %}
+                            </span>
+                        </div>
                         {% if form.instance.pk %}
-                            {{ form.instance.reference }}
-                        {% else %}
-                            Auto-généré
+                            <p class="reference-date">Creee le {{ form.instance.created_at|date:'d/m/Y H:i' }}</p>
                         {% endif %}
-                    </p>
-                </div>
-                {% if form.instance.pk %}
-                    <p class="reference-date">Créée le {{ form.instance.created_at|date:'d/m/Y H:i' }}</p>
-                {% endif %}
-            </div>
-
-            <!-- Quick Help -->
-            <div class="help-box">
-                <h3 class="help-box-title">Workflow Simple</h3>
-                <ul class="help-list">
-                    <li><i class="fas fa-check"></i> Sélectionnez un client (optionnel)</li>
-                    <li><i class="fas fa-check"></i> Ajoutez les articles</li>
-                    <li><i class="fas fa-check"></i> Paramètres: remise, TVA, paiement</li>
-                    <li><i class="fas fa-check"></i> Créer → Facture prête!</li>
-                </ul>
-            </div>
-
-            <!-- Invoice Summary -->
-            <div class="sidebar-card">
-                <h3 class="sidebar-title">Résumé & Paiement</h3>
-
-                <!-- Total Amount -->
-                <div class="summary-row">
-                    <div class="summary-label">Total Facture</div>
-                    <div class="summary-value" id="invoiceTotal">0.00 DH</div>
+                    </div>
                 </div>
 
-                <!-- Balance Due -->
-                <div class="summary-row">
-                    <div class="summary-label">Solde Restant</div>
-                    <div class="summary-value" id="balanceDue">0.00 DH</div>
+                <!-- Help Card -->
+                <div class="card mb-6 animate-slide-up help-card" style="animation-delay: 50ms;">
+                    <div class="card-body">
+                        <h4 class="help-title"><i class="fas fa-lightbulb mr-2"></i> Workflow Simple</h4>
+                        <ul class="help-list">
+                            <li><i class="fas fa-check text-success"></i> Selectionnez un client (optionnel)</li>
+                            <li><i class="fas fa-check text-success"></i> Ajoutez les articles</li>
+                            <li><i class="fas fa-check text-success"></i> Parametres: remise, TVA, paiement</li>
+                            <li><i class="fas fa-check text-success"></i> Creer - Facture prete!</li>
+                        </ul>
+                    </div>
                 </div>
 
-                <!-- Status Indicator -->
-                <div class="status-indicator">
-                    <i class="fas fa-info-circle"></i>
-                    <span id="paymentStatus">Ajoutez les articles pour voir le total</span>
-                </div>
-            </div>
-
-            <!-- Status Info -->
-            {% if form.instance.pk %}
-                <div class="sidebar-card">
-                    <h3 class="sidebar-title">État</h3>
-                    <div class="existing-status">
-                        <div class="status-row">
-                            <strong>Statut:</strong>
-                            <span class="badge" style="background: rgba(212, 169, 55, 0.1); color: var(--color-warning);">{{ form.instance.get_status_display }}</span>
+                <!-- Summary Card -->
+                <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                    <div class="card-header">
+                        <h3>Resume & Paiement</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="summary-row">
+                            <span class="summary-label">Total Facture</span>
+                            <span class="summary-value" id="invoiceTotal">0.00 DH</span>
                         </div>
-                        <div class="status-row">
-                            <strong>Total:</strong>
-                            <span class="status-row-value">{{ form.instance.total_amount|floatformat:2 }} DH</span>
+                        <div class="summary-row">
+                            <span class="summary-label">Solde Restant</span>
+                            <span class="summary-value" id="balanceDue">0.00 DH</span>
                         </div>
-                        <div class="status-row">
-                            <strong>Payé:</strong>
-                            <span>{{ form.instance.amount_paid|floatformat:2 }} DH</span>
-                        </div>
-                        <div class="status-row">
-                            <strong>Dû:</strong>
-                            <span class="status-row-value">{{ form.instance.balance_due|floatformat:2 }} DH</span>
+                        <div class="summary-status">
+                            <i class="fas fa-info-circle"></i>
+                            <span id="paymentStatus">Ajoutez les articles pour voir le total</span>
                         </div>
                     </div>
                 </div>
-            {% endif %}
+
+                <!-- Existing Invoice Status -->
+                {% if form.instance.pk %}
+                    <div class="card mt-6 animate-slide-up" style="animation-delay: 150ms;">
+                        <div class="card-header">
+                            <h3>Etat</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="status-grid">
+                                <div class="status-row">
+                                    <span>Statut:</span>
+                                    <span class="badge badge-{% if form.instance.status == 'paid' %}success{% elif form.instance.status == 'partial' %}warning{% else %}error{% endif %}">
+                                        {{ form.instance.get_status_display }}
+                                    </span>
+                                </div>
+                                <div class="status-row">
+                                    <span>Total:</span>
+                                    <span class="text-primary font-semibold">{{ form.instance.total_amount|floatformat:2 }} DH</span>
+                                </div>
+                                <div class="status-row">
+                                    <span>Paye:</span>
+                                    <span>{{ form.instance.amount_paid|floatformat:2 }} DH</span>
+                                </div>
+                                <div class="status-row">
+                                    <span>Du:</span>
+                                    <span class="text-primary font-semibold">{{ form.instance.balance_due|floatformat:2 }} DH</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
         </div>
-    </div><!-- End invoice-form-container -->
+    </form>
 
     <!-- Modal: Quick Add Client -->
-    <style>
-        /* Modal Styling - Refined Minimalist */
-        .modal-header {
-            border-bottom: 1px solid var(--color-neutral-medium);
-            background: transparent;
-        }
-
-        .modal-title {
-            font-family: var(--font-serif);
-            font-size: var(--text-xl);
-            color: var(--color-neutral-black);
-            font-weight: var(--weight-normal);
-        }
-
-        .modal-body {
-            padding: var(--space-6);
-        }
-
-        .modal-footer {
-            border-top: 1px solid var(--color-neutral-medium);
-            background: transparent;
-        }
-
-        .modal-form-group {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-2);
-            margin-bottom: var(--space-4);
-        }
-
-        .modal-form-group:last-child {
-            margin-bottom: 0;
-        }
-
-        .modal-form-group label {
-            font-size: var(--text-sm);
-            font-weight: var(--weight-semibold);
-            color: var(--color-neutral-dark);
-        }
-
-        .modal-form-group input {
-            padding: var(--space-3) var(--space-4);
-            border: 1px solid var(--color-neutral-medium);
-            border-radius: var(--radius-md);
-            font-size: var(--text-base);
-            color: var(--color-neutral-dark);
-            background: white;
-            transition: all var(--transition-fast);
-        }
-
-        .modal-form-group input:focus {
-            outline: none;
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
-        }
-
-        .modal-btn {
-            padding: var(--space-3) var(--space-4);
-            border: none;
-            border-radius: var(--radius-md);
-            font-weight: var(--weight-semibold);
-            font-size: var(--text-sm);
-            text-transform: uppercase;
-            letter-spacing: var(--tracking-wide);
-            cursor: pointer;
-            transition: all var(--transition-fast);
-            min-height: 2.5rem;
-        }
-
-        .modal-btn-primary {
-            background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
-            color: white;
-        }
-
-        .modal-btn-primary:hover {
-            background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
-            box-shadow: var(--shadow-hover);
-        }
-
-        .modal-btn-secondary {
-            background: var(--color-neutral-light);
-            color: var(--color-neutral-dark);
-            border: 1px solid var(--color-neutral-medium);
-        }
-
-        .modal-btn-secondary:hover {
-            background: var(--color-neutral-medium);
-        }
-    </style>
-
     <div class="modal fade" id="addClientModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -1005,35 +365,431 @@
                 <div class="modal-body">
                     <form id="quickAddClientForm">
                         {% csrf_token %}
-                        <div class="modal-form-group">
-                            <label for="first_name">Prénom</label>
-                            <input type="text" id="first_name" name="first_name" required>
+                        <div class="form-group mb-4">
+                            <label class="form-label" for="first_name">Prenom</label>
+                            <input type="text" id="first_name" name="first_name" class="form-input" required>
                         </div>
-                        <div class="modal-form-group">
-                            <label for="last_name">Nom</label>
-                            <input type="text" id="last_name" name="last_name" required>
+                        <div class="form-group mb-4">
+                            <label class="form-label" for="last_name">Nom</label>
+                            <input type="text" id="last_name" name="last_name" class="form-input" required>
                         </div>
-                        <div class="modal-form-group">
-                            <label for="phone">Téléphone</label>
-                            <input type="tel" id="phone" name="phone" required>
+                        <div class="form-group mb-4">
+                            <label class="form-label" for="phone">Telephone</label>
+                            <input type="tel" id="phone" name="phone" class="form-input" required>
                         </div>
-                        <div class="modal-form-group">
-                            <label for="email">Email</label>
-                            <input type="email" id="email" name="email">
+                        <div class="form-group mb-4">
+                            <label class="form-label" for="email">Email</label>
+                            <input type="email" id="email" name="email" class="form-input">
                         </div>
-                        <div class="modal-form-group">
-                            <label for="city">Ville</label>
-                            <input type="text" id="city" name="city">
+                        <div class="form-group">
+                            <label class="form-label" for="city">Ville</label>
+                            <input type="text" id="city" name="city" class="form-input">
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="modal-btn modal-btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="button" class="modal-btn modal-btn-primary" id="saveClientBtn">Ajouter Client</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" id="saveClientBtn">Ajouter Client</button>
                 </div>
             </div>
         </div>
     </div>
+
+    <style>
+        /* Invoice Form Layout */
+        .invoice-form {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .invoice-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: var(--space-6);
+        }
+
+        @media (max-width: 1024px) {
+            .invoice-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .invoice-sidebar {
+                order: -1;
+            }
+        }
+
+        /* Form Elements */
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        @media (max-width: 640px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .form-label {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-700);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-input,
+        .form-select {
+            padding: var(--space-3) var(--space-4);
+            border: 1px solid var(--neutral-300);
+            border-radius: var(--radius-md);
+            font-size: var(--text-base);
+            color: var(--neutral-800);
+            background: white;
+            transition: all var(--transition-fast);
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary-400);
+            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
+        }
+
+        .form-hint {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            margin: 0;
+        }
+
+        .form-error {
+            font-size: var(--text-sm);
+            color: var(--error-500);
+            margin: 0;
+        }
+
+        .info-hint {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        /* Items Container */
+        .items-container {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
+
+        .item-card {
+            background: var(--neutral-50);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+        }
+
+        .item-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: var(--space-3);
+        }
+
+        .item-card-title {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .item-card-subtitle {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .item-card-summary {
+            background: white;
+            padding: var(--space-3);
+            border-radius: var(--radius-md);
+            font-size: var(--text-sm);
+        }
+
+        .item-summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: var(--space-1);
+        }
+
+        .item-summary-row:last-child {
+            margin-bottom: 0;
+            padding-top: var(--space-2);
+            border-top: 1px solid var(--neutral-200);
+            font-weight: var(--font-semibold);
+        }
+
+        /* Add Item Form */
+        .add-item-form {
+            background: var(--neutral-50);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+        }
+
+        .add-item-form h4 {
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        /* Price comparison display */
+        .price-comparison {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            background: var(--warning-50);
+            border: 1px solid var(--warning-200);
+            border-radius: var(--radius-md);
+            font-size: var(--text-sm);
+        }
+
+        .original-price-label {
+            color: var(--neutral-600);
+        }
+
+        .original-price-value {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+            text-decoration: line-through;
+        }
+
+        .discount-badge {
+            background: var(--success-500);
+            color: white;
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-sm);
+            font-weight: var(--font-semibold);
+            font-size: var(--text-xs);
+        }
+
+        .calculation-box {
+            background: white;
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--neutral-200);
+            margin: var(--space-4) 0;
+        }
+
+        .calc-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: var(--text-sm);
+            margin-bottom: var(--space-2);
+        }
+
+        .calc-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .calc-total {
+            padding-top: var(--space-2);
+            border-top: 1px solid var(--neutral-200);
+            font-weight: var(--font-semibold);
+        }
+
+        .calc-value {
+            font-weight: var(--font-medium);
+        }
+
+        .item-actions {
+            display: flex;
+            gap: var(--space-3);
+        }
+
+        /* Empty State */
+        .empty-state {
+            background: var(--neutral-50);
+            border: 1px dashed var(--neutral-300);
+            border-radius: var(--radius-md);
+            padding: var(--space-8);
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            font-size: 2.5rem;
+            color: var(--neutral-400);
+            margin-bottom: var(--space-3);
+        }
+
+        .empty-state p {
+            color: var(--neutral-500);
+            font-size: var(--text-sm);
+            margin: 0;
+        }
+
+        /* Form Actions */
+        .form-actions {
+            display: flex;
+            gap: var(--space-4);
+        }
+
+        @media (max-width: 640px) {
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .form-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Sidebar */
+        .invoice-sidebar {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .reference-box {
+            background: var(--neutral-50);
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            text-align: center;
+        }
+
+        .reference-label {
+            display: block;
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--space-2);
+        }
+
+        .reference-value {
+            display: block;
+            font-size: var(--text-xl);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .reference-date {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            text-align: center;
+            margin-top: var(--space-3);
+        }
+
+        /* Help Card */
+        .help-card {
+            background: var(--success-50);
+            border: 1px solid var(--success-200);
+        }
+
+        .help-card .card-body {
+            padding: var(--space-4);
+        }
+
+        .help-title {
+            font-size: var(--text-base);
+            font-weight: var(--font-semibold);
+            color: var(--success-700);
+            margin-bottom: var(--space-3);
+        }
+
+        .help-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .help-list li {
+            font-size: var(--text-sm);
+            color: var(--success-700);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        /* Summary */
+        .summary-row {
+            background: var(--neutral-50);
+            padding: var(--space-3);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-3);
+        }
+
+        .summary-label {
+            display: block;
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+            margin-bottom: var(--space-1);
+        }
+
+        .summary-value {
+            display: block;
+            font-size: var(--text-2xl);
+            font-weight: var(--font-semibold);
+            color: var(--primary-500);
+        }
+
+        .summary-status {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding-top: var(--space-3);
+            border-top: 1px solid var(--neutral-200);
+        }
+
+        /* Status Grid */
+        .status-grid {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: var(--text-sm);
+        }
+
+        /* Utility Classes */
+        .mt-4 { margin-top: var(--space-4); }
+        .mb-4 { margin-bottom: var(--space-4); }
+        .mr-2 { margin-right: var(--space-2); }
+        .text-primary { color: var(--primary-500); }
+        .text-success { color: var(--success-500); }
+        .text-error { color: var(--error-500); }
+        .font-semibold { font-weight: var(--font-semibold); }
+
+        /* Mobile Sidebar */
+        @media (max-width: 1024px) {
+            .invoice-sidebar {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: var(--space-4);
+            }
+
+            .invoice-sidebar .card {
+                margin-bottom: 0 !important;
+            }
+        }
+    </style>
 
     <script>
         let invoiceItems = [];
@@ -1070,7 +826,7 @@
                             const modal = bootstrap.Modal.getInstance(modalEl);
                             if (modal) modal.hide();
                             form.reset();
-                            alert('Client ajouté avec succès!');
+                            alert('Client ajoute avec succes!');
                         } else {
                             alert('Erreur: ' + (data.error || 'Erreur inconnue'));
                         }
@@ -1088,80 +844,55 @@
             const bankAccountSection = document.getElementById('bankAccountSection');
 
             function updatePaymentFieldsVisibility() {
-                if (!paymentRefSection || !bankAccountSection) {
-                    console.warn('⚠ Payment or bank account sections not found in DOM');
-                    return;
-                }
+                if (!paymentRefSection || !bankAccountSection) return;
 
                 if (!paymentMethodSelect || !paymentMethodSelect.value) {
-                    paymentRefSection.classList.add('hidden');
                     paymentRefSection.style.display = 'none';
-                    bankAccountSection.classList.add('hidden');
                     bankAccountSection.style.display = 'none';
                     return;
                 }
 
-                // Get the selected option's text
                 const selectedText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex].text;
                 const selectedTextLower = selectedText.toLowerCase();
-
-                // Define payment methods that DO NOT require reference (only Espèces)
-                const noReferenceNeeded = ['Espèces', 'espece', 'cash'];
-
-                // Show reference field for everything EXCEPT cash/espèces
-                const showReference = !noReferenceNeeded.some(text =>
-                    selectedTextLower.includes(text.toLowerCase())
-                );
-
-                // Show bank account field ONLY for Virement Bancaire
+                const noReferenceNeeded = ['especes', 'espece', 'cash'];
+                const showReference = !noReferenceNeeded.some(text => selectedTextLower.includes(text.toLowerCase()));
                 const isBankTransfer = selectedTextLower.includes('virement');
 
-                // Update payment reference visibility
-                if (showReference) {
-                    paymentRefSection.classList.remove('hidden');
-                    paymentRefSection.style.display = 'block';
-                } else {
-                    paymentRefSection.classList.add('hidden');
-                    paymentRefSection.style.display = 'none';
-                }
-
-                // Update bank account visibility
-                if (isBankTransfer) {
-                    bankAccountSection.classList.remove('hidden');
-                    bankAccountSection.style.display = 'block';
-                } else {
-                    bankAccountSection.classList.add('hidden');
-                    bankAccountSection.style.display = 'none';
-                }
+                paymentRefSection.style.display = showReference ? 'flex' : 'none';
+                bankAccountSection.style.display = isBankTransfer ? 'flex' : 'none';
             }
 
             if (paymentMethodSelect) {
                 paymentMethodSelect.addEventListener('change', updatePaymentFieldsVisibility);
-                // Check on page load
                 setTimeout(updatePaymentFieldsVisibility, 100);
-            } else {
-                console.warn('⚠ Payment method select not found');
             }
 
             // ============ HELPER FUNCTIONS ============
+            // Track current catalog price globally for calculations
+            let globalCatalogPrice = 0;
+
             function updateEstimatedTotal() {
                 const quantityInput = document.getElementById('quantity');
                 const unitPriceInput = document.getElementById('unit_price');
-                const discountInput = document.getElementById('discount_amount');
-                const estimatedTotalSpan = document.getElementById('estimated_total');
 
-                if (!quantityInput || !unitPriceInput || !discountInput) return;
+                if (!quantityInput || !unitPriceInput) return;
 
                 const qty = parseFloat(quantityInput.value) || 0;
-                const price = parseFloat(unitPriceInput.value) || 0;
-                const discount = parseFloat(discountInput.value) || 0;
-                const subtotal = qty * price;
-                const total = Math.max(0, subtotal - discount);
+                const enteredPrice = parseFloat(unitPriceInput.value) || 0;
+                const catalogPrice = globalCatalogPrice || enteredPrice;
+
+                // Calculate discount as difference between catalog and entered price
+                const priceDiscount = Math.max(0, catalogPrice - enteredPrice);
+                const totalDiscount = priceDiscount * qty;
+                const subtotal = catalogPrice * qty;  // Original price * quantity
+                const total = enteredPrice * qty;  // Final price after discount
 
                 const subtotalEl = document.getElementById('subtotal_display');
                 const discountEl = document.getElementById('discount_display');
+                const estimatedTotalSpan = document.getElementById('estimated_total');
+
                 if (subtotalEl) subtotalEl.textContent = subtotal.toFixed(2);
-                if (discountEl) discountEl.textContent = discount.toFixed(2);
+                if (discountEl) discountEl.textContent = totalDiscount.toFixed(2);
                 if (estimatedTotalSpan) estimatedTotalSpan.textContent = total.toFixed(2) + ' DH';
             }
 
@@ -1169,66 +900,75 @@
                 const productSelect = document.getElementById('product_id');
                 const quantityInput = document.getElementById('quantity');
                 const unitPriceInput = document.getElementById('unit_price');
-                const discountInput = document.getElementById('discount_amount');
-                const estimatedTotalSpan = document.getElementById('estimated_total');
 
                 if (productSelect) productSelect.value = '';
                 if (quantityInput) quantityInput.value = '1';
                 if (unitPriceInput) unitPriceInput.value = '';
-                if (discountInput) discountInput.value = '0';
-                if (estimatedTotalSpan) estimatedTotalSpan.textContent = '0.00 DH';
+
+                // Reset global catalog price
+                globalCatalogPrice = 0;
+
+                // Hide price info and discount badge
+                const priceInfo = document.getElementById('originalPriceInfo');
+                const discountBadge = document.getElementById('discountBadge');
+                if (priceInfo) priceInfo.style.display = 'none';
+                if (discountBadge) discountBadge.style.display = 'none';
 
                 const subtotalEl = document.getElementById('subtotal_display');
                 const discountEl = document.getElementById('discount_display');
+                const estimatedTotalSpan = document.getElementById('estimated_total');
+
                 if (subtotalEl) subtotalEl.textContent = '0.00';
                 if (discountEl) discountEl.textContent = '0.00';
+                if (estimatedTotalSpan) estimatedTotalSpan.textContent = '0.00 DH';
             }
 
             function renderItems() {
                 const container = document.getElementById('itemsContainer');
                 const emptyState = document.getElementById('emptyState');
 
-                if (!container || !emptyState) {
-                    console.warn('⚠ Items container or empty state not found');
-                    return;
-                }
+                if (!container || !emptyState) return;
 
                 if (invoiceItems.length === 0) {
                     container.innerHTML = '';
-                    emptyState.classList.remove('hidden');
+                    emptyState.style.display = 'block';
                     return;
                 }
 
-                emptyState.classList.add('hidden');
-                container.innerHTML = invoiceItems.map((item, index) => `
-                    <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="flex-1">
-                                <p class="font-bold text-gray-900">${item.product_name}</p>
-                                <p class="text-sm text-gray-600">Qty: ${item.quantity} × ${item.unit_price.toFixed(2)} DH</p>
+                emptyState.style.display = 'none';
+                container.innerHTML = invoiceItems.map((item, index) => {
+                    const originalPrice = item.original_price || item.unit_price;
+                    const hasDiscount = item.discount_amount > 0;
+                    const originalSubtotal = originalPrice * item.quantity;
+
+                    return `
+                    <div class="item-card">
+                        <div class="item-card-header">
+                            <div>
+                                <p class="item-card-title">${item.product_name}</p>
+                                <p class="item-card-subtitle">Qty: ${item.quantity} x ${item.unit_price.toFixed(2)} DH${hasDiscount ? ` <span style="text-decoration: line-through; color: var(--neutral-400);">(${originalPrice.toFixed(2)} DH)</span>` : ''}</p>
                             </div>
-                            <button type="button" class="text-red-600 hover:text-red-800 text-sm ml-2" onclick="window.removeItem(${index})">
-                                <i class="fas fa-trash mr-1"></i> Supprimer
+                            <button type="button" class="btn btn-error btn-sm" onclick="window.removeItem(${index})">
+                                <i class="fas fa-trash"></i>
                             </button>
                         </div>
-                        <div class="bg-gray-50 p-2 rounded text-sm">
-                            <div class="flex justify-between">
-                                <span>Sous-total:</span>
-                                <span>${(item.quantity * item.unit_price).toFixed(2)} DH</span>
-                            </div>
-                            ${item.discount_amount > 0 ? `<div class="flex justify-between text-red-600">
+                        <div class="item-card-summary">
+                            ${hasDiscount ? `<div class="item-summary-row">
+                                <span>Prix catalogue:</span>
+                                <span style="text-decoration: line-through; color: var(--neutral-400);">${originalSubtotal.toFixed(2)} DH</span>
+                            </div>` : ''}
+                            ${hasDiscount ? `<div class="item-summary-row text-error">
                                 <span>Remise:</span>
                                 <span>-${item.discount_amount.toFixed(2)} DH</span>
                             </div>` : ''}
-                            <div class="flex justify-between font-bold border-t pt-1 mt-1">
+                            <div class="item-summary-row">
                                 <span>Total:</span>
-                                <span class="text-green-600">${item.total_amount.toFixed(2)} DH</span>
+                                <span class="text-success font-semibold">${item.total_amount.toFixed(2)} DH</span>
                             </div>
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
 
-                // Update invoice totals in sidebar
                 updateInvoiceSummary();
             }
 
@@ -1239,36 +979,31 @@
                 const balanceDueDisplay = document.getElementById('balanceDue');
                 const paymentStatusDisplay = document.getElementById('paymentStatus');
 
-                if (!invoiceTotalDisplay || !balanceDueDisplay || !amountPaidInput) {
-                    return;
-                }
+                if (!invoiceTotalDisplay || !balanceDueDisplay || !amountPaidInput) return;
 
-                // Update total display
                 invoiceTotalDisplay.textContent = invoiceTotal.toFixed(2) + ' DH';
 
-                // Calculate balance
                 const amountPaid = parseFloat(amountPaidInput.value) || 0;
                 const balance = invoiceTotal - amountPaid;
 
-                // Update balance display with color
                 balanceDueDisplay.textContent = balance.toFixed(2) + ' DH';
+
                 if (balance <= 0) {
-                    balanceDueDisplay.className = 'text-2xl font-bold text-green-600';
+                    balanceDueDisplay.style.color = 'var(--success-500)';
                 } else if (balance < invoiceTotal && amountPaid > 0) {
-                    balanceDueDisplay.className = 'text-2xl font-bold text-orange-600';
+                    balanceDueDisplay.style.color = 'var(--warning-500)';
                 } else {
-                    balanceDueDisplay.className = 'text-2xl font-bold text-red-600';
+                    balanceDueDisplay.style.color = 'var(--error-500)';
                 }
 
-                // Update payment status
                 if (invoiceTotal === 0) {
                     paymentStatusDisplay.textContent = 'Ajoutez les articles pour voir le total';
                 } else if (balance <= 0) {
-                    paymentStatusDisplay.textContent = '✓ Facture payée en intégralité';
+                    paymentStatusDisplay.textContent = 'Facture payee en integralite';
                 } else if (amountPaid > 0) {
-                    paymentStatusDisplay.textContent = '⚠ Paiement partiel - ' + balance.toFixed(2) + ' DH restants';
+                    paymentStatusDisplay.textContent = 'Paiement partiel - ' + balance.toFixed(2) + ' DH restants';
                 } else {
-                    paymentStatusDisplay.textContent = '• Facture non payée - Cliquez sur "Créer" pour l\'enregistrer';
+                    paymentStatusDisplay.textContent = 'Facture non payee';
                 }
             }
 
@@ -1288,56 +1023,85 @@
             const discountInput = document.getElementById('discount_amount');
 
             if (addItemBtn) {
-                console.log('✓ Article management elements found');
-
-                // Show/hide add item form
                 addItemBtn.addEventListener('click', function() {
-                    console.log('✓ Add item button clicked');
                     if (addItemSection) {
-                        addItemSection.classList.remove('hidden');
+                        addItemSection.style.display = 'block';
                         if (productSelect) productSelect.focus();
                     }
                 });
 
                 if (cancelItemBtn) {
                     cancelItemBtn.addEventListener('click', function() {
-                        console.log('✓ Cancel item button clicked');
-                        if (addItemSection) addItemSection.classList.add('hidden');
+                        if (addItemSection) addItemSection.style.display = 'none';
                         resetItemForm();
                     });
                 }
 
-                // Auto-fill price when product selected
                 if (productSelect) {
                     productSelect.addEventListener('change', function() {
                         if (this.value) {
                             const option = this.options[this.selectedIndex];
                             const price = parseFloat(option.dataset.price) || 0;
+                            globalCatalogPrice = price;  // Update global variable
+
                             if (unitPriceInput) unitPriceInput.value = price.toFixed(2);
+
+                            // Show original price info
+                            const priceInfo = document.getElementById('originalPriceInfo');
+                            const catalogPriceEl = document.getElementById('catalogPrice');
+                            if (priceInfo && catalogPriceEl) {
+                                catalogPriceEl.textContent = price.toFixed(2) + ' DH';
+                                priceInfo.style.display = 'block';
+                            }
+
                             updateEstimatedTotal();
+                        } else {
+                            globalCatalogPrice = 0;
+                            const priceInfo = document.getElementById('originalPriceInfo');
+                            if (priceInfo) priceInfo.style.display = 'none';
                         }
                     });
                 }
 
-                // Update total on input change
-                [quantityInput, unitPriceInput, discountInput].forEach(input => {
+                // Update discount badge when price changes
+                function updateDiscountBadge() {
+                    const enteredPrice = parseFloat(unitPriceInput?.value) || 0;
+                    const discountBadge = document.getElementById('discountBadge');
+                    const discountPercent = document.getElementById('discountPercent');
+
+                    if (discountBadge && discountPercent && globalCatalogPrice > 0) {
+                        const priceDiff = globalCatalogPrice - enteredPrice;
+                        if (priceDiff > 0) {
+                            const percent = Math.round((priceDiff / currentCatalogPrice) * 100);
+                            discountPercent.textContent = percent;
+                            discountBadge.style.display = 'inline';
+                        } else {
+                            discountBadge.style.display = 'none';
+                        }
+                    }
+                }
+
+                [quantityInput, unitPriceInput].forEach(input => {
                     if (input) {
-                        input.addEventListener('change', updateEstimatedTotal);
-                        input.addEventListener('keyup', updateEstimatedTotal);
+                        input.addEventListener('change', function() {
+                            updateEstimatedTotal();
+                            updateDiscountBadge();
+                        });
+                        input.addEventListener('keyup', function() {
+                            updateEstimatedTotal();
+                            updateDiscountBadge();
+                        });
                     }
                 });
 
-                // Add item to list
                 if (confirmItemBtn) {
                     confirmItemBtn.addEventListener('click', function() {
-                        console.log('✓ Confirm item button clicked');
-
                         if (!productSelect || !productSelect.value) {
-                            alert('Sélectionnez un produit');
+                            alert('Selectionnez un produit');
                             return;
                         }
                         if (!quantityInput || !quantityInput.value || parseFloat(quantityInput.value) <= 0) {
-                            alert('Entrez une quantité valide');
+                            alert('Entrez une quantite valide');
                             return;
                         }
                         if (!unitPriceInput || !unitPriceInput.value || parseFloat(unitPriceInput.value) < 0) {
@@ -1347,30 +1111,34 @@
 
                         const productOption = productSelect.options[productSelect.selectedIndex];
                         const qty = parseFloat(quantityInput.value);
-                        const price = parseFloat(unitPriceInput.value);
-                        const discount = parseFloat(discountInput.value) || 0;
-                        const subtotal = qty * price;
-                        const total = Math.max(0, subtotal - discount);
+                        const enteredPrice = parseFloat(unitPriceInput.value);
+                        const catalogPrice = globalCatalogPrice || enteredPrice;
+
+                        // Calculate discount as difference between catalog and entered price
+                        const priceDiscount = Math.max(0, catalogPrice - enteredPrice);
+                        const subtotal = qty * enteredPrice;
+                        const total = subtotal;
 
                         const item = {
                             id: Date.now(),
                             product_id: productSelect.value,
                             product_name: productOption.text,
                             quantity: qty,
-                            unit_price: price,
-                            discount_amount: discount,
+                            unit_price: enteredPrice,
+                            original_price: catalogPrice,  // Include catalog price
+                            discount_amount: priceDiscount * qty,  // Total discount for this item
                             total_amount: total
                         };
 
-                        console.log('✓ Item added:', item.product_name, 'Qty:', qty);
                         invoiceItems.push(item);
                         renderItems();
                         resetItemForm();
-                        if (addItemSection) addItemSection.classList.add('hidden');
+                        globalCatalogPrice = 0;
+                        const priceInfo = document.getElementById('originalPriceInfo');
+                        if (priceInfo) priceInfo.style.display = 'none';
+                        if (addItemSection) addItemSection.style.display = 'none';
                     });
                 }
-            } else {
-                console.warn('⚠ Article management elements not found');
             }
 
             // ============ PAYMENT AMOUNT INPUT ============
@@ -1382,24 +1150,11 @@
 
             // Add items to form before submit
             const mainForm = document.querySelector('form[method="post"]');
-
-            if (!mainForm) {
-                console.error('✗ CRITICAL ERROR: Form element not found!');
-            } else {
-                console.log('✓ Main form found:', mainForm.action);
-
-                // Add items before form submission
-                // This needs to happen BEFORE the form tries to validate
+            if (mainForm) {
                 const submitBtn = mainForm.querySelector('button[type="submit"]');
                 if (submitBtn) {
                     submitBtn.addEventListener('click', function(e) {
-                        console.log('✓ Submit button clicked');
-
-                        // Add items as hidden inputs BEFORE submit
                         if (invoiceItems.length > 0) {
-                            console.log('✓ Adding', invoiceItems.length, 'items to form');
-
-                            // Remove any existing item inputs first
                             mainForm.querySelectorAll('input[name^="items["]').forEach(el => el.remove());
 
                             invoiceItems.forEach((item, index) => {
@@ -1408,22 +1163,11 @@
                                 input.name = `items[${index}]`;
                                 input.value = JSON.stringify(item);
                                 mainForm.appendChild(input);
-                                console.log(`  ✓ Item ${index} added:`, item.product_id);
                             });
-
-                            console.log('✓ Items added, now submitting form');
                         }
-
-                        // Now submit the form
-                        console.log('✓ Submitting form to:', mainForm.action);
                         mainForm.submit();
-                        console.log('✓ Form.submit() called');
                     });
-
-                    console.log('✓ Submit button listener attached');
                 }
-
-                console.log('✓ Submit handler ready');
             }
         });
     </script>
