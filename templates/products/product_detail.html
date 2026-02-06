@@ -621,115 +621,36 @@
         }
     </style>
 
-    <!-- Print Modal -->
-    <div id="printModal" class="modal" style="display: none;">
-        <div class="modal-backdrop" onclick="closePrintModal()"></div>
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-print mr-2"></i> Imprimer Etiquette</h3>
-                <button type="button" class="modal-close" onclick="closePrintModal()">&times;</button>
+    <!-- Print Modal - Using inline styles to avoid conflicts -->
+    <div id="printModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 99999; align-items: center; justify-content: center;">
+        <div onclick="closePrintModal()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);"></div>
+        <div style="position: relative; background: white; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 100000;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid #e5e7eb;">
+                <h3 style="margin: 0; font-size: 18px;"><i class="fas fa-print" style="margin-right: 8px;"></i> Imprimer Etiquette</h3>
+                <button type="button" onclick="closePrintModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
             </div>
             <form id="printForm" method="POST" action="{% url 'products:print_label' product.reference %}">
                 {% csrf_token %}
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>Type d'etiquette</label>
-                        <select name="label_type" class="form-control">
+                <div style="padding: 16px;">
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Type d'etiquette</label>
+                        <select name="label_type" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px;">
                             <option value="product">Etiquette produit (complete)</option>
                             <option value="price">Etiquette prix (simple)</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>Quantite</label>
-                        <input type="number" name="quantity" value="1" min="1" max="10" class="form-control">
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Quantite</label>
+                        <input type="number" name="quantity" value="1" min="1" max="10" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px;">
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closePrintModal()">Annuler</button>
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-print"></i> Imprimer
-                    </button>
+                <div style="display: flex; justify-content: flex-end; gap: 12px; padding: 16px; border-top: 1px solid #e5e7eb;">
+                    <button type="button" onclick="closePrintModal()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">ANNULER</button>
+                    <button type="submit" style="padding: 10px 20px; background: #22c55e; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;"><i class="fas fa-print" style="margin-right: 6px;"></i> IMPRIMER</button>
                 </div>
             </form>
         </div>
     </div>
-
-    <style>
-        #printModal.modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 9999 !important;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: auto !important;
-        }
-        #printModal .modal-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 9999 !important;
-        }
-        #printModal .modal-content {
-            position: relative;
-            background: white;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            z-index: 10000 !important;
-            pointer-events: auto !important;
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: var(--space-4);
-            border-bottom: 1px solid var(--neutral-200);
-        }
-        .modal-header h3 {
-            margin: 0;
-            font-size: var(--text-lg);
-        }
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: var(--neutral-500);
-        }
-        .modal-body {
-            padding: var(--space-4);
-        }
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: var(--space-3);
-            padding: var(--space-4);
-            border-top: 1px solid var(--neutral-200);
-        }
-        .form-group {
-            margin-bottom: var(--space-4);
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: var(--space-2);
-            font-weight: var(--font-medium);
-        }
-        .form-control {
-            width: 100%;
-            padding: var(--space-3);
-            border: 1px solid var(--neutral-300);
-            border-radius: var(--radius-md);
-            font-size: var(--text-base);
-        }
-    </style>
 
     <script>
         function printLabel() {
