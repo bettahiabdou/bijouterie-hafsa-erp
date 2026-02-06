@@ -71,9 +71,28 @@ def generate_product_reference(product_type='FIN'):
             - 'CMP' for Components
     """
     from products.models import Product
+    import re
+
     today = timezone.now().date()
-    count = Product.objects.filter(created_at__date=today).count() + 1
-    return f'PRD-{product_type}-{today.strftime("%Y%m%d")}-{count:04d}'
+    date_str = today.strftime("%Y%m%d")
+
+    # Find the highest existing reference number for today
+    # Look for references containing today's date and extract the sequence number
+    today_products = Product.objects.filter(
+        reference__contains=date_str
+    )
+
+    max_num = 0
+    for product in today_products:
+        # Extract the last 4-digit sequence number from the reference
+        match = re.search(r'-(\d{4})$', product.reference)
+        if match:
+            num = int(match.group(1))
+            if num > max_num:
+                max_num = num
+
+    next_num = max_num + 1
+    return f'PRD-{product_type}-{date_str}-{next_num:04d}'
 
 
 def generate_bank_account_code():
