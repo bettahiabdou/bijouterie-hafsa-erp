@@ -363,6 +363,10 @@
                         <a href="{% url 'sales:bulk_create' %}" class="nav-link">
                             <span class="nav-text">Facturation en Lot</span>
                         </a>
+                        <a href="{% url 'sales:pending_invoices' %}" class="nav-link {% if 'pending' in request.path and 'sales' in request.path %}active{% endif %}">
+                            <i class="fas fa-clock text-warning" style="margin-right: 6px;"></i>
+                            <span class="nav-text">En Attente (Telegram)</span>
+                        </a>
                         <a href="{% url 'sales:invoice_list' %}" class="nav-link {% if 'list' in request.path and 'sales' in request.path %}active{% endif %}">
                             <span class="nav-text">Historique</span>
                         </a>
