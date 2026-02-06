@@ -29,6 +29,39 @@
 {% block content %}
     <!-- System Status Overview -->
     <div class="status-grid mb-8 animate-stagger">
+        <!-- Storage Status -->
+        <div class="card status-card">
+            <div class="card-body">
+                <div class="status-card-header">
+                    <h3 class="status-card-title">Stockage Serveur</h3>
+                    <div class="status-icon {% if disk_percent > 85 %}error{% elif disk_percent > 70 %}warning{% else %}success{% endif %}">
+                        <i class="fas fa-hdd"></i>
+                    </div>
+                </div>
+                <div class="status-details">
+                    <div class="status-row">
+                        <span class="status-label">Espace Total</span>
+                        <span class="status-value">{{ disk_total_gb }} GB</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Espace Utilise</span>
+                        <span class="status-value">{{ disk_used_gb }} GB</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Espace Libre</span>
+                        <span class="status-value {% if disk_free_gb < 5 %}text-error{% elif disk_free_gb < 10 %}text-warning{% else %}text-success{% endif %}">{{ disk_free_gb }} GB</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Utilisation</span>
+                        <div class="storage-progress">
+                            <div class="storage-bar {% if disk_percent > 85 %}error{% elif disk_percent > 70 %}warning{% else %}success{% endif %}" style="width: {{ disk_percent }}%;"></div>
+                        </div>
+                        <span class="status-value" style="margin-left: var(--space-2);">{{ disk_percent }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Database Status -->
         <div class="card status-card">
             <div class="card-body">
@@ -42,6 +75,14 @@
                     <div class="status-row">
                         <span class="status-label">Total Enregistrements</span>
                         <span class="status-value">{{ total_records }}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Taille Base de Donnees</span>
+                        <span class="status-value">{{ db_size_mb }} MB</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Fichiers Media</span>
+                        <span class="status-value">{{ media_size_mb }} MB</span>
                     </div>
                     <div class="status-row">
                         <span class="status-label">Statut</span>
@@ -184,8 +225,53 @@
         /* Status Grid */
         .status-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: var(--space-6);
+        }
+
+        /* Storage Progress Bar */
+        .storage-progress {
+            flex: 1;
+            height: 8px;
+            background: var(--neutral-200);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+        }
+
+        .storage-bar {
+            height: 100%;
+            border-radius: var(--radius-full);
+            transition: width 0.3s ease;
+        }
+
+        .storage-bar.success {
+            background: var(--success-500);
+        }
+
+        .storage-bar.warning {
+            background: var(--warning-500);
+        }
+
+        .storage-bar.error {
+            background: var(--error-500);
+        }
+
+        .status-icon.warning {
+            background: var(--warning-50);
+            color: var(--warning-600);
+        }
+
+        .status-icon.error {
+            background: var(--error-50);
+            color: var(--error-600);
+        }
+
+        .text-warning {
+            color: var(--warning-600);
+        }
+
+        .text-error {
+            color: var(--error-600);
         }
 
         .status-card-header {

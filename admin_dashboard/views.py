@@ -583,6 +583,43 @@ def activity_log_view(request):
 @staff_required
 def system_status(request):
     """System Status - Application health and diagnostics"""
+    import shutil
+    import os
+    from django.conf import settings as django_settings
+
+    # Get disk usage for the server
+    try:
+        disk_usage = shutil.disk_usage('/')
+        disk_total_gb = disk_usage.total / (1024 ** 3)
+        disk_used_gb = disk_usage.used / (1024 ** 3)
+        disk_free_gb = disk_usage.free / (1024 ** 3)
+        disk_percent = (disk_usage.used / disk_usage.total) * 100
+    except Exception:
+        disk_total_gb = disk_used_gb = disk_free_gb = disk_percent = 0
+
+    # Get media folder size
+    try:
+        media_root = getattr(django_settings, 'MEDIA_ROOT', '')
+        media_size = 0
+        if media_root and os.path.exists(media_root):
+            for dirpath, dirnames, filenames in os.walk(media_root):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    if os.path.exists(fp):
+                        media_size += os.path.getsize(fp)
+        media_size_mb = media_size / (1024 ** 2)
+    except Exception:
+        media_size_mb = 0
+
+    # Get database size (PostgreSQL)
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_database_size(current_database())")
+            db_size = cursor.fetchone()[0]
+            db_size_mb = db_size / (1024 ** 2)
+    except Exception:
+        db_size_mb = 0
 
     context = {
         'page_title': 'État du Système',
@@ -602,6 +639,14 @@ def system_status(request):
         'total_users': User.objects.count(),
         'active_users': User.objects.filter(is_active=True).count(),
         'admin_users': User.objects.filter(is_staff=True).count(),
+
+        # Storage stats
+        'disk_total_gb': round(disk_total_gb, 2),
+        'disk_used_gb': round(disk_used_gb, 2),
+        'disk_free_gb': round(disk_free_gb, 2),
+        'disk_percent': round(disk_percent, 1),
+        'media_size_mb': round(media_size_mb, 2),
+        'db_size_mb': round(db_size_mb, 2),
 
         # Recent errors
         'recent_errors': ActivityLog.objects.filter(
