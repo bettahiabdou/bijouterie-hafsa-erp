@@ -40,7 +40,9 @@ def generate_product_label_zpl(product, quantity=1):
     """
     name = product.name[:25] + "..." if len(product.name) > 25 else product.name
     reference = product.reference or ""
-    weight = f"{product.weight:.2f}" if product.weight else "N/A"
+    # Use net_weight (the actual product weight) or gross_weight as fallback
+    weight_value = product.net_weight or product.gross_weight
+    weight = f"{weight_value:.2f}" if weight_value else "N/A"
     price = f"{product.selling_price:.2f}" if product.selling_price else "0.00"
 
     # Use reference as barcode data
