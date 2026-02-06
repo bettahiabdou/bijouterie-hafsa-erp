@@ -274,31 +274,63 @@ class SaleInvoice(models.Model):
         return f"{self.reference} - {self.client.full_name} - {self.total_amount} MAD"
 
     def calculate_totals(self):
-        """Calculate totals from line items"""
-        subtotal = self.items.aggregate(
-            total=models.Sum('total_amount')
-        )['total'] or Decimal('0')
+        """Calculate totals from line items
 
-        self.subtotal = subtotal
+        Subtotal = Sum of original prices (before negotiation)
+        Discount = Sum of item-level discounts (original - negotiated) + any invoice-level discount
+        Total = Subtotal - Discount (equals sum of negotiated prices) + tax + delivery - old gold
+        """
+        # Force refresh from database to get latest items (avoid cache issues)
+        # Use a fresh queryset by accessing the related manager directly
+        items = SaleInvoiceItem.objects.filter(invoice=self)
 
-        # Calculate discount
-        if self.discount_percent > 0:
-            self.discount_amount = subtotal * (self.discount_percent / 100)
+        # Calculate subtotal from ORIGINAL prices (before any negotiation)
+        original_subtotal = Decimal('0')
+        negotiated_total = Decimal('0')
+        item_discount_total = Decimal('0')
 
-        # FIXED: Calculate tax on subtotal after discount
-        after_discount = subtotal - self.discount_amount
-        if self.tax_rate > 0:
-            self.tax_amount = after_discount * (self.tax_rate / 100)
+        for item in items:
+            # Ensure all values are Decimal to avoid type errors
+            original_price = Decimal(str(item.original_price or item.unit_price or 0))
+            negotiated_price = Decimal(str(item.negotiated_price or item.unit_price or 0))
+            qty = Decimal(str(item.quantity or 1))
+
+            original_subtotal += original_price * qty
+            negotiated_total += negotiated_price * qty
+            item_discount_total += (original_price - negotiated_price) * qty
+
+        # Subtotal = sum of original prices (what items would cost without negotiation)
+        self.subtotal = original_subtotal
+
+        # Calculate invoice-level discount (percentage discount on top of item discounts)
+        # Ensure all values are Decimal to avoid type errors
+        invoice_discount = Decimal('0')
+        discount_pct = Decimal(str(self.discount_percent or 0))
+        if discount_pct > 0:
+            invoice_discount = negotiated_total * (discount_pct / Decimal('100'))
+
+        # Total discount = item-level discounts + invoice-level discount
+        self.discount_amount = item_discount_total + invoice_discount
+
+        # Calculate tax on amount after all discounts
+        after_discount = negotiated_total - invoice_discount
+        tax_pct = Decimal(str(self.tax_rate or 0))
+        if tax_pct > 0:
+            self.tax_amount = after_discount * (tax_pct / Decimal('100'))
         else:
             self.tax_amount = Decimal('0')
 
-        # Calculate total with tax
+        # Calculate total: subtotal - discount - old gold + tax + delivery
+        # This equals: negotiated_total - invoice_discount - old_gold + tax + delivery
+        # Ensure all values are Decimal
+        old_gold = Decimal(str(self.old_gold_amount or 0))
+        delivery = Decimal(str(self.delivery_cost or 0))
         self.total_amount = (
-            subtotal -
+            self.subtotal -
             self.discount_amount -
-            self.old_gold_amount +
+            old_gold +
             self.tax_amount +
-            self.delivery_cost
+            delivery
         )
 
         # Update status (which will set correct balance_due: 0 if paid, remaining balance otherwise)
@@ -310,18 +342,27 @@ class SaleInvoice(models.Model):
 
     def update_status(self):
         """Update status based on payment"""
-        if self.amount_paid >= self.total_amount:
+        # Ensure all values are Decimal to avoid type errors
+        amount_paid = Decimal(str(self.amount_paid or 0))
+        total_amount = Decimal(str(self.total_amount or 0))
+
+        # Don't change DRAFT status - it should only change via explicit completion
+        if self.status == self.Status.DRAFT:
+            self.balance_due = total_amount
+            return
+
+        if amount_paid >= total_amount:
             self.status = self.Status.PAID
             # When fully paid, balance due is 0 (no outstanding balance)
             self.balance_due = Decimal('0')
-        elif self.amount_paid > 0:
+        elif amount_paid > 0:
             self.status = self.Status.PARTIAL_PAID
             # For partial payment, show remaining balance
-            self.balance_due = self.total_amount - self.amount_paid
+            self.balance_due = total_amount - amount_paid
         else:
             self.status = self.Status.UNPAID
             # For unpaid invoices, balance due equals total amount
-            self.balance_due = self.total_amount
+            self.balance_due = total_amount
 
     def update_payment(self, amount):
         """Update payment amount"""
@@ -481,12 +522,17 @@ class SaleInvoiceItem(models.Model):
         # Use negotiated price if set, otherwise original
         self.unit_price = self.negotiated_price or self.original_price
 
-        # FIXED: Calculate total with quantity
-        # NOTE: The unit_price is already the final selling price (after any discount)
-        # The discount_amount field is stored for informational/reference purposes
-        # and represents the difference from original_price to unit_price
-        # So we calculate total = unit_price * quantity (discount is already in unit_price)
-        self.total_amount = self.unit_price * self.quantity
+        # Ensure all values are Decimal to avoid type errors
+        original_price = Decimal(str(self.original_price or 0))
+        unit_price = Decimal(str(self.unit_price or 0))
+        qty = Decimal(str(self.quantity or 1))
+
+        # Calculate item-level discount (difference between original and negotiated price)
+        # This is the discount applied to this specific item
+        self.discount_amount = (original_price - unit_price) * qty
+
+        # Calculate total with quantity (using the negotiated/unit price)
+        self.total_amount = unit_price * qty
 
         super().save(*args, **kwargs)
 
@@ -756,3 +802,61 @@ class Layaway(models.Model):
         if self.agreed_price > 0:
             return (self.total_paid / self.agreed_price) * 100
         return 0
+
+
+class InvoicePhoto(models.Model):
+    """
+    Photos attached to invoices - used for draft invoices created via Telegram
+    Salespeople send photos of handwritten invoices, products, and payment receipts
+    """
+
+    class PhotoType(models.TextChoices):
+        PRODUCT = 'product', _('Photo produit')
+        INVOICE = 'invoice', _('Facture manuscrite')
+        PAYMENT = 'payment', _('Preuve de paiement')
+        OTHER = 'other', _('Autre')
+
+    invoice = models.ForeignKey(
+        SaleInvoice,
+        on_delete=models.CASCADE,
+        related_name='photos',
+        verbose_name=_('Facture')
+    )
+
+    image = models.ImageField(
+        _('Image'),
+        upload_to='invoice_photos/%Y/%m/%d/'
+    )
+
+    photo_type = models.CharField(
+        _('Type de photo'),
+        max_length=20,
+        choices=PhotoType.choices,
+        default=PhotoType.OTHER
+    )
+
+    # Telegram metadata
+    telegram_file_id = models.CharField(
+        _('Telegram File ID'),
+        max_length=255,
+        blank=True,
+        help_text=_('ID du fichier Telegram pour référence')
+    )
+
+    caption = models.TextField(
+        _('Légende'),
+        blank=True
+    )
+
+    uploaded_at = models.DateTimeField(
+        _('Téléchargé le'),
+        auto_now_add=True
+    )
+
+    class Meta:
+        verbose_name = _('Photo de facture')
+        verbose_name_plural = _('Photos de factures')
+        ordering = ['uploaded_at']
+
+    def __str__(self):
+        return f"Photo {self.id} - {self.invoice.reference}"

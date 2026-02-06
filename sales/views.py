@@ -390,13 +390,24 @@ def invoice_create(request):
                 for item_data in items_data:
                     try:
                         product = Product.objects.get(id=item_data['product_id'])
+
+                        # Get the entered price and calculate discount properly
+                        entered_price = Decimal(str(item_data['unit_price']))
+                        catalog_price = product.selling_price or entered_price
+                        manual_discount = Decimal(str(item_data.get('discount_amount', 0)))
+
+                        # If price was changed from catalog price, that's also a discount
+                        price_difference = catalog_price - entered_price
+                        total_discount = manual_discount + max(Decimal('0'), price_difference)
+
                         SaleInvoiceItem.objects.create(
                             invoice=invoice,
                             product=product,
                             quantity=Decimal(str(item_data['quantity'])),
-                            unit_price=Decimal(str(item_data['unit_price'])),
-                            original_price=Decimal(str(item_data['unit_price'])),
-                            discount_amount=Decimal(str(item_data['discount_amount'])),
+                            unit_price=entered_price,
+                            original_price=catalog_price,  # Product's catalog price
+                            negotiated_price=entered_price,  # The actual sale price
+                            discount_amount=total_discount,
                             total_amount=Decimal(str(item_data['total_amount']))
                         )
 
@@ -543,6 +554,47 @@ def bulk_invoice_create(request):
             bank_accounts = request.POST.getlist('bank_account')
             discount_amounts = request.POST.getlist('discount_amount')
 
+            # ============================================
+            # SERVER-SIDE VALIDATION
+            # ============================================
+
+            # Track products and references used in this batch
+            used_product_ids = []
+            used_payment_refs = []
+            validation_errors = []
+
+            for i, product_id_str in enumerate(product_ids):
+                if not product_id_str:
+                    continue
+
+                # Check for duplicate products in the same batch
+                if product_id_str in used_product_ids:
+                    validation_errors.append(f"Ligne {i + 1}: Produit déjà utilisé dans une autre ligne")
+                else:
+                    used_product_ids.append(product_id_str)
+
+                # Check for duplicate payment references in the same batch
+                payment_ref = payment_references[i].strip() if i < len(payment_references) else ''
+                if payment_ref:
+                    if payment_ref in used_payment_refs:
+                        validation_errors.append(f"Ligne {i + 1}: Référence de paiement '{payment_ref}' déjà utilisée dans une autre ligne")
+                    else:
+                        used_payment_refs.append(payment_ref)
+
+                    # Check if payment reference already exists in database
+                    if SaleInvoice.objects.filter(payment_reference__iexact=payment_ref).exists():
+                        validation_errors.append(f"Ligne {i + 1}: Référence de paiement '{payment_ref}' existe déjà dans la base de données")
+
+            # If there are validation errors, stop and show them
+            if validation_errors:
+                for error in validation_errors:
+                    messages.error(request, error)
+                return redirect('sales:bulk_create')
+
+            # ============================================
+            # END VALIDATION - START PROCESSING
+            # ============================================
+
             created_count = 0
             failed_rows = []
 
@@ -588,11 +640,18 @@ def bulk_invoice_create(request):
                         except (ValueError, InvalidOperation):
                             discount_amount = Decimal(0)
 
-                    # IMPORTANT: The selling_price is already the discounted price
-                    # The discount_amount represents the difference from original to selling price
-                    # So total = selling_price * quantity (no need to subtract discount again)
-                    subtotal = selling_price * quantity
-                    total_amount = subtotal  # selling_price is already the final price after discount
+                    # Calculate prices:
+                    # - subtotal = original price (before discount)
+                    # - total_amount = selling price (after discount/negotiation)
+                    # - discount_amount = difference between original and selling
+                    original_price = product.selling_price or Decimal('0')
+                    subtotal = original_price * quantity  # Original price
+                    total_amount = selling_price * quantity  # Negotiated/sale price
+                    calculated_discount = subtotal - total_amount  # Auto-calculated discount
+
+                    # Use calculated discount if no manual discount provided
+                    if discount_amount == 0 and calculated_discount > 0:
+                        discount_amount = calculated_discount
 
                     # Create invoice
                     invoice = SaleInvoice.objects.create(
@@ -608,14 +667,19 @@ def bulk_invoice_create(request):
                     )
 
                     # Add product item to invoice
-                    # The unit_price is the selling price (already includes any discount)
-                    # discount_amount field stores the actual discount for record-keeping
+                    # original_price = product's catalog price
+                    # negotiated_price = the price entered by user (selling_price)
+                    # unit_price will be set by SaleInvoiceItem.save() based on negotiated_price
+                    original_price = product.selling_price or Decimal('0')
+
                     SaleInvoiceItem.objects.create(
                         invoice=invoice,
                         product=product,
                         quantity=quantity,
+                        original_price=original_price,
+                        negotiated_price=selling_price,  # The actual sale price
                         unit_price=selling_price,
-                        discount_amount=discount_amount,  # Store for reference
+                        total_amount=selling_price * quantity,
                     )
 
                     # RESERVE PRODUCT: Mark as 'indisponible' when invoice is created
@@ -1173,3 +1237,365 @@ def get_payment_methods(request):
     return JsonResponse({
         'payment_methods': list(payment_methods)
     })
+
+
+# ============================================================================
+# PENDING INVOICES (BROUILLON) - Created via Telegram
+# ============================================================================
+
+@login_required(login_url='login')
+def pending_invoices_list(request):
+    """List all draft invoices pending data entry"""
+    # Get draft invoices with photos
+    invoices = SaleInvoice.objects.filter(
+        status=SaleInvoice.Status.DRAFT,
+        is_deleted=False
+    ).select_related('seller').prefetch_related('photos').order_by('-created_at')
+
+    # Filter by seller (for non-admin users, show only their own)
+    if not request.user.is_admin and not request.user.is_manager:
+        invoices = invoices.filter(seller=request.user)
+
+    # Search
+    search_query = request.GET.get('search', '')
+    if search_query:
+        invoices = invoices.filter(
+            Q(reference__icontains=search_query) |
+            Q(seller__username__icontains=search_query) |
+            Q(seller__first_name__icontains=search_query)
+        )
+
+    # Stats
+    stats = {
+        'total_pending': invoices.count(),
+        'today_pending': invoices.filter(date=timezone.now().date()).count(),
+    }
+
+    # Pagination
+    paginator = Paginator(invoices, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'invoices': page_obj,
+        'stats': stats,
+        'search_query': search_query,
+    }
+
+    return render(request, 'sales/pending_invoices_list.html', context)
+
+
+@login_required(login_url='login')
+def pending_invoice_complete(request, reference):
+    """Complete a draft invoice - add products and finalize"""
+    from settings_app.models import ProductCategory, MetalType, MetalPurity
+
+    invoice = get_object_or_404(
+        SaleInvoice.objects.select_related('seller', 'client').prefetch_related('photos', 'items__product'),
+        reference=reference,
+        is_deleted=False
+    )
+
+    # Check if invoice is still draft
+    if invoice.status != SaleInvoice.Status.DRAFT:
+        messages.error(request, "Cette facture a déjà été validée.")
+        return redirect('sales:invoice_detail', reference=reference)
+
+    # Handle form submission
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'add_item':
+            # Add existing product to invoice
+            product_id = request.POST.get('product_id')
+            quantity = request.POST.get('quantity', 1)
+            selling_price = request.POST.get('selling_price')
+
+            try:
+                product = Product.objects.get(id=product_id)
+                quantity = Decimal(quantity)
+                selling_price = Decimal(selling_price) if selling_price else product.selling_price
+
+                # Create invoice item - the save() method will calculate totals
+                SaleInvoiceItem.objects.create(
+                    invoice=invoice,
+                    product=product,
+                    quantity=quantity,
+                    original_price=product.selling_price,
+                    negotiated_price=selling_price,
+                    unit_price=selling_price,
+                    total_amount=selling_price * quantity
+                )
+
+                # Explicitly recalculate totals after item is saved
+                invoice.calculate_totals()
+
+                messages.success(request, f"Article {product.reference} ajouté.")
+
+            except Product.DoesNotExist:
+                messages.error(request, "Produit non trouvé.")
+            except (ValueError, InvalidOperation):
+                messages.error(request, "Valeurs invalides.")
+
+        elif action == 'remove_item':
+            item_id = request.POST.get('item_id')
+            try:
+                item = SaleInvoiceItem.objects.get(id=item_id, invoice=invoice)
+                item.delete()
+                invoice.calculate_totals()
+                messages.success(request, "Article retiré.")
+            except SaleInvoiceItem.DoesNotExist:
+                messages.error(request, "Article non trouvé.")
+
+        elif action == 'complete':
+            # Validate invoice has items
+            if not invoice.items.exists():
+                messages.error(request, "Ajoutez au moins un article avant de valider.")
+            else:
+                invoice.date = timezone.now().date()
+
+                # Set client if provided
+                client_id = request.POST.get('client_id')
+                if client_id:
+                    try:
+                        invoice.client = Client.objects.get(id=client_id)
+                    except Client.DoesNotExist:
+                        pass
+
+                # Set payment method
+                payment_method_id = request.POST.get('payment_method')
+                if payment_method_id:
+                    try:
+                        payment_method = PaymentMethod.objects.get(id=payment_method_id)
+                        invoice.payment_method = payment_method
+                    except PaymentMethod.DoesNotExist:
+                        pass
+
+                # Set payment reference (check for uniqueness)
+                payment_reference = request.POST.get('payment_reference', '').strip()
+                if payment_reference:
+                    # Check if this payment reference already exists
+                    existing = SaleInvoice.objects.filter(
+                        payment_reference__iexact=payment_reference
+                    ).exclude(id=invoice.id).exists()
+                    if existing:
+                        messages.error(request, f"La référence de paiement '{payment_reference}' existe déjà.")
+                        return redirect('sales:pending_invoice_complete', reference=reference)
+                    invoice.payment_reference = payment_reference
+
+                # Set bank account
+                bank_account_id = request.POST.get('bank_account')
+                if bank_account_id:
+                    try:
+                        invoice.bank_account = BankAccount.objects.get(id=bank_account_id)
+                    except BankAccount.DoesNotExist:
+                        pass
+
+                # Calculate totals first
+                invoice.calculate_totals()
+
+                # Get amount paid from form
+                amount_paid_str = request.POST.get('amount_paid', '0')
+                try:
+                    amount_paid = Decimal(amount_paid_str)
+                except (InvalidOperation, TypeError):
+                    amount_paid = Decimal('0')
+
+                # Set payment amounts and determine status based on amount paid
+                invoice.amount_paid = amount_paid
+                invoice.balance_due = invoice.total_amount - amount_paid
+
+                if amount_paid >= invoice.total_amount:
+                    invoice.status = SaleInvoice.Status.PAID
+                    invoice.balance_due = Decimal('0')  # Ensure no negative balance
+                elif amount_paid > 0:
+                    invoice.status = SaleInvoice.Status.PARTIAL_PAID
+                else:
+                    invoice.status = SaleInvoice.Status.UNPAID
+
+                invoice.save()
+
+                # Mark all products in the invoice as sold
+                for item in invoice.items.all():
+                    if item.product:
+                        item.product.status = 'sold'
+                        item.product.save(update_fields=['status'])
+
+                # Log activity
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action=ActivityLog.ActionType.UPDATE,
+                    model_name='SaleInvoice',
+                    object_id=str(invoice.id),
+                    object_repr=str(invoice),
+                    details={'action': 'completed_draft', 'reference': invoice.reference}
+                )
+
+                messages.success(request, f"Facture {invoice.reference} validée avec succès!")
+                return redirect('sales:invoice_detail', reference=invoice.reference)
+
+        elif action == 'quick_create_product':
+            # Quick product creation
+            return _handle_quick_product_creation(request, invoice)
+
+        return redirect('sales:pending_invoice_complete', reference=reference)
+
+    # GET request - show completion form
+    # Refresh invoice from database to get latest totals
+    invoice.refresh_from_db()
+
+    # Get available products for selection
+    available_products = Product.objects.filter(
+        status='available'
+    ).select_related('category', 'metal_type', 'purity').order_by('-created_at')[:100]
+
+    # Get form options
+    categories = ProductCategory.objects.filter(is_active=True)
+    metals = MetalType.objects.filter(is_active=True)
+    purities = MetalPurity.objects.filter(is_active=True)
+    clients = Client.objects.filter(is_active=True).order_by('first_name')
+    payment_methods = PaymentMethod.objects.filter(is_active=True)
+    bank_accounts = BankAccount.objects.filter(is_active=True)
+
+    context = {
+        'invoice': invoice,
+        'photos': invoice.photos.all(),
+        'items': invoice.items.all(),
+        'available_products': available_products,
+        'categories': categories,
+        'metals': metals,
+        'purities': purities,
+        'clients': clients,
+        'payment_methods': payment_methods,
+        'bank_accounts': bank_accounts,
+    }
+
+    return render(request, 'sales/pending_invoice_complete.html', context)
+
+
+def _handle_quick_product_creation(request, invoice):
+    """Handle quick product creation from pending invoice form"""
+    from settings_app.models import ProductCategory, MetalType, MetalPurity
+    from products.models import Product as ProductModel
+
+    try:
+        category_id = request.POST.get('quick_category')
+        metal_type_id = request.POST.get('quick_metal_type')
+        purity_id = request.POST.get('quick_purity')
+        weight = request.POST.get('quick_weight')
+        selling_price_str = request.POST.get('quick_selling_price')
+
+        # Validate required fields
+        if not all([category_id, weight, selling_price_str]):
+            messages.error(request, "Catégorie, poids et prix de vente sont requis.")
+            return redirect('sales:pending_invoice_complete', reference=invoice.reference)
+
+        category = ProductCategory.objects.get(id=category_id)
+        metal_type = MetalType.objects.get(id=metal_type_id) if metal_type_id else None
+        metal_purity = MetalPurity.objects.get(id=purity_id) if purity_id else None
+        weight_decimal = Decimal(weight)
+        selling_price = Decimal(selling_price_str)
+
+        # Generate unique reference for the product
+        from django.utils import timezone
+        today = timezone.now().strftime('%Y%m%d')
+        prefix = f"PRD-{category.code if hasattr(category, 'code') and category.code else 'QCK'}-{today}"
+
+        # Find next sequence number
+        existing_count = ProductModel.objects.filter(reference__startswith=prefix).count()
+        reference = f"{prefix}-{existing_count + 1:04d}"
+
+        # Create product with correct field names
+        product = ProductModel.objects.create(
+            reference=reference,
+            name=f"{category.name} - Création rapide",
+            category=category,
+            metal_type=metal_type,
+            metal_purity=metal_purity,
+            gross_weight=weight_decimal,
+            net_weight=weight_decimal,
+            selling_price=selling_price,
+            status='available',
+        )
+
+        # Add to invoice with negotiated_price for proper totals calculation
+        SaleInvoiceItem.objects.create(
+            invoice=invoice,
+            product=product,
+            quantity=1,
+            original_price=selling_price,
+            negotiated_price=selling_price,
+            unit_price=selling_price,
+            total_amount=selling_price
+        )
+
+        # Product stays 'available' until invoice is validated
+        # Status will change to 'reserved'/'sold' when invoice is completed
+
+        # Recalculate invoice totals - refresh first to get fresh data
+        invoice.refresh_from_db()
+        invoice.calculate_totals()
+
+        messages.success(request, f"Article {product.reference} créé et ajouté à la facture.")
+
+    except (ProductCategory.DoesNotExist, MetalType.DoesNotExist, MetalPurity.DoesNotExist) as e:
+        messages.error(request, f"Catégorie, métal ou pureté non trouvé: {e}")
+    except (ValueError, InvalidOperation) as e:
+        messages.error(request, f"Valeurs invalides: {e}")
+    except Exception as e:
+        import traceback
+        messages.error(request, f"Erreur lors de la création: {e}")
+        # Log the full traceback for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f"Quick product creation error: {traceback.format_exc()}")
+
+    return redirect('sales:pending_invoice_complete', reference=invoice.reference)
+
+
+@login_required(login_url='login')
+def search_products_api(request):
+    """API endpoint to search products for pending invoice completion"""
+    try:
+        query = request.GET.get('q', '').strip()
+        limit = min(int(request.GET.get('limit', 20)), 50)
+
+        if len(query) < 2:
+            return JsonResponse({'products': []})
+
+        # Search only AVAILABLE products (disponible)
+        products = Product.objects.filter(
+            status='available'
+        ).filter(
+            Q(reference__icontains=query) |
+            Q(name__icontains=query) |
+            Q(category__name__icontains=query)
+        ).select_related('category', 'metal_type', 'metal_purity').order_by('-created_at')[:limit]
+
+        results = []
+        for p in products:
+            try:
+                results.append({
+                    'id': p.id,
+                    'reference': p.reference or '',
+                    'name': p.name or (p.category.name if p.category else 'Produit'),
+                    'category': p.category.name if p.category else '',
+                    'metal': p.metal_type.name if p.metal_type else '',
+                    'purity': p.metal_purity.name if p.metal_purity else '',
+                    'weight': str(p.net_weight) if p.net_weight else '',
+                    'selling_price': str(p.selling_price) if p.selling_price else '0',
+                    'status': p.get_status_display() if p.status else '',
+                    'display': f"{p.reference or ''} - {p.category.name if p.category else ''} - {p.selling_price or 0} DH"
+                })
+            except Exception as item_error:
+                # Skip problematic items
+                continue
+
+        return JsonResponse({'products': results})
+    except Exception as e:
+        import traceback
+        return JsonResponse({
+            'products': [],
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })

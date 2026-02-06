@@ -23,10 +23,15 @@ urlpatterns = [
 
     # API endpoints
     path('api/payment-methods/', views.get_payment_methods, name='get_payment_methods'),
+    path('api/search-products/', views.search_products_api, name='search_products_api'),
 
     # Quote to Invoice conversion
     path('quotes/<int:quote_id>/to-invoice/', views.quote_to_invoice, name='quote_to_invoice'),
 
     # Payment tracking
     path('payments/tracking/', views.payment_tracking, name='payment_tracking'),
+
+    # Pending invoices (Brouillon - from Telegram)
+    path('pending/', views.pending_invoices_list, name='pending_invoices'),
+    path('pending/<str:reference>/complete/', views.pending_invoice_complete, name='pending_invoice_complete'),
 ]
