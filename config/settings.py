@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'quotes.apps.QuotesConfig',
     'reports.apps.ReportsConfig',
     'settings_app.apps.SettingsAppConfig',
+    'telegram_bot.apps.TelegramBotConfig',
 ]
 
 MIDDLEWARE = [
@@ -199,3 +200,13 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+
+# Telegram Bot Configuration
+# Get token from @BotFather on Telegram
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
+
+
+# Media files (uploaded images)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
