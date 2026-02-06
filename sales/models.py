@@ -271,7 +271,8 @@ class SaleInvoice(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.reference} - {self.client.full_name} - {self.total_amount} MAD"
+        client_name = self.client.full_name if self.client else "Vente anonyme"
+        return f"{self.reference} - {client_name} - {self.total_amount} MAD"
 
     def calculate_totals(self):
         """Calculate totals from line items
