@@ -206,6 +206,10 @@ REST_FRAMEWORK = {
 # Get token from @BotFather on Telegram
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
 
+# Zebra Printer Configuration
+ZEBRA_PRINTER_HOST = os.getenv('ZEBRA_PRINTER_HOST', '')
+ZEBRA_PRINTER_PORT = int(os.getenv('ZEBRA_PRINTER_PORT', '19100'))
+
 
 # Media files (uploaded images)
 MEDIA_URL = '/media/'

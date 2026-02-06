@@ -7,7 +7,9 @@ from django.contrib import messages
 from django.db.models import Q, Count, Sum, F
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
 from .models import Product, ProductImage, ProductStone
+from .print_utils import print_product_label, print_price_tag, print_test_label
 from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount
 from suppliers.models import Supplier
 from users.models import ActivityLog
@@ -464,3 +466,58 @@ def get_client_ip(request):
     else:
         ip = request.META.get('REMOTE_ADDR')
     return ip
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def print_label(request, reference):
+    """Print a product label"""
+    product = get_object_or_404(Product, reference=reference)
+
+    label_type = request.POST.get('label_type', 'product')
+    quantity = int(request.POST.get('quantity', 1))
+
+    if quantity < 1 or quantity > 10:
+        quantity = 1
+
+    if label_type == 'price':
+        success, message = print_price_tag(product, quantity)
+    else:
+        success, message = print_product_label(product, quantity)
+
+    # Log activity
+    ActivityLog.objects.create(
+        user=request.user,
+        action=ActivityLog.ActionType.PRINT,
+        model_name='Product',
+        object_id=str(product.id),
+        object_repr=f"{product.reference} - {label_type} x{quantity}",
+        ip_address=get_client_ip(request)
+    )
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': success, 'message': message})
+
+    if success:
+        messages.success(request, f'Étiquette imprimée pour {product.reference}')
+    else:
+        messages.error(request, f'Erreur d\'impression: {message}')
+
+    return redirect('products:detail', reference=reference)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def print_test(request):
+    """Print a test label"""
+    success, message = print_test_label()
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': success, 'message': message})
+
+    if success:
+        messages.success(request, 'Test d\'impression réussi!')
+    else:
+        messages.error(request, f'Erreur d\'impression: {message}')
+
+    return redirect('products:list')
