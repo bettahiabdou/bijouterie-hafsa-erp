@@ -329,10 +329,15 @@ class Product(models.Model):
         )
 
         # Calculate selling price based on margin
+        # Ensure all values are Decimal to avoid type errors
         if self.margin_type == 'percentage':
-            self.selling_price = self.total_cost * (1 + self.margin_value / 100)
+            margin_val = Decimal(str(self.margin_value or 0))
+            total_cost = Decimal(str(self.total_cost or 0))
+            self.selling_price = total_cost * (Decimal('1') + margin_val / Decimal('100'))
         else:
-            self.selling_price = self.total_cost + self.margin_value
+            total_cost = Decimal(str(self.total_cost or 0))
+            margin_val = Decimal(str(self.margin_value or 0))
+            self.selling_price = total_cost + margin_val
 
         # Set minimum price to cost if not specified
         if not self.minimum_price:

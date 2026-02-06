@@ -96,6 +96,29 @@
                         </div>
                     </div>
 
+                    <!-- Contact Info Grid -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="{{ form.phone.id_for_label }}" class="form-label">
+                                <i class="fas fa-phone mr-1"></i> Telephone
+                            </label>
+                            <input type="tel" name="{{ form.phone.name }}" id="{{ form.phone.id_for_label }}"
+                                   value="{{ form.phone.value|default:'' }}"
+                                   class="form-input"
+                                   placeholder="+212 6XX XXX XXX">
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.telegram_username.id_for_label }}" class="form-label">
+                                <i class="fab fa-telegram mr-1"></i> Telegram Username
+                            </label>
+                            <input type="text" name="{{ form.telegram_username.name }}" id="{{ form.telegram_username.id_for_label }}"
+                                   value="{{ form.telegram_username.value|default:'' }}"
+                                   class="form-input"
+                                   placeholder="@username">
+                            <span class="form-hint">Pour l'integration avec le bot Telegram de ventes</span>
+                        </div>
+                    </div>
+
                     <!-- Role -->
                     <div class="form-group">
                         <label for="{{ form.role.id_for_label }}" class="form-label">

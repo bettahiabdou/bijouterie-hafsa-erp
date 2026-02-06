@@ -148,8 +148,12 @@ def batch_product_create(request):
             product_banks = request.POST.getlist('product_bank_account')
             product_suppliers = request.POST.getlist('product_supplier')
 
+            # Check if we should print labels
+            print_labels = request.POST.get('print_labels') == '1'
+
             created_count = 0
             failed_rows = []
+            created_products = []  # Keep track of created products for printing
 
             for i, weight_net_str in enumerate(product_weights_net):
                 try:
@@ -220,6 +224,7 @@ def batch_product_create(request):
                         ip_address=get_client_ip(request)
                     )
 
+                    created_products.append(product)
                     created_count += 1
 
                 except (ValueError, TypeError) as e:
@@ -238,6 +243,34 @@ def batch_product_create(request):
             if failed_rows:
                 error_details = '; '.join([f"Ligne {row}: {error}" for row, error in failed_rows])
                 messages.warning(request, f'Certaines lignes n\'ont pas pu être créées: {error_details}')
+
+            # Print labels if requested
+            if print_labels and created_products:
+                printed_count = 0
+                print_errors = []
+                for product in created_products:
+                    try:
+                        success, msg = print_product_label(product, 1)
+                        if success:
+                            printed_count += 1
+                            # Log print activity
+                            ActivityLog.objects.create(
+                                user=request.user,
+                                action=ActivityLog.ActionType.PRINT,
+                                model_name='Product',
+                                object_id=str(product.id),
+                                object_repr=f"{product.reference} - batch print",
+                                ip_address=get_client_ip(request)
+                            )
+                        else:
+                            print_errors.append(f"{product.reference}: {msg}")
+                    except Exception as e:
+                        print_errors.append(f"{product.reference}: {str(e)}")
+
+                if printed_count > 0:
+                    messages.info(request, f'{printed_count} étiquette(s) envoyée(s) à l\'imprimante.')
+                if print_errors:
+                    messages.warning(request, f'Erreurs d\'impression: {"; ".join(print_errors[:3])}')
 
             return redirect('products:list')
 

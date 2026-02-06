@@ -14,7 +14,7 @@ class MetalType(models.Model):
     """
     name = models.CharField(_('Nom'), max_length=50, unique=True)
     name_ar = models.CharField(_('Nom (Arabe)'), max_length=50, blank=True)
-    code = models.CharField(_('Code'), max_length=10, unique=True)
+    code = models.CharField(_('Code'), max_length=25, unique=True)
     is_active = models.BooleanField(_('Actif'), default=True)
     created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
     updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
@@ -117,7 +117,7 @@ class StoneType(models.Model):
     """
     name = models.CharField(_('Nom'), max_length=50, unique=True)
     name_ar = models.CharField(_('Nom (Arabe)'), max_length=50, blank=True)
-    code = models.CharField(_('Code'), max_length=10, unique=True)
+    code = models.CharField(_('Code'), max_length=25, unique=True)
     is_precious = models.BooleanField(
         _('Pierre précieuse'),
         default=False,
@@ -150,7 +150,7 @@ class StoneClarity(models.Model):
     """
     Stone clarity grades (IF, VVS1, VVS2, VS1, VS2, SI1, SI2, I1, I2, I3)
     """
-    code = models.CharField(_('Code'), max_length=10, unique=True)
+    code = models.CharField(_('Code'), max_length=25, unique=True)
     name = models.CharField(_('Nom'), max_length=50)
     description = models.TextField(_('Description'), blank=True)
     rank = models.PositiveIntegerField(
@@ -180,7 +180,7 @@ class StoneColor(models.Model):
     """
     Stone color grades (D, E, F, G, H, I, J, K, etc.)
     """
-    code = models.CharField(_('Code'), max_length=10, unique=True)
+    code = models.CharField(_('Code'), max_length=25, unique=True)
     name = models.CharField(_('Nom'), max_length=50)
     description = models.TextField(_('Description'), blank=True)
     rank = models.PositiveIntegerField(

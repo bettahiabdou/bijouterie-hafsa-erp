@@ -1051,24 +1051,24 @@ select.is-invalid:focus {
 }
 
 .badge-success {
-  background: rgba(124, 179, 66, 0.1);
-  color: var(--color-success);
+  background: #16a34a;
+  color: #ffffff;
 }
 
 .badge-warning {
-  background: rgba(212, 169, 55, 0.1);
-  color: var(--color-warning);
+  background: #f59e0b;
+  color: #ffffff;
 }
 
 .badge-danger,
 .badge-error {
-  background: rgba(200, 90, 84, 0.1);
-  color: var(--color-error);
+  background: #dc2626;
+  color: #ffffff;
 }
 
 .badge-info {
-  background: rgba(122, 159, 184, 0.1);
-  color: var(--color-info);
+  background: #2563eb;
+  color: #ffffff;
 }
 
 /* Mobile alerts */

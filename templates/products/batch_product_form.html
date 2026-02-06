@@ -346,6 +346,22 @@
                     Cout total estime: <strong id="total_estimated_cost">0.00</strong> DH
                 </p>
             </div>
+
+            <!-- Print Option -->
+            <div class="p-4 rounded-lg mt-6" style="background: var(--success-50); border: 1px solid var(--success-200);">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" name="print_labels" id="print_labels" value="1"
+                        style="width: 20px; height: 20px; accent-color: var(--success-600);">
+                    <div>
+                        <span class="font-semibold" style="color: var(--success-700);">
+                            <i class="fas fa-print mr-2"></i>Imprimer les etiquettes
+                        </span>
+                        <p class="text-sm" style="color: var(--success-600);">
+                            Les etiquettes seront envoyees a l'imprimante Zebra apres la creation des produits
+                        </p>
+                    </div>
+                </label>
+            </div>
         </div>
 
         <!-- Form Actions -->
@@ -664,6 +680,20 @@
                 input.addEventListener('change', calculatePreview);
             });
 
+            // Track manual edits to selling price
+            const sellingPriceInput = item.querySelector('.product_selling_price');
+            if (sellingPriceInput) {
+                sellingPriceInput.addEventListener('input', function() {
+                    this.dataset.manuallyEdited = 'true';
+                });
+                // Double-click to reset to auto-calculation
+                sellingPriceInput.addEventListener('dblclick', function() {
+                    this.value = '';
+                    delete this.dataset.manuallyEdited;
+                    calculatePreview();
+                });
+            }
+
             const detailRow = item.nextElementSibling;
             if (detailRow && detailRow.classList.contains('detail-row')) {
                 const detailInputs = detailRow.querySelectorAll('input, select');
@@ -731,13 +761,14 @@
 
                     let sellingPriceCalc;
                     if (marginType === 'percentage') {
-                        sellingPriceCalc = totalCost * (1 + marginValue / 100);
+                        sellingPriceCalc = totalCost + (totalCost * marginValue / 100);
                     } else {
                         sellingPriceCalc = totalCost + marginValue;
                     }
 
                     const finalPrice = card.querySelector('.product_selling_price_mobile');
-                    if (finalPrice && (!finalPrice.value || finalPrice.value === '')) {
+                    // Always update unless user manually edited (check data attribute)
+                    if (finalPrice && !finalPrice.dataset.manuallyEdited) {
                         finalPrice.value = sellingPriceCalc.toFixed(2);
                     }
 
@@ -769,14 +800,15 @@
 
                     let sellingPriceCalc;
                     if (marginType === 'percentage') {
-                        sellingPriceCalc = totalCost * (1 + marginValue / 100);
+                        sellingPriceCalc = totalCost + (totalCost * marginValue / 100);
                     } else {
                         sellingPriceCalc = totalCost + marginValue;
                     }
 
                     const finalPrice = item.querySelector('.product_selling_price');
 
-                    if (!finalPrice.value || finalPrice.value === '') {
+                    // Always update unless user manually edited (check data attribute)
+                    if (!finalPrice.dataset.manuallyEdited) {
                         finalPrice.value = sellingPriceCalc.toFixed(2);
                         finalPrice.style.background = 'var(--accent-50)';
                         finalPrice.style.borderColor = 'var(--accent-300)';
@@ -820,6 +852,20 @@
             inputs.forEach(input => {
                 input.addEventListener('change', calculatePreview);
             });
+
+            // Track manual edits to selling price (mobile)
+            const sellingPriceInput = card.querySelector('.product_selling_price_mobile');
+            if (sellingPriceInput) {
+                sellingPriceInput.addEventListener('input', function() {
+                    this.dataset.manuallyEdited = 'true';
+                });
+                // Double-click to reset to auto-calculation
+                sellingPriceInput.addEventListener('dblclick', function() {
+                    this.value = '';
+                    delete this.dataset.manuallyEdited;
+                    calculatePreview();
+                });
+            }
         }
 
         // Initialize

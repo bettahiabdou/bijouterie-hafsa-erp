@@ -1415,33 +1415,33 @@ strong {
 }
 
 .badge-primary {
-  background: var(--primary-100);
-  color: var(--primary-700);
+  background: var(--primary-600);
+  color: #ffffff;
 }
 
 .badge-success {
-  background: var(--success-100);
-  color: var(--success-700);
+  background: #16a34a;
+  color: #ffffff;
 }
 
 .badge-warning {
-  background: var(--warning-100);
-  color: var(--warning-700);
+  background: #f59e0b;
+  color: #ffffff;
 }
 
 .badge-danger, .badge-error {
-  background: var(--error-100);
-  color: var(--error-700);
+  background: #dc2626;
+  color: #ffffff;
 }
 
 .badge-info {
-  background: var(--info-100);
-  color: var(--info-700);
+  background: #2563eb;
+  color: #ffffff;
 }
 
 .badge-neutral {
-  background: var(--neutral-200);
-  color: var(--neutral-700);
+  background: var(--neutral-500);
+  color: #ffffff;
 }
 
 /* Badge with dot */

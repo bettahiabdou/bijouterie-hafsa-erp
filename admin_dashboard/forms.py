@@ -38,7 +38,7 @@ class UserManagementForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'first_name', 'last_name', 'role', 'is_active']
+        fields = ['username', 'email', 'first_name', 'last_name', 'role', 'phone', 'telegram_username', 'is_active']
         widgets = {
             'username': forms.TextInput(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
@@ -58,6 +58,14 @@ class UserManagementForm(forms.ModelForm):
             }),
             'role': forms.Select(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500'
+            }),
+            'phone': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
+                'placeholder': 'Téléphone'
+            }),
+            'telegram_username': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500',
+                'placeholder': 'Username Telegram (sans @)'
             }),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'w-4 h-4 rounded'
