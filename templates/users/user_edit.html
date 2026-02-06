@@ -62,6 +62,35 @@
                     </div>
                 </div>
 
+                <!-- Telegram Integration Section -->
+                <div class="card-header" style="border-top: 1px solid var(--neutral-200); margin-top: var(--space-4);">
+                    <h3><i class="fab fa-telegram mr-2"></i> Integration Telegram</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Telegram Chat ID</label>
+                            <input type="text" name="telegram_chat_id" value="{{ user.telegram_chat_id|default:'' }}" class="form-input" placeholder="Ex: 123456789">
+                            <p class="form-hint">ID unique du chat Telegram de l'utilisateur</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Nom d'utilisateur Telegram</label>
+                            <input type="text" name="telegram_username" value="{{ user.telegram_username|default:'' }}" class="form-input" placeholder="Ex: username (sans @)">
+                            <p class="form-hint">Username Telegram sans le @</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Verification Telegram</label>
+                            <div class="checkbox-wrapper">
+                                <input type="checkbox" name="is_telegram_verified" id="is_telegram_verified" {% if user.is_telegram_verified %}checked{% endif %} class="form-checkbox">
+                                <label for="is_telegram_verified" class="checkbox-label">Compte Telegram verifie</label>
+                            </div>
+                            <p class="form-hint">Cochez si le compte Telegram a ete verifie</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card-footer form-actions">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i>

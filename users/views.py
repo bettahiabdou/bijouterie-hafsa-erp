@@ -244,6 +244,12 @@ def user_edit(request, user_id):
         if hasattr(user, 'role'):
             user.role = request.POST.get('role', user.role)
 
+        # Telegram integration fields
+        telegram_chat_id = request.POST.get('telegram_chat_id', '').strip()
+        user.telegram_chat_id = telegram_chat_id if telegram_chat_id else None
+        user.telegram_username = request.POST.get('telegram_username', '').strip()
+        user.is_telegram_verified = request.POST.get('is_telegram_verified') == 'on'
+
         user.save()
 
         # Log activity
