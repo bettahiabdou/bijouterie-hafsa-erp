@@ -217,15 +217,17 @@ def batch_product_create(request):
                     # Handle image upload for this product (if any)
                     product_images = request.FILES.getlist(f'product_image_{i}')
                     for idx, img_file in enumerate(product_images):
-                        ProductImage.objects.create(
+                        img_file.seek(0)
+                        prod_image = ProductImage.objects.create(
                             product=product,
                             image=img_file,
                             is_primary=(idx == 0),
                             display_order=idx
                         )
-                        # Set first image as main_image
+                        # Set first image as main_image (use the saved ProductImage path)
                         if idx == 0:
-                            product.main_image.save(img_file.name, img_file, save=True)
+                            product.main_image = prod_image.image
+                            product.save(update_fields=['main_image'])
 
                     # Log activity
                     ActivityLog.objects.create(
@@ -367,15 +369,18 @@ def product_create(request):
             # Handle image uploads
             images = request.FILES.getlist('images')
             for i, image_file in enumerate(images):
+                # Reset file pointer before each use
+                image_file.seek(0)
                 product_image = ProductImage.objects.create(
                     product=product,
                     image=image_file,
                     is_primary=(i == 0),
                     display_order=i
                 )
-                # Set first image as main_image
+                # Set first image as main_image (use the saved ProductImage path)
                 if i == 0:
-                    product.main_image.save(image_file.name, image_file, save=True)
+                    product.main_image = product_image.image
+                    product.save(update_fields=['main_image'])
 
             # Log activity
             ActivityLog.objects.create(
@@ -457,15 +462,17 @@ def product_edit(request, reference):
             images = request.FILES.getlist('images')
             existing_count = product.images.count()
             for i, image_file in enumerate(images):
-                ProductImage.objects.create(
+                image_file.seek(0)
+                product_image = ProductImage.objects.create(
                     product=product,
                     image=image_file,
                     is_primary=False,
                     display_order=existing_count + i
                 )
-                # Set as main_image if none exists
+                # Set as main_image if none exists (use the saved ProductImage path)
                 if i == 0 and not product.main_image:
-                    product.main_image.save(image_file.name, image_file, save=True)
+                    product.main_image = product_image.image
+                    product.save(update_fields=['main_image'])
 
             # Log activity
             ActivityLog.objects.create(
