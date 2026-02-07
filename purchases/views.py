@@ -439,7 +439,12 @@ def purchase_invoice_detail(request, reference):
                         created_by=request.user
                     )
 
-                    # Delete the item
+                    # Update product status to "returned"
+                    if original_product:
+                        original_product.status = 'returned'
+                        original_product.save(update_fields=['status'])
+
+                    # Delete the item from invoice
                     item.delete()
                     invoice.calculate_totals()
                     invoice.save()
@@ -487,6 +492,11 @@ def purchase_invoice_detail(request, reference):
                             notes=notes,
                             created_by=request.user
                         )
+
+                        # Update original product status to "returned"
+                        if original_product:
+                            original_product.status = 'returned'
+                            original_product.save(update_fields=['status'])
 
                         # Delete old item and create new one with replacement
                         item.delete()
