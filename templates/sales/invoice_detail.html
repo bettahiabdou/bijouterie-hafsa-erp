@@ -1242,7 +1242,7 @@
         function openReturnExchangeModal(itemId, productRef, itemPrice) {
             currentItemId = itemId;
             currentAction = null;
-            originalPrice = parseFloat(itemPrice) || 0;
+            originalPrice = parseNumber(itemPrice);
             selectedExchangeProducts = [];
 
             document.getElementById('returnExchangeProductRef').textContent = productRef;
@@ -1306,7 +1306,7 @@
                 return;
             }
 
-            const priceValue = parseFloat(price) || 0;
+            const priceValue = parseNumber(price);
             selectedExchangeProducts.push({
                 id: productId,
                 ref: productRef,
@@ -1371,7 +1371,7 @@
         function updateProductPrice(productId, newPrice) {
             const product = selectedExchangeProducts.find(p => p.id === productId);
             if (product) {
-                product.price = parseFloat(newPrice) || 0;
+                product.price = parseNumber(newPrice);
                 updateExchangeTotals();
             }
         }
@@ -1429,11 +1429,19 @@
             bankGroup.style.display = isVirement ? 'block' : 'none';
         }
 
+        // Helper function to parse numbers with comma or dot as decimal separator
+        function parseNumber(value) {
+            if (!value) return 0;
+            // Replace comma with dot for parsing
+            const normalized = String(value).replace(',', '.');
+            return parseFloat(normalized) || 0;
+        }
+
         function updatePaymentStatus() {
             const totalNewProducts = selectedExchangeProducts.reduce((sum, p) => sum + p.price, 0);
             const difference = totalNewProducts - originalPrice; // Différence à payer
             const amountPaidNowStr = document.getElementById('exchangeAmountPaid').value;
-            const amountPaidNow = parseFloat(amountPaidNowStr) || 0;
+            const amountPaidNow = parseNumber(amountPaidNowStr);
 
             const indicator = document.getElementById('paymentStatusIndicator');
             const statusText = document.getElementById('paymentStatusText');
