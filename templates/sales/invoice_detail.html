@@ -1355,8 +1355,9 @@
                         </div>
                     </td>
                     <td>
-                        <input type="number" class="form-input exchange-price-input"
-                               value="${p.price.toFixed(2)}" step="0.01" min="0"
+                        <input type="text" class="form-input exchange-price-input"
+                               value="${p.price.toFixed(2)}"
+                               oninput="updateProductPrice('${p.id}', this.value)"
                                onchange="updateProductPrice('${p.id}', this.value)">
                     </td>
                     <td class="text-center">
@@ -1377,7 +1378,17 @@
         }
 
         function updateExchangeTotals() {
-            const totalNewProducts = selectedExchangeProducts.reduce((sum, p) => sum + p.price, 0);
+            // Calculate total from actual input fields if they exist, otherwise from array
+            let totalNewProducts = 0;
+            const priceInputs = document.querySelectorAll('.exchange-price-input');
+            if (priceInputs.length > 0) {
+                priceInputs.forEach(input => {
+                    totalNewProducts += parseNumber(input.value);
+                });
+            } else {
+                totalNewProducts = selectedExchangeProducts.reduce((sum, p) => sum + p.price, 0);
+            }
+
             const difference = totalNewProducts - originalPrice;
 
             document.getElementById('exchangeTotalPrice').textContent = totalNewProducts.toFixed(2);
@@ -1438,7 +1449,24 @@
         }
 
         function updatePaymentStatus() {
-            const totalNewProducts = selectedExchangeProducts.reduce((sum, p) => sum + p.price, 0);
+            // Recalculate from the actual input fields to ensure we have current values
+            let totalNewProducts = 0;
+            document.querySelectorAll('.exchange-price-input').forEach(input => {
+                totalNewProducts += parseNumber(input.value);
+            });
+
+            // Also update selectedExchangeProducts array to match inputs
+            document.querySelectorAll('#selectedProductsList tr').forEach(row => {
+                const productId = row.dataset.productId;
+                const input = row.querySelector('.exchange-price-input');
+                if (input && productId) {
+                    const product = selectedExchangeProducts.find(p => p.id === productId);
+                    if (product) {
+                        product.price = parseNumber(input.value);
+                    }
+                }
+            });
+
             const difference = totalNewProducts - originalPrice; // Différence à payer
             const amountPaidNowStr = document.getElementById('exchangeAmountPaid').value;
             const amountPaidNow = parseNumber(amountPaidNowStr);
@@ -1448,6 +1476,15 @@
 
             indicator.className = '';
             indicator.style.display = 'block';
+
+            // Debug: log values
+            console.log('Payment Status Debug:', {
+                totalNewProducts,
+                originalPrice,
+                difference,
+                amountPaidNow,
+                selectedPrices: selectedExchangeProducts.map(p => p.price)
+            });
 
             // Logic:
             // - Original price is already credited from the exchanged invoice
@@ -1652,7 +1689,7 @@
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Montant payé (DH)</label>
-                                <input type="number" id="exchangeAmountPaid" class="form-input" step="0.01" min="0" placeholder="0.00" onchange="updatePaymentStatus()" oninput="updatePaymentStatus()">
+                                <input type="text" id="exchangeAmountPaid" class="form-input" placeholder="0.00" onchange="updatePaymentStatus()" oninput="updatePaymentStatus()">
                             </div>
                         </div>
 
