@@ -171,9 +171,63 @@
                 {% endif %}
             </div>
 
+            <!-- Product Images -->
+            {% if items %}
+            <div class="card animate-slide-up" style="animation-delay: 150ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-images mr-2"></i> Images des Produits</h3>
+                </div>
+                <div class="card-body">
+                    {% for item in items %}
+                        {% if item.product.main_image or item.product.images.exists %}
+                        <div class="product-images-section">
+                            <h4 class="product-images-title">
+                                <span class="product-ref">{{ item.product.reference }}</span>
+                                <span class="product-name-sub">{{ item.product.name }}</span>
+                            </h4>
+                            <div class="photos-grid">
+                                {% if item.product.main_image %}
+                                <div class="photo-item">
+                                    <a href="{{ item.product.main_image.url }}" target="_blank" class="photo-link">
+                                        <img src="{{ item.product.main_image.url }}" alt="{{ item.product.name }}" class="photo-thumbnail">
+                                        <div class="photo-overlay">
+                                            <i class="fas fa-expand"></i>
+                                        </div>
+                                    </a>
+                                    <span class="photo-type badge badge-sm badge-info">Image principale</span>
+                                </div>
+                                {% endif %}
+                                {% for image in item.product.images.all %}
+                                <div class="photo-item">
+                                    <a href="{{ image.image.url }}" target="_blank" class="photo-link">
+                                        <img src="{{ image.image.url }}" alt="{{ item.product.name }} - {{ forloop.counter }}" class="photo-thumbnail">
+                                        <div class="photo-overlay">
+                                            <i class="fas fa-expand"></i>
+                                        </div>
+                                    </a>
+                                    {% if image.caption %}
+                                        <p class="photo-caption">{{ image.caption }}</p>
+                                    {% endif %}
+                                    <span class="photo-type badge badge-sm badge-neutral">Image {{ forloop.counter }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% empty %}
+                    <div class="empty-state">
+                        <i class="fas fa-image"></i>
+                        <h4>Aucune image</h4>
+                        <p>Les produits de cette facture n'ont pas d'images.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Notes -->
             {% if invoice.notes %}
-            <div class="card animate-slide-up" style="animation-delay: 150ms;">
+            <div class="card animate-slide-up" style="animation-delay: 200ms;">
                 <div class="card-header">
                     <h3><i class="fas fa-sticky-note mr-2"></i> Notes</h3>
                 </div>
@@ -185,7 +239,7 @@
 
             <!-- Photos (from Telegram) -->
             {% if invoice.photos.exists %}
-            <div class="card animate-slide-up" style="animation-delay: 200ms;">
+            <div class="card animate-slide-up" style="animation-delay: 250ms;">
                 <div class="card-header">
                     <h3><i class="fas fa-camera mr-2"></i> Photos</h3>
                     <span class="badge badge-neutral">{{ invoice.photos.count }} photo{{ invoice.photos.count|pluralize }}</span>
@@ -635,9 +689,48 @@
             align-self: flex-start;
         }
 
+        /* Product Images Section */
+        .product-images-section {
+            margin-bottom: var(--space-6);
+            padding-bottom: var(--space-6);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .product-images-section:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .product-images-title {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin-bottom: var(--space-4);
+            font-size: var(--text-base);
+            font-weight: var(--font-semibold);
+        }
+
+        .product-images-title .product-ref {
+            color: var(--primary-600);
+            font-weight: var(--font-bold);
+        }
+
+        .product-images-title .product-name-sub {
+            color: var(--neutral-500);
+            font-weight: var(--font-normal);
+            font-size: var(--text-sm);
+        }
+
         @media (max-width: 768px) {
             .photos-grid {
                 grid-template-columns: repeat(2, 1fr);
+            }
+
+            .product-images-title {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: var(--space-1);
             }
         }
 
