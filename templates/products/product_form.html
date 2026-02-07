@@ -195,13 +195,13 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Poids Brut (g) <span class="required">*</span></label>
-                        <input type="number" name="gross_weight" value="{% if product %}{{ product.gross_weight }}{% else %}0{% endif %}"
+                        <input type="number" name="gross_weight" value="{% if product %}{{ product.gross_weight|stringformat:'f' }}{% else %}0{% endif %}"
                             step="0.001" min="0" required class="form-input">
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Poids Net (g)</label>
-                        <input type="number" id="net_weight" name="net_weight" value="{% if product %}{{ product.net_weight }}{% else %}0{% endif %}"
+                        <input type="number" id="net_weight" name="net_weight" value="{% if product %}{{ product.net_weight|stringformat:'f' }}{% else %}0{% endif %}"
                             step="0.001" min="0" onchange="calculateCosts()" class="form-input">
                     </div>
                 </div>
@@ -218,14 +218,14 @@
                     <div class="form-group">
                         <label class="form-label">Prix d'Achat/g (DH) <span class="required">*</span></label>
                         <input type="number" id="purchase_price_per_gram" name="purchase_price_per_gram"
-                            value="{% if product %}{{ product.purchase_price_per_gram }}{% else %}0{% endif %}"
+                            value="{% if product %}{{ product.purchase_price_per_gram|stringformat:'f' }}{% else %}0{% endif %}"
                             step="0.01" min="0" required onchange="calculateCosts()" class="form-input">
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Cout du Metal (DH)</label>
                         <input type="number" id="metal_cost" name="metal_cost"
-                            value="{% if product %}{{ product.metal_cost }}{% else %}0{% endif %}"
+                            value="{% if product %}{{ product.metal_cost|stringformat:'f' }}{% else %}0{% endif %}"
                             step="0.01" min="0" readonly class="form-input"
                             style="background: var(--info-50); border-color: var(--info-500); color: var(--info-700); font-weight: 600;">
                         <p class="form-help">Calcule = Poids Net x Prix/g</p>
@@ -234,7 +234,7 @@
                     <div class="form-group">
                         <label class="form-label">Main d'Oeuvre (DH)</label>
                         <input type="number" id="labor_cost" name="labor_cost"
-                            value="{% if product %}{{ product.labor_cost }}{% else %}0{% endif %}"
+                            value="{% if product %}{{ product.labor_cost|stringformat:'f' }}{% else %}0{% endif %}"
                             step="0.01" min="0" onchange="calculateCosts()" class="form-input">
                     </div>
                 </div>
@@ -243,21 +243,21 @@
                     <div class="form-group">
                         <label class="form-label">Cout des Pierres (DH)</label>
                         <input type="number" id="stone_cost" name="stone_cost"
-                            value="{% if product %}{{ product.stone_cost }}{% else %}0{% endif %}"
+                            value="{% if product %}{{ product.stone_cost|stringformat:'f' }}{% else %}0{% endif %}"
                             step="0.01" min="0" onchange="calculateCosts()" class="form-input">
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Autres Couts (DH)</label>
                         <input type="number" id="other_cost" name="other_cost"
-                            value="{% if product %}{{ product.other_cost }}{% else %}0{% endif %}"
+                            value="{% if product %}{{ product.other_cost|stringformat:'f' }}{% else %}0{% endif %}"
                             step="0.01" min="0" onchange="calculateCosts()" class="form-input">
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Cout Total (DH)</label>
                         <input type="number" id="total_cost" name="total_cost"
-                            value="{% if product %}{{ product.total_cost }}{% else %}0{% endif %}"
+                            value="{% if product %}{{ product.total_cost|stringformat:'f' }}{% else %}0{% endif %}"
                             step="0.01" min="0" readonly class="form-input"
                             style="background: var(--success-50); border-color: var(--success-500); color: var(--success-700); font-weight: 700; font-size: var(--text-lg);">
                     </div>
@@ -270,8 +270,8 @@
                         <div class="form-group">
                             <label class="form-label">Type de Marge</label>
                             <select id="margin_type" name="margin_type" onchange="calculateSellingPrice()" class="form-select">
-                                <option value="percentage" selected>Pourcentage (%)</option>
-                                <option value="fixed">Montant Fixe (DH)</option>
+                                <option value="percentage" {% if not product or product.margin_type == 'percentage' %}selected{% endif %}>Pourcentage (%)</option>
+                                <option value="fixed" {% if product and product.margin_type == 'fixed' %}selected{% endif %}>Montant Fixe (DH)</option>
                             </select>
                         </div>
 
@@ -279,16 +279,16 @@
                             <label class="form-label">Valeur de Marge</label>
                             <div class="flex items-center gap-2">
                                 <input type="number" id="margin_value" name="margin_value"
-                                    value="{% if product %}{{ product.margin_value }}{% else %}25{% endif %}"
+                                    value="{% if product %}{{ product.margin_value|stringformat:'f' }}{% else %}25{% endif %}"
                                     step="0.01" min="0" onchange="calculateSellingPrice()" class="form-input">
-                                <span id="margin_unit" class="text-muted font-medium" style="white-space: nowrap;">%</span>
+                                <span id="margin_unit" class="text-muted font-medium" style="white-space: nowrap;">{% if product and product.margin_type == 'fixed' %}DH{% else %}%{% endif %}</span>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">Prix de Vente (DH)</label>
                             <input type="number" id="selling_price" name="selling_price"
-                                value="{% if product %}{{ product.selling_price }}{% else %}0{% endif %}"
+                                value="{% if product %}{{ product.selling_price|stringformat:'f' }}{% else %}0{% endif %}"
                                 step="0.01" min="0" readonly class="form-input"
                                 style="background: var(--primary-50); border-color: var(--primary-500); color: var(--primary-700); font-weight: 700; font-size: var(--text-lg);">
                         </div>
@@ -298,7 +298,7 @@
                 <div class="form-row mt-4">
                     <div class="form-group">
                         <label class="form-label">Prix Minimum (DH) <span class="required">*</span></label>
-                        <input type="number" name="minimum_price" value="{% if product %}{{ product.minimum_price }}{% else %}0{% endif %}"
+                        <input type="number" name="minimum_price" value="{% if product %}{{ product.minimum_price|stringformat:'f' }}{% else %}0{% endif %}"
                             step="0.01" min="0" required class="form-input">
                         <p class="form-help">Prix minimum en dessous duquel une approbation est necessaire</p>
                     </div>
