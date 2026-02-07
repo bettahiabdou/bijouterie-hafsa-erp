@@ -3,7 +3,13 @@ Utility functions for Bijouterie Hafsa ERP
 """
 
 from django.utils import timezone
+from django.core.cache import cache
+from decimal import Decimal
 import uuid
+import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def generate_reference(prefix, model_class=None, date_based=True):
@@ -291,13 +297,6 @@ def generate_certificate_issuer_code():
 # Free APIs used:
 # - Gold price: https://api.gold-api.com/price/XAU (no API key, no limits)
 # - Exchange rate: https://open.er-api.com/v6/latest/USD (no API key, free)
-
-import requests
-from decimal import Decimal
-from django.core.cache import cache
-import logging
-
-logger = logging.getLogger(__name__)
 
 # Troy ounce to gram conversion
 TROY_OUNCE_TO_GRAM = Decimal('31.1035')

@@ -34,8 +34,9 @@ from settings_app.models import (
     StoneClarity, StoneColor, StoneCut, PaymentMethod,
     BankAccount, StockLocation, DeliveryMethod,
     DeliveryPerson, RepairType, CertificateIssuer,
-    CompanySettings, SystemConfig
+    CompanySettings
 )
+# SystemConfig is imported in the view function to avoid migration issues
 
 
 def staff_required(view_func):
@@ -952,6 +953,7 @@ def system_config_edit(request):
     like Telegram bot, Zebra printer, SMTP, etc.
     """
     from django import forms
+    from settings_app.models import SystemConfig
 
     # Get or create the singleton config
     config = SystemConfig.get_config()
