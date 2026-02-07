@@ -7,16 +7,33 @@ import socket
 from django.conf import settings
 
 
+def get_printer_settings():
+    """
+    Get printer settings from SystemConfig (database) or fall back to Django settings.
+    """
+    try:
+        from settings_app.models import SystemConfig
+        config = SystemConfig.get_config()
+        if config.zebra_printer_ip and config.zebra_printer_enabled:
+            return str(config.zebra_printer_ip), config.zebra_printer_port or 9100
+    except Exception:
+        pass  # Fall back to Django settings
+
+    # Fallback to environment variables
+    host = getattr(settings, 'ZEBRA_PRINTER_HOST', '')
+    port = getattr(settings, 'ZEBRA_PRINTER_PORT', 9100)
+    return host, port
+
+
 def send_to_printer(zpl_data):
     """
     Send ZPL data to Zebra printer via TCP
     Returns (success, message)
     """
-    host = getattr(settings, 'ZEBRA_PRINTER_HOST', '')
-    port = getattr(settings, 'ZEBRA_PRINTER_PORT', 19100)
+    host, port = get_printer_settings()
 
     if not host:
-        return False, "Printer not configured (ZEBRA_PRINTER_HOST not set)"
+        return False, "Printer not configured (set IP in Configuration Environnement)"
 
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
