@@ -1431,6 +1431,7 @@
 
         function updatePaymentStatus() {
             const totalNewProducts = selectedExchangeProducts.reduce((sum, p) => sum + p.price, 0);
+            const difference = totalNewProducts - originalPrice; // Différence à payer
             const amountPaid = parseFloat(document.getElementById('exchangeAmountPaid').value) || 0;
 
             const indicator = document.getElementById('paymentStatusIndicator');
@@ -1439,16 +1440,28 @@
             indicator.className = '';
             indicator.style.display = 'block';
 
-            if (amountPaid >= totalNewProducts) {
+            // Compare with the DIFFERENCE, not the total new products
+            // The original price is already "paid" from the old invoice
+            const amountDue = Math.max(0, difference); // Only positive difference needs to be paid
+
+            if (difference <= 0) {
+                // Client gets credit or it's equal - new invoice is fully paid
+                indicator.classList.add('status-paid');
+                if (difference < 0) {
+                    statusText.textContent = `Facture payée - Crédit client: ${Math.abs(difference).toFixed(2)} DH`;
+                } else {
+                    statusText.textContent = 'Facture sera payée (échange équivalent)';
+                }
+            } else if (amountPaid >= amountDue) {
                 indicator.classList.add('status-paid');
                 statusText.textContent = 'Facture sera payée intégralement';
             } else if (amountPaid > 0) {
                 indicator.classList.add('status-partial');
-                const remaining = totalNewProducts - amountPaid;
+                const remaining = amountDue - amountPaid;
                 statusText.textContent = `Paiement partiel - Solde restant: ${remaining.toFixed(2)} DH`;
             } else {
                 indicator.classList.add('status-unpaid');
-                statusText.textContent = 'Facture sera non payée';
+                statusText.textContent = `Facture sera non payée - À payer: ${amountDue.toFixed(2)} DH`;
             }
         }
 

@@ -270,25 +270,42 @@ def invoice_detail(request, reference):
                     new_invoice.calculate_totals()
 
                     # Handle payment amount
+                    # The logic: original price is already "paid" from the exchanged invoice
+                    # So the client only needs to pay the DIFFERENCE (if positive)
                     try:
-                        amount_paid = Decimal(amount_paid_str)
+                        amount_paid_input = Decimal(amount_paid_str)
                     except (InvalidOperation, ValueError):
-                        amount_paid = Decimal('0')
+                        amount_paid_input = Decimal('0')
 
-                    if amount_paid > 0:
-                        new_invoice.amount_paid = amount_paid
-                        new_invoice.balance_due = new_invoice.total_amount - amount_paid
+                    # Calculate the difference to pay
+                    original_item_price = item.total_amount  # Price from original invoice
+                    difference = new_invoice.total_amount - original_item_price
 
-                        if amount_paid >= new_invoice.total_amount:
-                            new_invoice.status = SaleInvoice.Status.PAID
+                    if difference <= 0:
+                        # New products cost less or equal - invoice is fully paid
+                        # The "credit" from original covers everything
+                        new_invoice.amount_paid = new_invoice.total_amount
+                        new_invoice.balance_due = Decimal('0')
+                        new_invoice.status = SaleInvoice.Status.PAID
+                    else:
+                        # Client needs to pay the difference
+                        # amount_paid_input is what they pay NOW for the difference
+                        # Total amount_paid = original_item_price + what they pay now
+                        total_effectively_paid = original_item_price + amount_paid_input
+
+                        if total_effectively_paid >= new_invoice.total_amount:
+                            new_invoice.amount_paid = new_invoice.total_amount
                             new_invoice.balance_due = Decimal('0')
-                        elif amount_paid > 0:
+                            new_invoice.status = SaleInvoice.Status.PAID
+                        elif amount_paid_input > 0:
+                            new_invoice.amount_paid = total_effectively_paid
+                            new_invoice.balance_due = new_invoice.total_amount - total_effectively_paid
                             new_invoice.status = SaleInvoice.Status.PARTIAL_PAID
                         else:
-                            new_invoice.status = SaleInvoice.Status.UNPAID
-                    else:
-                        new_invoice.status = SaleInvoice.Status.UNPAID
-                        new_invoice.balance_due = new_invoice.total_amount
+                            # No additional payment - only original price credited
+                            new_invoice.amount_paid = original_item_price
+                            new_invoice.balance_due = difference
+                            new_invoice.status = SaleInvoice.Status.PARTIAL_PAID
 
                     new_invoice.save()
 
@@ -324,11 +341,11 @@ def invoice_detail(request, reference):
                     # Create success message
                     status_msg = ''
                     if new_invoice.status == SaleInvoice.Status.PAID:
-                        status_msg = ' (Payée)'
+                        status_msg = ' ✓ Payée'
                     elif new_invoice.status == SaleInvoice.Status.PARTIAL_PAID:
-                        status_msg = f' (Partiellement payée - Solde: {new_invoice.balance_due} DH)'
+                        status_msg = f' - Solde: {new_invoice.balance_due} DH'
                     else:
-                        status_msg = ' (Non payée)'
+                        status_msg = f' - À payer: {new_invoice.balance_due} DH'
 
                     messages.success(
                         request,
