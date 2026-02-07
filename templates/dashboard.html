@@ -204,8 +204,48 @@
                 </div>
             </div>
 
+            <!-- Gold Price Widget -->
+            {% if gold_prices %}
+            <div class="card animate-slide-up gold-price-card" style="animation-delay: 150ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-coins mr-2" style="color: #FFD700;"></i> Cours de l'Or</h3>
+                    <span class="gold-live-badge">
+                        <span class="gold-live-dot"></span>
+                        Live
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="gold-price-main">
+                        <div class="gold-price-value">{{ gold_prices.price_24k_gram }}</div>
+                        <div class="gold-price-unit">DH/g <span class="gold-karat">24K</span></div>
+                    </div>
+                    <div class="gold-price-grid">
+                        <div class="gold-price-item">
+                            <span class="gold-karat-label">22K</span>
+                            <span class="gold-karat-price">{{ gold_prices.price_22k_gram }} DH</span>
+                        </div>
+                        <div class="gold-price-item">
+                            <span class="gold-karat-label">21K</span>
+                            <span class="gold-karat-price">{{ gold_prices.price_21k_gram }} DH</span>
+                        </div>
+                        <div class="gold-price-item">
+                            <span class="gold-karat-label">18K</span>
+                            <span class="gold-karat-price">{{ gold_prices.price_18k_gram }} DH</span>
+                        </div>
+                        <div class="gold-price-item">
+                            <span class="gold-karat-label">14K</span>
+                            <span class="gold-karat-price">{{ gold_prices.price_14k_gram }} DH</span>
+                        </div>
+                    </div>
+                    <div class="gold-price-meta">
+                        <span><i class="fas fa-dollar-sign mr-1"></i> 1 USD = {{ gold_prices.usd_mad_rate }} MAD</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Statistics -->
-            <div class="card animate-slide-up" style="animation-delay: 150ms;">
+            <div class="card animate-slide-up" style="animation-delay: 200ms;">
                 <div class="card-header">
                     <h3><i class="fas fa-chart-pie mr-2"></i> Statistiques</h3>
                 </div>
@@ -437,6 +477,112 @@
             font-weight: var(--font-bold);
             font-family: var(--font-display);
             color: var(--neutral-800);
+        }
+
+        /* Gold Price Widget */
+        .gold-price-card {
+            background: linear-gradient(135deg, #FFF9E6 0%, #FFF3CC 100%);
+            border: 1px solid #FFE082;
+        }
+
+        .gold-price-card .card-header {
+            border-bottom-color: #FFE082;
+        }
+
+        .gold-live-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+            color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+
+        .gold-live-dot {
+            width: 8px;
+            height: 8px;
+            background: #4CAF50;
+            border-radius: 50%;
+            animation: pulse-green 2s infinite;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.9); }
+        }
+
+        .gold-price-main {
+            text-align: center;
+            padding: var(--space-4) 0;
+            border-bottom: 1px dashed #FFE082;
+            margin-bottom: var(--space-4);
+        }
+
+        .gold-price-value {
+            font-size: 2.5rem;
+            font-weight: var(--font-bold);
+            color: #B8860B;
+            font-family: var(--font-display);
+            line-height: 1.2;
+        }
+
+        .gold-price-unit {
+            font-size: var(--text-sm);
+            color: #A67C00;
+            margin-top: var(--space-1);
+        }
+
+        .gold-price-unit .gold-karat {
+            background: #FFD700;
+            color: #5D4E37;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: var(--font-bold);
+            font-size: var(--text-xs);
+            margin-left: 4px;
+        }
+
+        .gold-price-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-2);
+        }
+
+        .gold-price-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-2) var(--space-3);
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .gold-karat-label {
+            font-size: var(--text-xs);
+            font-weight: var(--font-bold);
+            color: #8B7355;
+            background: #FFE082;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .gold-karat-price {
+            font-size: var(--text-sm);
+            font-weight: var(--font-semibold);
+            color: #5D4E37;
+        }
+
+        .gold-price-meta {
+            margin-top: var(--space-3);
+            padding-top: var(--space-3);
+            border-top: 1px dashed #FFE082;
+            font-size: var(--text-xs);
+            color: #8B7355;
+            text-align: center;
         }
 
         /* Mobile Responsive */

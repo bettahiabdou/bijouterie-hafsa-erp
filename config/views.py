@@ -16,6 +16,7 @@ from products.models import Product
 from suppliers.models import Supplier
 from repairs.models import Repair
 from clients.models import Client
+from utils import get_gold_price_mad
 
 
 @require_http_methods(["GET", "POST"])
@@ -99,6 +100,9 @@ def dashboard(request):
     # Get recent activities
     recent_activities = ActivityLog.objects.select_related('user').order_by('-created_at')[:10]
 
+    # Get live gold price in MAD
+    gold_prices = get_gold_price_mad()
+
     context = {
         'page_title': 'Tableau de Bord',
         # KPI Cards
@@ -114,6 +118,8 @@ def dashboard(request):
         # Recent data
         'recent_sales': recent_sales,
         'activities': recent_activities,
+        # Gold prices
+        'gold_prices': gold_prices,
     }
     return render(request, 'dashboard.html', context)
 

@@ -283,3 +283,136 @@ def generate_certificate_issuer_code():
     today = timezone.now().date()
     count = CertificateIssuer.objects.filter(created_at__date=today).count() + 1
     return f'CERT-{today.strftime("%Y%m%d")}-{count:04d}'
+
+
+# ============================================================================
+# GOLD PRICE SERVICE
+# ============================================================================
+# Free APIs used:
+# - Gold price: https://api.gold-api.com/price/XAU (no API key, no limits)
+# - Exchange rate: https://open.er-api.com/v6/latest/USD (no API key, free)
+
+import requests
+from decimal import Decimal
+from django.core.cache import cache
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Troy ounce to gram conversion
+TROY_OUNCE_TO_GRAM = Decimal('31.1035')
+
+# Cache timeout in seconds (5 minutes)
+GOLD_PRICE_CACHE_TIMEOUT = 300
+
+
+def get_gold_price_usd():
+    """
+    Get current gold price in USD per troy ounce from Gold-API.com
+
+    Returns:
+        dict: {'price': Decimal, 'updated_at': str} or None if failed
+    """
+    cache_key = 'gold_price_usd'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        response = requests.get(
+            'https://api.gold-api.com/price/XAU',
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        result = {
+            'price': Decimal(str(data['price'])),
+            'updated_at': data.get('updatedAt', ''),
+            'name': data.get('name', 'Gold'),
+        }
+
+        cache.set(cache_key, result, GOLD_PRICE_CACHE_TIMEOUT)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to fetch gold price: {e}")
+        return None
+
+
+def get_usd_to_mad_rate():
+    """
+    Get current USD to MAD exchange rate from Open Exchange Rates API
+
+    Returns:
+        Decimal: Exchange rate or None if failed
+    """
+    cache_key = 'usd_mad_rate'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        response = requests.get(
+            'https://open.er-api.com/v6/latest/USD',
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        rate = Decimal(str(data['rates']['MAD']))
+        cache.set(cache_key, rate, GOLD_PRICE_CACHE_TIMEOUT)
+        return rate
+    except Exception as e:
+        logger.error(f"Failed to fetch USD/MAD rate: {e}")
+        return None
+
+
+def get_gold_price_mad():
+    """
+    Get current gold prices in MAD (Moroccan Dirham)
+
+    Returns:
+        dict: {
+            'price_per_ounce_usd': Decimal,
+            'price_per_ounce_mad': Decimal,
+            'price_per_gram_mad': Decimal,
+            'price_24k_gram': Decimal,
+            'price_22k_gram': Decimal,
+            'price_21k_gram': Decimal,
+            'price_18k_gram': Decimal,
+            'price_14k_gram': Decimal,
+            'usd_mad_rate': Decimal,
+            'updated_at': str,
+        } or None if failed
+    """
+    cache_key = 'gold_price_mad_full'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    gold_usd = get_gold_price_usd()
+    mad_rate = get_usd_to_mad_rate()
+
+    if not gold_usd or not mad_rate:
+        return None
+
+    price_per_ounce_usd = gold_usd['price']
+    price_per_ounce_mad = price_per_ounce_usd * mad_rate
+    price_per_gram_mad = price_per_ounce_mad / TROY_OUNCE_TO_GRAM
+
+    # Calculate prices for different karats (24K = 100% pure)
+    result = {
+        'price_per_ounce_usd': price_per_ounce_usd.quantize(Decimal('0.01')),
+        'price_per_ounce_mad': price_per_ounce_mad.quantize(Decimal('0.01')),
+        'price_per_gram_mad': price_per_gram_mad.quantize(Decimal('0.01')),
+        'price_24k_gram': price_per_gram_mad.quantize(Decimal('0.01')),
+        'price_22k_gram': (price_per_gram_mad * Decimal('22') / Decimal('24')).quantize(Decimal('0.01')),
+        'price_21k_gram': (price_per_gram_mad * Decimal('21') / Decimal('24')).quantize(Decimal('0.01')),
+        'price_18k_gram': (price_per_gram_mad * Decimal('18') / Decimal('24')).quantize(Decimal('0.01')),
+        'price_14k_gram': (price_per_gram_mad * Decimal('14') / Decimal('24')).quantize(Decimal('0.01')),
+        'usd_mad_rate': mad_rate.quantize(Decimal('0.0001')),
+        'updated_at': gold_usd['updated_at'],
+    }
+
+    cache.set(cache_key, result, GOLD_PRICE_CACHE_TIMEOUT)
+    return result
