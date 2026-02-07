@@ -53,14 +53,12 @@ def send_to_printer(zpl_data):
 def generate_product_label_zpl(product, quantity=1):
     """
     Generate ZPL for RFID jewelry hang tag with loop
-    Total tag: 68x26mm - print on RIGHT side (the visible tag head)
-    Left side has the loop/antenna, right side is for printing
+    Total tag: 68x26mm - print on LEFT side (the visible tag head)
+    Right side has the loop/antenna
 
-    Layout (compact with barcode):
-    - Line 1: Weight + Purity (e.g., "5.2g 18K")
-    - Line 2: Price with decimals (e.g., "1012.50")
-    - Line 3: Barcode (with dashes for search: 20260207-0001)
-    - Line 4: Reference date-seq (e.g., "20260207-0001")
+    Layout:
+    - Top: Weight + Purity (e.g., "5.2g 18K")
+    - Bottom: Barcode + Reference
     """
     # Reference parts - get date and sequence (e.g., "20260207-0001" from "PRD-FIN-20260207-0001")
     ref_parts = (product.reference or "").split("-")
@@ -76,26 +74,22 @@ def generate_product_label_zpl(product, quantity=1):
     weight_value = product.net_weight or product.gross_weight
     weight = f"{weight_value:.1f}" if weight_value else ""
 
-    # Price - with 2 decimals
-    price = f"{product.selling_price:.2f}" if product.selling_price else "0.00"
-
     # Purity (e.g., "18K")
     purity = ""
     if product.metal_purity:
         purity = product.metal_purity.name
 
-    # ZPL for 68x26mm tag - print on RIGHT side
-    # X offset ~350 to start on right portion
-    # Top half: weight+purity, price
-    # Bottom half: barcode, reference
+    # ZPL for 68x26mm tag - print on LEFT side
+    # X offset ~10 to start on left portion
+    # Top: weight+purity
+    # Bottom: barcode, reference
     zpl = f"""^XA
 ^CI28
 ^PW544
 ^LL208
-^FO350,15^A0N,20,18^FD{weight}g {purity}^FS
-^FO350,40^A0N,26,22^FD{price}^FS
-^FO350,115^BY1^BCN,35,N,N,N^FD{barcode_data}^FS
-^FO350,160^A0N,16,14^FD{short_ref}^FS
+^FO10,15^A0N,22,20^FD{weight}g {purity}^FS
+^FO10,130^BY1^BCN,35,N,N,N^FD{barcode_data}^FS
+^FO10,175^A0N,16,14^FD{short_ref}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -137,14 +131,13 @@ def print_price_tag(product, quantity=1):
 
 
 def print_test_label():
-    """Print a test label for jewelry RFID hang tag - RIGHT side with barcode"""
+    """Print a test label for jewelry RFID hang tag - LEFT side with barcode"""
     zpl = """^XA
 ^CI28
 ^PW544
 ^LL208
-^FO350,15^A0N,20,18^FD5.2g 18K^FS
-^FO350,40^A0N,26,22^FD1012.50^FS
-^FO350,115^BY1^BCN,35,N,N,N^FD20260207-0001^FS
-^FO350,160^A0N,16,14^FD20260207-0001^FS
+^FO10,15^A0N,22,20^FD5.2g 18K^FS
+^FO10,130^BY1^BCN,35,N,N,N^FD20260207-0001^FS
+^FO10,175^A0N,16,14^FD20260207-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
