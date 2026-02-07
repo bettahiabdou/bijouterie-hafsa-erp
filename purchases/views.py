@@ -456,10 +456,34 @@ def purchase_invoice_detail(request, reference):
         id__in=products_in_invoices
     ).order_by('-created_at')[:100]  # Limit to recent 100
 
+    # Get items and calculate dynamic totals from linked products
+    items = invoice.items.select_related('product').all()
+    dynamic_subtotal = Decimal('0')
+
+    for item in items:
+        if item.product:
+            # Calculate total from current product values
+            net_weight = item.product.net_weight or Decimal('0')
+            price_per_gram = item.product.purchase_price_per_gram or Decimal('0')
+            labor_cost = item.product.labor_cost or Decimal('0')
+            item.dynamic_total = (net_weight * price_per_gram) + labor_cost
+            dynamic_subtotal += item.dynamic_total
+        else:
+            # Use stored values for items without linked product
+            item.dynamic_total = item.total_amount
+            dynamic_subtotal += item.total_amount
+
+    # Calculate dynamic invoice totals
+    dynamic_total = dynamic_subtotal - invoice.discount_amount
+    dynamic_balance = dynamic_total - invoice.amount_paid
+
     context = {
         'invoice': invoice,
-        'items': invoice.items.select_related('product').all(),
+        'items': items,
         'all_products': available_products,
+        'dynamic_subtotal': dynamic_subtotal,
+        'dynamic_total': dynamic_total,
+        'dynamic_balance': dynamic_balance,
     }
     return render(request, 'purchases/purchase_invoice_detail.html', context)
 

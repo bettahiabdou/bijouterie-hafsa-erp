@@ -92,10 +92,34 @@
                                                 <span class="text-muted">-</span>
                                             {% endif %}
                                         </td>
-                                        <td>{{ item.description }}</td>
-                                        <td style="text-align: right;">{{ item.gross_weight }}</td>
-                                        <td style="text-align: right;">{{ item.price_per_gram }} DH</td>
-                                        <td style="text-align: right;" class="font-semibold">{{ item.total_amount }} DH</td>
+                                        <td>
+                                            {% if item.product %}
+                                                {{ item.product.name }} - {{ item.product.reference }}
+                                            {% else %}
+                                                {{ item.description }}
+                                            {% endif %}
+                                        </td>
+                                        <td style="text-align: right;">
+                                            {% if item.product %}
+                                                {{ item.product.net_weight|default:"0" }}
+                                            {% else %}
+                                                {{ item.gross_weight }}
+                                            {% endif %}
+                                        </td>
+                                        <td style="text-align: right;">
+                                            {% if item.product %}
+                                                {{ item.product.purchase_price_per_gram|default:"0" }} DH
+                                            {% else %}
+                                                {{ item.price_per_gram }} DH
+                                            {% endif %}
+                                        </td>
+                                        <td style="text-align: right;" class="font-semibold">
+                                            {% if item.product %}
+                                                {{ item.dynamic_total }} DH
+                                            {% else %}
+                                                {{ item.total_amount }} DH
+                                            {% endif %}
+                                        </td>
                                         <td style="text-align: center;">
                                             <form method="post" style="display: inline;" onsubmit="return confirm('Supprimer cet article?');">
                                                 {% csrf_token %}
@@ -120,21 +144,43 @@
                         {% for item in items %}
                             <div class="item-card">
                                 <div class="item-card-header">
-                                    <span class="item-card-title">{{ item.description }}</span>
+                                    <span class="item-card-title">
+                                        {% if item.product %}
+                                            {{ item.product.name }} - {{ item.product.reference }}
+                                        {% else %}
+                                            {{ item.description }}
+                                        {% endif %}
+                                    </span>
                                 </div>
                                 <div class="item-card-details">
                                     <div class="item-detail">
                                         <span class="item-detail-label">Poids</span>
-                                        <span class="item-detail-value">{{ item.gross_weight }} g</span>
+                                        <span class="item-detail-value">
+                                            {% if item.product %}{{ item.product.net_weight|default:"0" }}{% else %}{{ item.gross_weight }}{% endif %} g
+                                        </span>
                                     </div>
                                     <div class="item-detail">
                                         <span class="item-detail-label">Prix/g</span>
-                                        <span class="item-detail-value">{{ item.price_per_gram }} DH</span>
+                                        <span class="item-detail-value">
+                                            {% if item.product %}{{ item.product.purchase_price_per_gram|default:"0" }}{% else %}{{ item.price_per_gram }}{% endif %} DH
+                                        </span>
                                     </div>
                                     <div class="item-detail">
                                         <span class="item-detail-label">Total</span>
-                                        <span class="item-detail-value font-semibold">{{ item.total_amount }} DH</span>
+                                        <span class="item-detail-value font-semibold">
+                                            {% if item.product %}{{ item.dynamic_total }}{% else %}{{ item.total_amount }}{% endif %} DH
+                                        </span>
                                     </div>
+                                </div>
+                                <div style="margin-top: var(--space-2); text-align: right;">
+                                    <form method="post" style="display: inline;" onsubmit="return confirm('Supprimer cet article?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="remove_item">
+                                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                                        <button type="submit" class="btn btn-ghost btn-sm text-error">
+                                            <i class="fas fa-trash"></i> Supprimer
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                         {% empty %}
@@ -177,7 +223,7 @@
                     <div class="totals-list">
                         <div class="total-row">
                             <span>Sous-total</span>
-                            <span>{{ invoice.subtotal }} DH</span>
+                            <span>{{ dynamic_subtotal|floatformat:2 }} DH</span>
                         </div>
                         {% if invoice.discount_amount > 0 %}
                             <div class="total-row">
@@ -187,7 +233,7 @@
                         {% endif %}
                         <div class="total-row total-final">
                             <span>Total</span>
-                            <span class="text-success">{{ invoice.total_amount }} DH</span>
+                            <span class="text-success">{{ dynamic_total|floatformat:2 }} DH</span>
                         </div>
                     </div>
                 </div>
@@ -201,13 +247,13 @@
                 <div class="card-body">
                     <div class="status-list">
                         <div class="status-item">
-                            <span class="status-label">Paye</span>
+                            <span class="status-label">Payé</span>
                             <span class="status-value">{{ invoice.amount_paid }} DH</span>
                         </div>
                         <div class="status-item">
                             <span class="status-label">Solde</span>
-                            <span class="status-value font-semibold {% if invoice.balance_due > 0 %}text-error{% else %}text-success{% endif %}">
-                                {{ invoice.balance_due }} DH
+                            <span class="status-value font-semibold {% if dynamic_balance > 0 %}text-error{% else %}text-success{% endif %}">
+                                {{ dynamic_balance|floatformat:2 }} DH
                             </span>
                         </div>
                     </div>
