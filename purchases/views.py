@@ -367,6 +367,12 @@ def purchase_invoice_detail(request, reference):
                     try:
                         product = Product.objects.get(id=product_id)
 
+                        # Check if product is already linked to ANY purchase invoice
+                        existing_link = PurchaseInvoiceItem.objects.filter(product=product).first()
+                        if existing_link:
+                            errors.append(f'{product.reference}: déjà dans facture {existing_link.invoice.reference}')
+                            continue
+
                         # Validate required fields
                         if not product.category:
                             errors.append(f'{product.reference}: pas de catégorie')
@@ -438,15 +444,22 @@ def purchase_invoice_detail(request, reference):
 
         return redirect('purchases:purchase_invoice_detail', reference=reference)
 
-    # Get all products for the add product modal (regardless of status)
-    all_products = Product.objects.select_related(
+    # Get products that are NOT already linked to ANY purchase invoice
+    # This ensures each product can only be in one purchase invoice
+    products_in_invoices = PurchaseInvoiceItem.objects.filter(
+        product__isnull=False
+    ).values_list('product_id', flat=True)
+
+    available_products = Product.objects.select_related(
         'category', 'metal_type', 'metal_purity'
+    ).exclude(
+        id__in=products_in_invoices
     ).order_by('-created_at')[:100]  # Limit to recent 100
 
     context = {
         'invoice': invoice,
         'items': invoice.items.select_related('product').all(),
-        'all_products': all_products,
+        'all_products': available_products,
     }
     return render(request, 'purchases/purchase_invoice_detail.html', context)
 
