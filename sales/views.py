@@ -192,10 +192,16 @@ def invoice_detail(request, reference):
             item_id = request.POST.get('item_id')
             replacement_products_json = request.POST.get('replacement_products', '[]')
             new_invoice_reference = request.POST.get('new_invoice_reference', '').strip()
+            # Payment 1
             payment_method_id = request.POST.get('payment_method_id', '')
             payment_reference = request.POST.get('payment_reference', '').strip()
             bank_account_id = request.POST.get('bank_account_id', '')
             amount_paid_str = request.POST.get('amount_paid', '0')
+            # Payment 2 (hybrid)
+            payment_method_id_2 = request.POST.get('payment_method_id_2', '')
+            payment_reference_2 = request.POST.get('payment_reference_2', '').strip()
+            bank_account_id_2 = request.POST.get('bank_account_id_2', '')
+            amount_paid_str_2 = request.POST.get('amount_paid_2', '0')
             notes = request.POST.get('notes', '')
 
             try:
@@ -296,16 +302,66 @@ def invoice_detail(request, reference):
                     # Calculate totals for new invoice
                     new_invoice.calculate_totals()
 
-                    # Handle payment amount
+                    # Handle hybrid payments
                     # The logic:
                     # - Original invoice was already paid (amount_paid on original invoice)
                     # - We transfer that payment to the new invoice
-                    # - The only DIFFERENCE to pay is: new_invoice.total - original_invoice.total
-                    # - Plus any additional payment the client makes now
+                    # - The DIFFERENCE to pay is: new_invoice.total - original_invoice.total
+                    # - Plus any additional payment(s) the client makes now
+                    from payments.models import ClientPayment
+
+                    # Parse payment amounts
                     try:
-                        amount_paid_input = Decimal(amount_paid_str)
+                        amount_paid_1 = Decimal(amount_paid_str)
                     except (InvalidOperation, ValueError):
-                        amount_paid_input = Decimal('0')
+                        amount_paid_1 = Decimal('0')
+
+                    try:
+                        amount_paid_2 = Decimal(amount_paid_str_2)
+                    except (InvalidOperation, ValueError):
+                        amount_paid_2 = Decimal('0')
+
+                    amount_paid_input = amount_paid_1 + amount_paid_2
+                    payment_details = []
+
+                    # Create ClientPayment records for each payment
+                    if amount_paid_1 > 0 and payment_method_id:
+                        try:
+                            pm1 = PaymentMethod.objects.get(id=payment_method_id)
+                            pay_ref_1 = payment_reference if payment_reference else f"PAY-{new_invoice.reference}-1"
+                            ClientPayment.objects.create(
+                                reference=pay_ref_1,
+                                date=timezone.now().date(),
+                                payment_type=ClientPayment.PaymentType.INVOICE,
+                                client=new_invoice.client,
+                                amount=amount_paid_1,
+                                payment_method=pm1,
+                                bank_account_id=bank_account_id or None,
+                                sale_invoice=new_invoice,
+                                created_by=request.user
+                            )
+                            payment_details.append({'method': pm1.name, 'amount': amount_paid_1})
+                        except PaymentMethod.DoesNotExist:
+                            pass
+
+                    if amount_paid_2 > 0 and payment_method_id_2:
+                        try:
+                            pm2 = PaymentMethod.objects.get(id=payment_method_id_2)
+                            pay_ref_2 = payment_reference_2 if payment_reference_2 else f"PAY-{new_invoice.reference}-2"
+                            ClientPayment.objects.create(
+                                reference=pay_ref_2,
+                                date=timezone.now().date(),
+                                payment_type=ClientPayment.PaymentType.INVOICE,
+                                client=new_invoice.client,
+                                amount=amount_paid_2,
+                                payment_method=pm2,
+                                bank_account_id=bank_account_id_2 or None,
+                                sale_invoice=new_invoice,
+                                created_by=request.user
+                            )
+                            payment_details.append({'method': pm2.name, 'amount': amount_paid_2})
+                        except PaymentMethod.DoesNotExist:
+                            pass
 
                     # Calculate the difference to pay
                     # Old invoice total was already paid, so transfer that amount
@@ -716,16 +772,66 @@ def invoice_create(request):
                     invoice.delete()  # Clean up empty invoice
                     return redirect('sales:invoice_create')
 
-                # Handle payment amount if provided during invoice creation
-                try:
-                    amount_paid = Decimal(str(request.POST.get('amount_paid', '0')))
-                except (InvalidOperation, ValueError):
-                    amount_paid = Decimal('0')
+                # Handle payments (multiple payment lines support)
+                from payments.models import ClientPayment
 
-                if amount_paid and amount_paid > 0:
+                total_amount_paid = Decimal('0')
+                payment_details = []
+
+                # Process multiple payment lines
+                for key in request.POST:
+                    if key.startswith('payments[') and key.endswith(']'):
+                        try:
+                            payment_json = request.POST.get(key)
+                            payment_data = json.loads(payment_json)
+                            payment_amount = Decimal(str(payment_data.get('amount', 0)))
+
+                            if payment_amount > 0 and payment_data.get('method_id'):
+                                total_amount_paid += payment_amount
+
+                                # Get payment method
+                                payment_method = PaymentMethod.objects.get(id=payment_data['method_id'])
+
+                                # Create ClientPayment record
+                                payment_ref = payment_data.get('reference', '').strip()
+                                if not payment_ref:
+                                    # Auto-generate reference if not provided
+                                    payment_ref = f"PAY-{invoice.reference}-{len(payment_details)+1}"
+
+                                client_payment = ClientPayment.objects.create(
+                                    reference=payment_ref,
+                                    date=timezone.now().date(),
+                                    payment_type=ClientPayment.PaymentType.INVOICE,
+                                    client=invoice.client,
+                                    amount=payment_amount,
+                                    payment_method=payment_method,
+                                    bank_account_id=payment_data.get('bank_account_id') or None,
+                                    sale_invoice=invoice,
+                                    created_by=request.user
+                                )
+
+                                payment_details.append({
+                                    'method': payment_method.name,
+                                    'amount': payment_amount
+                                })
+
+                        except (json.JSONDecodeError, ValueError, PaymentMethod.DoesNotExist) as e:
+                            print(f'Error processing payment: {e}')
+                            continue
+
+                # Fallback: Check for simple amount_paid field (backward compatibility)
+                if total_amount_paid == 0:
+                    try:
+                        amount_paid = Decimal(str(request.POST.get('amount_paid', '0')))
+                        if amount_paid > 0:
+                            total_amount_paid = amount_paid
+                    except (InvalidOperation, ValueError):
+                        pass
+
+                if total_amount_paid > 0:
                     # SET the amount_paid (not add to it)
-                    invoice.amount_paid = amount_paid
-                    invoice.balance_due = invoice.total_amount - amount_paid
+                    invoice.amount_paid = total_amount_paid
+                    invoice.balance_due = invoice.total_amount - total_amount_paid
                     invoice.update_status()
                     invoice.save(update_fields=['amount_paid', 'balance_due', 'status'])
 
@@ -737,14 +843,17 @@ def invoice_create(request):
                     # Note: if status is UNPAID or PARTIAL, product stays 'indisponible' (reserved)
 
                     # Log the payment activity
+                    payment_summary = ', '.join([f"{p['method']}: {p['amount']} DH" for p in payment_details]) if payment_details else f"{total_amount_paid} DH"
                     ActivityLog.objects.create(
                         user=request.user,
                         action=ActivityLog.ActionType.UPDATE,
                         model_name='SaleInvoice',
                         object_id=str(invoice.id),
-                        object_repr=f'{invoice.reference} - Payment: {amount_paid} DH',
+                        object_repr=f'{invoice.reference} - Paiements: {payment_summary}',
                         ip_address=get_client_ip(request)
                     )
+
+                amount_paid = total_amount_paid  # For message generation below
 
                 # PHASE 3: Invalidate client balance cache on new invoice
                 from django.core.cache import cache
@@ -808,6 +917,7 @@ def invoice_create(request):
             'category', 'metal_type', 'metal_purity', 'supplier'
         ),
         'bank_accounts': BankAccount.objects.filter(is_active=True),
+        'payment_methods': PaymentMethod.objects.filter(is_active=True),
         'sale_types': SaleInvoice.SaleType.choices,
     }
 
@@ -842,6 +952,11 @@ def bulk_invoice_create(request):
             amount_paids = request.POST.getlist('amount_paid')
             bank_accounts = request.POST.getlist('bank_account')
             discount_amounts = request.POST.getlist('discount_amount')
+            # Second payment (hybrid)
+            payment_methods_2 = request.POST.getlist('payment_method_2')
+            payment_references_2 = request.POST.getlist('payment_reference_2')
+            amount_paids_2 = request.POST.getlist('amount_paid_2')
+            bank_accounts_2 = request.POST.getlist('bank_account_2')
 
             # ============================================
             # SERVER-SIDE VALIDATION
@@ -1015,38 +1130,104 @@ def bulk_invoice_create(request):
                             pass
 
                     # Handle amount paid if provided (for partial/full payment at creation)
+                    # Support for hybrid payments (payment 1 + payment 2)
+                    from payments.models import ClientPayment
+
+                    total_amount_paid = Decimal('0')
+                    payment_details = []
+
+                    # Payment 1
                     if i < len(amount_paids) and amount_paids[i].strip():
                         try:
-                            amount_paid = Decimal(amount_paids[i])
-                            if amount_paid > 0:
-                                invoice.amount_paid = amount_paid
+                            amount_paid_1 = Decimal(amount_paids[i])
+                            if amount_paid_1 > 0:
+                                total_amount_paid += amount_paid_1
+                                payment_method_id = payment_methods[i] if i < len(payment_methods) else ''
+                                if payment_method_id:
+                                    try:
+                                        pm = PaymentMethod.objects.get(id=payment_method_id)
+                                        payment_details.append({'method': pm.name, 'amount': amount_paid_1})
 
-                                # Call update_status() to properly set status AND balance_due
-                                # This ensures balance_due = 0 when PAID, and correct balance otherwise
-                                invoice.update_status()
-
-                                invoice.save(update_fields=['amount_paid', 'status', 'balance_due'])
-
-                                # UPDATE PRODUCT STATUS: Change status based on final invoice status
-                                # This must be done AFTER invoice status is updated (not in SaleInvoiceItem.save)
-                                if invoice.status == SaleInvoice.Status.PAID:
-                                    # Get the product from the invoice items
-                                    for item in invoice.items.all():
-                                        item.product.status = 'sold'
-                                        item.product.save(update_fields=['status'])
-                                # Note: if status is UNPAID or PARTIAL, product stays 'indisponible' (reserved)
-
-                                # Log payment activity
-                                ActivityLog.objects.create(
-                                    user=request.user,
-                                    action=ActivityLog.ActionType.CREATE,
-                                    model_name='Payment',
-                                    object_id=str(invoice.id),
-                                    object_repr=f'Paiement {amount_paid} DH - {invoice.reference}',
-                                    ip_address=get_client_ip(request)
-                                )
-                        except (ValueError, InvalidOperation):
+                                        # Create ClientPayment record
+                                        pay_ref = payment_references[i].strip() if i < len(payment_references) else ''
+                                        if not pay_ref:
+                                            pay_ref = f"PAY-{invoice.reference}-1"
+                                        ClientPayment.objects.create(
+                                            reference=pay_ref,
+                                            date=timezone.now().date(),
+                                            payment_type=ClientPayment.PaymentType.INVOICE,
+                                            client=client,
+                                            amount=amount_paid_1,
+                                            payment_method=pm,
+                                            bank_account_id=bank_accounts[i] if i < len(bank_accounts) and bank_accounts[i] else None,
+                                            sale_invoice=invoice,
+                                            created_by=request.user
+                                        )
+                                    except PaymentMethod.DoesNotExist:
+                                        pass
+                        except (InvalidOperation, ValueError):
                             pass
+
+                    # Payment 2 (hybrid)
+                    if i < len(amount_paids_2) and amount_paids_2[i].strip():
+                        try:
+                            amount_paid_2 = Decimal(amount_paids_2[i])
+                            if amount_paid_2 > 0:
+                                total_amount_paid += amount_paid_2
+                                payment_method_id_2 = payment_methods_2[i] if i < len(payment_methods_2) else ''
+                                if payment_method_id_2:
+                                    try:
+                                        pm2 = PaymentMethod.objects.get(id=payment_method_id_2)
+                                        payment_details.append({'method': pm2.name, 'amount': amount_paid_2})
+
+                                        # Create ClientPayment record for second payment
+                                        pay_ref_2 = payment_references_2[i].strip() if i < len(payment_references_2) else ''
+                                        if not pay_ref_2:
+                                            pay_ref_2 = f"PAY-{invoice.reference}-2"
+                                        ClientPayment.objects.create(
+                                            reference=pay_ref_2,
+                                            date=timezone.now().date(),
+                                            payment_type=ClientPayment.PaymentType.INVOICE,
+                                            client=client,
+                                            amount=amount_paid_2,
+                                            payment_method=pm2,
+                                            bank_account_id=bank_accounts_2[i] if i < len(bank_accounts_2) and bank_accounts_2[i] else None,
+                                            sale_invoice=invoice,
+                                            created_by=request.user
+                                        )
+                                    except PaymentMethod.DoesNotExist:
+                                        pass
+                        except (InvalidOperation, ValueError):
+                            pass
+
+                    # Update invoice with total payments
+                    if total_amount_paid > 0:
+                        invoice.amount_paid = total_amount_paid
+
+                        # Call update_status() to properly set status AND balance_due
+                        # This ensures balance_due = 0 when PAID, and correct balance otherwise
+                        invoice.update_status()
+
+                        invoice.save(update_fields=['amount_paid', 'status', 'balance_due'])
+
+                        # UPDATE PRODUCT STATUS: Change status based on final invoice status
+                        # This must be done AFTER invoice status is updated (not in SaleInvoiceItem.save)
+                        if invoice.status == SaleInvoice.Status.PAID:
+                            # Get the product from the invoice items
+                            for item in invoice.items.all():
+                                item.product.status = 'sold'
+                                item.product.save(update_fields=['status'])
+                        # Note: if status is UNPAID or PARTIAL, product stays 'indisponible' (reserved)
+
+                        # Log payment activity
+                        ActivityLog.objects.create(
+                            user=request.user,
+                            action=ActivityLog.ActionType.CREATE,
+                            model_name='Payment',
+                            object_id=str(invoice.id),
+                            object_repr=f'Paiements: {payment_summary} - {invoice.reference}',
+                            ip_address=get_client_ip(request)
+                        )
 
                     # Log invoice creation
                     ActivityLog.objects.create(
@@ -1706,21 +1887,88 @@ def pending_invoice_complete(request, reference):
                 # Calculate totals first
                 invoice.calculate_totals()
 
-                # Get amount paid from form
-                amount_paid_str = request.POST.get('amount_paid', '0')
+                # Handle hybrid payments (payment 1 + payment 2)
+                from payments.models import ClientPayment
+
+                total_amount_paid = Decimal('0')
+                payment_details = []
+
+                # Payment 1
+                amount_paid_1_str = request.POST.get('amount_paid', '0')
+                payment_method_id_1 = request.POST.get('payment_method', '')
+                payment_ref_1 = request.POST.get('payment_reference', '').strip()
+                bank_account_id_1 = request.POST.get('bank_account', '')
+
                 try:
-                    amount_paid = Decimal(amount_paid_str)
+                    amount_paid_1 = Decimal(amount_paid_1_str)
                 except (InvalidOperation, TypeError):
-                    amount_paid = Decimal('0')
+                    amount_paid_1 = Decimal('0')
 
-                # Set payment amounts and determine status based on amount paid
-                invoice.amount_paid = amount_paid
-                invoice.balance_due = invoice.total_amount - amount_paid
+                if amount_paid_1 > 0 and payment_method_id_1:
+                    total_amount_paid += amount_paid_1
+                    try:
+                        pm1 = PaymentMethod.objects.get(id=payment_method_id_1)
+                        payment_details.append({'method': pm1.name, 'amount': amount_paid_1})
 
-                if amount_paid >= invoice.total_amount:
+                        # Create ClientPayment record
+                        if not payment_ref_1:
+                            payment_ref_1 = f"PAY-{invoice.reference}-1"
+                        ClientPayment.objects.create(
+                            reference=payment_ref_1,
+                            date=timezone.now().date(),
+                            payment_type=ClientPayment.PaymentType.INVOICE,
+                            client=invoice.client,
+                            amount=amount_paid_1,
+                            payment_method=pm1,
+                            bank_account_id=bank_account_id_1 or None,
+                            sale_invoice=invoice,
+                            created_by=request.user
+                        )
+                    except PaymentMethod.DoesNotExist:
+                        pass
+
+                # Payment 2 (hybrid)
+                amount_paid_2_str = request.POST.get('amount_paid_2', '0')
+                payment_method_id_2 = request.POST.get('payment_method_2', '')
+                payment_ref_2 = request.POST.get('payment_reference_2', '').strip()
+                bank_account_id_2 = request.POST.get('bank_account_2', '')
+
+                try:
+                    amount_paid_2 = Decimal(amount_paid_2_str)
+                except (InvalidOperation, TypeError):
+                    amount_paid_2 = Decimal('0')
+
+                if amount_paid_2 > 0 and payment_method_id_2:
+                    total_amount_paid += amount_paid_2
+                    try:
+                        pm2 = PaymentMethod.objects.get(id=payment_method_id_2)
+                        payment_details.append({'method': pm2.name, 'amount': amount_paid_2})
+
+                        # Create ClientPayment record
+                        if not payment_ref_2:
+                            payment_ref_2 = f"PAY-{invoice.reference}-2"
+                        ClientPayment.objects.create(
+                            reference=payment_ref_2,
+                            date=timezone.now().date(),
+                            payment_type=ClientPayment.PaymentType.INVOICE,
+                            client=invoice.client,
+                            amount=amount_paid_2,
+                            payment_method=pm2,
+                            bank_account_id=bank_account_id_2 or None,
+                            sale_invoice=invoice,
+                            created_by=request.user
+                        )
+                    except PaymentMethod.DoesNotExist:
+                        pass
+
+                # Set payment amounts and determine status based on total amount paid
+                invoice.amount_paid = total_amount_paid
+                invoice.balance_due = invoice.total_amount - total_amount_paid
+
+                if total_amount_paid >= invoice.total_amount:
                     invoice.status = SaleInvoice.Status.PAID
                     invoice.balance_due = Decimal('0')  # Ensure no negative balance
-                elif amount_paid > 0:
+                elif total_amount_paid > 0:
                     invoice.status = SaleInvoice.Status.PARTIAL_PAID
                 else:
                     invoice.status = SaleInvoice.Status.UNPAID
@@ -1734,13 +1982,14 @@ def pending_invoice_complete(request, reference):
                         item.product.save(update_fields=['status'])
 
                 # Log activity
+                payment_summary = ', '.join([f"{p['method']}: {p['amount']} DH" for p in payment_details]) if payment_details else 'Aucun paiement'
                 ActivityLog.objects.create(
                     user=request.user,
                     action=ActivityLog.ActionType.UPDATE,
                     model_name='SaleInvoice',
                     object_id=str(invoice.id),
                     object_repr=str(invoice),
-                    details={'action': 'completed_draft', 'reference': invoice.reference}
+                    details={'action': 'completed_draft', 'reference': invoice.reference, 'payments': payment_summary}
                 )
 
                 messages.success(request, f"Facture {invoice.reference} validée avec succès!")

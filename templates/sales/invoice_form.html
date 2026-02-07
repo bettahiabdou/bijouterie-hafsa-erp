@@ -218,18 +218,39 @@
                     </div>
                 </div>
 
-                <!-- Payment Section -->
+                <!-- Payment Section - Multi-payment support -->
                 <div class="card mb-6 animate-slide-up" style="animation-delay: 150ms;">
                     <div class="card-header">
-                        <h3><i class="fas fa-money-bill-wave mr-2"></i> Paiement a la Creation</h3>
+                        <h3><i class="fas fa-money-bill-wave mr-2"></i> Paiements</h3>
+                        <button type="button" class="btn btn-secondary btn-sm" id="addPaymentBtn">
+                            <i class="fas fa-plus"></i>
+                            <span>Ajouter</span>
+                        </button>
                     </div>
                     <div class="card-body">
-                        <div class="form-group">
-                            <label class="form-label" for="amountPaidInput">Montant Paye (Optionnel)</label>
-                            <input type="number" name="amount_paid" id="amountPaidInput" class="form-input"
-                                   step="0.01" min="0" value="0" placeholder="0.00">
-                            <p class="form-hint">Montant paye lors de la creation de la facture</p>
+                        <!-- Payment Lines Container -->
+                        <div id="paymentLinesContainer">
+                            <!-- Payment lines will be added here dynamically -->
                         </div>
+
+                        <!-- Empty State -->
+                        <div id="paymentEmptyState" class="empty-state-small">
+                            <i class="fas fa-credit-card"></i>
+                            <p>Aucun paiement ajouté. Cliquez sur "Ajouter" pour enregistrer un paiement.</p>
+                        </div>
+
+                        <!-- Payment Summary -->
+                        <div id="paymentSummary" class="payment-summary" style="display: none;">
+                            <div class="payment-summary-row">
+                                <span>Total des paiements:</span>
+                                <span id="totalPayments">0.00 DH</span>
+                            </div>
+                        </div>
+
+                        <p class="form-hint mt-3">
+                            <i class="fas fa-info-circle"></i>
+                            Vous pouvez ajouter plusieurs paiements (ex: Espèces + Virement)
+                        </p>
                     </div>
                 </div>
 
@@ -1138,19 +1159,161 @@
                 }
             }
 
-            // ============ PAYMENT AMOUNT INPUT ============
-            const amountPaidInput = document.getElementById('amountPaidInput');
-            if (amountPaidInput) {
-                amountPaidInput.addEventListener('change', updateInvoiceSummary);
-                amountPaidInput.addEventListener('keyup', updateInvoiceSummary);
+            // ============ MULTI-PAYMENT SYSTEM ============
+            let paymentLines = [];
+            let paymentLineCounter = 0;
+
+            const paymentMethods = [
+                {% for method in payment_methods %}
+                { id: '{{ method.id }}', name: '{{ method.name }}', nameL: '{{ method.name|lower }}' },
+                {% endfor %}
+            ];
+
+            const bankAccounts = [
+                {% for bank in bank_accounts %}
+                { id: '{{ bank.id }}', name: '{{ bank.bank_name }} - {{ bank.account_number }}' },
+                {% endfor %}
+            ];
+
+            function addPaymentLine() {
+                paymentLineCounter++;
+                const lineId = paymentLineCounter;
+
+                paymentLines.push({
+                    id: lineId,
+                    method_id: '',
+                    amount: 0,
+                    reference: '',
+                    bank_account_id: ''
+                });
+
+                renderPaymentLines();
+                updatePaymentSummary();
+                document.getElementById('paymentEmptyState').style.display = 'none';
+                document.getElementById('paymentSummary').style.display = 'block';
             }
 
-            // Add items to form before submit
+            function removePaymentLine(lineId) {
+                paymentLines = paymentLines.filter(p => p.id !== lineId);
+                renderPaymentLines();
+                updatePaymentSummary();
+
+                if (paymentLines.length === 0) {
+                    document.getElementById('paymentEmptyState').style.display = 'block';
+                    document.getElementById('paymentSummary').style.display = 'none';
+                }
+            }
+
+            function updatePaymentLine(lineId, field, value) {
+                const line = paymentLines.find(p => p.id === lineId);
+                if (line) {
+                    line[field] = value;
+                    updatePaymentSummary();
+
+                    // Show/hide reference and bank account fields based on method
+                    if (field === 'method_id' && value) {
+                        const method = paymentMethods.find(m => m.id == value);
+                        const methodName = method ? method.nameL : '';
+                        const isVirement = methodName.includes('virement') || methodName.includes('bank');
+                        const isEspece = methodName.includes('espece') || methodName.includes('cash') || methodName.includes('espèce');
+
+                        const refInput = document.querySelector(`#payment-ref-${lineId}`);
+                        const bankSelect = document.querySelector(`#payment-bank-${lineId}`);
+                        const refGroup = document.querySelector(`#payment-ref-group-${lineId}`);
+                        const bankGroup = document.querySelector(`#payment-bank-group-${lineId}`);
+
+                        if (refGroup) refGroup.style.display = isEspece ? 'none' : 'block';
+                        if (bankGroup) bankGroup.style.display = isVirement ? 'block' : 'none';
+                    }
+                }
+            }
+
+            function renderPaymentLines() {
+                const container = document.getElementById('paymentLinesContainer');
+                container.innerHTML = paymentLines.map((line, index) => `
+                    <div class="payment-line" data-id="${line.id}">
+                        <div class="payment-line-header">
+                            <span class="payment-line-number">Paiement ${index + 1}</span>
+                            <button type="button" class="btn btn-ghost btn-sm text-error" onclick="removePaymentLine(${line.id})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="payment-line-content">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Méthode *</label>
+                                    <select class="form-select" onchange="updatePaymentLine(${line.id}, 'method_id', this.value)">
+                                        <option value="">-- Sélectionner --</option>
+                                        ${paymentMethods.map(m => `<option value="${m.id}" ${line.method_id == m.id ? 'selected' : ''}>${m.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Montant (DH) *</label>
+                                    <input type="number" class="form-input" step="0.01" min="0" value="${line.amount || ''}"
+                                           placeholder="0.00" onchange="updatePaymentLine(${line.id}, 'amount', parseFloat(this.value) || 0)"
+                                           oninput="updatePaymentLine(${line.id}, 'amount', parseFloat(this.value) || 0)">
+                                </div>
+                            </div>
+                            <div class="form-row" id="payment-ref-group-${line.id}" style="display: none;">
+                                <div class="form-group">
+                                    <label class="form-label">Référence paiement</label>
+                                    <input type="text" id="payment-ref-${line.id}" class="form-input" value="${line.reference || ''}"
+                                           placeholder="N° chèque, réf. virement..."
+                                           onchange="updatePaymentLine(${line.id}, 'reference', this.value)">
+                                </div>
+                                <div class="form-group" id="payment-bank-group-${line.id}" style="display: none;">
+                                    <label class="form-label">Compte bancaire</label>
+                                    <select id="payment-bank-${line.id}" class="form-select" onchange="updatePaymentLine(${line.id}, 'bank_account_id', this.value)">
+                                        <option value="">-- Sélectionner --</option>
+                                        ${bankAccounts.map(b => `<option value="${b.id}" ${line.bank_account_id == b.id ? 'selected' : ''}>${b.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            function updatePaymentSummary() {
+                const total = paymentLines.reduce((sum, p) => sum + (p.amount || 0), 0);
+                document.getElementById('totalPayments').textContent = total.toFixed(2) + ' DH';
+                updateInvoiceSummary();
+            }
+
+            function getTotalPayments() {
+                return paymentLines.reduce((sum, p) => sum + (p.amount || 0), 0);
+            }
+
+            // Update the invoice summary to use payments total
+            const originalUpdateInvoiceSummary = updateInvoiceSummary;
+            updateInvoiceSummary = function() {
+                const subtotal = invoiceItems.reduce((sum, item) => sum + item.total_amount, 0);
+                const amountPaid = getTotalPayments();
+
+                const subtotalEl = document.getElementById('summarySubtotal');
+                const totalEl = document.getElementById('summaryTotal');
+                const paidEl = document.getElementById('summaryPaid');
+                const balanceEl = document.getElementById('summaryBalance');
+
+                if (subtotalEl) subtotalEl.textContent = subtotal.toFixed(2) + ' DH';
+                if (totalEl) totalEl.textContent = subtotal.toFixed(2) + ' DH';
+                if (paidEl) paidEl.textContent = amountPaid.toFixed(2) + ' DH';
+                if (balanceEl) balanceEl.textContent = Math.max(0, subtotal - amountPaid).toFixed(2) + ' DH';
+            };
+
+            // Add Payment button event
+            const addPaymentBtn = document.getElementById('addPaymentBtn');
+            if (addPaymentBtn) {
+                addPaymentBtn.addEventListener('click', addPaymentLine);
+            }
+
+            // Add items and payments to form before submit
             const mainForm = document.querySelector('form[method="post"]');
             if (mainForm) {
                 const submitBtn = mainForm.querySelector('button[type="submit"]');
                 if (submitBtn) {
                     submitBtn.addEventListener('click', function(e) {
+                        // Add items
                         if (invoiceItems.length > 0) {
                             mainForm.querySelectorAll('input[name^="items["]').forEach(el => el.remove());
 
@@ -1162,10 +1325,114 @@
                                 mainForm.appendChild(input);
                             });
                         }
+
+                        // Add payments
+                        mainForm.querySelectorAll('input[name^="payments["]').forEach(el => el.remove());
+                        mainForm.querySelectorAll('input[name="amount_paid"]').forEach(el => el.remove());
+
+                        if (paymentLines.length > 0) {
+                            paymentLines.forEach((payment, index) => {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = `payments[${index}]`;
+                                input.value = JSON.stringify(payment);
+                                mainForm.appendChild(input);
+                            });
+                        }
+
+                        // Add total amount_paid for backward compatibility
+                        const totalPaid = getTotalPayments();
+                        const amountPaidInput = document.createElement('input');
+                        amountPaidInput.type = 'hidden';
+                        amountPaidInput.name = 'amount_paid';
+                        amountPaidInput.value = totalPaid.toFixed(2);
+                        mainForm.appendChild(amountPaidInput);
+
                         mainForm.submit();
                     });
                 }
             }
         });
     </script>
+
+    <style>
+        /* Multi-payment styles */
+        .empty-state-small {
+            text-align: center;
+            padding: var(--space-4);
+            color: var(--neutral-500);
+        }
+
+        .empty-state-small i {
+            font-size: 2rem;
+            margin-bottom: var(--space-2);
+            opacity: 0.5;
+        }
+
+        .empty-state-small p {
+            font-size: var(--text-sm);
+            margin: 0;
+        }
+
+        .payment-line {
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-3);
+            overflow: hidden;
+        }
+
+        .payment-line-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-2) var(--space-3);
+            background: var(--neutral-50);
+            border-bottom: 1px solid var(--neutral-200);
+        }
+
+        .payment-line-number {
+            font-weight: var(--font-semibold);
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        .payment-line-content {
+            padding: var(--space-3);
+        }
+
+        .payment-line-content .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-3);
+        }
+
+        .payment-line-content .form-group {
+            margin-bottom: var(--space-2);
+        }
+
+        .payment-line-content .form-label {
+            font-size: var(--text-xs);
+            margin-bottom: var(--space-1);
+        }
+
+        .payment-summary {
+            margin-top: var(--space-3);
+            padding-top: var(--space-3);
+            border-top: 2px solid var(--neutral-200);
+        }
+
+        .payment-summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+        }
+
+        @media (max-width: 600px) {
+            .payment-line-content .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 {% endblock %}

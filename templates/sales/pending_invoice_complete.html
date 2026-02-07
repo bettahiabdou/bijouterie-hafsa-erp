@@ -189,40 +189,96 @@
                             </select>
                         </div>
 
-                        <div class="form-group">
-                            <label class="form-label">Mode de paiement</label>
-                            <select name="payment_method" id="payment-method-select" class="form-select" onchange="updatePaymentFields()">
-                                <option value="" data-name="">-- Sélectionner --</option>
-                                {% for pm in payment_methods %}
-                                    <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
-                                {% endfor %}
-                            </select>
+                        <!-- Payment 1 -->
+                        <div class="payment-section" style="border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3);">
+                            <h4 style="font-size: var(--text-sm); color: var(--primary-600); margin-bottom: var(--space-3);">
+                                <i class="fas fa-credit-card"></i> Paiement 1
+                            </h4>
+                            <div class="form-group">
+                                <label class="form-label">Mode de paiement</label>
+                                <select name="payment_method" id="payment-method-select" class="form-select" onchange="updatePaymentFields()">
+                                    <option value="" data-name="">-- Sélectionner --</option>
+                                    {% for pm in payment_methods %}
+                                        <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Reference field - hidden for Espèces -->
+                            <div class="form-group" id="reference-group" style="display: none;">
+                                <label class="form-label">Référence de paiement</label>
+                                <input type="text" name="payment_reference" id="payment-reference" class="form-input" placeholder="Numéro de chèque, transaction, etc.">
+                            </div>
+
+                            <!-- Bank account - only for Virement Bancaire -->
+                            <div class="form-group" id="bank-account-group" style="display: none;">
+                                <label class="form-label">Compte bancaire</label>
+                                <select name="bank_account" class="form-select">
+                                    <option value="">-- Sélectionner --</option>
+                                    {% for ba in bank_accounts %}
+                                        <option value="{{ ba.id }}">{{ ba.bank_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Amount Paid 1 -->
+                            <div class="form-group">
+                                <label class="form-label">Montant (DH)</label>
+                                <input type="number" name="amount_paid" id="amount-paid" class="form-input"
+                                       step="0.01" min="0" value="{{ invoice.total_amount|floatformat:2 }}"
+                                       oninput="updatePaymentStatus()">
+                            </div>
                         </div>
 
-                        <!-- Reference field - hidden for Espèces -->
-                        <div class="form-group" id="reference-group" style="display: none;">
-                            <label class="form-label">Référence de paiement</label>
-                            <input type="text" name="payment_reference" id="payment-reference" class="form-input" placeholder="Numéro de chèque, transaction, etc.">
+                        <!-- Payment 2 (Optional - Hybrid) -->
+                        <div class="payment-section" style="border: 1px dashed var(--neutral-300); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3);">
+                            <h4 style="font-size: var(--text-sm); color: var(--neutral-500); margin-bottom: var(--space-3);">
+                                <i class="fas fa-plus-circle"></i> Paiement 2 (optionnel)
+                            </h4>
+                            <div class="form-group">
+                                <label class="form-label">Mode de paiement 2</label>
+                                <select name="payment_method_2" id="payment-method-select-2" class="form-select" onchange="updatePaymentFields2()">
+                                    <option value="" data-name="">-- Aucun --</option>
+                                    {% for pm in payment_methods %}
+                                        <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group" id="reference-group-2" style="display: none;">
+                                <label class="form-label">Référence 2</label>
+                                <input type="text" name="payment_reference_2" id="payment-reference-2" class="form-input" placeholder="Référence...">
+                            </div>
+
+                            <div class="form-group" id="bank-account-group-2" style="display: none;">
+                                <label class="form-label">Compte bancaire 2</label>
+                                <select name="bank_account_2" class="form-select">
+                                    <option value="">-- Sélectionner --</option>
+                                    {% for ba in bank_accounts %}
+                                        <option value="{{ ba.id }}">{{ ba.bank_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Montant 2 (DH)</label>
+                                <input type="number" name="amount_paid_2" id="amount-paid-2" class="form-input"
+                                       step="0.01" min="0" placeholder="0.00"
+                                       oninput="updatePaymentStatus()">
+                            </div>
                         </div>
 
-                        <!-- Bank account - only for Virement Bancaire -->
-                        <div class="form-group" id="bank-account-group" style="display: none;">
-                            <label class="form-label">Compte bancaire</label>
-                            <select name="bank_account" class="form-select">
-                                <option value="">-- Sélectionner --</option>
-                                {% for ba in bank_accounts %}
-                                    <option value="{{ ba.id }}">{{ ba.bank_name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <!-- Amount Paid -->
-                        <div class="form-group">
-                            <label class="form-label">Montant payé (DH)</label>
-                            <input type="number" name="amount_paid" id="amount-paid" class="form-input"
-                                   step="0.01" min="0" value="{{ invoice.total_amount|floatformat:2 }}"
-                                   oninput="updatePaymentStatus()">
-                            <div id="payment-status-hint" class="form-hint"></div>
+                        <!-- Payment Summary -->
+                        <div class="form-group" style="background: var(--neutral-50); padding: var(--space-3); border-radius: var(--radius-md);">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-2);">
+                                <span>Total facture:</span>
+                                <strong>{{ invoice.total_amount|floatformat:2 }} DH</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; color: var(--primary-600);">
+                                <span>Total paiements:</span>
+                                <strong id="total-payments">{{ invoice.total_amount|floatformat:2 }} DH</strong>
+                            </div>
+                            <div id="payment-status-hint" class="form-hint" style="margin-top: var(--space-2);"></div>
                         </div>
 
                         <button type="submit" class="btn btn-success btn-block btn-lg" {% if not items %}disabled{% endif %}>
@@ -808,16 +864,25 @@
             return {{ invoice.total_amount|default:0 }};
         }
 
-        // Payment Status Hint
+        // Payment Status Hint - supports hybrid payments
         function updatePaymentStatus() {
             const invoiceTotal = getInvoiceTotal();
-            const amountPaid = parseFloat(document.getElementById('amount-paid').value) || 0;
-            const hint = document.getElementById('payment-status-hint');
+            const amountPaid1 = parseFloat(document.getElementById('amount-paid').value) || 0;
+            const amountPaid2El = document.getElementById('amount-paid-2');
+            const amountPaid2 = amountPaid2El ? (parseFloat(amountPaid2El.value) || 0) : 0;
+            const totalPaid = amountPaid1 + amountPaid2;
 
-            if (amountPaid >= invoiceTotal && invoiceTotal > 0) {
+            const hint = document.getElementById('payment-status-hint');
+            const totalPaymentsEl = document.getElementById('total-payments');
+
+            if (totalPaymentsEl) {
+                totalPaymentsEl.textContent = totalPaid.toFixed(2) + ' DH';
+            }
+
+            if (totalPaid >= invoiceTotal && invoiceTotal > 0) {
                 hint.innerHTML = '<span style="color: var(--success-600);"><i class="fas fa-check-circle"></i> Payée intégralement</span>';
-            } else if (amountPaid > 0 && invoiceTotal > 0) {
-                const remaining = invoiceTotal - amountPaid;
+            } else if (totalPaid > 0 && invoiceTotal > 0) {
+                const remaining = invoiceTotal - totalPaid;
                 hint.innerHTML = '<span style="color: var(--warning-600);"><i class="fas fa-exclamation-circle"></i> Partiellement payée - Reste: ' + remaining.toFixed(2) + ' DH</span>';
             } else if (invoiceTotal > 0) {
                 hint.innerHTML = '<span style="color: var(--error-600);"><i class="fas fa-times-circle"></i> Non payée</span>';
@@ -865,6 +930,35 @@
                 // Other (cheque, card, etc.) - show only reference
                 referenceGroup.style.display = 'block';
                 bankAccountGroup.style.display = 'none';
+            }
+        }
+
+        // Payment Method Fields Logic - Payment 2 (Hybrid)
+        function updatePaymentFields2() {
+            const select = document.getElementById('payment-method-select-2');
+            if (!select) return;
+
+            const selectedOption = select.options[select.selectedIndex];
+            const paymentName = selectedOption.getAttribute('data-name') || '';
+
+            const referenceGroup = document.getElementById('reference-group-2');
+            const bankAccountGroup = document.getElementById('bank-account-group-2');
+
+            if (!referenceGroup || !bankAccountGroup) return;
+
+            referenceGroup.style.display = 'none';
+            bankAccountGroup.style.display = 'none';
+
+            if (!paymentName) return;
+
+            const isEspeces = paymentName.includes('espèce') || paymentName.includes('espece') || paymentName === 'cash';
+            const isVirement = paymentName.includes('virement');
+
+            if (!isEspeces) {
+                referenceGroup.style.display = 'block';
+                if (isVirement) {
+                    bankAccountGroup.style.display = 'block';
+                }
             }
         }
 

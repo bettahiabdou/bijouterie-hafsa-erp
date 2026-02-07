@@ -1462,6 +1462,26 @@
             bankGroup.style.display = isVirement ? 'block' : 'none';
         }
 
+        // Payment fields for second payment (hybrid)
+        function updatePaymentFields2() {
+            const methodSelect = document.getElementById('exchangePaymentMethod2');
+            if (!methodSelect) return;
+
+            const selectedOption = methodSelect.options[methodSelect.selectedIndex];
+            const methodName = (selectedOption.getAttribute('data-name') || '').toLowerCase();
+            const hasPaymentMethod = methodSelect.value !== '';
+
+            const detailsRow = document.getElementById('paymentDetailsRow2');
+            const bankGroup = document.getElementById('bankAccountGroup2');
+
+            const isVirement = methodName.includes('virement') || methodName.includes('bank');
+            const isEspece = methodName.includes('espece') || methodName.includes('cash') || methodName.includes('espèce');
+            const needsReference = hasPaymentMethod && !isEspece;
+
+            if (detailsRow) detailsRow.style.display = needsReference ? 'grid' : 'none';
+            if (bankGroup) bankGroup.style.display = isVirement ? 'block' : 'none';
+        }
+
         // Helper function to parse numbers with comma or dot as decimal separator
         function parseNumber(value) {
             if (!value) return 0;
@@ -1495,8 +1515,14 @@
             // Difference = new invoice total - original invoice total
             const difference = newInvoiceTotal - originalInvoiceTotal;
 
-            const amountPaidNowStr = document.getElementById('exchangeAmountPaid').value;
-            const amountPaidNow = parseNumber(amountPaidNowStr);
+            // Get both payment amounts (hybrid support)
+            const amountPaid1Str = document.getElementById('exchangeAmountPaid').value;
+            const amountPaid1 = parseNumber(amountPaid1Str);
+
+            const amountPaid2El = document.getElementById('exchangeAmountPaid2');
+            const amountPaid2 = amountPaid2El ? parseNumber(amountPaid2El.value) : 0;
+
+            const amountPaidNow = amountPaid1 + amountPaid2;
 
             const indicator = document.getElementById('paymentStatusIndicator');
             const statusText = document.getElementById('paymentStatusText');
@@ -1584,10 +1610,20 @@
                 document.getElementById('exchangeItemId').value = currentItemId;
                 document.getElementById('exchangeReplacementProducts').value = JSON.stringify(productsData);
                 document.getElementById('exchangeNewInvoiceRef').value = document.getElementById('exchangeNewReference').value;
+                // Payment 1
                 document.getElementById('exchangePaymentMethodId').value = document.getElementById('exchangePaymentMethod').value;
                 document.getElementById('exchangePaymentRef').value = document.getElementById('exchangePaymentReference').value;
                 document.getElementById('exchangeBankAccountId').value = document.getElementById('exchangeBankAccount').value;
                 document.getElementById('exchangeAmountPaidField').value = document.getElementById('exchangeAmountPaid').value;
+                // Payment 2 (hybrid)
+                const pm2El = document.getElementById('exchangePaymentMethod2');
+                const ref2El = document.getElementById('exchangePaymentReference2');
+                const bank2El = document.getElementById('exchangeBankAccount2');
+                const amt2El = document.getElementById('exchangeAmountPaid2');
+                document.getElementById('exchangePaymentMethodId2').value = pm2El ? pm2El.value : '';
+                document.getElementById('exchangePaymentRef2').value = ref2El ? ref2El.value : '';
+                document.getElementById('exchangeBankAccountId2').value = bank2El ? bank2El.value : '';
+                document.getElementById('exchangeAmountPaidField2').value = amt2El ? amt2El.value : '';
                 document.getElementById('exchangeNotes').value = notes;
                 document.getElementById('exchangeForm').submit();
             }
@@ -1710,37 +1746,77 @@
                             </div>
                         </div>
 
-                        <!-- Payment Method -->
-                        <div class="form-row" style="margin-top: var(--space-4);">
-                            <div class="form-group">
-                                <label class="form-label">Méthode de paiement</label>
-                                <select id="exchangePaymentMethod" class="form-select" onchange="updatePaymentFields()">
-                                    <option value="">-- Sélectionner --</option>
-                                    {% for method in payment_methods %}
-                                        <option value="{{ method.id }}" data-name="{{ method.name|lower }}">{{ method.name }}</option>
-                                    {% endfor %}
-                                </select>
+                        <!-- Payment 1 -->
+                        <div style="border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: var(--space-3); margin-top: var(--space-4);">
+                            <h4 style="font-size: var(--text-sm); color: var(--primary-600); margin-bottom: var(--space-2);">
+                                <i class="fas fa-credit-card"></i> Paiement 1
+                            </h4>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Méthode</label>
+                                    <select id="exchangePaymentMethod" class="form-select" onchange="updatePaymentFields()">
+                                        <option value="">-- Sélectionner --</option>
+                                        {% for method in payment_methods %}
+                                            <option value="{{ method.id }}" data-name="{{ method.name|lower }}">{{ method.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Montant (DH)</label>
+                                    <input type="text" id="exchangeAmountPaid" class="form-input" placeholder="0.00" onchange="updatePaymentStatus()" oninput="updatePaymentStatus()">
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">Montant payé (DH)</label>
-                                <input type="text" id="exchangeAmountPaid" class="form-input" placeholder="0.00" onchange="updatePaymentStatus()" oninput="updatePaymentStatus()">
+                            <div class="form-row" id="paymentDetailsRow" style="display: none;">
+                                <div class="form-group" id="paymentReferenceGroup">
+                                    <label class="form-label">Référence</label>
+                                    <input type="text" id="exchangePaymentReference" class="form-input" placeholder="N° chèque, référence...">
+                                </div>
+                                <div class="form-group" id="bankAccountGroup" style="display: none;">
+                                    <label class="form-label">Compte bancaire</label>
+                                    <select id="exchangeBankAccount" class="form-select">
+                                        <option value="">-- Sélectionner --</option>
+                                        {% for bank in bank_accounts %}
+                                            <option value="{{ bank.id }}">{{ bank.bank_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Payment Reference & Bank Account -->
-                        <div class="form-row" id="paymentDetailsRow" style="display: none;">
-                            <div class="form-group" id="paymentReferenceGroup">
-                                <label class="form-label">Référence de paiement</label>
-                                <input type="text" id="exchangePaymentReference" class="form-input" placeholder="N° chèque, référence virement...">
+                        <!-- Payment 2 (Hybrid - Optional) -->
+                        <div style="border: 1px dashed var(--neutral-300); border-radius: var(--radius-md); padding: var(--space-3); margin-top: var(--space-3);">
+                            <h4 style="font-size: var(--text-sm); color: var(--neutral-500); margin-bottom: var(--space-2);">
+                                <i class="fas fa-plus-circle"></i> Paiement 2 (optionnel)
+                            </h4>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Méthode 2</label>
+                                    <select id="exchangePaymentMethod2" class="form-select" onchange="updatePaymentFields2()">
+                                        <option value="">-- Aucun --</option>
+                                        {% for method in payment_methods %}
+                                            <option value="{{ method.id }}" data-name="{{ method.name|lower }}">{{ method.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Montant 2 (DH)</label>
+                                    <input type="text" id="exchangeAmountPaid2" class="form-input" placeholder="0.00" onchange="updatePaymentStatus()" oninput="updatePaymentStatus()">
+                                </div>
                             </div>
-                            <div class="form-group" id="bankAccountGroup" style="display: none;">
-                                <label class="form-label">Compte bancaire</label>
-                                <select id="exchangeBankAccount" class="form-select">
-                                    <option value="">-- Sélectionner --</option>
-                                    {% for bank in bank_accounts %}
-                                        <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_number }}</option>
-                                    {% endfor %}
-                                </select>
+                            <div class="form-row" id="paymentDetailsRow2" style="display: none;">
+                                <div class="form-group" id="paymentReferenceGroup2">
+                                    <label class="form-label">Référence 2</label>
+                                    <input type="text" id="exchangePaymentReference2" class="form-input" placeholder="Référence...">
+                                </div>
+                                <div class="form-group" id="bankAccountGroup2" style="display: none;">
+                                    <label class="form-label">Compte 2</label>
+                                    <select id="exchangeBankAccount2" class="form-select">
+                                        <option value="">-- Sélectionner --</option>
+                                        {% for bank in bank_accounts %}
+                                            <option value="{{ bank.id }}">{{ bank.bank_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
@@ -1781,10 +1857,16 @@
         <input type="hidden" name="item_id" id="exchangeItemId" value="">
         <input type="hidden" name="replacement_products" id="exchangeReplacementProducts" value="">
         <input type="hidden" name="new_invoice_reference" id="exchangeNewInvoiceRef" value="">
+        <!-- Payment 1 -->
         <input type="hidden" name="payment_method_id" id="exchangePaymentMethodId" value="">
         <input type="hidden" name="payment_reference" id="exchangePaymentRef" value="">
         <input type="hidden" name="bank_account_id" id="exchangeBankAccountId" value="">
         <input type="hidden" name="amount_paid" id="exchangeAmountPaidField" value="">
+        <!-- Payment 2 (Hybrid) -->
+        <input type="hidden" name="payment_method_id_2" id="exchangePaymentMethodId2" value="">
+        <input type="hidden" name="payment_reference_2" id="exchangePaymentRef2" value="">
+        <input type="hidden" name="bank_account_id_2" id="exchangeBankAccountId2" value="">
+        <input type="hidden" name="amount_paid_2" id="exchangeAmountPaidField2" value="">
         <input type="hidden" name="notes" id="exchangeNotes" value="">
     </form>
 

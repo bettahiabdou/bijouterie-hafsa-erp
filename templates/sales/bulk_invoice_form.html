@@ -137,30 +137,63 @@
                                 </tr>
                                 <!-- Detail row template -->
                                 <tr class="detail-row" style="display: none;">
-                                    <td colspan="9">
+                                    <td colspan="10">
                                         <div class="detail-content">
                                             <div class="detail-grid">
                                                 <div class="form-group payment-reference-field" style="display: none;">
-                                                    <label class="form-label">Reference de Paiement *</label>
+                                                    <label class="form-label">Référence Paiement 1</label>
                                                     <input type="text" name="payment_reference" class="payment_reference form-input"
-                                                        placeholder="N° cheque, reference virement, n° de carte...">
-                                                    <p class="form-hint">Requis pour: virement bancaire, cheque, carte bancaire, paiement mobile</p>
+                                                        placeholder="N° chèque, référence virement...">
                                                 </div>
                                                 <div class="form-group bank-account-field" style="display: none;">
-                                                    <label class="form-label">Compte Bancaire (Virement)</label>
+                                                    <label class="form-label">Compte Bancaire</label>
                                                     <select name="bank_account" class="bank_account form-select">
-                                                        <option value="">-- Selectionner un compte --</option>
+                                                        <option value="">-- Sélectionner --</option>
                                                         {% for bank in bank_accounts %}
                                                             <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_number }}</option>
                                                         {% endfor %}
                                                     </select>
-                                                    <p class="form-hint">Compte bancaire pour le virement</p>
                                                 </div>
                                                 <div class="form-group">
                                                     <label class="form-label">Remise (DH)</label>
                                                     <input type="number" name="discount_amount" class="discount_amount form-input"
                                                         step="0.01" min="0" value="0">
-                                                    <p class="form-hint">Remise automatique ou manuelle (calculee si prix modifie)</p>
+                                                </div>
+                                            </div>
+                                            <!-- Second Payment (Hybrid) -->
+                                            <div class="hybrid-payment-section" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--neutral-300);">
+                                                <label class="form-label" style="color: var(--primary-600); margin-bottom: 8px;">
+                                                    <i class="fas fa-plus-circle"></i> Paiement supplémentaire (optionnel)
+                                                </label>
+                                                <div class="detail-grid">
+                                                    <div class="form-group">
+                                                        <label class="form-label">Méthode 2</label>
+                                                        <select name="payment_method_2" class="payment_method_2 form-select form-select-sm">
+                                                            <option value="">-- Aucune --</option>
+                                                            {% for method in payment_methods %}
+                                                                <option value="{{ method.id }}" data-name="{{ method.name|lower }}">{{ method.name }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label class="form-label">Montant 2 (DH)</label>
+                                                        <input type="number" name="amount_paid_2" class="amount_paid_2 form-input form-input-sm"
+                                                            step="0.01" min="0" placeholder="0.00">
+                                                    </div>
+                                                    <div class="form-group payment-reference-field-2" style="display: none;">
+                                                        <label class="form-label">Référence 2</label>
+                                                        <input type="text" name="payment_reference_2" class="payment_reference_2 form-input"
+                                                            placeholder="N° chèque, référence...">
+                                                    </div>
+                                                    <div class="form-group bank-account-field-2" style="display: none;">
+                                                        <label class="form-label">Compte Bancaire 2</label>
+                                                        <select name="bank_account_2" class="bank_account_2 form-select">
+                                                            <option value="">-- Sélectionner --</option>
+                                                            {% for bank in bank_accounts %}
+                                                                <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_number }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -243,7 +276,7 @@
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label class="form-label">Montant Paye</label>
+                                        <label class="form-label">Montant Payé 1</label>
                                         <input type="number" name="amount_paid" class="amount_paid_mobile form-input"
                                             step="0.01" min="0" placeholder="0.00">
                                     </div>
@@ -251,6 +284,33 @@
                                         <label class="form-label">Remise (DH)</label>
                                         <input type="number" name="discount_amount" class="discount_amount_mobile form-input"
                                             step="0.01" min="0" value="0">
+                                    </div>
+                                </div>
+                                <!-- Second Payment (Hybrid) - Mobile -->
+                                <div class="hybrid-payment-section-mobile" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--neutral-300);">
+                                    <label class="form-label" style="color: var(--primary-600); margin-bottom: 8px;">
+                                        <i class="fas fa-plus-circle"></i> Paiement 2 (optionnel)
+                                    </label>
+                                    <div class="form-group">
+                                        <label class="form-label">Méthode 2</label>
+                                        <select name="payment_method_2" class="payment_method_2_mobile form-select">
+                                            <option value="">-- Aucune --</option>
+                                            {% for method in payment_methods %}
+                                                <option value="{{ method.id }}" data-name="{{ method.name|lower }}">{{ method.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label class="form-label">Montant 2</label>
+                                            <input type="number" name="amount_paid_2" class="amount_paid_2_mobile form-input"
+                                                step="0.01" min="0" placeholder="0.00">
+                                        </div>
+                                        <div class="form-group payment-reference-field-2-mobile" style="display: none;">
+                                            <label class="form-label">Réf. 2</label>
+                                            <input type="text" name="payment_reference_2" class="payment_reference_2_mobile form-input"
+                                                placeholder="Référence...">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
