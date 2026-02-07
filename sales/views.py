@@ -185,81 +185,156 @@ def invoice_detail(request, reference):
                 except SaleInvoiceItem.DoesNotExist:
                     messages.error(request, 'Article non trouvé.')
 
-        # Handle exchange action
+        # Handle exchange action (supports multiple products and payment)
         elif action == 'exchange_item':
+            import json
+
             item_id = request.POST.get('item_id')
-            replacement_product_id = request.POST.get('replacement_product_id')
+            replacement_products_json = request.POST.get('replacement_products', '[]')
+            payment_method_id = request.POST.get('payment_method_id', '')
+            payment_reference = request.POST.get('payment_reference', '').strip()
+            bank_account_id = request.POST.get('bank_account_id', '')
+            amount_paid_str = request.POST.get('amount_paid', '0')
             notes = request.POST.get('notes', '')
 
-            if item_id and replacement_product_id:
+            try:
+                replacement_products_data = json.loads(replacement_products_json)
+            except json.JSONDecodeError:
+                replacement_products_data = []
+
+            if item_id and replacement_products_data:
                 try:
                     item = SaleInvoiceItem.objects.get(id=item_id, invoice=invoice)
                     original_product = item.product
                     original_ref = original_product.reference
 
-                    replacement_product = Product.objects.get(id=replacement_product_id)
+                    # Validate all replacement products are available
+                    replacement_refs = []
+                    for prod_data in replacement_products_data:
+                        prod = Product.objects.get(id=prod_data['id'])
+                        if prod.status == 'sold':
+                            messages.error(request, f'{prod.reference} est déjà vendu.')
+                            return redirect('sales:invoice_detail', reference=reference)
+                        replacement_refs.append(prod.reference)
 
-                    # Check replacement product is available
-                    if replacement_product.status == 'sold':
-                        messages.error(request, f'{replacement_product.reference} est déjà vendu.')
-                    else:
-                        # Create new invoice for the exchange
-                        new_invoice = SaleInvoice.objects.create(
-                            date=timezone.now().date(),
-                            sale_type=invoice.sale_type,
-                            client=invoice.client,
-                            seller=request.user,
-                            created_by=request.user,
-                            notes=f"Échange depuis {invoice.reference} - {original_ref} → {replacement_product.reference}",
-                        )
+                    # Create new invoice for the exchange
+                    new_invoice = SaleInvoice.objects.create(
+                        date=timezone.now().date(),
+                        sale_type=invoice.sale_type,
+                        client=invoice.client,
+                        seller=request.user,
+                        created_by=request.user,
+                        notes=f"Échange depuis {invoice.reference} - {original_ref} → {', '.join(replacement_refs)}",
+                    )
 
-                        # Add the replacement product to new invoice
+                    # Add payment method if provided
+                    if payment_method_id:
+                        try:
+                            payment_method = PaymentMethod.objects.get(id=payment_method_id)
+                            new_invoice.payment_method = payment_method
+                            if payment_reference:
+                                new_invoice.payment_reference = payment_reference
+                            if bank_account_id:
+                                try:
+                                    bank_account = BankAccount.objects.get(id=bank_account_id)
+                                    new_invoice.bank_account = bank_account
+                                except BankAccount.DoesNotExist:
+                                    pass
+                        except PaymentMethod.DoesNotExist:
+                            pass
+
+                    # Add all replacement products to new invoice with custom prices
+                    first_replacement = None
+                    for prod_data in replacement_products_data:
+                        replacement_product = Product.objects.get(id=prod_data['id'])
+                        custom_price = Decimal(str(prod_data.get('price', replacement_product.selling_price)))
+
+                        if first_replacement is None:
+                            first_replacement = replacement_product
+
                         SaleInvoiceItem.objects.create(
                             invoice=new_invoice,
                             product=replacement_product,
                             quantity=1,
                             original_price=replacement_product.selling_price,
-                            negotiated_price=replacement_product.selling_price,
-                            unit_price=replacement_product.selling_price,
-                            total_amount=replacement_product.selling_price,
+                            negotiated_price=custom_price,
+                            unit_price=custom_price,
+                            total_amount=custom_price,
                         )
-
-                        # Update new invoice totals
-                        new_invoice.calculate_totals()
-
-                        # Create action record
-                        SaleInvoiceAction.objects.create(
-                            original_invoice=invoice,
-                            action_type=SaleInvoiceAction.ActionType.EXCHANGE,
-                            original_product=original_product,
-                            original_product_ref=original_ref,
-                            new_invoice=new_invoice,
-                            replacement_product=replacement_product,
-                            notes=notes,
-                            created_by=request.user
-                        )
-
-                        # Update original product status to available
-                        original_product.status = 'available'
-                        original_product.save(update_fields=['status'])
 
                         # Update replacement product status to sold
                         replacement_product.status = 'sold'
                         replacement_product.save(update_fields=['status'])
 
-                        # Update original invoice status to exchanged
-                        invoice.status = SaleInvoice.Status.EXCHANGED
-                        invoice.save(update_fields=['status'])
+                    # Calculate totals for new invoice
+                    new_invoice.calculate_totals()
 
-                        ActivityLog.objects.create(
-                            user=request.user,
-                            action=ActivityLog.ActionType.UPDATE,
-                            model_name='SaleInvoice',
-                            object_id=str(invoice.id),
-                            object_repr=f'Exchanged {original_ref} for {replacement_product.reference}',
-                            ip_address=get_client_ip(request)
-                        )
-                        messages.success(request, f'Échange effectué: {original_ref} → {replacement_product.reference}. Nouvelle facture: {new_invoice.reference}')
+                    # Handle payment amount
+                    try:
+                        amount_paid = Decimal(amount_paid_str)
+                    except (InvalidOperation, ValueError):
+                        amount_paid = Decimal('0')
+
+                    if amount_paid > 0:
+                        new_invoice.amount_paid = amount_paid
+                        new_invoice.balance_due = new_invoice.total_amount - amount_paid
+
+                        if amount_paid >= new_invoice.total_amount:
+                            new_invoice.status = SaleInvoice.Status.PAID
+                            new_invoice.balance_due = Decimal('0')
+                        elif amount_paid > 0:
+                            new_invoice.status = SaleInvoice.Status.PARTIAL_PAID
+                        else:
+                            new_invoice.status = SaleInvoice.Status.UNPAID
+                    else:
+                        new_invoice.status = SaleInvoice.Status.UNPAID
+                        new_invoice.balance_due = new_invoice.total_amount
+
+                    new_invoice.save()
+
+                    # Create action record (link to first replacement product for reference)
+                    SaleInvoiceAction.objects.create(
+                        original_invoice=invoice,
+                        action_type=SaleInvoiceAction.ActionType.EXCHANGE,
+                        original_product=original_product,
+                        original_product_ref=original_ref,
+                        new_invoice=new_invoice,
+                        replacement_product=first_replacement,
+                        notes=notes,
+                        created_by=request.user
+                    )
+
+                    # Update original product status to available
+                    original_product.status = 'available'
+                    original_product.save(update_fields=['status'])
+
+                    # Update original invoice status to exchanged
+                    invoice.status = SaleInvoice.Status.EXCHANGED
+                    invoice.save(update_fields=['status'])
+
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.UPDATE,
+                        model_name='SaleInvoice',
+                        object_id=str(invoice.id),
+                        object_repr=f'Exchanged {original_ref} for {", ".join(replacement_refs)}',
+                        ip_address=get_client_ip(request)
+                    )
+
+                    # Create success message
+                    status_msg = ''
+                    if new_invoice.status == SaleInvoice.Status.PAID:
+                        status_msg = ' (Payée)'
+                    elif new_invoice.status == SaleInvoice.Status.PARTIAL_PAID:
+                        status_msg = f' (Partiellement payée - Solde: {new_invoice.balance_due} DH)'
+                    else:
+                        status_msg = ' (Non payée)'
+
+                    messages.success(
+                        request,
+                        f'Échange effectué: {original_ref} → {", ".join(replacement_refs)}. '
+                        f'Nouvelle facture: {new_invoice.reference}{status_msg}'
+                    )
 
                 except SaleInvoiceItem.DoesNotExist:
                     messages.error(request, 'Article non trouvé.')
@@ -285,12 +360,18 @@ def invoice_detail(request, reference):
         'original_product', 'replacement_product', 'new_invoice', 'created_by'
     ).all()
 
+    # Get payment methods and bank accounts for exchange modal
+    payment_methods = PaymentMethod.objects.filter(is_active=True)
+    bank_accounts = BankAccount.objects.filter(is_active=True)
+
     context = {
         'invoice': invoice,
         'items': invoice.items.all(),
         'products': products,
         'exchange_products': exchange_products,
         'invoice_actions': invoice_actions,
+        'payment_methods': payment_methods,
+        'bank_accounts': bank_accounts,
     }
 
     return render(request, 'sales/invoice_detail.html', context)

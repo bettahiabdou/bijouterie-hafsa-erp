@@ -117,7 +117,7 @@
                                                 </td>
                                             {% elif invoice.status == 'paid' %}
                                                 <td class="text-center">
-                                                    <button type="button" onclick="openReturnExchangeModal('{{ item.id }}', '{{ item.product.reference }}')" class="btn btn-ghost btn-sm text-warning">
+                                                    <button type="button" onclick="openReturnExchangeModal('{{ item.id }}', '{{ item.product.reference }}', '{{ item.total_amount }}')" class="btn btn-ghost btn-sm text-warning">
                                                         <i class="fas fa-exchange-alt"></i>
                                                     </button>
                                                 </td>
@@ -278,13 +278,26 @@
                                         <span class="font-semibold">{{ action.original_product_ref }}</span>
                                     </td>
                                     <td>
-                                        {% if action.replacement_product %}
+                                        {% if action.new_invoice %}
+                                            {% for item in action.new_invoice.items.all %}
+                                                <a href="{% url 'products:detail' item.product.reference %}" class="text-primary">
+                                                    {{ item.product.reference }}
+                                                </a>
+                                                <small class="text-muted">({{ item.total_amount }} DH)</small>
+                                                {% if not forloop.last %}<br>{% endif %}
+                                            {% endfor %}
+                                            <br><small>
+                                                <a href="{% url 'sales:invoice_detail' action.new_invoice.reference %}">
+                                                    <i class="fas fa-file-invoice mr-1"></i>{{ action.new_invoice.reference }}
+                                                </a>
+                                                <span class="badge {% if action.new_invoice.status == 'paid' %}badge-success{% elif action.new_invoice.status == 'partial' %}badge-warning{% else %}badge-error{% endif %}" style="margin-left: 4px;">
+                                                    {{ action.new_invoice.get_status_display }}
+                                                </span>
+                                            </small>
+                                        {% elif action.replacement_product %}
                                             <a href="{% url 'products:detail' action.replacement_product.reference %}" class="text-primary">
                                                 {{ action.replacement_product.reference }}
                                             </a>
-                                            {% if action.new_invoice %}
-                                                <br><small><a href="{% url 'sales:invoice_detail' action.new_invoice.reference %}">{{ action.new_invoice.reference }}</a></small>
-                                            {% endif %}
                                         {% else %}
                                             <span class="text-muted">-</span>
                                         {% endif %}
@@ -1223,21 +1236,37 @@
         // ===== Return/Exchange Modal Functions =====
         let currentItemId = null;
         let currentAction = null;
-        let selectedExchangeProductId = null;
+        let originalPrice = 0;
+        let selectedExchangeProducts = []; // Array of {id, ref, price, name}
 
-        function openReturnExchangeModal(itemId, productRef) {
+        function openReturnExchangeModal(itemId, productRef, itemPrice) {
             currentItemId = itemId;
             currentAction = null;
-            selectedExchangeProductId = null;
+            originalPrice = parseFloat(itemPrice) || 0;
+            selectedExchangeProducts = [];
 
             document.getElementById('returnExchangeProductRef').textContent = productRef;
+            document.getElementById('originalPriceBadge').textContent = originalPrice.toFixed(2) + ' DH';
             document.getElementById('returnExchangeNotes').value = '';
             document.getElementById('confirmReturnExchangeBtn').disabled = true;
 
             // Reset action choices
             document.querySelectorAll('.re-action-choice-btn').forEach(btn => btn.classList.remove('selected'));
             document.getElementById('exchangeProductSection').classList.remove('visible');
-            document.getElementById('selectedExchangeProduct').style.display = 'none';
+
+            // Reset selected products
+            document.getElementById('selectedProductsList').innerHTML = '';
+            document.getElementById('selectedProductsSection').style.display = 'none';
+            document.getElementById('exchangePaymentSection').style.display = 'none';
+
+            // Reset payment fields
+            document.getElementById('exchangePaymentMethod').value = '';
+            document.getElementById('exchangeAmountPaid').value = '';
+            document.getElementById('exchangePaymentReference').value = '';
+            document.getElementById('exchangeBankAccount').value = '';
+            document.getElementById('paymentDetailsRow').style.display = 'none';
+            document.getElementById('paymentStatusIndicator').style.display = 'none';
+
             const searchInput = document.getElementById('exchangeProductSearch');
             if (searchInput) searchInput.value = '';
             filterExchangeProducts();
@@ -1249,7 +1278,8 @@
             document.getElementById('returnExchangeModal').classList.remove('active');
             currentItemId = null;
             currentAction = null;
-            selectedExchangeProductId = null;
+            originalPrice = 0;
+            selectedExchangeProducts = [];
         }
 
         function selectReturnExchangeAction(action) {
@@ -1264,23 +1294,162 @@
             } else if (action === 'exchange') {
                 document.querySelector('.re-exchange-btn').classList.add('selected');
                 document.getElementById('exchangeProductSection').classList.add('visible');
-                document.getElementById('confirmReturnExchangeBtn').disabled = !selectedExchangeProductId;
+                updateExchangeTotals();
+                document.getElementById('confirmReturnExchangeBtn').disabled = selectedExchangeProducts.length === 0;
             }
         }
 
-        function selectExchangeProduct(productId, productRef) {
-            selectedExchangeProductId = productId;
+        function addExchangeProduct(productId, productRef, price, name) {
+            // Check if already selected
+            if (selectedExchangeProducts.find(p => p.id === productId)) {
+                alert('Ce produit est déjà sélectionné.');
+                return;
+            }
+
+            const priceValue = parseFloat(price) || 0;
+            selectedExchangeProducts.push({
+                id: productId,
+                ref: productRef,
+                price: priceValue,
+                name: name
+            });
 
             // Update UI
-            document.querySelectorAll('.exchange-product-item').forEach(item => {
-                item.querySelector('.exchange-product-content').classList.remove('selected');
-            });
-            const selectedEl = document.querySelector(`.exchange-product-item[data-id="${productId}"] .exchange-product-content`);
-            if (selectedEl) selectedEl.classList.add('selected');
-
-            document.getElementById('selectedExchangeProduct').style.display = 'block';
-            document.getElementById('selectedExchangeProductRef').textContent = productRef;
+            renderSelectedProducts();
+            updateExchangeTotals();
             document.getElementById('confirmReturnExchangeBtn').disabled = false;
+
+            // Hide the product from the list
+            const item = document.querySelector(`.exchange-product-item[data-id="${productId}"]`);
+            if (item) item.style.display = 'none';
+        }
+
+        function removeExchangeProduct(productId) {
+            selectedExchangeProducts = selectedExchangeProducts.filter(p => p.id !== productId);
+
+            // Show the product in the list again
+            const item = document.querySelector(`.exchange-product-item[data-id="${productId}"]`);
+            if (item) item.style.display = 'block';
+
+            renderSelectedProducts();
+            updateExchangeTotals();
+            document.getElementById('confirmReturnExchangeBtn').disabled = selectedExchangeProducts.length === 0;
+        }
+
+        function renderSelectedProducts() {
+            const tbody = document.getElementById('selectedProductsList');
+            const section = document.getElementById('selectedProductsSection');
+
+            if (selectedExchangeProducts.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            tbody.innerHTML = selectedExchangeProducts.map(p => `
+                <tr data-product-id="${p.id}">
+                    <td>
+                        <div class="product-cell">
+                            <span class="product-ref">${p.ref}</span>
+                            <span class="product-name" style="font-size: var(--text-xs); color: var(--neutral-500);">${p.name}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <input type="number" class="form-input exchange-price-input"
+                               value="${p.price.toFixed(2)}" step="0.01" min="0"
+                               onchange="updateProductPrice('${p.id}', this.value)">
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-ghost btn-sm text-error" onclick="removeExchangeProduct('${p.id}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateProductPrice(productId, newPrice) {
+            const product = selectedExchangeProducts.find(p => p.id === productId);
+            if (product) {
+                product.price = parseFloat(newPrice) || 0;
+                updateExchangeTotals();
+            }
+        }
+
+        function updateExchangeTotals() {
+            const totalNewProducts = selectedExchangeProducts.reduce((sum, p) => sum + p.price, 0);
+            const difference = totalNewProducts - originalPrice;
+
+            document.getElementById('exchangeTotalPrice').textContent = totalNewProducts.toFixed(2);
+            document.getElementById('originalInvoicePrice').textContent = originalPrice.toFixed(2);
+            document.getElementById('newProductsTotal').textContent = totalNewProducts.toFixed(2);
+            document.getElementById('priceDifference').textContent = difference.toFixed(2);
+
+            // Update difference styling
+            const diffEl = document.querySelector('.price-difference');
+            diffEl.classList.remove('positive', 'negative', 'zero');
+            if (difference > 0) {
+                diffEl.classList.add('positive');
+            } else if (difference < 0) {
+                diffEl.classList.add('negative');
+            } else {
+                diffEl.classList.add('zero');
+            }
+
+            // Show/hide payment section based on products selected
+            const paymentSection = document.getElementById('exchangePaymentSection');
+            if (selectedExchangeProducts.length > 0) {
+                paymentSection.style.display = 'block';
+                // Pre-fill amount paid with the difference if positive
+                const amountPaidInput = document.getElementById('exchangeAmountPaid');
+                if (!amountPaidInput.value) {
+                    amountPaidInput.value = Math.max(0, difference).toFixed(2);
+                }
+                updatePaymentStatus();
+            } else {
+                paymentSection.style.display = 'none';
+            }
+        }
+
+        function updatePaymentFields() {
+            const methodSelect = document.getElementById('exchangePaymentMethod');
+            const selectedOption = methodSelect.options[methodSelect.selectedIndex];
+            const methodName = (selectedOption.getAttribute('data-name') || '').toLowerCase();
+            const hasPaymentMethod = methodSelect.value !== '';
+
+            const detailsRow = document.getElementById('paymentDetailsRow');
+            const refGroup = document.getElementById('paymentReferenceGroup');
+            const bankGroup = document.getElementById('bankAccountGroup');
+
+            const isVirement = methodName.includes('virement') || methodName.includes('bank');
+            const isEspece = methodName.includes('espece') || methodName.includes('cash') || methodName.includes('espèce');
+            const needsReference = hasPaymentMethod && !isEspece;
+
+            detailsRow.style.display = needsReference ? 'grid' : 'none';
+            bankGroup.style.display = isVirement ? 'block' : 'none';
+        }
+
+        function updatePaymentStatus() {
+            const totalNewProducts = selectedExchangeProducts.reduce((sum, p) => sum + p.price, 0);
+            const amountPaid = parseFloat(document.getElementById('exchangeAmountPaid').value) || 0;
+
+            const indicator = document.getElementById('paymentStatusIndicator');
+            const statusText = document.getElementById('paymentStatusText');
+
+            indicator.className = '';
+            indicator.style.display = 'block';
+
+            if (amountPaid >= totalNewProducts) {
+                indicator.classList.add('status-paid');
+                statusText.textContent = 'Facture sera payée intégralement';
+            } else if (amountPaid > 0) {
+                indicator.classList.add('status-partial');
+                const remaining = totalNewProducts - amountPaid;
+                statusText.textContent = `Paiement partiel - Solde restant: ${remaining.toFixed(2)} DH`;
+            } else {
+                indicator.classList.add('status-unpaid');
+                statusText.textContent = 'Facture sera non payée';
+            }
         }
 
         function filterExchangeProducts() {
@@ -1289,6 +1458,13 @@
             const items = document.querySelectorAll('.exchange-product-item');
 
             items.forEach(item => {
+                const productId = item.dataset.id;
+                // Don't show already selected products
+                if (selectedExchangeProducts.find(p => p.id === productId)) {
+                    item.style.display = 'none';
+                    return;
+                }
+
                 const ref = item.dataset.ref || '';
                 const name = item.dataset.name || '';
                 if (ref.includes(search) || name.includes(search)) {
@@ -1308,9 +1484,19 @@
                 document.getElementById('returnItemId').value = currentItemId;
                 document.getElementById('returnNotes').value = notes;
                 document.getElementById('returnForm').submit();
-            } else if (currentAction === 'exchange' && selectedExchangeProductId) {
+            } else if (currentAction === 'exchange' && selectedExchangeProducts.length > 0) {
+                // Prepare products data with their prices
+                const productsData = selectedExchangeProducts.map(p => ({
+                    id: p.id,
+                    price: p.price
+                }));
+
                 document.getElementById('exchangeItemId').value = currentItemId;
-                document.getElementById('exchangeReplacementId').value = selectedExchangeProductId;
+                document.getElementById('exchangeReplacementProducts').value = JSON.stringify(productsData);
+                document.getElementById('exchangePaymentMethodId').value = document.getElementById('exchangePaymentMethod').value;
+                document.getElementById('exchangePaymentRef').value = document.getElementById('exchangePaymentReference').value;
+                document.getElementById('exchangeBankAccountId').value = document.getElementById('exchangeBankAccount').value;
+                document.getElementById('exchangeAmountPaidField').value = document.getElementById('exchangeAmountPaid').value;
                 document.getElementById('exchangeNotes').value = notes;
                 document.getElementById('exchangeForm').submit();
             }
@@ -1329,14 +1515,15 @@
 
     <!-- Return/Exchange Modal -->
     <div id="returnExchangeModal" class="modal-overlay-custom">
-        <div class="modal-content-custom" style="max-width: 600px;">
+        <div class="modal-content-custom" style="max-width: 800px;">
             <div class="modal-header-custom">
                 <h3><i class="fas fa-exchange-alt mr-2"></i> Retour / Échange</h3>
                 <button type="button" class="modal-close-custom" onclick="closeReturnExchangeModal()">&times;</button>
             </div>
             <div class="modal-body-custom">
                 <p style="margin-bottom: var(--space-4);">
-                    Produit: <strong id="returnExchangeProductRef"></strong>
+                    Produit original: <strong id="returnExchangeProductRef"></strong>
+                    <span class="badge badge-info" style="margin-left: var(--space-2);" id="originalPriceBadge"></span>
                 </p>
 
                 <!-- Action Choice -->
@@ -1349,26 +1536,26 @@
                     <div class="re-action-choice-btn re-exchange-btn" onclick="selectReturnExchangeAction('exchange')">
                         <i class="fas fa-exchange-alt"></i>
                         <strong>Échange</strong>
-                        <small style="color: var(--neutral-500);">Échanger contre un autre produit</small>
+                        <small style="color: var(--neutral-500);">Échanger contre d'autres produits</small>
                     </div>
                 </div>
 
                 <!-- Exchange Product Selection (hidden by default) -->
                 <div id="exchangeProductSection" class="exchange-section">
                     <div class="form-group">
-                        <label>Produit de remplacement</label>
+                        <label>Ajouter des produits de remplacement</label>
                         <input type="text" id="exchangeProductSearch" class="form-input" placeholder="Rechercher un produit..." onkeyup="filterExchangeProducts()">
                     </div>
                     <div class="exchange-product-list" id="exchangeProductList">
                         {% for product in exchange_products %}
-                            <div class="exchange-product-item" data-ref="{{ product.reference|lower }}" data-name="{{ product.name|lower }}" data-id="{{ product.id }}" onclick="selectExchangeProduct('{{ product.id }}', '{{ product.reference }}')">
+                            <div class="exchange-product-item" data-ref="{{ product.reference|lower }}" data-name="{{ product.name|lower }}" data-id="{{ product.id }}" data-price="{{ product.selling_price }}" onclick="addExchangeProduct('{{ product.id }}', '{{ product.reference }}', '{{ product.selling_price }}', '{{ product.name|escapejs }}')">
                                 <div class="exchange-product-content">
                                     <div class="exchange-product-ref">{{ product.reference }}</div>
                                     <div class="exchange-product-name">{{ product.name }}</div>
                                     <div class="exchange-product-details">
                                         {{ product.net_weight|default:"0" }}g
                                         {% if product.metal_purity %}| {{ product.metal_purity.name }}{% endif %}
-                                        | {{ product.selling_price }} DH
+                                        | <strong>{{ product.selling_price }} DH</strong>
                                     </div>
                                 </div>
                             </div>
@@ -1376,9 +1563,86 @@
                             <p class="text-center text-muted">Aucun produit disponible</p>
                         {% endfor %}
                     </div>
-                    <p id="selectedExchangeProduct" style="margin-top: var(--space-2); display: none;">
-                        <strong>Sélectionné:</strong> <span id="selectedExchangeProductRef"></span>
-                    </p>
+
+                    <!-- Selected Products Table -->
+                    <div id="selectedProductsSection" style="margin-top: var(--space-4); display: none;">
+                        <label class="form-label"><i class="fas fa-shopping-cart mr-1"></i> Produits sélectionnés</label>
+                        <table class="data-table" style="margin-top: var(--space-2);">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th style="width: 140px;">Prix de vente (DH)</th>
+                                    <th style="width: 60px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="selectedProductsList"></tbody>
+                            <tfoot>
+                                <tr style="background: var(--neutral-100);">
+                                    <td><strong>Total nouveaux produits</strong></td>
+                                    <td class="text-right"><strong id="exchangeTotalPrice">0.00</strong> DH</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Price Difference & Payment Section -->
+                    <div id="exchangePaymentSection" style="margin-top: var(--space-4); display: none;">
+                        <div class="exchange-price-summary">
+                            <div class="price-summary-row">
+                                <span>Prix facture originale:</span>
+                                <span id="originalInvoicePrice">0.00</span> DH
+                            </div>
+                            <div class="price-summary-row">
+                                <span>Total nouveaux produits:</span>
+                                <span id="newProductsTotal">0.00</span> DH
+                            </div>
+                            <div class="price-summary-row price-difference">
+                                <span><strong>Différence à payer:</strong></span>
+                                <strong><span id="priceDifference">0.00</span> DH</strong>
+                            </div>
+                        </div>
+
+                        <!-- Payment Method -->
+                        <div class="form-row" style="margin-top: var(--space-4);">
+                            <div class="form-group">
+                                <label class="form-label">Méthode de paiement</label>
+                                <select id="exchangePaymentMethod" class="form-select" onchange="updatePaymentFields()">
+                                    <option value="">-- Sélectionner --</option>
+                                    {% for method in payment_methods %}
+                                        <option value="{{ method.id }}" data-name="{{ method.name|lower }}">{{ method.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Montant payé (DH)</label>
+                                <input type="number" id="exchangeAmountPaid" class="form-input" step="0.01" min="0" placeholder="0.00" onchange="updatePaymentStatus()">
+                            </div>
+                        </div>
+
+                        <!-- Payment Reference & Bank Account -->
+                        <div class="form-row" id="paymentDetailsRow" style="display: none;">
+                            <div class="form-group" id="paymentReferenceGroup">
+                                <label class="form-label">Référence de paiement</label>
+                                <input type="text" id="exchangePaymentReference" class="form-input" placeholder="N° chèque, référence virement...">
+                            </div>
+                            <div class="form-group" id="bankAccountGroup" style="display: none;">
+                                <label class="form-label">Compte bancaire</label>
+                                <select id="exchangeBankAccount" class="form-select">
+                                    <option value="">-- Sélectionner --</option>
+                                    {% for bank in bank_accounts %}
+                                        <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_number }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Payment Status Indicator -->
+                        <div id="paymentStatusIndicator" style="margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); display: none;">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <span id="paymentStatusText"></span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Notes -->
@@ -1408,7 +1672,11 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="exchange_item">
         <input type="hidden" name="item_id" id="exchangeItemId" value="">
-        <input type="hidden" name="replacement_product_id" id="exchangeReplacementId" value="">
+        <input type="hidden" name="replacement_products" id="exchangeReplacementProducts" value="">
+        <input type="hidden" name="payment_method_id" id="exchangePaymentMethodId" value="">
+        <input type="hidden" name="payment_reference" id="exchangePaymentRef" value="">
+        <input type="hidden" name="bank_account_id" id="exchangeBankAccountId" value="">
+        <input type="hidden" name="amount_paid" id="exchangeAmountPaidField" value="">
         <input type="hidden" name="notes" id="exchangeNotes" value="">
     </form>
 
@@ -1564,6 +1832,105 @@
         .exchange-product-details {
             font-size: var(--text-xs);
             color: var(--neutral-500);
+        }
+
+        /* Selected products table in exchange modal */
+        #selectedProductsSection .data-table {
+            width: 100%;
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+        }
+
+        #selectedProductsSection .data-table th {
+            padding: var(--space-2) var(--space-3);
+            background: var(--neutral-50);
+            font-size: var(--text-xs);
+        }
+
+        #selectedProductsSection .data-table td {
+            padding: var(--space-2) var(--space-3);
+            font-size: var(--text-sm);
+        }
+
+        #selectedProductsSection .form-input {
+            padding: var(--space-2);
+            font-size: var(--text-sm);
+            width: 100%;
+        }
+
+        /* Exchange price summary */
+        .exchange-price-summary {
+            background: var(--neutral-50);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+        }
+
+        .price-summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--space-2) 0;
+            font-size: var(--text-sm);
+        }
+
+        .price-summary-row:not(:last-child) {
+            border-bottom: 1px dashed var(--neutral-200);
+        }
+
+        .price-difference {
+            background: var(--warning-50);
+            margin: var(--space-2) calc(-1 * var(--space-4));
+            margin-bottom: calc(-1 * var(--space-4));
+            padding: var(--space-3) var(--space-4);
+            border-radius: 0 0 var(--radius-md) var(--radius-md);
+            color: var(--warning-700);
+        }
+
+        .price-difference.positive {
+            background: var(--error-50);
+            color: var(--error-700);
+        }
+
+        .price-difference.negative {
+            background: var(--success-50);
+            color: var(--success-700);
+        }
+
+        .price-difference.zero {
+            background: var(--info-50);
+            color: var(--info-700);
+        }
+
+        /* Payment status indicator */
+        #paymentStatusIndicator.status-paid {
+            background: var(--success-50);
+            color: var(--success-700);
+            border: 1px solid var(--success-200);
+        }
+
+        #paymentStatusIndicator.status-partial {
+            background: var(--warning-50);
+            color: var(--warning-700);
+            border: 1px solid var(--warning-200);
+        }
+
+        #paymentStatusIndicator.status-unpaid {
+            background: var(--error-50);
+            color: var(--error-700);
+            border: 1px solid var(--error-200);
+        }
+
+        /* Form row for payment fields */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-4);
+        }
+
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 {% endblock %}
