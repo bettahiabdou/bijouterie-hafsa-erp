@@ -57,7 +57,8 @@ def generate_product_label_zpl(product, quantity=1):
     Right side has the loop/antenna
 
     Layout:
-    - Top: Weight + Purity (e.g., "5.2g 18K")
+    - Line 1: Weight + Purity (e.g., "5.2g 18K")
+    - Line 2: Size if available (e.g., "T: 45cm")
     - Bottom: Barcode + Reference
     """
     # Reference parts - get date and sequence (e.g., "20260207-0001" from "PRD-FIN-20260207-0001")
@@ -79,11 +80,30 @@ def generate_product_label_zpl(product, quantity=1):
     if product.metal_purity:
         purity = product.metal_purity.name
 
+    # Size (e.g., "45" or "18")
+    size = product.size.strip() if product.size else ""
+
     # ZPL for 68x26mm tag - print on LEFT side
-    # Weight: X=34, Y=31 (pushed 2mm down from 15)
-    # Barcode: X=26 (pushed 1mm left from 34), Y=130
-    # Reference: X=34, Y=175 (unchanged)
-    zpl = f"""^XA
+    # Line 1 (Weight + Purity): X=34, Y=31
+    # Line 2 (Size): X=34, Y=55 (below purity line, only if size exists)
+    # Barcode: X=26, Y=130 (or Y=110 if size exists to make room)
+    # Reference: X=34, Y=175 (or Y=155 if size exists)
+
+    if size:
+        # Layout with size - adjust positions
+        zpl = f"""^XA
+^CI28
+^PW544
+^LL208
+^FO34,25^A0N,20,18^FD{weight}g {purity}^FS
+^FO34,50^A0N,18,16^FDT: {size}cm^FS
+^FO26,110^BY1^BCN,32,N,N,N^FD{barcode_data}^FS
+^FO34,150^A0N,14,12^FD{short_ref}^FS
+^PQ{quantity}
+^XZ"""
+    else:
+        # Layout without size - original spacing
+        zpl = f"""^XA
 ^CI28
 ^PW544
 ^LL208

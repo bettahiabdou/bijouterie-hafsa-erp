@@ -254,6 +254,7 @@ def batch_product_create(request):
             product_selling_prices = request.POST.getlist('product_selling_price')
             product_banks = request.POST.getlist('product_bank_account')
             product_suppliers = request.POST.getlist('product_supplier')
+            product_sizes = request.POST.getlist('product_size')
 
             # Check if we should print labels
             print_labels = request.POST.get('print_labels') == '1'
@@ -292,6 +293,7 @@ def batch_product_create(request):
                     product_purity_id = product_purities[i] if i < len(product_purities) else None
                     product_bank_id = product_banks[i] if i < len(product_banks) else None
                     product_supplier_id = product_suppliers[i] if i < len(product_suppliers) else None
+                    product_size = product_sizes[i].strip() if i < len(product_sizes) else ''
 
                     # Create product instance (don't save yet)
                     product = Product(
@@ -302,6 +304,7 @@ def batch_product_create(request):
                         metal_purity_id=product_purity_id if product_purity_id else None,
                         net_weight=weight_net,
                         gross_weight=weight_gross,
+                        size=product_size,
                         purchase_price_per_gram=purchase_price_per_gram,
                         labor_cost=labor_cost,
                         stone_cost=stone_cost,
@@ -448,6 +451,11 @@ def product_create(request):
                     'product_types': Product.ProductType.choices,
                 })
 
+            # Get size and length
+            size = request.POST.get('size', '').strip()
+            length = request.POST.get('length', '').strip()
+            length_value = float(length) if length else None
+
             # Create product instance (don't save yet)
             product = Product(
                 name=request.POST.get('name'),
@@ -459,6 +467,8 @@ def product_create(request):
                 metal_purity_id=request.POST.get('metal_purity') or None,
                 gross_weight=gross_weight,
                 net_weight=net_weight,
+                size=size,
+                length=length_value,
                 purchase_price_per_gram=purchase_price_per_gram,
                 minimum_price=minimum_price,
                 labor_cost=labor_cost,
@@ -540,11 +550,19 @@ def product_edit(request, reference):
             product.margin_type = request.POST.get('margin_type', product.margin_type)
             product.status = request.POST.get('status', product.status)
 
+            # Size field (text)
+            product.size = request.POST.get('size', product.size or '').strip()
+
             # Numeric fields - convert strings to float
             if request.POST.get('gross_weight'):
                 product.gross_weight = float(request.POST.get('gross_weight'))
             if request.POST.get('net_weight'):
                 product.net_weight = float(request.POST.get('net_weight'))
+            length_str = request.POST.get('length', '').strip()
+            if length_str:
+                product.length = float(length_str)
+            else:
+                product.length = None
             if request.POST.get('purchase_price_per_gram'):
                 product.purchase_price_per_gram = float(request.POST.get('purchase_price_per_gram'))
             if request.POST.get('minimum_price'):

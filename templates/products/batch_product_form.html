@@ -172,7 +172,7 @@
                                 <!-- Detail row template -->
                                 <tr class="detail-row" style="display: none;">
                                     <td colspan="7" style="background: var(--neutral-50); padding: var(--space-4);">
-                                        <div class="grid" style="grid-template-columns: repeat(5, 1fr); gap: var(--space-4);">
+                                        <div class="grid" style="grid-template-columns: repeat(6, 1fr); gap: var(--space-4);">
                                             <div class="form-group" style="margin-bottom: 0;">
                                                 <label class="form-label">Metal</label>
                                                 <select name="product_metal_type" class="product_metal_type form-select">
@@ -190,6 +190,10 @@
                                                         <option value="{{ purity.id }}" {% if purity.name == 'Or 18 carats' %}selected{% endif %}>{{ purity.name }}</option>
                                                     {% endfor %}
                                                 </select>
+                                            </div>
+                                            <div class="form-group" style="margin-bottom: 0;">
+                                                <label class="form-label">Taille (cm)</label>
+                                                <input type="text" name="product_size" class="product_size form-input" placeholder="Ex: 18, 45...">
                                             </div>
                                             <div class="form-group" style="margin-bottom: 0;">
                                                 <label class="form-label">Fournisseur</label>
@@ -314,6 +318,10 @@
                                                     {% endfor %}
                                                 </select>
                                             </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Taille (cm)</label>
+                                            <input type="text" name="product_size" class="product_size_mobile form-input" placeholder="Ex: 18, 45...">
                                         </div>
                                         <div class="form-row">
                                             <div class="form-group">
