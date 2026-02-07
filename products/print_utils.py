@@ -58,8 +58,8 @@ def generate_product_label_zpl(product, quantity=1):
 
     Layout (compact with barcode):
     - Line 1: Weight + Purity (e.g., "5.2g 18K")
-    - Line 2: Price (e.g., "2500")
-    - Line 3: Barcode
+    - Line 2: Price with decimals (e.g., "1012.50")
+    - Line 3: Barcode (with dashes for search: 20260207-0001)
     - Line 4: Reference date-seq (e.g., "20260207-0001")
     """
     # Reference parts - get date and sequence (e.g., "20260207-0001" from "PRD-FIN-20260207-0001")
@@ -67,7 +67,7 @@ def generate_product_label_zpl(product, quantity=1):
     if len(ref_parts) >= 2:
         # Get last two parts: date and sequence
         short_ref = f"{ref_parts[-2]}-{ref_parts[-1]}"
-        barcode_data = f"{ref_parts[-2]}{ref_parts[-1]}"  # No dashes for barcode
+        barcode_data = short_ref  # Keep dashes for search compatibility
     else:
         short_ref = ref_parts[-1] if ref_parts else "0000"
         barcode_data = short_ref
@@ -76,8 +76,8 @@ def generate_product_label_zpl(product, quantity=1):
     weight_value = product.net_weight or product.gross_weight
     weight = f"{weight_value:.1f}" if weight_value else ""
 
-    # Price - no decimals
-    price = f"{product.selling_price:.0f}" if product.selling_price else "0"
+    # Price - with 2 decimals
+    price = f"{product.selling_price:.2f}" if product.selling_price else "0.00"
 
     # Purity (e.g., "18K")
     purity = ""
@@ -91,10 +91,10 @@ def generate_product_label_zpl(product, quantity=1):
 ^CI28
 ^PW544
 ^LL208
-^FO350,5^A0N,22,20^FD{weight}g {purity}^FS
-^FO350,30^A0N,32,28^FD{price}^FS
-^FO350,70^BY1^BCN,45,N,N,N^FD{barcode_data}^FS
-^FO350,125^A0N,18,16^FD{short_ref}^FS
+^FO350,5^A0N,20,18^FD{weight}g {purity}^FS
+^FO350,28^A0N,26,22^FD{price}^FS
+^FO350,60^BY1^BCN,40,N,N,N^FD{barcode_data}^FS
+^FO350,110^A0N,16,14^FD{short_ref}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -141,9 +141,9 @@ def print_test_label():
 ^CI28
 ^PW544
 ^LL208
-^FO350,5^A0N,22,20^FD5.2g 18K^FS
-^FO350,30^A0N,32,28^FD2500^FS
-^FO350,70^BY1^BCN,45,N,N,N^FD202602070001^FS
-^FO350,125^A0N,18,16^FD20260207-0001^FS
+^FO350,5^A0N,20,18^FD5.2g 18K^FS
+^FO350,28^A0N,26,22^FD1012.50^FS
+^FO350,60^BY1^BCN,40,N,N,N^FD20260207-0001^FS
+^FO350,110^A0N,16,14^FD20260207-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
