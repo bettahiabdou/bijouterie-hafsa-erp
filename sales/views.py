@@ -12,7 +12,7 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation
-from .models import SaleInvoice, SaleInvoiceItem, ClientLoan, Layaway
+from .models import SaleInvoice, SaleInvoiceItem, SaleInvoiceAction, ClientLoan, Layaway
 from products.models import Product
 from clients.models import Client
 from quotes.models import Quote
@@ -124,7 +124,7 @@ def invoice_detail(request, reference):
     invoice = get_object_or_404(
         SaleInvoice.objects.select_related(
             'client', 'seller', 'delivery_method'
-        ).prefetch_related('items'),
+        ).prefetch_related('items', 'items__product'),
         reference=reference
     )
 
@@ -138,6 +138,136 @@ def invoice_detail(request, reference):
         ip_address=get_client_ip(request)
     )
 
+    # Handle POST actions for return/exchange
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        # Handle return action
+        if action == 'return_item':
+            item_id = request.POST.get('item_id')
+            notes = request.POST.get('notes', '')
+
+            if item_id:
+                try:
+                    item = SaleInvoiceItem.objects.get(id=item_id, invoice=invoice)
+                    product = item.product
+                    product_ref = product.reference
+
+                    # Create action record
+                    SaleInvoiceAction.objects.create(
+                        original_invoice=invoice,
+                        action_type=SaleInvoiceAction.ActionType.RETURN,
+                        original_product=product,
+                        original_product_ref=product_ref,
+                        refund_amount=item.total_amount,
+                        notes=notes,
+                        created_by=request.user
+                    )
+
+                    # Update product status to available
+                    product.status = 'available'
+                    product.save(update_fields=['status'])
+
+                    # Update original invoice status to returned
+                    invoice.status = SaleInvoice.Status.RETURNED
+                    invoice.save(update_fields=['status'])
+
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.UPDATE,
+                        model_name='SaleInvoice',
+                        object_id=str(invoice.id),
+                        object_repr=f'Returned product {product_ref} from invoice {invoice.reference}',
+                        ip_address=get_client_ip(request)
+                    )
+                    messages.success(request, f'Produit {product_ref} retourné. Facture marquée comme retournée.')
+
+                except SaleInvoiceItem.DoesNotExist:
+                    messages.error(request, 'Article non trouvé.')
+
+        # Handle exchange action
+        elif action == 'exchange_item':
+            item_id = request.POST.get('item_id')
+            replacement_product_id = request.POST.get('replacement_product_id')
+            notes = request.POST.get('notes', '')
+
+            if item_id and replacement_product_id:
+                try:
+                    item = SaleInvoiceItem.objects.get(id=item_id, invoice=invoice)
+                    original_product = item.product
+                    original_ref = original_product.reference
+
+                    replacement_product = Product.objects.get(id=replacement_product_id)
+
+                    # Check replacement product is available
+                    if replacement_product.status == 'sold':
+                        messages.error(request, f'{replacement_product.reference} est déjà vendu.')
+                    else:
+                        # Create new invoice for the exchange
+                        new_invoice = SaleInvoice.objects.create(
+                            date=timezone.now().date(),
+                            sale_type=invoice.sale_type,
+                            client=invoice.client,
+                            seller=request.user,
+                            created_by=request.user,
+                            notes=f"Échange depuis {invoice.reference} - {original_ref} → {replacement_product.reference}",
+                        )
+
+                        # Add the replacement product to new invoice
+                        SaleInvoiceItem.objects.create(
+                            invoice=new_invoice,
+                            product=replacement_product,
+                            quantity=1,
+                            original_price=replacement_product.selling_price,
+                            negotiated_price=replacement_product.selling_price,
+                            unit_price=replacement_product.selling_price,
+                            total_amount=replacement_product.selling_price,
+                        )
+
+                        # Update new invoice totals
+                        new_invoice.calculate_totals()
+
+                        # Create action record
+                        SaleInvoiceAction.objects.create(
+                            original_invoice=invoice,
+                            action_type=SaleInvoiceAction.ActionType.EXCHANGE,
+                            original_product=original_product,
+                            original_product_ref=original_ref,
+                            new_invoice=new_invoice,
+                            replacement_product=replacement_product,
+                            notes=notes,
+                            created_by=request.user
+                        )
+
+                        # Update original product status to available
+                        original_product.status = 'available'
+                        original_product.save(update_fields=['status'])
+
+                        # Update replacement product status to sold
+                        replacement_product.status = 'sold'
+                        replacement_product.save(update_fields=['status'])
+
+                        # Update original invoice status to exchanged
+                        invoice.status = SaleInvoice.Status.EXCHANGED
+                        invoice.save(update_fields=['status'])
+
+                        ActivityLog.objects.create(
+                            user=request.user,
+                            action=ActivityLog.ActionType.UPDATE,
+                            model_name='SaleInvoice',
+                            object_id=str(invoice.id),
+                            object_repr=f'Exchanged {original_ref} for {replacement_product.reference}',
+                            ip_address=get_client_ip(request)
+                        )
+                        messages.success(request, f'Échange effectué: {original_ref} → {replacement_product.reference}. Nouvelle facture: {new_invoice.reference}')
+
+                except SaleInvoiceItem.DoesNotExist:
+                    messages.error(request, 'Article non trouvé.')
+                except Product.DoesNotExist:
+                    messages.error(request, 'Produit de remplacement non trouvé.')
+
+        return redirect('sales:invoice_detail', reference=reference)
+
     # Get all products (except sold) for the add item modal
     # Include available, reserved, in_repair, consigned items, etc.
     # Exclude only: SOLD, CUSTOM_ORDER
@@ -145,10 +275,22 @@ def invoice_detail(request, reference):
         status__in=['sold', 'custom_order']
     ).order_by('name')
 
+    # Get available products for exchange (available only)
+    exchange_products = Product.objects.filter(
+        status='available'
+    ).select_related('category', 'metal_type', 'metal_purity').order_by('-created_at')[:100]
+
+    # Get action history
+    invoice_actions = invoice.actions.select_related(
+        'original_product', 'replacement_product', 'new_invoice', 'created_by'
+    ).all()
+
     context = {
         'invoice': invoice,
         'items': invoice.items.all(),
         'products': products,
+        'exchange_products': exchange_products,
+        'invoice_actions': invoice_actions,
     }
 
     return render(request, 'sales/invoice_detail.html', context)

@@ -92,6 +92,8 @@
                                         <th class="text-right">Total</th>
                                         {% if invoice.status == 'draft' %}
                                             <th class="text-center">Actions</th>
+                                        {% elif invoice.status == 'paid' %}
+                                            <th class="text-center">Retour/Échange</th>
                                         {% endif %}
                                     </tr>
                                 </thead>
@@ -111,6 +113,12 @@
                                                 <td class="text-center">
                                                     <button type="button" onclick="deleteItem({{ item.id }})" class="btn btn-ghost btn-sm text-error">
                                                         <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            {% elif invoice.status == 'paid' %}
+                                                <td class="text-center">
+                                                    <button type="button" onclick="openReturnExchangeModal('{{ item.id }}', '{{ item.product.reference }}')" class="btn btn-ghost btn-sm text-warning">
+                                                        <i class="fas fa-exchange-alt"></i>
                                                     </button>
                                                 </td>
                                             {% endif %}
@@ -233,6 +241,60 @@
                 </div>
                 <div class="card-body">
                     <p class="notes-text">{{ invoice.notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Actions History (Returns/Exchanges) -->
+            {% if invoice_actions %}
+            <div class="card animate-slide-up" style="animation-delay: 220ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-exchange-alt mr-2"></i> Historique Retours / Échanges</h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Produit Original</th>
+                                    <th>Remplacement</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for action in invoice_actions %}
+                                <tr>
+                                    <td>{{ action.created_at|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        {% if action.action_type == 'return' %}
+                                            <span class="badge badge-warning"><i class="fas fa-undo mr-1"></i> Retour</span>
+                                        {% else %}
+                                            <span class="badge badge-info"><i class="fas fa-exchange-alt mr-1"></i> Échange</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="font-semibold">{{ action.original_product_ref }}</span>
+                                    </td>
+                                    <td>
+                                        {% if action.replacement_product %}
+                                            <a href="{% url 'products:detail' action.replacement_product.reference %}" class="text-primary">
+                                                {{ action.replacement_product.reference }}
+                                            </a>
+                                            {% if action.new_invoice %}
+                                                <br><small><a href="{% url 'sales:invoice_detail' action.new_invoice.reference %}">{{ action.new_invoice.reference }}</a></small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ action.notes|default:"-" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             {% endif %}
@@ -1157,5 +1219,351 @@
                 alert('Erreur: ' + error);
             });
         }
+
+        // ===== Return/Exchange Modal Functions =====
+        let currentItemId = null;
+        let currentAction = null;
+        let selectedExchangeProductId = null;
+
+        function openReturnExchangeModal(itemId, productRef) {
+            currentItemId = itemId;
+            currentAction = null;
+            selectedExchangeProductId = null;
+
+            document.getElementById('returnExchangeProductRef').textContent = productRef;
+            document.getElementById('returnExchangeNotes').value = '';
+            document.getElementById('confirmReturnExchangeBtn').disabled = true;
+
+            // Reset action choices
+            document.querySelectorAll('.re-action-choice-btn').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById('exchangeProductSection').classList.remove('visible');
+            document.getElementById('selectedExchangeProduct').style.display = 'none';
+            const searchInput = document.getElementById('exchangeProductSearch');
+            if (searchInput) searchInput.value = '';
+            filterExchangeProducts();
+
+            document.getElementById('returnExchangeModal').classList.add('active');
+        }
+
+        function closeReturnExchangeModal() {
+            document.getElementById('returnExchangeModal').classList.remove('active');
+            currentItemId = null;
+            currentAction = null;
+            selectedExchangeProductId = null;
+        }
+
+        function selectReturnExchangeAction(action) {
+            currentAction = action;
+
+            // Update button styles
+            document.querySelectorAll('.re-action-choice-btn').forEach(btn => btn.classList.remove('selected'));
+            if (action === 'return') {
+                document.querySelector('.re-return-btn').classList.add('selected');
+                document.getElementById('exchangeProductSection').classList.remove('visible');
+                document.getElementById('confirmReturnExchangeBtn').disabled = false;
+            } else if (action === 'exchange') {
+                document.querySelector('.re-exchange-btn').classList.add('selected');
+                document.getElementById('exchangeProductSection').classList.add('visible');
+                document.getElementById('confirmReturnExchangeBtn').disabled = !selectedExchangeProductId;
+            }
+        }
+
+        function selectExchangeProduct(productId, productRef) {
+            selectedExchangeProductId = productId;
+
+            // Update UI
+            document.querySelectorAll('.exchange-product-item').forEach(item => {
+                item.querySelector('.exchange-product-content').classList.remove('selected');
+            });
+            const selectedEl = document.querySelector(`.exchange-product-item[data-id="${productId}"] .exchange-product-content`);
+            if (selectedEl) selectedEl.classList.add('selected');
+
+            document.getElementById('selectedExchangeProduct').style.display = 'block';
+            document.getElementById('selectedExchangeProductRef').textContent = productRef;
+            document.getElementById('confirmReturnExchangeBtn').disabled = false;
+        }
+
+        function filterExchangeProducts() {
+            const searchInput = document.getElementById('exchangeProductSearch');
+            const search = searchInput ? searchInput.value.toLowerCase() : '';
+            const items = document.querySelectorAll('.exchange-product-item');
+
+            items.forEach(item => {
+                const ref = item.dataset.ref || '';
+                const name = item.dataset.name || '';
+                if (ref.includes(search) || name.includes(search)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        function submitReturnExchangeAction() {
+            if (!currentItemId || !currentAction) return;
+
+            const notes = document.getElementById('returnExchangeNotes').value;
+
+            if (currentAction === 'return') {
+                document.getElementById('returnItemId').value = currentItemId;
+                document.getElementById('returnNotes').value = notes;
+                document.getElementById('returnForm').submit();
+            } else if (currentAction === 'exchange' && selectedExchangeProductId) {
+                document.getElementById('exchangeItemId').value = currentItemId;
+                document.getElementById('exchangeReplacementId').value = selectedExchangeProductId;
+                document.getElementById('exchangeNotes').value = notes;
+                document.getElementById('exchangeForm').submit();
+            }
+        }
+
+        // Close modal on outside click
+        const returnExchangeModal = document.getElementById('returnExchangeModal');
+        if (returnExchangeModal) {
+            returnExchangeModal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeReturnExchangeModal();
+                }
+            });
+        }
     </script>
+
+    <!-- Return/Exchange Modal -->
+    <div id="returnExchangeModal" class="modal-overlay-custom">
+        <div class="modal-content-custom" style="max-width: 600px;">
+            <div class="modal-header-custom">
+                <h3><i class="fas fa-exchange-alt mr-2"></i> Retour / Échange</h3>
+                <button type="button" class="modal-close-custom" onclick="closeReturnExchangeModal()">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <p style="margin-bottom: var(--space-4);">
+                    Produit: <strong id="returnExchangeProductRef"></strong>
+                </p>
+
+                <!-- Action Choice -->
+                <div class="re-action-choice">
+                    <div class="re-action-choice-btn re-return-btn" onclick="selectReturnExchangeAction('return')">
+                        <i class="fas fa-undo"></i>
+                        <strong>Retour</strong>
+                        <small style="color: var(--neutral-500);">Produit retourné, facture annulée</small>
+                    </div>
+                    <div class="re-action-choice-btn re-exchange-btn" onclick="selectReturnExchangeAction('exchange')">
+                        <i class="fas fa-exchange-alt"></i>
+                        <strong>Échange</strong>
+                        <small style="color: var(--neutral-500);">Échanger contre un autre produit</small>
+                    </div>
+                </div>
+
+                <!-- Exchange Product Selection (hidden by default) -->
+                <div id="exchangeProductSection" class="exchange-section">
+                    <div class="form-group">
+                        <label>Produit de remplacement</label>
+                        <input type="text" id="exchangeProductSearch" class="form-input" placeholder="Rechercher un produit..." onkeyup="filterExchangeProducts()">
+                    </div>
+                    <div class="exchange-product-list" id="exchangeProductList">
+                        {% for product in exchange_products %}
+                            <div class="exchange-product-item" data-ref="{{ product.reference|lower }}" data-name="{{ product.name|lower }}" data-id="{{ product.id }}" onclick="selectExchangeProduct('{{ product.id }}', '{{ product.reference }}')">
+                                <div class="exchange-product-content">
+                                    <div class="exchange-product-ref">{{ product.reference }}</div>
+                                    <div class="exchange-product-name">{{ product.name }}</div>
+                                    <div class="exchange-product-details">
+                                        {{ product.net_weight|default:"0" }}g
+                                        {% if product.metal_purity %}| {{ product.metal_purity.name }}{% endif %}
+                                        | {{ product.selling_price }} DH
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <p class="text-center text-muted">Aucun produit disponible</p>
+                        {% endfor %}
+                    </div>
+                    <p id="selectedExchangeProduct" style="margin-top: var(--space-2); display: none;">
+                        <strong>Sélectionné:</strong> <span id="selectedExchangeProductRef"></span>
+                    </p>
+                </div>
+
+                <!-- Notes -->
+                <div class="form-group" style="margin-top: var(--space-4);">
+                    <label>Notes (optionnel)</label>
+                    <textarea id="returnExchangeNotes" class="form-input" rows="2" placeholder="Raison du retour ou échange..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-secondary" onclick="closeReturnExchangeModal()">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="submitReturnExchangeAction()" id="confirmReturnExchangeBtn" disabled>
+                    <i class="fas fa-check mr-1"></i> Confirmer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden forms for return/exchange -->
+    <form method="post" id="returnForm" style="display: none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="return_item">
+        <input type="hidden" name="item_id" id="returnItemId" value="">
+        <input type="hidden" name="notes" id="returnNotes" value="">
+    </form>
+
+    <form method="post" id="exchangeForm" style="display: none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="exchange_item">
+        <input type="hidden" name="item_id" id="exchangeItemId" value="">
+        <input type="hidden" name="replacement_product_id" id="exchangeReplacementId" value="">
+        <input type="hidden" name="notes" id="exchangeNotes" value="">
+    </form>
+
+    <style>
+        /* Return/Exchange Modal Styles */
+        .modal-overlay-custom {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1050;
+        }
+
+        .modal-overlay-custom.active {
+            display: flex;
+        }
+
+        .modal-content-custom {
+            background: white;
+            border-radius: var(--radius-lg);
+            width: 95%;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header-custom {
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--neutral-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header-custom h3 {
+            margin: 0;
+            font-size: var(--text-lg);
+        }
+
+        .modal-close-custom {
+            background: none;
+            border: none;
+            font-size: var(--text-2xl);
+            cursor: pointer;
+            color: var(--neutral-400);
+        }
+
+        .modal-body-custom {
+            padding: var(--space-6);
+            overflow-y: auto;
+        }
+
+        .modal-footer-custom {
+            padding: var(--space-4) var(--space-6);
+            border-top: 1px solid var(--neutral-200);
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--space-3);
+        }
+
+        /* Action choice buttons */
+        .re-action-choice {
+            display: flex;
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
+
+        .re-action-choice-btn {
+            flex: 1;
+            padding: var(--space-4);
+            border: 2px solid var(--neutral-300);
+            border-radius: var(--radius-lg);
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            transition: all var(--transition-fast);
+        }
+
+        .re-action-choice-btn:hover {
+            border-color: var(--primary-400);
+            background: var(--primary-50);
+        }
+
+        .re-action-choice-btn.selected {
+            border-color: var(--primary-600);
+            background: var(--primary-100);
+        }
+
+        .re-action-choice-btn i {
+            font-size: var(--text-2xl);
+            margin-bottom: var(--space-2);
+            display: block;
+        }
+
+        .re-return-btn i {
+            color: var(--warning-600);
+        }
+
+        .re-exchange-btn i {
+            color: var(--info-600);
+        }
+
+        .exchange-section {
+            display: none;
+            margin-top: var(--space-4);
+            padding-top: var(--space-4);
+            border-top: 1px solid var(--neutral-200);
+        }
+
+        .exchange-section.visible {
+            display: block;
+        }
+
+        .exchange-product-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+        }
+
+        .exchange-product-item {
+            cursor: pointer;
+        }
+
+        .exchange-product-content {
+            padding: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+            transition: all var(--transition-fast);
+        }
+
+        .exchange-product-content:hover {
+            background: var(--primary-50);
+        }
+
+        .exchange-product-content.selected {
+            background: var(--primary-100);
+            border-color: var(--primary-500);
+        }
+
+        .exchange-product-ref {
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+        }
+
+        .exchange-product-name {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .exchange-product-details {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+    </style>
 {% endblock %}

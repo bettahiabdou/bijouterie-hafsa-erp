@@ -20,6 +20,8 @@ class SaleInvoice(models.Model):
         PARTIAL_PAID = 'partial', _('Partiellement payée')
         PAID = 'paid', _('Payée')
         CANCELLED = 'cancelled', _('Annulée')
+        RETURNED = 'returned', _('Retournée')
+        EXCHANGED = 'exchanged', _('Échangée')
 
     class SaleType(models.TextChoices):
         REGULAR = 'regular', _('Vente normale')
@@ -861,3 +863,89 @@ class InvoicePhoto(models.Model):
 
     def __str__(self):
         return f"Photo {self.id} - {self.invoice.reference}"
+
+
+class SaleInvoiceAction(models.Model):
+    """
+    Track returns and exchanges on sales invoices
+    """
+
+    class ActionType(models.TextChoices):
+        RETURN = 'return', _('Retour')
+        EXCHANGE = 'exchange', _('Échange')
+
+    # The original invoice being returned/exchanged
+    original_invoice = models.ForeignKey(
+        SaleInvoice,
+        on_delete=models.CASCADE,
+        related_name='actions',
+        verbose_name=_('Facture originale')
+    )
+
+    action_type = models.CharField(
+        _('Type d\'action'),
+        max_length=20,
+        choices=ActionType.choices
+    )
+
+    # The product that was returned or exchanged
+    original_product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='sale_returns',
+        verbose_name=_('Produit original')
+    )
+    original_product_ref = models.CharField(
+        _('Référence produit original'),
+        max_length=100,
+        blank=True
+    )
+
+    # For exchanges: the new invoice created with the exchanged product
+    new_invoice = models.ForeignKey(
+        SaleInvoice,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='exchange_from',
+        verbose_name=_('Nouvelle facture')
+    )
+
+    # For exchanges: the replacement product
+    replacement_product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sale_replacements',
+        verbose_name=_('Produit de remplacement')
+    )
+
+    # Refund amount (for returns)
+    refund_amount = models.DecimalField(
+        _('Montant remboursé'),
+        max_digits=12,
+        decimal_places=2,
+        default=0
+    )
+
+    # Tracking
+    notes = models.TextField(_('Notes'), blank=True)
+    created_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name=_('Créé par')
+    )
+    created_at = models.DateTimeField(_('Date'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('Action facture vente')
+        verbose_name_plural = _('Actions facture vente')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        if self.action_type == self.ActionType.EXCHANGE:
+            return f"Échange: {self.original_product_ref} → {self.replacement_product.reference if self.replacement_product else '?'}"
+        return f"Retour: {self.original_product_ref}"
