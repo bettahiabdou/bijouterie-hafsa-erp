@@ -22,8 +22,11 @@ import os
 def convert_image_to_jpeg(image_file):
     """
     Convert uploaded image to JPEG format if it's HEIC or other non-web formats.
+    Also handles EXIF orientation to fix rotated iPhone photos.
     Returns a new InMemoryUploadedFile with the converted image.
     """
+    from PIL import ExifTags
+
     filename = image_file.name.lower()
 
     # Check if it's a HEIC file or other format that needs conversion
@@ -42,6 +45,39 @@ def convert_image_to_jpeg(image_file):
 
         # Open image with PIL
         img = Image.open(image_file)
+
+        # Fix EXIF orientation (iPhone photos are often rotated)
+        try:
+            # Find the orientation tag
+            orientation_key = None
+            for key in ExifTags.TAGS.keys():
+                if ExifTags.TAGS[key] == 'Orientation':
+                    orientation_key = key
+                    break
+
+            if orientation_key and hasattr(img, '_getexif') and img._getexif():
+                exif = img._getexif()
+                if exif and orientation_key in exif:
+                    orientation = exif[orientation_key]
+
+                    # Apply rotation based on EXIF orientation value
+                    if orientation == 2:
+                        img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                    elif orientation == 3:
+                        img = img.rotate(180, expand=True)
+                    elif orientation == 4:
+                        img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+                    elif orientation == 5:
+                        img = img.rotate(-90, expand=True).transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                    elif orientation == 6:
+                        img = img.rotate(-90, expand=True)
+                    elif orientation == 7:
+                        img = img.rotate(90, expand=True).transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                    elif orientation == 8:
+                        img = img.rotate(90, expand=True)
+        except (AttributeError, KeyError, IndexError, TypeError):
+            # If EXIF reading fails, continue without rotation
+            pass
 
         # Convert to RGB if necessary (for RGBA, P mode images)
         if img.mode in ('RGBA', 'P', 'LA'):
