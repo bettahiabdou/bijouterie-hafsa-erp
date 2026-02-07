@@ -1432,7 +1432,8 @@
         function updatePaymentStatus() {
             const totalNewProducts = selectedExchangeProducts.reduce((sum, p) => sum + p.price, 0);
             const difference = totalNewProducts - originalPrice; // Différence à payer
-            const amountPaidNow = parseFloat(document.getElementById('exchangeAmountPaid').value) || 0;
+            const amountPaidNowStr = document.getElementById('exchangeAmountPaid').value;
+            const amountPaidNow = parseFloat(amountPaidNowStr) || 0;
 
             const indicator = document.getElementById('paymentStatusIndicator');
             const statusText = document.getElementById('paymentStatusText');
@@ -1441,29 +1442,36 @@
             indicator.style.display = 'block';
 
             // Logic:
-            // - Original price (1200) is already credited from the exchanged invoice
-            // - Client pays amountPaidNow (1887) for the difference
-            // - Total effectively paid = originalPrice + amountPaidNow = 1200 + 1887 = 3087
+            // - Original price is already credited from the exchanged invoice
+            // - Client pays amountPaidNow for the difference
+            // - Total effectively paid = originalPrice + amountPaidNow
             // - If totalEffectivelyPaid >= totalNewProducts => PAID
 
             const totalEffectivelyPaid = originalPrice + amountPaidNow;
 
-            if (difference <= 0) {
+            // Use small epsilon for floating point comparison
+            const epsilon = 0.01;
+
+            if (difference <= epsilon) {
                 // New products cost less or equal - invoice is fully paid automatically
                 indicator.classList.add('status-paid');
-                if (difference < 0) {
+                if (difference < -epsilon) {
                     statusText.textContent = `Facture payée - Crédit client: ${Math.abs(difference).toFixed(2)} DH`;
                 } else {
                     statusText.textContent = 'Facture sera payée (échange équivalent)';
                 }
-            } else if (totalEffectivelyPaid >= totalNewProducts) {
-                // Client paid enough to cover the total
+            } else if (totalEffectivelyPaid >= totalNewProducts - epsilon) {
+                // Client paid enough to cover the total (with epsilon tolerance)
                 indicator.classList.add('status-paid');
                 statusText.textContent = 'Facture sera payée intégralement ✓';
-            } else if (amountPaidNow > 0) {
+            } else if (amountPaidNow >= difference - epsilon) {
+                // Client paid at least the difference - invoice is paid
+                indicator.classList.add('status-paid');
+                statusText.textContent = 'Facture sera payée intégralement ✓';
+            } else if (amountPaidNow > epsilon) {
                 // Partial payment
                 indicator.classList.add('status-partial');
-                const remaining = totalNewProducts - totalEffectivelyPaid;
+                const remaining = difference - amountPaidNow;
                 statusText.textContent = `Paiement partiel - Solde restant: ${remaining.toFixed(2)} DH`;
             } else {
                 // No additional payment - only original price credited
@@ -1636,7 +1644,7 @@
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Montant payé (DH)</label>
-                                <input type="number" id="exchangeAmountPaid" class="form-input" step="0.01" min="0" placeholder="0.00" onchange="updatePaymentStatus()">
+                                <input type="number" id="exchangeAmountPaid" class="form-input" step="0.01" min="0" placeholder="0.00" onchange="updatePaymentStatus()" oninput="updatePaymentStatus()">
                             </div>
                         </div>
 
