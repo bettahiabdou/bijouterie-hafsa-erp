@@ -131,10 +131,10 @@ def purchase_order_create(request):
         # Log activity
         ActivityLog.objects.create(
             user=request.user,
-            action_type=ActivityLog.ActionType.CREATE,
-            object_type='PurchaseOrder',
-            object_id=order.id,
-            description=f'Created purchase order {order.reference}',
+            action=ActivityLog.ActionType.CREATE,
+            model_name='PurchaseOrder',
+            object_id=str(order.id),
+            object_repr=f'Created purchase order {order.reference}',
             ip_address=get_client_ip(request)
         )
 
@@ -163,10 +163,10 @@ def purchase_order_detail(request, reference):
     # Log view
     ActivityLog.objects.create(
         user=request.user,
-        action_type=ActivityLog.ActionType.VIEW,
-        object_type='PurchaseOrder',
-        object_id=order.id,
-        description=f'Viewed purchase order {order.reference}',
+        action=ActivityLog.ActionType.VIEW,
+        model_name='PurchaseOrder',
+        object_id=str(order.id),
+        object_repr=f'Viewed purchase order {order.reference}',
         ip_address=get_client_ip(request)
     )
 
@@ -180,10 +180,10 @@ def purchase_order_detail(request, reference):
 
             ActivityLog.objects.create(
                 user=request.user,
-                action_type=ActivityLog.ActionType.UPDATE,
-                object_type='PurchaseOrder',
-                object_id=order.id,
-                description=f'Approved purchase order {order.reference}',
+                action=ActivityLog.ActionType.UPDATE,
+                model_name='PurchaseOrder',
+                object_id=str(order.id),
+                object_repr=f'Approved purchase order {order.reference}',
                 ip_address=get_client_ip(request)
             )
 
@@ -296,10 +296,10 @@ def purchase_invoice_create(request):
         # Log activity
         ActivityLog.objects.create(
             user=request.user,
-            action_type=ActivityLog.ActionType.CREATE,
-            object_type='PurchaseInvoice',
-            object_id=invoice.id,
-            description=f'Created purchase invoice {invoice.reference}',
+            action=ActivityLog.ActionType.CREATE,
+            model_name='PurchaseInvoice',
+            object_id=str(invoice.id),
+            object_repr=f'Created purchase invoice {invoice.reference}',
             ip_address=get_client_ip(request)
         )
 
@@ -327,10 +327,10 @@ def purchase_invoice_detail(request, reference):
     # Log view
     ActivityLog.objects.create(
         user=request.user,
-        action_type=ActivityLog.ActionType.VIEW,
-        object_type='PurchaseInvoice',
-        object_id=invoice.id,
-        description=f'Viewed purchase invoice {invoice.reference}',
+        action=ActivityLog.ActionType.VIEW,
+        model_name='PurchaseInvoice',
+        object_id=str(invoice.id),
+        object_repr=f'Viewed purchase invoice {invoice.reference}',
         ip_address=get_client_ip(request)
     )
 
@@ -342,10 +342,10 @@ def purchase_invoice_detail(request, reference):
 
             ActivityLog.objects.create(
                 user=request.user,
-                action_type=ActivityLog.ActionType.UPDATE,
-                object_type='PurchaseInvoice',
-                object_id=invoice.id,
-                description=f'Confirmed purchase invoice {invoice.reference}',
+                action=ActivityLog.ActionType.UPDATE,
+                model_name='PurchaseInvoice',
+                object_id=str(invoice.id),
+                object_repr=f'Confirmed purchase invoice {invoice.reference}',
                 ip_address=get_client_ip(request)
             )
 
@@ -437,10 +437,10 @@ def consignment_create(request):
         # Log activity
         ActivityLog.objects.create(
             user=request.user,
-            action_type=ActivityLog.ActionType.CREATE,
-            object_type='Consignment',
-            object_id=consignment.id,
-            description=f'Created consignment {consignment.reference}',
+            action=ActivityLog.ActionType.CREATE,
+            model_name='Consignment',
+            object_id=str(consignment.id),
+            object_repr=f'Created consignment {consignment.reference}',
             ip_address=get_client_ip(request)
         )
 
@@ -466,10 +466,10 @@ def consignment_detail(request, reference):
     # Log view
     ActivityLog.objects.create(
         user=request.user,
-        action_type=ActivityLog.ActionType.VIEW,
-        object_type='Consignment',
-        object_id=consignment.id,
-        description=f'Viewed consignment {consignment.reference}',
+        action=ActivityLog.ActionType.VIEW,
+        model_name='Consignment',
+        object_id=str(consignment.id),
+        object_repr=f'Viewed consignment {consignment.reference}',
         ip_address=get_client_ip(request)
     )
 
