@@ -80,15 +80,15 @@ def generate_product_label_zpl(product, quantity=1):
         purity = product.metal_purity.name
 
     # ZPL for 68x26mm tag - print on LEFT side
-    # X offset ~34 (moved 3mm right from 10)
-    # Top: weight+purity
-    # Bottom: barcode, reference
+    # Weight: X=34, Y=31 (pushed 2mm down from 15)
+    # Barcode: X=26 (pushed 1mm left from 34), Y=130
+    # Reference: X=34, Y=175 (unchanged)
     zpl = f"""^XA
 ^CI28
 ^PW544
 ^LL208
-^FO34,15^A0N,22,20^FD{weight}g {purity}^FS
-^FO34,130^BY1^BCN,35,N,N,N^FD{barcode_data}^FS
+^FO34,31^A0N,22,20^FD{weight}g {purity}^FS
+^FO26,130^BY1^BCN,35,N,N,N^FD{barcode_data}^FS
 ^FO34,175^A0N,16,14^FD{short_ref}^FS
 ^PQ{quantity}
 ^XZ"""
@@ -136,8 +136,8 @@ def print_test_label():
 ^CI28
 ^PW544
 ^LL208
-^FO34,15^A0N,22,20^FD5.2g 18K^FS
-^FO34,130^BY1^BCN,35,N,N,N^FD20260207-0001^FS
+^FO34,31^A0N,22,20^FD5.2g 18K^FS
+^FO26,130^BY1^BCN,35,N,N,N^FD20260207-0001^FS
 ^FO34,175^A0N,16,14^FD20260207-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
