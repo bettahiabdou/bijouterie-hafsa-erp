@@ -238,6 +238,12 @@
                             <span class="weight-label">Poids Net</span>
                             <span class="weight-value">{{ product.net_weight }} g</span>
                         </div>
+                        {% if product.size %}
+                        <div class="weight-item">
+                            <span class="weight-label">Taille</span>
+                            <span class="weight-value">{{ product.size }} cm</span>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
