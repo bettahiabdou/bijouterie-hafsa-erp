@@ -215,6 +215,25 @@
                                                     style="background: var(--success-50); border-color: var(--success-300); color: var(--success-700); font-weight: 600;">
                                             </div>
                                         </div>
+                                        <!-- Image Upload Section -->
+                                        <div class="mt-4" style="border-top: 1px solid var(--neutral-200); padding-top: var(--space-4);">
+                                            <div class="form-group" style="margin-bottom: 0;">
+                                                <label class="form-label"><i class="fas fa-image mr-1"></i> Image du Produit</label>
+                                                <div class="image-upload-area">
+                                                    <input type="file" name="product_image_0" class="product_image form-input" accept="image/*" style="display: none;">
+                                                    <div class="image-upload-trigger" onclick="this.previousElementSibling.click()">
+                                                        <i class="fas fa-camera"></i>
+                                                        <span>Cliquez pour ajouter une image</span>
+                                                    </div>
+                                                    <div class="image-preview-container" style="display: none;">
+                                                        <img class="image-preview" src="" alt="Preview">
+                                                        <button type="button" class="btn btn-error btn-sm remove-image-btn">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -320,6 +339,23 @@
                                             <label class="form-label">Cout Total (DH)</label>
                                             <input type="number" name="product_total_cost" class="product_total_cost_mobile form-input" step="0.01" min="0" readonly
                                                 style="background: var(--success-50); border-color: var(--success-300); color: var(--success-700); font-weight: 600;">
+                                        </div>
+                                        <!-- Image Upload Section (Mobile) -->
+                                        <div class="form-group">
+                                            <label class="form-label"><i class="fas fa-image mr-1"></i> Image du Produit</label>
+                                            <div class="image-upload-area-mobile">
+                                                <input type="file" name="product_image_0" class="product_image_mobile" accept="image/*" style="display: none;">
+                                                <div class="image-upload-trigger-mobile" onclick="this.previousElementSibling.click()">
+                                                    <i class="fas fa-camera"></i>
+                                                    <span>Ajouter une image</span>
+                                                </div>
+                                                <div class="image-preview-container-mobile" style="display: none;">
+                                                    <img class="image-preview-mobile" src="" alt="Preview">
+                                                    <button type="button" class="btn btn-error btn-sm remove-image-btn-mobile">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </details>
@@ -491,6 +527,72 @@
             border-color: var(--accent-300) !important;
         }
 
+        /* Image Upload Styles */
+        .image-upload-area,
+        .image-upload-area-mobile {
+            position: relative;
+        }
+
+        .image-upload-trigger,
+        .image-upload-trigger-mobile {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-3);
+            border: 2px dashed var(--neutral-300);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: white;
+        }
+
+        .image-upload-trigger:hover,
+        .image-upload-trigger-mobile:hover {
+            border-color: var(--primary-400);
+            background: var(--primary-50);
+        }
+
+        .image-upload-trigger i,
+        .image-upload-trigger-mobile i {
+            color: var(--neutral-400);
+            font-size: 1.25rem;
+        }
+
+        .image-upload-trigger span,
+        .image-upload-trigger-mobile span {
+            color: var(--neutral-500);
+            font-size: var(--text-sm);
+        }
+
+        .image-preview-container,
+        .image-preview-container-mobile {
+            position: relative;
+            display: inline-block;
+        }
+
+        .image-preview,
+        .image-preview-mobile {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: var(--radius-md);
+            border: 2px solid var(--neutral-200);
+        }
+
+        .remove-image-btn,
+        .remove-image-btn-mobile {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
         /* Mobile Responsive */
         @media (max-width: 768px) {
             .desktop-view {
@@ -561,9 +663,20 @@
             newMainRow.querySelectorAll('input').forEach(input => {
                 input.value = '';
             });
-            newDetailRow.querySelectorAll('input').forEach(input => {
+            newDetailRow.querySelectorAll('input:not([type="file"])').forEach(input => {
                 input.value = '';
             });
+            // Reset file input
+            const fileInput = newDetailRow.querySelector('.product_image');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            // Reset image preview
+            const previewContainer = newDetailRow.querySelector('.image-preview-container');
+            const uploadTrigger = newDetailRow.querySelector('.image-upload-trigger');
+            if (previewContainer) previewContainer.style.display = 'none';
+            if (uploadTrigger) uploadTrigger.style.display = 'flex';
+
             newDetailRow.style.display = 'none';
 
             // Reset expand toggle icon
@@ -577,10 +690,15 @@
             productsList.appendChild(newMainRow);
             productsList.appendChild(newDetailRow);
 
+            // Get the new index
+            const newIndex = document.querySelectorAll('.product_item').length - 1;
+
             // Setup event listeners
             attachEventListeners(newMainRow);
             setupExpandToggle(newMainRow);
+            setupImageUpload(newDetailRow, newIndex);
             updateRemoveButtons();
+            updateImageInputNames();
             calculatePreview();
         }
 
@@ -593,10 +711,21 @@
             newCard.setAttribute('data-index', mobileProductCount - 1);
             newCard.querySelector('.mobile-product-number').textContent = 'Produit #' + mobileProductCount;
 
-            // Clear input values
-            newCard.querySelectorAll('input').forEach(input => {
+            // Clear input values (except file inputs)
+            newCard.querySelectorAll('input:not([type="file"])').forEach(input => {
                 input.value = '';
             });
+            // Reset file input
+            const fileInput = newCard.querySelector('.product_image_mobile');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            // Reset image preview
+            const previewContainer = newCard.querySelector('.image-preview-container-mobile');
+            const uploadTrigger = newCard.querySelector('.image-upload-trigger-mobile');
+            if (previewContainer) previewContainer.style.display = 'none';
+            if (uploadTrigger) uploadTrigger.style.display = 'flex';
+
             newCard.querySelectorAll('select').forEach(select => {
                 // Reset to first option or default
                 if (select.classList.contains('product_type_mobile')) {
@@ -630,7 +759,13 @@
 
             // Append card
             mobileProductsList.appendChild(newCard);
+
+            // Setup image upload for new card
+            const newIndex = document.querySelectorAll('.product_item_mobile').length - 1;
+            setupMobileImageUpload(newCard, newIndex);
+
             updateRemoveButtons();
+            updateImageInputNames();
             calculatePreview();
         }
 
@@ -868,17 +1003,114 @@
             }
         }
 
+        // Image upload handling for desktop
+        function setupImageUpload(detailRow, index) {
+            const imageInput = detailRow.querySelector('.product_image');
+            const uploadTrigger = detailRow.querySelector('.image-upload-trigger');
+            const previewContainer = detailRow.querySelector('.image-preview-container');
+            const previewImg = detailRow.querySelector('.image-preview');
+            const removeBtn = detailRow.querySelector('.remove-image-btn');
+
+            if (!imageInput) return;
+
+            // Update input name with correct index
+            imageInput.name = `product_image_${index}`;
+
+            imageInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewImg.src = e.target.result;
+                        previewContainer.style.display = 'inline-block';
+                        uploadTrigger.style.display = 'none';
+                    };
+                    reader.readAsDataURL(this.files[0]);
+                }
+            });
+
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    imageInput.value = '';
+                    previewContainer.style.display = 'none';
+                    uploadTrigger.style.display = 'flex';
+                });
+            }
+        }
+
+        // Image upload handling for mobile
+        function setupMobileImageUpload(card, index) {
+            const imageInput = card.querySelector('.product_image_mobile');
+            const uploadTrigger = card.querySelector('.image-upload-trigger-mobile');
+            const previewContainer = card.querySelector('.image-preview-container-mobile');
+            const previewImg = card.querySelector('.image-preview-mobile');
+            const removeBtn = card.querySelector('.remove-image-btn-mobile');
+
+            if (!imageInput) return;
+
+            // Update input name with correct index
+            imageInput.name = `product_image_${index}`;
+
+            imageInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewImg.src = e.target.result;
+                        previewContainer.style.display = 'inline-block';
+                        uploadTrigger.style.display = 'none';
+                    };
+                    reader.readAsDataURL(this.files[0]);
+                }
+            });
+
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    imageInput.value = '';
+                    previewContainer.style.display = 'none';
+                    uploadTrigger.style.display = 'flex';
+                });
+            }
+        }
+
+        // Update all image input names based on row index
+        function updateImageInputNames() {
+            // Desktop
+            document.querySelectorAll('.product_item').forEach((item, index) => {
+                const detailRow = item.nextElementSibling;
+                if (detailRow && detailRow.classList.contains('detail-row')) {
+                    const imageInput = detailRow.querySelector('.product_image');
+                    if (imageInput) {
+                        imageInput.name = `product_image_${index}`;
+                    }
+                }
+            });
+
+            // Mobile
+            document.querySelectorAll('.product_item_mobile').forEach((card, index) => {
+                const imageInput = card.querySelector('.product_image_mobile');
+                if (imageInput) {
+                    imageInput.name = `product_image_${index}`;
+                }
+            });
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             // Desktop view initialization
-            document.querySelectorAll('.product_item').forEach(item => {
+            document.querySelectorAll('.product_item').forEach((item, index) => {
                 attachEventListeners(item);
                 setupExpandToggle(item);
+                const detailRow = item.nextElementSibling;
+                if (detailRow && detailRow.classList.contains('detail-row')) {
+                    setupImageUpload(detailRow, index);
+                }
             });
 
             // Mobile view initialization
-            document.querySelectorAll('.product_item_mobile').forEach(card => {
+            document.querySelectorAll('.product_item_mobile').forEach((card, index) => {
                 attachMobileEventListeners(card);
+                setupMobileImageUpload(card, index);
             });
 
             updateRemoveButtons();
