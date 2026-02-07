@@ -566,3 +566,149 @@ class CompanySettings(models.Model):
             'company_name': 'Bijouterie Hafsa'
         })
         return obj
+
+
+class SystemConfig(models.Model):
+    """
+    System/Environment Configuration (singleton)
+    Stores production settings like API keys, ports, IPs, etc.
+    """
+    # Telegram Bot Configuration
+    telegram_bot_token = models.CharField(
+        _('Token Bot Telegram'),
+        max_length=100,
+        blank=True,
+        help_text=_('Token du bot Telegram pour les notifications')
+    )
+    telegram_chat_id = models.CharField(
+        _('Chat ID Telegram'),
+        max_length=50,
+        blank=True,
+        help_text=_('ID du chat/groupe pour recevoir les notifications')
+    )
+    telegram_enabled = models.BooleanField(
+        _('Telegram activé'),
+        default=False
+    )
+
+    # Zebra Printer Configuration
+    zebra_printer_ip = models.GenericIPAddressField(
+        _('IP Imprimante Zebra'),
+        blank=True,
+        null=True,
+        help_text=_('Adresse IP de l\'imprimante Zebra')
+    )
+    zebra_printer_port = models.PositiveIntegerField(
+        _('Port Imprimante Zebra'),
+        default=9100,
+        help_text=_('Port de l\'imprimante (défaut: 9100)')
+    )
+    zebra_printer_enabled = models.BooleanField(
+        _('Imprimante Zebra activée'),
+        default=False
+    )
+    zebra_label_width = models.PositiveIntegerField(
+        _('Largeur étiquette (mm)'),
+        default=50,
+        help_text=_('Largeur des étiquettes en millimètres')
+    )
+    zebra_label_height = models.PositiveIntegerField(
+        _('Hauteur étiquette (mm)'),
+        default=25,
+        help_text=_('Hauteur des étiquettes en millimètres')
+    )
+
+    # Server Configuration
+    server_base_url = models.URLField(
+        _('URL de base du serveur'),
+        blank=True,
+        help_text=_('URL publique du serveur (ex: https://erp.bijouterie-hafsa.ma)')
+    )
+    debug_mode = models.BooleanField(
+        _('Mode Debug'),
+        default=False,
+        help_text=_('Activer le mode debug (désactiver en production)')
+    )
+
+    # Email Configuration (SMTP)
+    smtp_host = models.CharField(
+        _('Serveur SMTP'),
+        max_length=200,
+        blank=True,
+        help_text=_('Serveur SMTP pour l\'envoi d\'emails')
+    )
+    smtp_port = models.PositiveIntegerField(
+        _('Port SMTP'),
+        default=587,
+        help_text=_('Port SMTP (défaut: 587 pour TLS)')
+    )
+    smtp_username = models.CharField(
+        _('Utilisateur SMTP'),
+        max_length=200,
+        blank=True
+    )
+    smtp_password = models.CharField(
+        _('Mot de passe SMTP'),
+        max_length=200,
+        blank=True,
+        help_text=_('Mot de passe ou App Password')
+    )
+    smtp_use_tls = models.BooleanField(
+        _('Utiliser TLS'),
+        default=True
+    )
+    smtp_from_email = models.EmailField(
+        _('Email expéditeur'),
+        blank=True,
+        help_text=_('Adresse email pour l\'envoi')
+    )
+
+    # Backup Configuration
+    backup_enabled = models.BooleanField(
+        _('Sauvegarde automatique'),
+        default=False
+    )
+    backup_path = models.CharField(
+        _('Chemin de sauvegarde'),
+        max_length=500,
+        blank=True,
+        help_text=_('Chemin du dossier de sauvegarde')
+    )
+    backup_retention_days = models.PositiveIntegerField(
+        _('Rétention sauvegardes (jours)'),
+        default=30
+    )
+
+    # API Keys
+    gold_price_api_key = models.CharField(
+        _('Clé API Prix de l\'Or'),
+        max_length=200,
+        blank=True,
+        help_text=_('Clé API pour récupérer les prix de l\'or')
+    )
+    gold_price_api_url = models.URLField(
+        _('URL API Prix de l\'Or'),
+        blank=True,
+        help_text=_('URL de l\'API pour les prix de l\'or')
+    )
+
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('Configuration système')
+        verbose_name_plural = _('Configuration système')
+
+    def __str__(self):
+        return 'Configuration Système'
+
+    def save(self, *args, **kwargs):
+        # Ensure only one instance exists (singleton)
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_config(cls):
+        """Get or create system configuration"""
+        obj, created = cls.objects.get_or_create(pk=1, defaults={})
+        return obj

@@ -106,6 +106,22 @@
         {% endfor %}
     </div>
 
+    <!-- Environment Configuration Card -->
+    <div class="env-config-section mt-8 animate-slide-up">
+        <a href="{% url 'admin_dashboard:system_config' %}" class="env-config-card">
+            <div class="env-config-icon">
+                <i class="fas fa-cogs"></i>
+            </div>
+            <div class="env-config-content">
+                <h3>Configuration Environnement</h3>
+                <p>Telegram, Imprimante Zebra, SMTP, API, Sauvegarde</p>
+            </div>
+            <div class="env-config-arrow">
+                <i class="fas fa-chevron-right"></i>
+            </div>
+        </a>
+    </div>
+
     <!-- Info Alert -->
     <div class="alert alert-info mt-8 animate-slide-up">
         <i class="fas fa-info-circle"></i>
@@ -255,6 +271,64 @@
 
         .empty-state p {
             font-size: var(--text-sm);
+        }
+
+        /* Environment Config Card */
+        .env-config-section {
+            margin-top: var(--space-8);
+        }
+
+        .env-config-card {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            padding: var(--space-5);
+            background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
+            border: 2px solid var(--primary-200);
+            border-radius: var(--radius-lg);
+            text-decoration: none;
+            transition: all var(--transition-base);
+        }
+
+        .env-config-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-400);
+            background: linear-gradient(135deg, var(--primary-100), var(--primary-200));
+        }
+
+        .env-config-icon {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            border-radius: var(--radius-lg);
+            color: white;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .env-config-content {
+            flex: 1;
+        }
+
+        .env-config-content h3 {
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+            margin-bottom: var(--space-1);
+        }
+
+        .env-config-content p {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .env-config-arrow {
+            color: var(--primary-500);
+            font-size: 1.25rem;
         }
 
         /* Alert */

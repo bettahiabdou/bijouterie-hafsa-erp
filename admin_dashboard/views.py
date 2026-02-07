@@ -34,7 +34,7 @@ from settings_app.models import (
     StoneClarity, StoneColor, StoneCut, PaymentMethod,
     BankAccount, StockLocation, DeliveryMethod,
     DeliveryPerson, RepairType, CertificateIssuer,
-    CompanySettings
+    CompanySettings, SystemConfig
 )
 
 
@@ -941,3 +941,94 @@ def get_client_ip(request):
     else:
         ip = request.META.get('REMOTE_ADDR')
     return ip
+
+
+@login_required(login_url='login')
+@staff_required
+def system_config_edit(request):
+    """Edit System Configuration (Singleton)
+
+    Allows administrators to configure production environment settings
+    like Telegram bot, Zebra printer, SMTP, etc.
+    """
+    from django import forms
+
+    # Get or create the singleton config
+    config = SystemConfig.get_config()
+
+    # Define the form dynamically
+    class SystemConfigForm(forms.ModelForm):
+        class Meta:
+            model = SystemConfig
+            fields = [
+                # Telegram
+                'telegram_bot_token', 'telegram_chat_id', 'telegram_enabled',
+                # Zebra Printer
+                'zebra_printer_ip', 'zebra_printer_port', 'zebra_printer_enabled',
+                'zebra_label_width', 'zebra_label_height',
+                # Server
+                'server_base_url', 'debug_mode',
+                # SMTP
+                'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password',
+                'smtp_use_tls', 'smtp_from_email',
+                # Backup
+                'backup_enabled', 'backup_path', 'backup_retention_days',
+                # API Keys
+                'gold_price_api_key', 'gold_price_api_url',
+            ]
+            widgets = {
+                'telegram_bot_token': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '123456789:ABC...'}),
+                'telegram_chat_id': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '-100123456789'}),
+                'telegram_enabled': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+                'zebra_printer_ip': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '192.168.1.100'}),
+                'zebra_printer_port': forms.NumberInput(attrs={'class': 'form-input', 'min': 1, 'max': 65535}),
+                'zebra_printer_enabled': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+                'zebra_label_width': forms.NumberInput(attrs={'class': 'form-input', 'min': 10, 'max': 200}),
+                'zebra_label_height': forms.NumberInput(attrs={'class': 'form-input', 'min': 10, 'max': 200}),
+                'server_base_url': forms.URLInput(attrs={'class': 'form-input', 'placeholder': 'https://erp.example.com'}),
+                'debug_mode': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+                'smtp_host': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'smtp.gmail.com'}),
+                'smtp_port': forms.NumberInput(attrs={'class': 'form-input', 'min': 1, 'max': 65535}),
+                'smtp_username': forms.TextInput(attrs={'class': 'form-input'}),
+                'smtp_password': forms.PasswordInput(attrs={'class': 'form-input', 'autocomplete': 'new-password'}),
+                'smtp_use_tls': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+                'smtp_from_email': forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'noreply@example.com'}),
+                'backup_enabled': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+                'backup_path': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '/var/backups/erp'}),
+                'backup_retention_days': forms.NumberInput(attrs={'class': 'form-input', 'min': 1}),
+                'gold_price_api_key': forms.TextInput(attrs={'class': 'form-input'}),
+                'gold_price_api_url': forms.URLInput(attrs={'class': 'form-input', 'placeholder': 'https://api.example.com/gold'}),
+            }
+
+    if request.method == 'POST':
+        form = SystemConfigForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+
+            # Log the activity
+            ActivityLog.objects.create(
+                user=request.user,
+                action='update',
+                model_name='SystemConfig',
+                object_id=1,
+                object_repr='Configuration Système',
+                ip_address=get_client_ip(request),
+            )
+
+            messages.success(request, 'Configuration système mise à jour avec succès.')
+            return redirect('admin_dashboard:system_config')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
+    else:
+        form = SystemConfigForm(instance=config)
+
+    context = {
+        'page_title': 'Configuration Environnement',
+        'section': 'configuration',
+        'form': form,
+        'config': config,
+    }
+
+    return render(request, 'admin_dashboard/system_config.html', context)

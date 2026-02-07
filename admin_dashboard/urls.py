@@ -21,6 +21,7 @@ urlpatterns = [
 
     # System Configuration
     path('configuration/', views.system_configuration, name='configuration'),
+    path('system-config/', views.system_config_edit, name='system_config'),
 
     # Generic Configuration CRUD Routes (DRY Implementation)
     # Supports all 15+ configuration model types dynamically

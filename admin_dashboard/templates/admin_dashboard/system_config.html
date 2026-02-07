@@ -1,0 +1,498 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuration Environnement - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'admin_dashboard:home' %}" class="breadcrumb-item">Administration</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'admin_dashboard:configuration' %}" class="breadcrumb-item">Configuration</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Environnement</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Configuration Environnement</h1>
+                <p class="page-subtitle">Parametres du serveur, API et services externes</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'admin_dashboard:configuration' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <form method="POST" class="system-config-form">
+        {% csrf_token %}
+
+        <!-- Telegram Configuration -->
+        <div class="card config-section animate-slide-up">
+            <div class="card-header">
+                <div class="config-header-content">
+                    <i class="fab fa-telegram config-icon telegram"></i>
+                    <div>
+                        <h3>Bot Telegram</h3>
+                        <p class="config-description">Configuration du bot pour les notifications</p>
+                    </div>
+                </div>
+                <div class="config-status">
+                    {% if config.telegram_enabled %}
+                        <span class="status-badge status-active"><i class="fas fa-check-circle"></i> Actif</span>
+                    {% else %}
+                        <span class="status-badge status-inactive"><i class="fas fa-times-circle"></i> Inactif</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Token du Bot</label>
+                        <input type="text" name="telegram_bot_token" value="{{ form.telegram_bot_token.value|default:'' }}"
+                            class="form-input" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz">
+                        <p class="form-help">Obtenez-le via @BotFather sur Telegram</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Chat ID</label>
+                        <input type="text" name="telegram_chat_id" value="{{ form.telegram_chat_id.value|default:'' }}"
+                            class="form-input" placeholder="-100123456789">
+                        <p class="form-help">ID du groupe ou chat pour les notifications</p>
+                    </div>
+                </div>
+                <div class="form-group form-checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="telegram_enabled" {% if config.telegram_enabled %}checked{% endif %}>
+                        <span class="checkbox-text">Activer les notifications Telegram</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Zebra Printer Configuration -->
+        <div class="card config-section animate-slide-up" style="animation-delay: 50ms;">
+            <div class="card-header">
+                <div class="config-header-content">
+                    <i class="fas fa-print config-icon printer"></i>
+                    <div>
+                        <h3>Imprimante Zebra</h3>
+                        <p class="config-description">Configuration de l'imprimante d'etiquettes</p>
+                    </div>
+                </div>
+                <div class="config-status">
+                    {% if config.zebra_printer_enabled %}
+                        <span class="status-badge status-active"><i class="fas fa-check-circle"></i> Actif</span>
+                    {% else %}
+                        <span class="status-badge status-inactive"><i class="fas fa-times-circle"></i> Inactif</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Adresse IP</label>
+                        <input type="text" name="zebra_printer_ip" value="{{ form.zebra_printer_ip.value|default:'' }}"
+                            class="form-input" placeholder="192.168.1.100">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Port</label>
+                        <input type="number" name="zebra_printer_port" value="{{ form.zebra_printer_port.value|default:'9100' }}"
+                            class="form-input" min="1" max="65535">
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Largeur etiquette (mm)</label>
+                        <input type="number" name="zebra_label_width" value="{{ form.zebra_label_width.value|default:'50' }}"
+                            class="form-input" min="10" max="200">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Hauteur etiquette (mm)</label>
+                        <input type="number" name="zebra_label_height" value="{{ form.zebra_label_height.value|default:'25' }}"
+                            class="form-input" min="10" max="200">
+                    </div>
+                </div>
+                <div class="form-group form-checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="zebra_printer_enabled" {% if config.zebra_printer_enabled %}checked{% endif %}>
+                        <span class="checkbox-text">Activer l'imprimante Zebra</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Server Configuration -->
+        <div class="card config-section animate-slide-up" style="animation-delay: 100ms;">
+            <div class="card-header">
+                <div class="config-header-content">
+                    <i class="fas fa-server config-icon server"></i>
+                    <div>
+                        <h3>Serveur</h3>
+                        <p class="config-description">Parametres du serveur de production</p>
+                    </div>
+                </div>
+                <div class="config-status">
+                    {% if config.debug_mode %}
+                        <span class="status-badge status-warning"><i class="fas fa-bug"></i> Debug</span>
+                    {% else %}
+                        <span class="status-badge status-active"><i class="fas fa-shield-alt"></i> Production</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">URL de base du serveur</label>
+                    <input type="url" name="server_base_url" value="{{ form.server_base_url.value|default:'' }}"
+                        class="form-input" placeholder="https://erp.bijouterie-hafsa.ma">
+                    <p class="form-help">URL publique du serveur (utilisee pour les liens dans les notifications)</p>
+                </div>
+                <div class="form-group form-checkbox-group">
+                    <label class="checkbox-label checkbox-warning">
+                        <input type="checkbox" name="debug_mode" {% if config.debug_mode %}checked{% endif %}>
+                        <span class="checkbox-text">Mode Debug (desactiver en production!)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- SMTP Configuration -->
+        <div class="card config-section animate-slide-up" style="animation-delay: 150ms;">
+            <div class="card-header">
+                <div class="config-header-content">
+                    <i class="fas fa-envelope config-icon email"></i>
+                    <div>
+                        <h3>Email (SMTP)</h3>
+                        <p class="config-description">Configuration pour l'envoi d'emails</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Serveur SMTP</label>
+                        <input type="text" name="smtp_host" value="{{ form.smtp_host.value|default:'' }}"
+                            class="form-input" placeholder="smtp.gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Port SMTP</label>
+                        <input type="number" name="smtp_port" value="{{ form.smtp_port.value|default:'587' }}"
+                            class="form-input" min="1" max="65535">
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Utilisateur</label>
+                        <input type="text" name="smtp_username" value="{{ form.smtp_username.value|default:'' }}"
+                            class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Mot de passe</label>
+                        <input type="password" name="smtp_password" value="{{ form.smtp_password.value|default:'' }}"
+                            class="form-input" autocomplete="new-password">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email expediteur</label>
+                    <input type="email" name="smtp_from_email" value="{{ form.smtp_from_email.value|default:'' }}"
+                        class="form-input" placeholder="noreply@bijouterie-hafsa.ma">
+                </div>
+                <div class="form-group form-checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="smtp_use_tls" {% if config.smtp_use_tls %}checked{% endif %}>
+                        <span class="checkbox-text">Utiliser TLS (recommande)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backup Configuration -->
+        <div class="card config-section animate-slide-up" style="animation-delay: 200ms;">
+            <div class="card-header">
+                <div class="config-header-content">
+                    <i class="fas fa-database config-icon backup"></i>
+                    <div>
+                        <h3>Sauvegarde</h3>
+                        <p class="config-description">Configuration des sauvegardes automatiques</p>
+                    </div>
+                </div>
+                <div class="config-status">
+                    {% if config.backup_enabled %}
+                        <span class="status-badge status-active"><i class="fas fa-check-circle"></i> Actif</span>
+                    {% else %}
+                        <span class="status-badge status-inactive"><i class="fas fa-times-circle"></i> Inactif</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Chemin de sauvegarde</label>
+                        <input type="text" name="backup_path" value="{{ form.backup_path.value|default:'' }}"
+                            class="form-input" placeholder="/var/backups/erp">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Retention (jours)</label>
+                        <input type="number" name="backup_retention_days" value="{{ form.backup_retention_days.value|default:'30' }}"
+                            class="form-input" min="1">
+                    </div>
+                </div>
+                <div class="form-group form-checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="backup_enabled" {% if config.backup_enabled %}checked{% endif %}>
+                        <span class="checkbox-text">Activer les sauvegardes automatiques</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Keys Configuration -->
+        <div class="card config-section animate-slide-up" style="animation-delay: 250ms;">
+            <div class="card-header">
+                <div class="config-header-content">
+                    <i class="fas fa-key config-icon api"></i>
+                    <div>
+                        <h3>Cles API</h3>
+                        <p class="config-description">Cles d'acces aux services externes</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Cle API Prix de l'Or</label>
+                    <input type="text" name="gold_price_api_key" value="{{ form.gold_price_api_key.value|default:'' }}"
+                        class="form-input">
+                    <p class="form-help">Cle pour recuperer automatiquement les prix de l'or</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">URL API Prix de l'Or</label>
+                    <input type="url" name="gold_price_api_url" value="{{ form.gold_price_api_url.value|default:'' }}"
+                        class="form-input" placeholder="https://api.example.com/gold">
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="form-actions animate-slide-up" style="animation-delay: 300ms;">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save"></i>
+                <span>Enregistrer la Configuration</span>
+            </button>
+        </div>
+    </form>
+
+    <style>
+        .system-config-form {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+
+        .config-section {
+            overflow: hidden;
+        }
+
+        .config-section .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--space-4);
+        }
+
+        .config-header-content {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+        }
+
+        .config-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-lg);
+            font-size: 1.5rem;
+        }
+
+        .config-icon.telegram {
+            background: linear-gradient(135deg, #0088cc, #00a8e6);
+            color: white;
+        }
+
+        .config-icon.printer {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+        }
+
+        .config-icon.server {
+            background: linear-gradient(135deg, #10b981, #34d399);
+            color: white;
+        }
+
+        .config-icon.email {
+            background: linear-gradient(135deg, #f59e0b, #fbbf24);
+            color: white;
+        }
+
+        .config-icon.backup {
+            background: linear-gradient(135deg, #3b82f6, #60a5fa);
+            color: white;
+        }
+
+        .config-icon.api {
+            background: linear-gradient(135deg, #ec4899, #f472b6);
+            color: white;
+        }
+
+        .config-description {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            margin-top: var(--space-1);
+        }
+
+        .config-status {
+            flex-shrink: 0;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            border-radius: var(--radius-full);
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+        }
+
+        .status-active {
+            background: var(--success-100);
+            color: var(--success-700);
+        }
+
+        .status-inactive {
+            background: var(--neutral-100);
+            color: var(--neutral-600);
+        }
+
+        .status-warning {
+            background: var(--warning-100);
+            color: var(--warning-700);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            margin-bottom: var(--space-4);
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-700);
+            margin-bottom: var(--space-2);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: var(--space-3) var(--space-4);
+            border: 1px solid var(--neutral-300);
+            border-radius: var(--radius-md);
+            font-size: var(--text-sm);
+            transition: all var(--transition-fast);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-400);
+            box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
+        }
+
+        .form-help {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            margin-top: var(--space-1);
+        }
+
+        .form-checkbox-group {
+            padding-top: var(--space-2);
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary-500);
+            cursor: pointer;
+        }
+
+        .checkbox-text {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        .checkbox-warning .checkbox-text {
+            color: var(--warning-600);
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            padding-top: var(--space-4);
+        }
+
+        .btn-lg {
+            padding: var(--space-4) var(--space-8);
+            font-size: var(--text-base);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .config-header-content {
+                flex-direction: column;
+                align-items: flex-start;
+                text-align: left;
+            }
+
+            .config-section .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .form-actions {
+                justify-content: stretch;
+            }
+
+            .form-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+{% endblock %}
