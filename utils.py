@@ -3,13 +3,25 @@ Utility functions for Bijouterie Hafsa ERP
 """
 
 from django.utils import timezone
-from django.core.cache import cache
 from decimal import Decimal
 import uuid
-import requests
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Optional imports for gold price service
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+    logger.warning("requests library not available - gold price service disabled")
+
+try:
+    from django.core.cache import cache
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
 
 
 def generate_reference(prefix, model_class=None, date_based=True):
@@ -312,10 +324,14 @@ def get_gold_price_usd():
     Returns:
         dict: {'price': Decimal, 'updated_at': str} or None if failed
     """
+    if not REQUESTS_AVAILABLE:
+        return None
+
     cache_key = 'gold_price_usd'
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
+    if CACHE_AVAILABLE:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
 
     try:
         response = requests.get(
@@ -331,7 +347,8 @@ def get_gold_price_usd():
             'name': data.get('name', 'Gold'),
         }
 
-        cache.set(cache_key, result, GOLD_PRICE_CACHE_TIMEOUT)
+        if CACHE_AVAILABLE:
+            cache.set(cache_key, result, GOLD_PRICE_CACHE_TIMEOUT)
         return result
     except Exception as e:
         logger.error(f"Failed to fetch gold price: {e}")
@@ -345,10 +362,14 @@ def get_usd_to_mad_rate():
     Returns:
         Decimal: Exchange rate or None if failed
     """
+    if not REQUESTS_AVAILABLE:
+        return None
+
     cache_key = 'usd_mad_rate'
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
+    if CACHE_AVAILABLE:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
 
     try:
         response = requests.get(
@@ -359,7 +380,8 @@ def get_usd_to_mad_rate():
         data = response.json()
 
         rate = Decimal(str(data['rates']['MAD']))
-        cache.set(cache_key, rate, GOLD_PRICE_CACHE_TIMEOUT)
+        if CACHE_AVAILABLE:
+            cache.set(cache_key, rate, GOLD_PRICE_CACHE_TIMEOUT)
         return rate
     except Exception as e:
         logger.error(f"Failed to fetch USD/MAD rate: {e}")
@@ -384,10 +406,14 @@ def get_gold_price_mad():
             'updated_at': str,
         } or None if failed
     """
+    if not REQUESTS_AVAILABLE:
+        return None
+
     cache_key = 'gold_price_mad_full'
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
+    if CACHE_AVAILABLE:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
 
     gold_usd = get_gold_price_usd()
     mad_rate = get_usd_to_mad_rate()
@@ -413,5 +439,6 @@ def get_gold_price_mad():
         'updated_at': gold_usd['updated_at'],
     }
 
-    cache.set(cache_key, result, GOLD_PRICE_CACHE_TIMEOUT)
+    if CACHE_AVAILABLE:
+        cache.set(cache_key, result, GOLD_PRICE_CACHE_TIMEOUT)
     return result

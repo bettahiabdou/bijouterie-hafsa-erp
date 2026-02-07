@@ -16,7 +16,6 @@ from products.models import Product
 from suppliers.models import Supplier
 from repairs.models import Repair
 from clients.models import Client
-from utils import get_gold_price_mad
 
 
 @require_http_methods(["GET", "POST"])
@@ -100,8 +99,13 @@ def dashboard(request):
     # Get recent activities
     recent_activities = ActivityLog.objects.select_related('user').order_by('-created_at')[:10]
 
-    # Get live gold price in MAD
-    gold_prices = get_gold_price_mad()
+    # Get live gold price in MAD (lazy import to avoid startup issues)
+    gold_prices = None
+    try:
+        from utils import get_gold_price_mad
+        gold_prices = get_gold_price_mad()
+    except Exception:
+        pass  # Gold prices will be None if fetch fails
 
     context = {
         'page_title': 'Tableau de Bord',
