@@ -139,9 +139,15 @@
                                 <tr class="detail-row" style="display: none;">
                                     <td colspan="10">
                                         <div class="detail-content">
+                                            <!-- Détails Paiement 1 -->
+                                            <div class="payment-section-header" style="margin-bottom: 8px;">
+                                                <span class="form-label" style="color: var(--neutral-600); font-weight: 600;">
+                                                    <i class="fas fa-credit-card"></i> Détails Paiement 1
+                                                </span>
+                                            </div>
                                             <div class="detail-grid">
                                                 <div class="form-group payment-reference-field" style="display: none;">
-                                                    <label class="form-label">Référence Paiement 1</label>
+                                                    <label class="form-label">Référence</label>
                                                     <input type="text" name="payment_reference" class="payment_reference form-input"
                                                         placeholder="N° chèque, référence virement...">
                                                 </div>
@@ -154,16 +160,12 @@
                                                         {% endfor %}
                                                     </select>
                                                 </div>
-                                                <div class="form-group">
-                                                    <label class="form-label">Remise (DH)</label>
-                                                    <input type="number" name="discount_amount" class="discount_amount form-input"
-                                                        step="0.01" min="0" value="0">
-                                                </div>
                                             </div>
+
                                             <!-- Second Payment (Hybrid) -->
                                             <div class="hybrid-payment-section" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--neutral-300);">
                                                 <label class="form-label" style="color: var(--primary-600); margin-bottom: 8px;">
-                                                    <i class="fas fa-plus-circle"></i> Paiement supplémentaire (optionnel)
+                                                    <i class="fas fa-plus-circle"></i> Paiement 2 (optionnel)
                                                 </label>
                                                 <div class="detail-grid">
                                                     <div class="form-group">
@@ -194,6 +196,21 @@
                                                             {% endfor %}
                                                         </select>
                                                     </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Remise Section (separate from payments) -->
+                                            <div class="discount-section" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--warning-300); background: var(--warning-50); padding: 12px; border-radius: var(--radius-md);">
+                                                <label class="form-label" style="color: var(--warning-700); margin-bottom: 8px;">
+                                                    <i class="fas fa-tag"></i> Remise appliquée
+                                                </label>
+                                                <div class="form-group" style="margin-bottom: 0;">
+                                                    <input type="number" name="discount_amount" class="discount_amount form-input"
+                                                        step="0.01" min="0" value="0" placeholder="0.00"
+                                                        style="max-width: 200px;">
+                                                    <p class="form-hint" style="margin-top: 4px; font-size: 11px; color: var(--warning-600);">
+                                                        Auto-calculée si le prix de vente est inférieur au prix catalogue
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
@@ -274,17 +291,10 @@
                                     <input type="text" name="payment_reference" class="payment_reference_mobile form-input"
                                         placeholder="N° cheque, reference virement...">
                                 </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label class="form-label">Montant Payé 1</label>
-                                        <input type="number" name="amount_paid" class="amount_paid_mobile form-input"
-                                            step="0.01" min="0" placeholder="0.00">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Remise (DH)</label>
-                                        <input type="number" name="discount_amount" class="discount_amount_mobile form-input"
-                                            step="0.01" min="0" value="0">
-                                    </div>
+                                <div class="form-group">
+                                    <label class="form-label">Montant Payé 1 (DH)</label>
+                                    <input type="number" name="amount_paid" class="amount_paid_mobile form-input"
+                                        step="0.01" min="0" placeholder="0.00">
                                 </div>
                                 <!-- Second Payment (Hybrid) - Mobile -->
                                 <div class="hybrid-payment-section-mobile" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--neutral-300);">
@@ -302,7 +312,7 @@
                                     </div>
                                     <div class="form-row">
                                         <div class="form-group">
-                                            <label class="form-label">Montant 2</label>
+                                            <label class="form-label">Montant 2 (DH)</label>
                                             <input type="number" name="amount_paid_2" class="amount_paid_2_mobile form-input"
                                                 step="0.01" min="0" placeholder="0.00">
                                         </div>
@@ -311,6 +321,19 @@
                                             <input type="text" name="payment_reference_2" class="payment_reference_2_mobile form-input"
                                                 placeholder="Référence...">
                                         </div>
+                                    </div>
+                                </div>
+                                <!-- Remise Section (separate from payments) - Mobile -->
+                                <div class="discount-section-mobile" style="margin-top: 12px; padding: 12px; background: var(--warning-50); border-radius: var(--radius-md); border: 1px dashed var(--warning-300);">
+                                    <label class="form-label" style="color: var(--warning-700); margin-bottom: 8px;">
+                                        <i class="fas fa-tag"></i> Remise appliquée
+                                    </label>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <input type="number" name="discount_amount" class="discount_amount_mobile form-input"
+                                            step="0.01" min="0" value="0" placeholder="0.00">
+                                        <p class="form-hint" style="margin-top: 4px; font-size: 11px; color: var(--warning-600);">
+                                            Auto-calculée si prix vente &lt; prix catalogue
+                                        </p>
                                     </div>
                                 </div>
                             </div>

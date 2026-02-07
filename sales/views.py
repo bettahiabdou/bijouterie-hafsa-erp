@@ -468,6 +468,9 @@ def invoice_detail(request, reference):
     payment_methods = PaymentMethod.objects.filter(is_active=True)
     bank_accounts = BankAccount.objects.filter(is_active=True)
 
+    # Get all payments associated with this invoice
+    invoice_payments = invoice.payments.select_related('payment_method', 'bank_account').all()
+
     context = {
         'invoice': invoice,
         'items': invoice.items.all(),
@@ -476,6 +479,7 @@ def invoice_detail(request, reference):
         'invoice_actions': invoice_actions,
         'payment_methods': payment_methods,
         'bank_accounts': bank_accounts,
+        'invoice_payments': invoice_payments,
     }
 
     return render(request, 'sales/invoice_detail.html', context)

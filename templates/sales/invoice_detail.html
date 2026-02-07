@@ -398,7 +398,7 @@
             <!-- Payment Info -->
             <div class="card animate-slide-up" style="animation-delay: 100ms;">
                 <div class="card-header">
-                    <h3><i class="fas fa-credit-card mr-2"></i> Paiement</h3>
+                    <h3><i class="fas fa-credit-card mr-2"></i> Paiements</h3>
                     {% if invoice.status != 'paid' %}
                         <a href="{% url 'sales:invoice_payment' invoice.reference %}" class="btn btn-primary btn-sm">
                             <i class="fas fa-plus"></i> Payer
@@ -406,10 +406,11 @@
                     {% endif %}
                 </div>
                 <div class="card-body">
-                    <div class="payment-list">
+                    <!-- Summary -->
+                    <div class="payment-list" style="margin-bottom: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--neutral-200);">
                         <div class="payment-item">
-                            <span class="payment-label">Paye</span>
-                            <span class="payment-value">{{ invoice.amount_paid }} DH</span>
+                            <span class="payment-label">Total payé</span>
+                            <span class="payment-value font-semibold text-success">{{ invoice.amount_paid }} DH</span>
                         </div>
                         <div class="payment-item">
                             <span class="payment-label">Solde</span>
@@ -417,14 +418,45 @@
                                 {{ invoice.balance_due }} DH
                             </span>
                         </div>
-                        {% if invoice.payment_method %}
+                    </div>
+
+                    <!-- Individual Payments List -->
+                    {% if invoice_payments %}
+                        <div class="payments-detail-list">
+                            <h4 style="font-size: var(--text-sm); color: var(--neutral-600); margin-bottom: var(--space-2);">
+                                <i class="fas fa-list mr-1"></i> Détail des paiements ({{ invoice_payments|length }})
+                            </h4>
+                            {% for payment in invoice_payments %}
+                                <div class="payment-detail-card {% cycle 'even' 'odd' %}">
+                                    <div class="payment-detail-header">
+                                        <span class="payment-method-badge">
+                                            <i class="fas fa-{% if 'espèce' in payment.payment_method.name|lower or 'cash' in payment.payment_method.name|lower %}money-bill{% elif 'virement' in payment.payment_method.name|lower or 'bank' in payment.payment_method.name|lower %}university{% elif 'carte' in payment.payment_method.name|lower or 'card' in payment.payment_method.name|lower %}credit-card{% elif 'chèque' in payment.payment_method.name|lower or 'cheque' in payment.payment_method.name|lower %}money-check{% else %}wallet{% endif %}"></i>
+                                            {{ payment.payment_method.name }}
+                                        </span>
+                                        <span class="payment-amount">{{ payment.amount }} DH</span>
+                                    </div>
+                                    <div class="payment-detail-info">
+                                        <span class="payment-date"><i class="fas fa-calendar-alt"></i> {{ payment.date|date:"d/m/Y" }}</span>
+                                        {% if payment.reference %}
+                                            <span class="payment-ref"><i class="fas fa-hashtag"></i> {{ payment.reference }}</span>
+                                        {% endif %}
+                                        {% if payment.bank_account %}
+                                            <span class="payment-bank"><i class="fas fa-university"></i> {{ payment.bank_account.bank_name }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% elif invoice.payment_method %}
+                        <!-- Fallback: Show invoice-level payment info if no ClientPayment records -->
+                        <div class="payment-list">
                             <div class="payment-item">
-                                <span class="payment-label">Methode</span>
+                                <span class="payment-label">Méthode</span>
                                 <span class="payment-value">{{ invoice.payment_method.name }}</span>
                             </div>
                             {% if invoice.payment_reference %}
                                 <div class="payment-item">
-                                    <span class="payment-label">Reference</span>
+                                    <span class="payment-label">Référence</span>
                                     <span class="payment-value font-mono">{{ invoice.payment_reference }}</span>
                                 </div>
                             {% endif %}
@@ -437,8 +469,12 @@
                                     </span>
                                 </div>
                             {% endif %}
-                        {% endif %}
-                    </div>
+                        </div>
+                    {% else %}
+                        <p class="text-neutral-500" style="font-size: var(--text-sm);">
+                            <i class="fas fa-info-circle"></i> Aucun paiement enregistré
+                        </p>
+                    {% endif %}
                 </div>
             </div>
 
@@ -927,6 +963,71 @@
         .payment-bank .payment-value {
             text-align: right;
             font-size: var(--text-sm);
+        }
+
+        /* Payments Detail List */
+        .payments-detail-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .payment-detail-card {
+            padding: var(--space-3);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--neutral-200);
+            background: var(--white);
+        }
+
+        .payment-detail-card.even {
+            background: var(--neutral-50);
+        }
+
+        .payment-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-2);
+        }
+
+        .payment-method-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
+            padding: var(--space-1) var(--space-2);
+            background: var(--primary-100);
+            color: var(--primary-700);
+            border-radius: var(--radius-sm);
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+        }
+
+        .payment-method-badge i {
+            font-size: 0.75rem;
+        }
+
+        .payment-amount {
+            font-weight: var(--font-bold);
+            color: var(--success-600);
+            font-size: var(--text-base);
+        }
+
+        .payment-detail-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-3);
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .payment-detail-info span {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .payment-detail-info i {
+            font-size: 0.65rem;
         }
 
         /* Info Box */
