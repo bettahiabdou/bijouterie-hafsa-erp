@@ -470,6 +470,16 @@
                                 </div>
                             {% endif %}
                         </div>
+                    {% elif invoice.amount_paid > 0 %}
+                        <!-- Anonymous sale with payment but no ClientPayment records -->
+                        <div class="payment-list">
+                            <div class="payment-item">
+                                <span class="payment-label">Note</span>
+                                <span class="payment-value" style="font-size: var(--text-sm); color: var(--neutral-500);">
+                                    <i class="fas fa-user-slash"></i> Vente anonyme - détails de paiement non disponibles
+                                </span>
+                            </div>
+                        </div>
                     {% else %}
                         <p class="text-neutral-500" style="font-size: var(--text-sm);">
                             <i class="fas fa-info-circle"></i> Aucun paiement enregistré
