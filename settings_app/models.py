@@ -709,6 +709,36 @@ class SystemConfig(models.Model):
 
     @classmethod
     def get_config(cls):
-        """Get or create system configuration"""
-        obj, created = cls.objects.get_or_create(pk=1, defaults={})
+        """Get or create system configuration
+
+        When creating for the first time, initializes from environment variables.
+        """
+        import os
+
+        # Default values from environment variables
+        defaults = {
+            'telegram_bot_token': os.getenv('TELEGRAM_BOT_TOKEN', ''),
+            'telegram_chat_id': os.getenv('TELEGRAM_CHAT_ID', ''),
+            'telegram_enabled': os.getenv('TELEGRAM_BOT_TOKEN', '') != '',
+            'zebra_printer_ip': os.getenv('ZEBRA_PRINTER_HOST', None),
+            'zebra_printer_port': int(os.getenv('ZEBRA_PRINTER_PORT', 9100)),
+            'zebra_printer_enabled': os.getenv('ZEBRA_PRINTER_HOST', '') != '',
+            'server_base_url': os.getenv('SERVER_BASE_URL', ''),
+            'debug_mode': os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes'),
+            'smtp_host': os.getenv('SMTP_HOST', ''),
+            'smtp_port': int(os.getenv('SMTP_PORT', 587)),
+            'smtp_username': os.getenv('SMTP_USERNAME', ''),
+            'smtp_password': os.getenv('SMTP_PASSWORD', ''),
+            'smtp_use_tls': os.getenv('SMTP_USE_TLS', 'True').lower() in ('true', '1', 'yes'),
+            'smtp_from_email': os.getenv('SMTP_FROM_EMAIL', ''),
+            'backup_path': os.getenv('BACKUP_PATH', ''),
+            'gold_price_api_key': os.getenv('GOLD_PRICE_API_KEY', ''),
+            'gold_price_api_url': os.getenv('GOLD_PRICE_API_URL', ''),
+        }
+
+        # Clean up None values for non-nullable fields
+        if not defaults['zebra_printer_ip']:
+            defaults['zebra_printer_ip'] = None
+
+        obj, created = cls.objects.get_or_create(pk=1, defaults=defaults)
         return obj
