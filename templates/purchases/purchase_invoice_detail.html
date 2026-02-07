@@ -121,14 +121,9 @@
                                             {% endif %}
                                         </td>
                                         <td style="text-align: center;">
-                                            <form method="post" style="display: inline;" onsubmit="return confirm('Supprimer cet article?');">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="action" value="remove_item">
-                                                <input type="hidden" name="item_id" value="{{ item.id }}">
-                                                <button type="submit" class="btn btn-ghost btn-sm text-error">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-ghost btn-sm text-error" onclick="openRemoveModal('{{ item.id }}', '{% if item.product %}{{ item.product.reference }}{% else %}{{ item.description }}{% endif %}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
                                         </td>
                                     </tr>
                                 {% empty %}
@@ -137,6 +132,15 @@
                                     </tr>
                                 {% endfor %}
                             </tbody>
+                            <tfoot>
+                                <tr style="background: var(--neutral-100); font-weight: var(--font-semibold);">
+                                    <td colspan="2" style="text-align: right;">Total Poids:</td>
+                                    <td style="text-align: right;">{{ total_net_weight|floatformat:3 }} g</td>
+                                    <td></td>
+                                    <td style="text-align: right;">{{ dynamic_subtotal|floatformat:2 }} DH</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                     <!-- Mobile Cards -->
@@ -173,26 +177,104 @@
                                     </div>
                                 </div>
                                 <div style="margin-top: var(--space-2); text-align: right;">
-                                    <form method="post" style="display: inline;" onsubmit="return confirm('Supprimer cet article?');">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="remove_item">
-                                        <input type="hidden" name="item_id" value="{{ item.id }}">
-                                        <button type="submit" class="btn btn-ghost btn-sm text-error">
-                                            <i class="fas fa-trash"></i> Supprimer
-                                        </button>
-                                    </form>
+                                    <button type="button" class="btn btn-ghost btn-sm text-error" onclick="openRemoveModal('{{ item.id }}', '{% if item.product %}{{ item.product.reference }}{% else %}{{ item.description }}{% endif %}')">
+                                        <i class="fas fa-trash"></i> Retour/Échange
+                                    </button>
                                 </div>
                             </div>
                         {% empty %}
                             <p class="text-center text-muted">Aucun article</p>
                         {% endfor %}
+                        <!-- Mobile weight total -->
+                        <div class="item-card" style="background: var(--neutral-100);">
+                            <div class="item-card-details">
+                                <div class="item-detail">
+                                    <span class="item-detail-label">Poids Net Total</span>
+                                    <span class="item-detail-value font-semibold">{{ total_net_weight|floatformat:3 }} g</span>
+                                </div>
+                                <div class="item-detail">
+                                    <span class="item-detail-label">Poids Brut Total</span>
+                                    <span class="item-detail-value font-semibold">{{ total_gross_weight|floatformat:3 }} g</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Actions History (Returns/Exchanges) -->
+            {% if invoice_actions %}
+            <div class="card animate-slide-up" style="animation-delay: 150ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-exchange-alt mr-2"></i> Historique Retours / Échanges</h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-wrapper" style="border: none; border-radius: 0;">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Produit Original</th>
+                                    <th>Produit Remplacement</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for action in invoice_actions %}
+                                <tr>
+                                    <td>{{ action.created_at|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        {% if action.action_type == 'return' %}
+                                            <span class="badge badge-warning"><i class="fas fa-undo mr-1"></i> Retour</span>
+                                        {% else %}
+                                            <span class="badge badge-info"><i class="fas fa-exchange-alt mr-1"></i> Échange</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="font-semibold">{{ action.original_product_ref }}</span>
+                                    </td>
+                                    <td>
+                                        {% if action.replacement_product %}
+                                            <a href="{% url 'products:detail' action.replacement_product.reference %}" class="text-primary">
+                                                {{ action.replacement_product.reference }}
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ action.notes|default:"-" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Sidebar -->
         <div class="detail-sidebar">
+            <!-- Weight Totals -->
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-balance-scale mr-2"></i> Poids Total</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Poids Brut</span>
+                            <span class="status-value font-semibold">{{ total_gross_weight|floatformat:3 }} g</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Poids Net</span>
+                            <span class="status-value font-semibold">{{ total_net_weight|floatformat:3 }} g</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Status -->
             <div class="card animate-slide-up" style="animation-delay: 150ms;">
                 <div class="card-header">
@@ -664,7 +746,167 @@
         .modal-footer .btn {
             min-width: 120px;
         }
+
+        /* Action choice buttons */
+        .action-choice {
+            display: flex;
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
+
+        .action-choice-btn {
+            flex: 1;
+            padding: var(--space-4);
+            border: 2px solid var(--neutral-300);
+            border-radius: var(--radius-lg);
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            transition: all var(--transition-fast);
+        }
+
+        .action-choice-btn:hover {
+            border-color: var(--primary-400);
+            background: var(--primary-50);
+        }
+
+        .action-choice-btn.selected {
+            border-color: var(--primary-600);
+            background: var(--primary-100);
+        }
+
+        .action-choice-btn i {
+            font-size: var(--text-2xl);
+            margin-bottom: var(--space-2);
+            display: block;
+        }
+
+        .action-choice-btn.return-btn i {
+            color: var(--warning-600);
+        }
+
+        .action-choice-btn.exchange-btn i {
+            color: var(--info-600);
+        }
+
+        .exchange-product-section {
+            display: none;
+            margin-top: var(--space-4);
+            padding-top: var(--space-4);
+            border-top: 1px solid var(--neutral-200);
+        }
+
+        .exchange-product-section.visible {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: var(--space-4);
+        }
+
+        .form-group label {
+            display: block;
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-700);
+            margin-bottom: var(--space-2);
+        }
+
+        .form-group textarea,
+        .form-group input {
+            width: 100%;
+            padding: var(--space-3);
+            border: 1px solid var(--neutral-300);
+            border-radius: var(--radius-md);
+            font-size: var(--text-sm);
+        }
     </style>
+
+    <!-- Remove/Return/Exchange Modal -->
+    <div id="removeModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-exchange-alt mr-2"></i> Retour / Échange</h3>
+                <button type="button" class="modal-close" onclick="closeRemoveModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: var(--space-4);">
+                    Produit: <strong id="removeProductRef"></strong>
+                </p>
+
+                <!-- Action Choice -->
+                <div class="action-choice">
+                    <div class="action-choice-btn return-btn" onclick="selectAction('return')">
+                        <i class="fas fa-undo"></i>
+                        <strong>Retour</strong>
+                        <small style="color: var(--neutral-500);">Retourner au fournisseur</small>
+                    </div>
+                    <div class="action-choice-btn exchange-btn" onclick="selectAction('exchange')">
+                        <i class="fas fa-exchange-alt"></i>
+                        <strong>Échange</strong>
+                        <small style="color: var(--neutral-500);">Échanger contre un autre</small>
+                    </div>
+                </div>
+
+                <!-- Exchange Product Selection (hidden by default) -->
+                <div id="exchangeProductSection" class="exchange-product-section">
+                    <div class="form-group">
+                        <label>Produit de remplacement</label>
+                        <input type="text" id="exchangeProductSearch" class="product-search-input" placeholder="Rechercher un produit..." onkeyup="filterExchangeProducts()">
+                    </div>
+                    <div class="product-list" id="exchangeProductList" style="max-height: 200px;">
+                        {% for product in all_products %}
+                            <div class="exchange-product-item" data-ref="{{ product.reference|lower }}" data-name="{{ product.name|lower }}" data-id="{{ product.id }}" onclick="selectExchangeProduct('{{ product.id }}', '{{ product.reference }}')">
+                                <div class="product-item">
+                                    <div class="product-item-info">
+                                        <div class="product-item-ref">{{ product.reference }}</div>
+                                        <div class="product-item-name">{{ product.name }}</div>
+                                        <div class="product-item-details">
+                                            {{ product.net_weight|default:"0" }}g
+                                            {% if product.metal_purity %}| {{ product.metal_purity.name }}{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <p class="text-center text-muted">Aucun produit disponible</p>
+                        {% endfor %}
+                    </div>
+                    <p id="selectedExchangeProduct" style="margin-top: var(--space-2); display: none;">
+                        <strong>Sélectionné:</strong> <span id="selectedExchangeProductRef"></span>
+                    </p>
+                </div>
+
+                <!-- Notes -->
+                <div class="form-group" style="margin-top: var(--space-4);">
+                    <label>Notes (optionnel)</label>
+                    <textarea id="removeNotes" rows="2" placeholder="Raison du retour ou échange..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeRemoveModal()">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="submitRemoveAction()" id="confirmRemoveBtn" disabled>
+                    <i class="fas fa-check mr-1"></i> Confirmer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden forms for return/exchange -->
+    <form method="post" id="returnForm" style="display: none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="return_item">
+        <input type="hidden" name="item_id" id="returnItemId" value="">
+        <input type="hidden" name="notes" id="returnNotes" value="">
+    </form>
+
+    <form method="post" id="exchangeForm" style="display: none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="exchange_item">
+        <input type="hidden" name="item_id" id="exchangeItemId" value="">
+        <input type="hidden" name="replacement_product_id" id="exchangeReplacementId" value="">
+        <input type="hidden" name="notes" id="exchangeNotes" value="">
+    </form>
 
     <!-- Add Product Modal -->
     <div id="addProductModal" class="modal-overlay">
@@ -788,6 +1030,106 @@
         document.getElementById('addProductModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 closeAddProductModal();
+            }
+        });
+
+        // ===== Remove/Return/Exchange Modal Functions =====
+        let currentRemoveItemId = null;
+        let currentAction = null;
+        let selectedExchangeProductId = null;
+
+        function openRemoveModal(itemId, productRef) {
+            currentRemoveItemId = itemId;
+            currentAction = null;
+            selectedExchangeProductId = null;
+
+            document.getElementById('removeProductRef').textContent = productRef;
+            document.getElementById('removeNotes').value = '';
+            document.getElementById('confirmRemoveBtn').disabled = true;
+
+            // Reset action choices
+            document.querySelectorAll('.action-choice-btn').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById('exchangeProductSection').classList.remove('visible');
+            document.getElementById('selectedExchangeProduct').style.display = 'none';
+            document.getElementById('exchangeProductSearch').value = '';
+            filterExchangeProducts();
+
+            document.getElementById('removeModal').classList.add('active');
+        }
+
+        function closeRemoveModal() {
+            document.getElementById('removeModal').classList.remove('active');
+            currentRemoveItemId = null;
+            currentAction = null;
+            selectedExchangeProductId = null;
+        }
+
+        function selectAction(action) {
+            currentAction = action;
+
+            // Update button styles
+            document.querySelectorAll('.action-choice-btn').forEach(btn => btn.classList.remove('selected'));
+            if (action === 'return') {
+                document.querySelector('.return-btn').classList.add('selected');
+                document.getElementById('exchangeProductSection').classList.remove('visible');
+                document.getElementById('confirmRemoveBtn').disabled = false;
+            } else if (action === 'exchange') {
+                document.querySelector('.exchange-btn').classList.add('selected');
+                document.getElementById('exchangeProductSection').classList.add('visible');
+                document.getElementById('confirmRemoveBtn').disabled = !selectedExchangeProductId;
+            }
+        }
+
+        function selectExchangeProduct(productId, productRef) {
+            selectedExchangeProductId = productId;
+
+            // Update UI
+            document.querySelectorAll('.exchange-product-item').forEach(item => {
+                item.querySelector('.product-item').classList.remove('selected');
+            });
+            document.querySelector(`.exchange-product-item[data-id="${productId}"] .product-item`).classList.add('selected');
+
+            document.getElementById('selectedExchangeProduct').style.display = 'block';
+            document.getElementById('selectedExchangeProductRef').textContent = productRef;
+            document.getElementById('confirmRemoveBtn').disabled = false;
+        }
+
+        function filterExchangeProducts() {
+            const search = document.getElementById('exchangeProductSearch').value.toLowerCase();
+            const items = document.querySelectorAll('.exchange-product-item');
+
+            items.forEach(item => {
+                const ref = item.dataset.ref;
+                const name = item.dataset.name;
+                if (ref.includes(search) || name.includes(search)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        function submitRemoveAction() {
+            if (!currentRemoveItemId || !currentAction) return;
+
+            const notes = document.getElementById('removeNotes').value;
+
+            if (currentAction === 'return') {
+                document.getElementById('returnItemId').value = currentRemoveItemId;
+                document.getElementById('returnNotes').value = notes;
+                document.getElementById('returnForm').submit();
+            } else if (currentAction === 'exchange' && selectedExchangeProductId) {
+                document.getElementById('exchangeItemId').value = currentRemoveItemId;
+                document.getElementById('exchangeReplacementId').value = selectedExchangeProductId;
+                document.getElementById('exchangeNotes').value = notes;
+                document.getElementById('exchangeForm').submit();
+            }
+        }
+
+        // Close remove modal on outside click
+        document.getElementById('removeModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeRemoveModal();
             }
         });
     </script>

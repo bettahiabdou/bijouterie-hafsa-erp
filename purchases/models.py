@@ -502,6 +502,73 @@ class PurchaseInvoiceItem(models.Model):
         self.invoice.calculate_totals()
 
 
+class PurchaseInvoiceAction(models.Model):
+    """
+    Track returns and exchanges on purchase invoices
+    """
+
+    class ActionType(models.TextChoices):
+        RETURN = 'return', _('Retour')
+        EXCHANGE = 'exchange', _('Échange')
+
+    invoice = models.ForeignKey(
+        PurchaseInvoice,
+        on_delete=models.CASCADE,
+        related_name='actions',
+        verbose_name=_('Facture')
+    )
+
+    action_type = models.CharField(
+        _('Type d\'action'),
+        max_length=20,
+        choices=ActionType.choices
+    )
+
+    # The product that was returned or exchanged
+    original_product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='purchase_returns',
+        verbose_name=_('Produit original')
+    )
+    original_product_ref = models.CharField(
+        _('Référence produit original'),
+        max_length=100,
+        blank=True
+    )
+
+    # For exchanges: the replacement product
+    replacement_product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='purchase_replacements',
+        verbose_name=_('Produit de remplacement')
+    )
+
+    # Tracking
+    notes = models.TextField(_('Notes'), blank=True)
+    created_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name=_('Créé par')
+    )
+    created_at = models.DateTimeField(_('Date'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('Action facture achat')
+        verbose_name_plural = _('Actions facture achat')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        if self.action_type == self.ActionType.EXCHANGE:
+            return f"Échange: {self.original_product_ref} → {self.replacement_product.reference if self.replacement_product else '?'}"
+        return f"Retour: {self.original_product_ref}"
+
+
 class Consignment(models.Model):
     """
     Consignment (Dépôt-vente) - items received but not paid until sold

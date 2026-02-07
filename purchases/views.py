@@ -18,6 +18,7 @@ from .models import (
     PurchaseOrderItem,
     PurchaseInvoice,
     PurchaseInvoiceItem,
+    PurchaseInvoiceAction,
     Consignment,
     ConsignmentItem
 )
@@ -418,15 +419,28 @@ def purchase_invoice_detail(request, reference):
                 if errors:
                     messages.error(request, f'Erreurs: {", ".join(errors)}')
 
-        # Handle remove item action
-        elif action == 'remove_item':
+        # Handle return item action (Retour au fournisseur)
+        elif action == 'return_item':
             item_id = request.POST.get('item_id')
+            notes = request.POST.get('notes', '')
             if item_id:
                 try:
                     item = PurchaseInvoiceItem.objects.get(id=item_id, invoice=invoice)
-                    item_desc = item.description
+                    original_product = item.product
+                    original_ref = original_product.reference if original_product else item.description
+
+                    # Create action record
+                    PurchaseInvoiceAction.objects.create(
+                        invoice=invoice,
+                        action_type=PurchaseInvoiceAction.ActionType.RETURN,
+                        original_product=original_product,
+                        original_product_ref=original_ref,
+                        notes=notes,
+                        created_by=request.user
+                    )
+
+                    # Delete the item
                     item.delete()
-                    # Update invoice totals
                     invoice.calculate_totals()
                     invoice.save()
 
@@ -435,12 +449,78 @@ def purchase_invoice_detail(request, reference):
                         action=ActivityLog.ActionType.DELETE,
                         model_name='PurchaseInvoiceItem',
                         object_id=str(item_id),
-                        object_repr=f'Removed item {item_desc} from invoice {invoice.reference}',
+                        object_repr=f'Returned item {original_ref} to supplier',
                         ip_address=get_client_ip(request)
                     )
-                    messages.success(request, f'Article supprimé de la facture.')
+                    messages.success(request, f'Produit {original_ref} retourné au fournisseur.')
                 except PurchaseInvoiceItem.DoesNotExist:
                     messages.error(request, 'Article non trouvé.')
+
+        # Handle exchange item action (Échange avec fournisseur)
+        elif action == 'exchange_item':
+            item_id = request.POST.get('item_id')
+            replacement_product_id = request.POST.get('replacement_product_id')
+            notes = request.POST.get('notes', '')
+
+            if item_id and replacement_product_id:
+                try:
+                    item = PurchaseInvoiceItem.objects.get(id=item_id, invoice=invoice)
+                    original_product = item.product
+                    original_ref = original_product.reference if original_product else item.description
+
+                    replacement_product = Product.objects.get(id=replacement_product_id)
+
+                    # Check if replacement is already linked
+                    existing_link = PurchaseInvoiceItem.objects.filter(product=replacement_product).first()
+                    if existing_link:
+                        messages.error(request, f'{replacement_product.reference} est déjà dans la facture {existing_link.invoice.reference}')
+                    elif not replacement_product.category or not replacement_product.metal_type or not replacement_product.metal_purity:
+                        messages.error(request, f'{replacement_product.reference} n\'a pas toutes les informations requises.')
+                    else:
+                        # Create action record
+                        PurchaseInvoiceAction.objects.create(
+                            invoice=invoice,
+                            action_type=PurchaseInvoiceAction.ActionType.EXCHANGE,
+                            original_product=original_product,
+                            original_product_ref=original_ref,
+                            replacement_product=replacement_product,
+                            notes=notes,
+                            created_by=request.user
+                        )
+
+                        # Delete old item and create new one with replacement
+                        item.delete()
+
+                        PurchaseInvoiceItem.objects.create(
+                            invoice=invoice,
+                            product=replacement_product,
+                            description=f"{replacement_product.name} - {replacement_product.reference}",
+                            category=replacement_product.category,
+                            metal_type=replacement_product.metal_type,
+                            metal_purity=replacement_product.metal_purity,
+                            gross_weight=replacement_product.gross_weight or Decimal('0'),
+                            net_weight=replacement_product.net_weight or Decimal('0'),
+                            price_per_gram=replacement_product.purchase_price_per_gram or Decimal('0'),
+                            labor_cost=replacement_product.labor_cost or Decimal('0'),
+                        )
+
+                        invoice.calculate_totals()
+                        invoice.save()
+
+                        ActivityLog.objects.create(
+                            user=request.user,
+                            action=ActivityLog.ActionType.UPDATE,
+                            model_name='PurchaseInvoice',
+                            object_id=str(invoice.id),
+                            object_repr=f'Exchanged {original_ref} for {replacement_product.reference}',
+                            ip_address=get_client_ip(request)
+                        )
+                        messages.success(request, f'Échange effectué: {original_ref} → {replacement_product.reference}')
+
+                except PurchaseInvoiceItem.DoesNotExist:
+                    messages.error(request, 'Article non trouvé.')
+                except Product.DoesNotExist:
+                    messages.error(request, 'Produit de remplacement non trouvé.')
 
         return redirect('purchases:purchase_invoice_detail', reference=reference)
 
@@ -459,23 +539,35 @@ def purchase_invoice_detail(request, reference):
     # Get items and calculate dynamic totals from linked products
     items = invoice.items.select_related('product').all()
     dynamic_subtotal = Decimal('0')
+    total_gross_weight = Decimal('0')
+    total_net_weight = Decimal('0')
 
     for item in items:
         if item.product:
             # Calculate total from current product values
+            gross_weight = item.product.gross_weight or Decimal('0')
             net_weight = item.product.net_weight or Decimal('0')
             price_per_gram = item.product.purchase_price_per_gram or Decimal('0')
             labor_cost = item.product.labor_cost or Decimal('0')
             item.dynamic_total = (net_weight * price_per_gram) + labor_cost
             dynamic_subtotal += item.dynamic_total
+            total_gross_weight += gross_weight
+            total_net_weight += net_weight
         else:
             # Use stored values for items without linked product
             item.dynamic_total = item.total_amount
             dynamic_subtotal += item.total_amount
+            total_gross_weight += item.gross_weight or Decimal('0')
+            total_net_weight += item.net_weight or Decimal('0')
 
     # Calculate dynamic invoice totals
     dynamic_total = dynamic_subtotal - invoice.discount_amount
     dynamic_balance = dynamic_total - invoice.amount_paid
+
+    # Get return/exchange actions history
+    invoice_actions = invoice.actions.select_related(
+        'original_product', 'replacement_product', 'created_by'
+    ).all()
 
     context = {
         'invoice': invoice,
@@ -484,6 +576,9 @@ def purchase_invoice_detail(request, reference):
         'dynamic_subtotal': dynamic_subtotal,
         'dynamic_total': dynamic_total,
         'dynamic_balance': dynamic_balance,
+        'total_gross_weight': total_gross_weight,
+        'total_net_weight': total_net_weight,
+        'invoice_actions': invoice_actions,
     }
     return render(request, 'purchases/purchase_invoice_detail.html', context)
 
