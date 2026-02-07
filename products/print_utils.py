@@ -52,23 +52,24 @@ def send_to_printer(zpl_data):
 
 def generate_product_label_zpl(product, quantity=1):
     """
-    Generate ZPL for a jewelry hang tag (barbell/dumbbell shape)
-    Typical size: 10x50mm or 12x45mm with string hole
+    Generate ZPL for RFID jewelry hang tag with loop
+    Printable area: ~22x22mm square (the tag head, not the loop/tail)
+    Total tag: 68x26mm but only small square is printable
 
-    Layout optimized for small jewelry tags:
-    - Reference code (short)
-    - Weight
-    - Price
+    Layout (very compact):
+    - Line 1: Weight + Purity (e.g., "5.2g 18K")
+    - Line 2: Price (e.g., "2500")
+    - Line 3: Reference short code
     """
-    # Short reference - last part only (e.g., "0001" from "PRD-FIN-20260207-0001")
+    # Short reference - last 4 digits
     ref_parts = (product.reference or "").split("-")
     short_ref = ref_parts[-1] if ref_parts else "0000"
 
-    # Weight
+    # Weight - compact
     weight_value = product.net_weight or product.gross_weight
-    weight = f"{weight_value:.2f}g" if weight_value else ""
+    weight = f"{weight_value:.1f}" if weight_value else ""
 
-    # Price - compact format
+    # Price - no decimals for compact display
     price = f"{product.selling_price:.0f}" if product.selling_price else "0"
 
     # Purity (e.g., "18K")
@@ -76,15 +77,15 @@ def generate_product_label_zpl(product, quantity=1):
     if product.metal_purity:
         purity = product.metal_purity.name
 
-    # ZPL for small jewelry tag (approx 50x10mm or 45x12mm)
-    # Using small fonts and tight spacing
+    # ZPL for small printable area (~22x22mm = ~176x176 dots at 203dpi)
+    # Very compact 3-line layout
     zpl = f"""^XA
 ^CI28
-^PW400
-^LL80
-^FO10,5^A0N,20,18^FD{short_ref}^FS
-^FO10,28^A0N,22,20^FD{weight} {purity}^FS
-^FO10,52^A0N,24,22^FD{price}DH^FS
+^PW176
+^LL176
+^FO5,8^A0N,28,24^FD{weight}g {purity}^FS
+^FO5,45^A0N,50,42^FD{price}^FS
+^FO5,105^A0N,24,20^FD#{short_ref}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -92,7 +93,7 @@ def generate_product_label_zpl(product, quantity=1):
 
 def generate_price_tag_zpl(product, quantity=1):
     """
-    Generate ZPL for jewelry price tag (even smaller - price only)
+    Generate ZPL for jewelry price tag - price only (22x22mm printable area)
     """
     price = f"{product.selling_price:.0f}" if product.selling_price else "0"
 
@@ -101,12 +102,13 @@ def generate_price_tag_zpl(product, quantity=1):
     if product.metal_purity:
         purity = product.metal_purity.name
 
+    # ZPL for small printable area - just price and purity
     zpl = f"""^XA
 ^CI28
-^PW400
-^LL80
-^FO10,15^A0N,22,20^FD{purity}^FS
-^FO10,42^A0N,28,26^FD{price}DH^FS
+^PW176
+^LL176
+^FO5,20^A0N,35,30^FD{purity}^FS
+^FO5,70^A0N,60,50^FD{price}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -125,13 +127,13 @@ def print_price_tag(product, quantity=1):
 
 
 def print_test_label():
-    """Print a test label for jewelry tag"""
+    """Print a test label for jewelry RFID hang tag (22x22mm print area)"""
     zpl = """^XA
 ^CI28
-^PW400
-^LL80
-^FO10,5^A0N,20,18^FD0001^FS
-^FO10,28^A0N,22,20^FD5.25g 18K^FS
-^FO10,52^A0N,24,22^FD2500DH^FS
+^PW176
+^LL176
+^FO5,8^A0N,28,24^FD5.2g 18K^FS
+^FO5,45^A0N,50,42^FD2500^FS
+^FO5,105^A0N,24,20^FD#0001^FS
 ^XZ"""
     return send_to_printer(zpl)
