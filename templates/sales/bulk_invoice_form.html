@@ -71,6 +71,7 @@
                             <thead>
                                 <tr>
                                     <th style="width: 40px;"></th>
+                                    <th style="width: 140px;">Référence</th>
                                     <th>Client</th>
                                     <th>Produit *</th>
                                     <th style="width: 100px;">Quantite *</th>
@@ -87,6 +88,10 @@
                                         <button type="button" class="btn btn-ghost btn-sm expand-toggle" title="Afficher details">
                                             <i class="fas fa-chevron-down"></i>
                                         </button>
+                                    </td>
+                                    <td>
+                                        <input type="text" name="custom_reference" class="custom_reference form-input form-input-sm"
+                                            placeholder="Auto">
                                     </td>
                                     <td>
                                         <select name="client_id" class="client_id form-select form-select-sm">
@@ -132,7 +137,7 @@
                                 </tr>
                                 <!-- Detail row template -->
                                 <tr class="detail-row" style="display: none;">
-                                    <td colspan="8">
+                                    <td colspan="9">
                                         <div class="detail-content">
                                             <div class="detail-grid">
                                                 <div class="form-group payment-reference-field" style="display: none;">
@@ -178,6 +183,11 @@
                                 </button>
                             </div>
                             <div class="mobile-invoice-form">
+                                <div class="form-group">
+                                    <label class="form-label">Référence</label>
+                                    <input type="text" name="custom_reference" class="custom_reference_mobile form-input"
+                                        placeholder="Laisser vide pour auto-générer">
+                                </div>
                                 <div class="form-group">
                                     <label class="form-label">Client</label>
                                     <select name="client_id" class="client_id_mobile form-select">
@@ -307,7 +317,7 @@
                 </div>
                 <div class="help-item">
                     <h4><i class="fas fa-hashtag text-accent"></i> References</h4>
-                    <p>Chaque facture recoit une reference unique au format INV-YYYYMMDD-XXXX generee automatiquement.</p>
+                    <p>Vous pouvez saisir une référence personnalisée ou laisser vide pour auto-générer (INV-YYYYMMDD-XXXX).</p>
                 </div>
                 <div class="help-item">
                     <h4><i class="fas fa-tag text-success"></i> Statut Facture</h4>

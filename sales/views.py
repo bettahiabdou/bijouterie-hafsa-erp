@@ -191,6 +191,7 @@ def invoice_detail(request, reference):
 
             item_id = request.POST.get('item_id')
             replacement_products_json = request.POST.get('replacement_products', '[]')
+            new_invoice_reference = request.POST.get('new_invoice_reference', '').strip()
             payment_method_id = request.POST.get('payment_method_id', '')
             payment_reference = request.POST.get('payment_reference', '').strip()
             bank_account_id = request.POST.get('bank_account_id', '')
@@ -217,8 +218,19 @@ def invoice_detail(request, reference):
                             return redirect('sales:invoice_detail', reference=reference)
                         replacement_refs.append(prod.reference)
 
+                    # Handle custom reference for new invoice
+                    if new_invoice_reference:
+                        # Check if reference already exists
+                        if SaleInvoice.objects.filter(reference=new_invoice_reference).exists():
+                            messages.error(request, f'La référence "{new_invoice_reference}" existe déjà. Veuillez en choisir une autre.')
+                            return redirect('sales:invoice_detail', reference=reference)
+                        exchange_reference = new_invoice_reference
+                    else:
+                        exchange_reference = generate_invoice_reference()
+
                     # Create new invoice for the exchange
                     new_invoice = SaleInvoice.objects.create(
+                        reference=exchange_reference,
                         date=timezone.now().date(),
                         sale_type=invoice.sale_type,
                         client=invoice.client,
@@ -607,7 +619,28 @@ def invoice_create(request):
             if form.is_valid():
                 # Create invoice from form
                 invoice = form.save(commit=False)
-                invoice.reference = generate_invoice_reference()
+
+                # Handle custom reference - use provided one or auto-generate
+                custom_reference = request.POST.get('custom_reference', '').strip()
+                if custom_reference:
+                    # Check if reference already exists
+                    if SaleInvoice.objects.filter(reference=custom_reference).exists():
+                        messages.error(request, f'La référence "{custom_reference}" existe déjà. Veuillez en choisir une autre.')
+                        form = SaleInvoiceForm(request.POST)
+                        context = {
+                            'form': form,
+                            'clients': Client.objects.filter(is_active=True),
+                            'products': Product.objects.filter(status='available').select_related(
+                                'category', 'metal_type', 'metal_purity', 'supplier'
+                            ),
+                            'bank_accounts': BankAccount.objects.filter(is_active=True),
+                            'sale_types': SaleInvoice.SaleType.choices,
+                        }
+                        return render(request, 'sales/invoice_form.html', context)
+                    invoice.reference = custom_reference
+                else:
+                    invoice.reference = generate_invoice_reference()
+
                 invoice.date = timezone.now().date()
                 invoice.seller = request.user
                 invoice.created_by = request.user
@@ -784,6 +817,7 @@ def bulk_invoice_create(request):
 
         try:
             # Extract invoice rows from form
+            custom_references = request.POST.getlist('custom_reference')
             client_ids = request.POST.getlist('client_id')
             product_ids = request.POST.getlist('product_id')
             quantities = request.POST.getlist('quantity')
@@ -801,6 +835,7 @@ def bulk_invoice_create(request):
             # Track products and references used in this batch
             used_product_ids = []
             used_payment_refs = []
+            used_custom_refs = []
             validation_errors = []
 
             for i, product_id_str in enumerate(product_ids):
@@ -812,6 +847,18 @@ def bulk_invoice_create(request):
                     validation_errors.append(f"Ligne {i + 1}: Produit déjà utilisé dans une autre ligne")
                 else:
                     used_product_ids.append(product_id_str)
+
+                # Check for duplicate custom references in the same batch
+                custom_ref = custom_references[i].strip() if i < len(custom_references) else ''
+                if custom_ref:
+                    if custom_ref in used_custom_refs:
+                        validation_errors.append(f"Ligne {i + 1}: Référence de facture '{custom_ref}' déjà utilisée dans une autre ligne")
+                    else:
+                        used_custom_refs.append(custom_ref)
+
+                    # Check if custom reference already exists in database
+                    if SaleInvoice.objects.filter(reference=custom_ref).exists():
+                        validation_errors.append(f"Ligne {i + 1}: Référence de facture '{custom_ref}' existe déjà dans la base de données")
 
                 # Check for duplicate payment references in the same batch
                 payment_ref = payment_references[i].strip() if i < len(payment_references) else ''
@@ -855,8 +902,9 @@ def bulk_invoice_create(request):
                         failed_rows.append((i + 1, 'Quantité doit être positive'))
                         continue
 
-                    # Generate invoice reference
-                    reference = generate_invoice_reference()
+                    # Get custom reference or generate one
+                    custom_ref = custom_references[i].strip() if i < len(custom_references) else ''
+                    reference = custom_ref if custom_ref else generate_invoice_reference()
 
                     # Get client (optional for walk-in sales)
                     client_id = client_ids[i] if i < len(client_ids) and client_ids[i] else None
@@ -1593,6 +1641,15 @@ def pending_invoice_complete(request, reference):
                 messages.error(request, "Ajoutez au moins un article avant de valider.")
             else:
                 invoice.date = timezone.now().date()
+
+                # Handle custom reference update
+                custom_reference = request.POST.get('custom_reference', '').strip()
+                if custom_reference and custom_reference != invoice.reference:
+                    # Check if new reference already exists
+                    if SaleInvoice.objects.filter(reference=custom_reference).exclude(id=invoice.id).exists():
+                        messages.error(request, f"La référence '{custom_reference}' existe déjà. Veuillez en choisir une autre.")
+                        return redirect('sales:pending_invoice_complete', reference=reference)
+                    invoice.reference = custom_reference
 
                 # Set client if provided
                 client_id = request.POST.get('client_id')

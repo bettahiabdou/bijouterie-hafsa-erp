@@ -1259,11 +1259,12 @@
             document.getElementById('selectedProductsSection').style.display = 'none';
             document.getElementById('exchangePaymentSection').style.display = 'none';
 
-            // Reset payment fields
+            // Reset payment fields and new reference
             document.getElementById('exchangePaymentMethod').value = '';
             document.getElementById('exchangeAmountPaid').value = '';
             document.getElementById('exchangePaymentReference').value = '';
             document.getElementById('exchangeBankAccount').value = '';
+            document.getElementById('exchangeNewReference').value = '';
             document.getElementById('paymentDetailsRow').style.display = 'none';
             document.getElementById('paymentStatusIndicator').style.display = 'none';
 
@@ -1566,6 +1567,7 @@
 
                 document.getElementById('exchangeItemId').value = currentItemId;
                 document.getElementById('exchangeReplacementProducts').value = JSON.stringify(productsData);
+                document.getElementById('exchangeNewInvoiceRef').value = document.getElementById('exchangeNewReference').value;
                 document.getElementById('exchangePaymentMethodId').value = document.getElementById('exchangePaymentMethod').value;
                 document.getElementById('exchangePaymentRef').value = document.getElementById('exchangePaymentReference').value;
                 document.getElementById('exchangeBankAccountId').value = document.getElementById('exchangeBankAccount').value;
@@ -1661,6 +1663,14 @@
 
                     <!-- Price Difference & Payment Section -->
                     <div id="exchangePaymentSection" style="margin-top: var(--space-4); display: none;">
+                        <!-- Custom Reference for New Invoice -->
+                        <div class="form-group" style="margin-bottom: var(--space-4);">
+                            <label class="form-label"><i class="fas fa-hashtag mr-1"></i> Référence nouvelle facture</label>
+                            <input type="text" id="exchangeNewReference" class="form-input"
+                                   placeholder="Laisser vide pour auto-générer (INV-YYYYMMDD-XXXX)">
+                            <p class="form-hint">Vous pouvez saisir une référence personnalisée pour la nouvelle facture d'échange</p>
+                        </div>
+
                         <div class="exchange-price-summary">
                             <div class="price-summary-row">
                                 <span>Prix facture originale:</span>
@@ -1746,6 +1756,7 @@
         <input type="hidden" name="action" value="exchange_item">
         <input type="hidden" name="item_id" id="exchangeItemId" value="">
         <input type="hidden" name="replacement_products" id="exchangeReplacementProducts" value="">
+        <input type="hidden" name="new_invoice_reference" id="exchangeNewInvoiceRef" value="">
         <input type="hidden" name="payment_method_id" id="exchangePaymentMethodId" value="">
         <input type="hidden" name="payment_reference" id="exchangePaymentRef" value="">
         <input type="hidden" name="bank_account_id" id="exchangeBankAccountId" value="">

@@ -65,7 +65,9 @@
                     <div class="info-grid">
                         <div class="info-item">
                             <label>Référence</label>
-                            <span class="font-mono">{{ invoice.reference }}</span>
+                            <input type="text" name="custom_reference" id="custom-reference" class="form-input form-input-sm"
+                                   value="{{ invoice.reference }}" placeholder="Référence de la facture">
+                            <p class="form-hint" style="margin-top: 4px; font-size: 11px;">Modifiable - laisser pour garder la référence actuelle</p>
                         </div>
                         <div class="info-item">
                             <label>Vendeur</label>

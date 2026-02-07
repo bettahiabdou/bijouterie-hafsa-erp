@@ -270,15 +270,12 @@
                         <h3>Reference</h3>
                     </div>
                     <div class="card-body">
-                        <div class="reference-box">
-                            <span class="reference-label">Numero de Facture</span>
-                            <span class="reference-value">
-                                {% if form.instance.pk %}
-                                    {{ form.instance.reference }}
-                                {% else %}
-                                    Auto-genere
-                                {% endif %}
-                            </span>
+                        <div class="form-group">
+                            <label class="form-label" for="custom_reference">Numéro de Facture</label>
+                            <input type="text" id="custom_reference" name="custom_reference" class="form-input"
+                                   placeholder="Ex: FAC-2026-001 (laisser vide pour auto-générer)"
+                                   value="{% if form.instance.pk %}{{ form.instance.reference }}{% endif %}">
+                            <p class="form-hint">Laissez vide pour générer automatiquement (INV-YYYYMMDD-XXXX)</p>
                         </div>
                         {% if form.instance.pk %}
                             <p class="reference-date">Creee le {{ form.instance.created_at|date:'d/m/Y H:i' }}</p>
