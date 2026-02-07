@@ -56,20 +56,27 @@ def generate_product_label_zpl(product, quantity=1):
     Total tag: 68x26mm - print on RIGHT side (the visible tag head)
     Left side has the loop/antenna, right side is for printing
 
-    Layout (very compact):
+    Layout (compact with barcode):
     - Line 1: Weight + Purity (e.g., "5.2g 18K")
     - Line 2: Price (e.g., "2500")
-    - Line 3: Reference short code
+    - Line 3: Barcode
+    - Line 4: Reference date-seq (e.g., "20260207-0001")
     """
-    # Short reference - last 4 digits
+    # Reference parts - get date and sequence (e.g., "20260207-0001" from "PRD-FIN-20260207-0001")
     ref_parts = (product.reference or "").split("-")
-    short_ref = ref_parts[-1] if ref_parts else "0000"
+    if len(ref_parts) >= 2:
+        # Get last two parts: date and sequence
+        short_ref = f"{ref_parts[-2]}-{ref_parts[-1]}"
+        barcode_data = f"{ref_parts[-2]}{ref_parts[-1]}"  # No dashes for barcode
+    else:
+        short_ref = ref_parts[-1] if ref_parts else "0000"
+        barcode_data = short_ref
 
     # Weight - compact
     weight_value = product.net_weight or product.gross_weight
     weight = f"{weight_value:.1f}" if weight_value else ""
 
-    # Price - no decimals for compact display
+    # Price - no decimals
     price = f"{product.selling_price:.0f}" if product.selling_price else "0"
 
     # Purity (e.g., "18K")
@@ -77,16 +84,17 @@ def generate_product_label_zpl(product, quantity=1):
     if product.metal_purity:
         purity = product.metal_purity.name
 
-    # ZPL for 68x26mm tag - full width, print shifted to RIGHT side
-    # 68mm width = ~544 dots, 26mm height = ~208 dots at 203dpi
-    # X offset ~350 to start printing on the right portion
+    # ZPL for 68x26mm tag - print on RIGHT side
+    # Smaller fonts to fit barcode + all info
+    # X offset ~350 to start on right portion
     zpl = f"""^XA
 ^CI28
 ^PW544
 ^LL208
-^FO350,15^A0N,35,30^FD{weight}g {purity}^FS
-^FO350,60^A0N,55,50^FD{price}^FS
-^FO350,130^A0N,30,25^FD#{short_ref}^FS
+^FO350,5^A0N,22,20^FD{weight}g {purity}^FS
+^FO350,30^A0N,32,28^FD{price}^FS
+^FO350,70^BY1^BCN,45,N,N,N^FD{barcode_data}^FS
+^FO350,125^A0N,18,16^FD{short_ref}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -128,13 +136,14 @@ def print_price_tag(product, quantity=1):
 
 
 def print_test_label():
-    """Print a test label for jewelry RFID hang tag - RIGHT side"""
+    """Print a test label for jewelry RFID hang tag - RIGHT side with barcode"""
     zpl = """^XA
 ^CI28
 ^PW544
 ^LL208
-^FO350,15^A0N,35,30^FD5.2g 18K^FS
-^FO350,60^A0N,55,50^FD2500^FS
-^FO350,130^A0N,30,25^FD#0001^FS
+^FO350,5^A0N,22,20^FD5.2g 18K^FS
+^FO350,30^A0N,32,28^FD2500^FS
+^FO350,70^BY1^BCN,45,N,N,N^FD202602070001^FS
+^FO350,125^A0N,18,16^FD20260207-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
