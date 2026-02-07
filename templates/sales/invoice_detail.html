@@ -117,7 +117,7 @@
                                                 </td>
                                             {% elif invoice.status == 'paid' %}
                                                 <td class="text-center">
-                                                    <button type="button" onclick="openReturnExchangeModal('{{ item.id }}', '{{ item.product.reference }}', '{{ item.total_amount }}')" class="btn btn-ghost btn-sm text-warning">
+                                                    <button type="button" onclick="openReturnExchangeModal('{{ item.id }}', '{{ item.product.reference }}', '{{ item.total_amount }}', '{{ invoice.total_amount }}', '{{ invoice.amount_paid }}')" class="btn btn-ghost btn-sm text-warning">
                                                         <i class="fas fa-exchange-alt"></i>
                                                     </button>
                                                 </td>
@@ -1236,17 +1236,23 @@
         // ===== Return/Exchange Modal Functions =====
         let currentItemId = null;
         let currentAction = null;
-        let originalPrice = 0;
+        let originalItemPrice = 0;  // Price of the exchanged item only
+        let originalInvoiceTotal = 0;  // Total of the original invoice (all items)
+        let originalAmountPaid = 0;  // Amount already paid on original invoice
+        let otherItemsTotal = 0;  // Total of other items (not exchanged)
         let selectedExchangeProducts = []; // Array of {id, ref, price, name}
 
-        function openReturnExchangeModal(itemId, productRef, itemPrice) {
+        function openReturnExchangeModal(itemId, productRef, itemPrice, invoiceTotal, amountPaid) {
             currentItemId = itemId;
             currentAction = null;
-            originalPrice = parseNumber(itemPrice);
+            originalItemPrice = parseNumber(itemPrice);
+            originalInvoiceTotal = parseNumber(invoiceTotal);
+            originalAmountPaid = parseNumber(amountPaid);
+            otherItemsTotal = originalInvoiceTotal - originalItemPrice;  // Other items that will be copied
             selectedExchangeProducts = [];
 
             document.getElementById('returnExchangeProductRef').textContent = productRef;
-            document.getElementById('originalPriceBadge').textContent = originalPrice.toFixed(2) + ' DH';
+            document.getElementById('originalPriceBadge').textContent = originalItemPrice.toFixed(2) + ' DH';
             document.getElementById('returnExchangeNotes').value = '';
             document.getElementById('confirmReturnExchangeBtn').disabled = true;
 
@@ -1390,12 +1396,27 @@
                 totalNewProducts = selectedExchangeProducts.reduce((sum, p) => sum + p.price, 0);
             }
 
-            const difference = totalNewProducts - originalPrice;
+            // New invoice total = replacement products + other items from original invoice
+            const newInvoiceTotal = totalNewProducts + otherItemsTotal;
+
+            // Difference = new invoice total - original invoice total
+            const difference = newInvoiceTotal - originalInvoiceTotal;
 
             document.getElementById('exchangeTotalPrice').textContent = totalNewProducts.toFixed(2);
-            document.getElementById('originalInvoicePrice').textContent = originalPrice.toFixed(2);
-            document.getElementById('newProductsTotal').textContent = totalNewProducts.toFixed(2);
+            document.getElementById('replacementProductsPrice').textContent = totalNewProducts.toFixed(2);
+            document.getElementById('originalInvoicePrice').textContent = originalInvoiceTotal.toFixed(2);
+            document.getElementById('newProductsTotal').textContent = newInvoiceTotal.toFixed(2);
             document.getElementById('priceDifference').textContent = difference.toFixed(2);
+
+            // Show/hide other items row
+            const otherItemsRow = document.getElementById('otherItemsRow');
+            const otherItemsPriceEl = document.getElementById('otherItemsPrice');
+            if (otherItemsTotal > 0) {
+                otherItemsRow.style.display = 'flex';
+                otherItemsPriceEl.textContent = otherItemsTotal.toFixed(2);
+            } else {
+                otherItemsRow.style.display = 'none';
+            }
 
             // Update difference styling
             const diffEl = document.querySelector('.price-difference');
@@ -1468,7 +1489,12 @@
                 }
             });
 
-            const difference = totalNewProducts - originalPrice; // Différence à payer
+            // New invoice total = replacement products + other items from original invoice
+            const newInvoiceTotal = totalNewProducts + otherItemsTotal;
+
+            // Difference = new invoice total - original invoice total
+            const difference = newInvoiceTotal - originalInvoiceTotal;
+
             const amountPaidNowStr = document.getElementById('exchangeAmountPaid').value;
             const amountPaidNow = parseNumber(amountPaidNowStr);
 
@@ -1481,48 +1507,38 @@
             // Debug: log values
             console.log('Payment Status Debug:', {
                 totalNewProducts,
-                originalPrice,
+                otherItemsTotal,
+                newInvoiceTotal,
+                originalInvoiceTotal,
+                originalAmountPaid,
                 difference,
-                amountPaidNow,
-                selectedPrices: selectedExchangeProducts.map(p => p.price)
+                amountPaidNow
             });
 
             // Logic:
-            // - Original price is already credited from the exchanged invoice
-            // - Client pays amountPaidNow for the difference
-            // - Total effectively paid = originalPrice + amountPaidNow
-            // - If totalEffectivelyPaid >= totalNewProducts => PAID
+            // - Original invoice amount_paid is transferred to new invoice
+            // - Client pays amountPaidNow for any additional amount
+            // - Total payment = originalAmountPaid + amountPaidNow
+            // - If total payment >= newInvoiceTotal => PAID
 
-            const totalEffectivelyPaid = originalPrice + amountPaidNow;
+            const totalPayment = originalAmountPaid + amountPaidNow;
 
             // Use small epsilon for floating point comparison
             const epsilon = 0.01;
 
-            if (difference <= epsilon) {
-                // New products cost less or equal - invoice is fully paid automatically
-                indicator.classList.add('status-paid');
-                if (difference < -epsilon) {
-                    statusText.textContent = `Facture payée - Crédit client: ${Math.abs(difference).toFixed(2)} DH`;
-                } else {
-                    statusText.textContent = 'Facture sera payée (échange équivalent)';
-                }
-            } else if (totalEffectivelyPaid >= totalNewProducts - epsilon) {
-                // Client paid enough to cover the total (with epsilon tolerance)
+            if (totalPayment >= newInvoiceTotal - epsilon) {
+                // Fully paid
                 indicator.classList.add('status-paid');
                 statusText.textContent = 'Facture sera payée intégralement ✓';
-            } else if (amountPaidNow >= difference - epsilon) {
-                // Client paid at least the difference - invoice is paid
-                indicator.classList.add('status-paid');
-                statusText.textContent = 'Facture sera payée intégralement ✓';
-            } else if (amountPaidNow > epsilon) {
+            } else if (totalPayment > epsilon) {
                 // Partial payment
                 indicator.classList.add('status-partial');
-                const remaining = difference - amountPaidNow;
+                const remaining = newInvoiceTotal - totalPayment;
                 statusText.textContent = `Paiement partiel - Solde restant: ${remaining.toFixed(2)} DH`;
             } else {
-                // No additional payment - only original price credited
+                // Nothing paid
                 indicator.classList.add('status-partial');
-                statusText.textContent = `Crédit échange: ${originalPrice.toFixed(2)} DH - À payer: ${difference.toFixed(2)} DH`;
+                statusText.textContent = `À payer: ${newInvoiceTotal.toFixed(2)} DH`;
             }
         }
 
@@ -1672,13 +1688,21 @@
                         </div>
 
                         <div class="exchange-price-summary">
-                            <div class="price-summary-row">
-                                <span>Prix facture originale:</span>
+                            <div class="price-summary-row" style="font-size: 12px; color: var(--neutral-500);">
+                                <span>Facture originale (déjà payée):</span>
                                 <span id="originalInvoicePrice">0.00</span> DH
                             </div>
-                            <div class="price-summary-row">
-                                <span>Total nouveaux produits:</span>
-                                <span id="newProductsTotal">0.00</span> DH
+                            <div id="otherItemsRow" class="price-summary-row" style="font-size: 12px; color: var(--neutral-500); display: none;">
+                                <span>+ Autres articles (transférés):</span>
+                                <span id="otherItemsPrice">0.00</span> DH
+                            </div>
+                            <div class="price-summary-row" style="font-size: 12px; color: var(--neutral-500);">
+                                <span>+ Produits de remplacement:</span>
+                                <span id="replacementProductsPrice">0.00</span> DH
+                            </div>
+                            <div class="price-summary-row" style="border-top: 1px solid var(--neutral-200); padding-top: 8px; margin-top: 4px;">
+                                <span><strong>Total nouvelle facture:</strong></span>
+                                <strong><span id="newProductsTotal">0.00</span> DH</strong>
                             </div>
                             <div class="price-summary-row price-difference">
                                 <span><strong>Différence à payer:</strong></span>

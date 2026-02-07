@@ -255,6 +255,21 @@ def invoice_detail(request, reference):
                         except PaymentMethod.DoesNotExist:
                             pass
 
+                    # First, copy all OTHER items from original invoice (not the exchanged one)
+                    other_items_total = Decimal('0')
+                    for other_item in invoice.items.exclude(id=item_id):
+                        SaleInvoiceItem.objects.create(
+                            invoice=new_invoice,
+                            product=other_item.product,
+                            quantity=other_item.quantity,
+                            original_price=other_item.original_price,
+                            negotiated_price=other_item.negotiated_price,
+                            unit_price=other_item.unit_price,
+                            total_amount=other_item.total_amount,
+                        )
+                        other_items_total += other_item.total_amount
+                        # Note: These products keep their current status (already sold)
+
                     # Add all replacement products to new invoice with custom prices
                     first_replacement = None
                     for prod_data in replacement_products_data:
@@ -282,42 +297,42 @@ def invoice_detail(request, reference):
                     new_invoice.calculate_totals()
 
                     # Handle payment amount
-                    # The logic: original price is already "paid" from the exchanged invoice
-                    # So the client only needs to pay the DIFFERENCE (if positive)
+                    # The logic:
+                    # - Original invoice was already paid (amount_paid on original invoice)
+                    # - We transfer that payment to the new invoice
+                    # - The only DIFFERENCE to pay is: new_invoice.total - original_invoice.total
+                    # - Plus any additional payment the client makes now
                     try:
                         amount_paid_input = Decimal(amount_paid_str)
                     except (InvalidOperation, ValueError):
                         amount_paid_input = Decimal('0')
 
                     # Calculate the difference to pay
-                    original_item_price = item.total_amount  # Price from original invoice
-                    difference = new_invoice.total_amount - original_item_price
+                    # Old invoice total was already paid, so transfer that amount
+                    original_invoice_total = invoice.total_amount  # Total of original invoice (all items)
+                    original_amount_paid = invoice.amount_paid  # What was already paid on original
 
-                    if difference <= 0:
-                        # New products cost less or equal - invoice is fully paid
-                        # The "credit" from original covers everything
+                    # Difference = new total - old total (can be positive or negative)
+                    difference = new_invoice.total_amount - original_invoice_total
+
+                    # Total payment = what was paid before + what client pays now
+                    total_payment = original_amount_paid + amount_paid_input
+
+                    if total_payment >= new_invoice.total_amount:
+                        # Fully paid
                         new_invoice.amount_paid = new_invoice.total_amount
                         new_invoice.balance_due = Decimal('0')
                         new_invoice.status = SaleInvoice.Status.PAID
+                    elif total_payment > 0:
+                        # Partial payment
+                        new_invoice.amount_paid = total_payment
+                        new_invoice.balance_due = new_invoice.total_amount - total_payment
+                        new_invoice.status = SaleInvoice.Status.PARTIAL_PAID
                     else:
-                        # Client needs to pay the difference
-                        # amount_paid_input is what they pay NOW for the difference
-                        # Total amount_paid = original_item_price + what they pay now
-                        total_effectively_paid = original_item_price + amount_paid_input
-
-                        if total_effectively_paid >= new_invoice.total_amount:
-                            new_invoice.amount_paid = new_invoice.total_amount
-                            new_invoice.balance_due = Decimal('0')
-                            new_invoice.status = SaleInvoice.Status.PAID
-                        elif amount_paid_input > 0:
-                            new_invoice.amount_paid = total_effectively_paid
-                            new_invoice.balance_due = new_invoice.total_amount - total_effectively_paid
-                            new_invoice.status = SaleInvoice.Status.PARTIAL_PAID
-                        else:
-                            # No additional payment - only original price credited
-                            new_invoice.amount_paid = original_item_price
-                            new_invoice.balance_due = difference
-                            new_invoice.status = SaleInvoice.Status.PARTIAL_PAID
+                        # Nothing paid
+                        new_invoice.amount_paid = Decimal('0')
+                        new_invoice.balance_due = new_invoice.total_amount
+                        new_invoice.status = SaleInvoice.Status.UNPAID
 
                     new_invoice.save()
 
