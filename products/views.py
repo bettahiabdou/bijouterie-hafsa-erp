@@ -8,11 +8,82 @@ from django.db.models import Q, Count, Sum, F
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from .models import Product, ProductImage, ProductStone
 from .print_utils import print_product_label, print_price_tag, print_test_label
 from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount
 from suppliers.models import Supplier
 from users.models import ActivityLog
+from PIL import Image
+from io import BytesIO
+import os
+
+
+def convert_image_to_jpeg(image_file):
+    """
+    Convert uploaded image to JPEG format if it's HEIC or other non-web formats.
+    Returns a new InMemoryUploadedFile with the converted image.
+    """
+    filename = image_file.name.lower()
+
+    # Check if it's a HEIC file or other format that needs conversion
+    if filename.endswith(('.heic', '.heif')):
+        try:
+            # Try to use pillow-heif for HEIC support
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+        except ImportError:
+            # If pillow-heif not installed, try anyway with PIL
+            pass
+
+    try:
+        # Reset file pointer
+        image_file.seek(0)
+
+        # Open image with PIL
+        img = Image.open(image_file)
+
+        # Convert to RGB if necessary (for RGBA, P mode images)
+        if img.mode in ('RGBA', 'P', 'LA'):
+            # Create white background for transparency
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+
+        # Resize if too large (max 2000px on longest side)
+        max_size = 2000
+        if img.width > max_size or img.height > max_size:
+            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+
+        # Save to BytesIO as JPEG
+        output = BytesIO()
+        img.save(output, format='JPEG', quality=85, optimize=True)
+        output.seek(0)
+
+        # Create new filename with .jpg extension
+        base_name = os.path.splitext(image_file.name)[0]
+        new_filename = f"{base_name}.jpg"
+
+        # Return new InMemoryUploadedFile
+        return InMemoryUploadedFile(
+            file=output,
+            field_name=image_file.field_name if hasattr(image_file, 'field_name') else 'image',
+            name=new_filename,
+            content_type='image/jpeg',
+            size=output.getbuffer().nbytes,
+            charset=None
+        )
+    except Exception as e:
+        # If conversion fails, return original file
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Image conversion failed for {image_file.name}: {str(e)}")
+        image_file.seek(0)
+        return image_file
 
 
 @login_required(login_url='login')
@@ -217,10 +288,11 @@ def batch_product_create(request):
                     # Handle image upload for this product (if any)
                     product_images = request.FILES.getlist(f'product_image_{i}')
                     for idx, img_file in enumerate(product_images):
-                        img_file.seek(0)
+                        # Convert HEIC/HEIF to JPEG for browser compatibility
+                        converted_image = convert_image_to_jpeg(img_file)
                         prod_image = ProductImage.objects.create(
                             product=product,
-                            image=img_file,
+                            image=converted_image,
                             is_primary=(idx == 0),
                             display_order=idx
                         )
@@ -369,11 +441,11 @@ def product_create(request):
             # Handle image uploads
             images = request.FILES.getlist('images')
             for i, image_file in enumerate(images):
-                # Reset file pointer before each use
-                image_file.seek(0)
+                # Convert HEIC/HEIF to JPEG for browser compatibility
+                converted_image = convert_image_to_jpeg(image_file)
                 product_image = ProductImage.objects.create(
                     product=product,
-                    image=image_file,
+                    image=converted_image,
                     is_primary=(i == 0),
                     display_order=i
                 )
@@ -462,10 +534,11 @@ def product_edit(request, reference):
             images = request.FILES.getlist('images')
             existing_count = product.images.count()
             for i, image_file in enumerate(images):
-                image_file.seek(0)
+                # Convert HEIC/HEIF to JPEG for browser compatibility
+                converted_image = convert_image_to_jpeg(image_file)
                 product_image = ProductImage.objects.create(
                     product=product,
-                    image=image_file,
+                    image=converted_image,
                     is_primary=False,
                     display_order=existing_count + i
                 )
