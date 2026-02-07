@@ -324,42 +324,46 @@ def invoice_detail(request, reference):
                     amount_paid_input = amount_paid_1 + amount_paid_2
                     payment_details = []
 
-                    # Create ClientPayment records for each payment
+                    # Create ClientPayment records for each payment (only if client exists)
                     if amount_paid_1 > 0 and payment_method_id:
                         try:
                             pm1 = PaymentMethod.objects.get(id=payment_method_id)
-                            pay_ref_1 = payment_reference if payment_reference else f"PAY-{new_invoice.reference}-1"
-                            ClientPayment.objects.create(
-                                reference=pay_ref_1,
-                                date=timezone.now().date(),
-                                payment_type=ClientPayment.PaymentType.INVOICE,
-                                client=new_invoice.client,
-                                amount=amount_paid_1,
-                                payment_method=pm1,
-                                bank_account_id=bank_account_id or None,
-                                sale_invoice=new_invoice,
-                                created_by=request.user
-                            )
                             payment_details.append({'method': pm1.name, 'amount': amount_paid_1})
+
+                            if new_invoice.client:
+                                pay_ref_1 = payment_reference if payment_reference else f"PAY-{new_invoice.reference}-1"
+                                ClientPayment.objects.create(
+                                    reference=pay_ref_1,
+                                    date=timezone.now().date(),
+                                    payment_type=ClientPayment.PaymentType.INVOICE,
+                                    client=new_invoice.client,
+                                    amount=amount_paid_1,
+                                    payment_method=pm1,
+                                    bank_account_id=bank_account_id or None,
+                                    sale_invoice=new_invoice,
+                                    created_by=request.user
+                                )
                         except PaymentMethod.DoesNotExist:
                             pass
 
                     if amount_paid_2 > 0 and payment_method_id_2:
                         try:
                             pm2 = PaymentMethod.objects.get(id=payment_method_id_2)
-                            pay_ref_2 = payment_reference_2 if payment_reference_2 else f"PAY-{new_invoice.reference}-2"
-                            ClientPayment.objects.create(
-                                reference=pay_ref_2,
-                                date=timezone.now().date(),
-                                payment_type=ClientPayment.PaymentType.INVOICE,
-                                client=new_invoice.client,
-                                amount=amount_paid_2,
-                                payment_method=pm2,
-                                bank_account_id=bank_account_id_2 or None,
-                                sale_invoice=new_invoice,
-                                created_by=request.user
-                            )
                             payment_details.append({'method': pm2.name, 'amount': amount_paid_2})
+
+                            if new_invoice.client:
+                                pay_ref_2 = payment_reference_2 if payment_reference_2 else f"PAY-{new_invoice.reference}-2"
+                                ClientPayment.objects.create(
+                                    reference=pay_ref_2,
+                                    date=timezone.now().date(),
+                                    payment_type=ClientPayment.PaymentType.INVOICE,
+                                    client=new_invoice.client,
+                                    amount=amount_paid_2,
+                                    payment_method=pm2,
+                                    bank_account_id=bank_account_id_2 or None,
+                                    sale_invoice=new_invoice,
+                                    created_by=request.user
+                                )
                         except PaymentMethod.DoesNotExist:
                             pass
 
@@ -792,23 +796,24 @@ def invoice_create(request):
                                 # Get payment method
                                 payment_method = PaymentMethod.objects.get(id=payment_data['method_id'])
 
-                                # Create ClientPayment record
-                                payment_ref = payment_data.get('reference', '').strip()
-                                if not payment_ref:
-                                    # Auto-generate reference if not provided
-                                    payment_ref = f"PAY-{invoice.reference}-{len(payment_details)+1}"
+                                # Create ClientPayment record only if client exists
+                                if invoice.client:
+                                    payment_ref = payment_data.get('reference', '').strip()
+                                    if not payment_ref:
+                                        # Auto-generate reference if not provided
+                                        payment_ref = f"PAY-{invoice.reference}-{len(payment_details)+1}"
 
-                                client_payment = ClientPayment.objects.create(
-                                    reference=payment_ref,
-                                    date=timezone.now().date(),
-                                    payment_type=ClientPayment.PaymentType.INVOICE,
-                                    client=invoice.client,
-                                    amount=payment_amount,
-                                    payment_method=payment_method,
-                                    bank_account_id=payment_data.get('bank_account_id') or None,
-                                    sale_invoice=invoice,
-                                    created_by=request.user
-                                )
+                                    ClientPayment.objects.create(
+                                        reference=payment_ref,
+                                        date=timezone.now().date(),
+                                        payment_type=ClientPayment.PaymentType.INVOICE,
+                                        client=invoice.client,
+                                        amount=payment_amount,
+                                        payment_method=payment_method,
+                                        bank_account_id=payment_data.get('bank_account_id') or None,
+                                        sale_invoice=invoice,
+                                        created_by=request.user
+                                    )
 
                                 payment_details.append({
                                     'method': payment_method.name,
@@ -1148,21 +1153,22 @@ def bulk_invoice_create(request):
                                         pm = PaymentMethod.objects.get(id=payment_method_id)
                                         payment_details.append({'method': pm.name, 'amount': amount_paid_1})
 
-                                        # Create ClientPayment record
-                                        pay_ref = payment_references[i].strip() if i < len(payment_references) else ''
-                                        if not pay_ref:
-                                            pay_ref = f"PAY-{invoice.reference}-1"
-                                        ClientPayment.objects.create(
-                                            reference=pay_ref,
-                                            date=timezone.now().date(),
-                                            payment_type=ClientPayment.PaymentType.INVOICE,
-                                            client=client,
-                                            amount=amount_paid_1,
-                                            payment_method=pm,
-                                            bank_account_id=bank_accounts[i] if i < len(bank_accounts) and bank_accounts[i] else None,
-                                            sale_invoice=invoice,
-                                            created_by=request.user
-                                        )
+                                        # Create ClientPayment record only if client exists
+                                        if client:
+                                            pay_ref = payment_references[i].strip() if i < len(payment_references) else ''
+                                            if not pay_ref:
+                                                pay_ref = f"PAY-{invoice.reference}-1"
+                                            ClientPayment.objects.create(
+                                                reference=pay_ref,
+                                                date=timezone.now().date(),
+                                                payment_type=ClientPayment.PaymentType.INVOICE,
+                                                client=client,
+                                                amount=amount_paid_1,
+                                                payment_method=pm,
+                                                bank_account_id=bank_accounts[i] if i < len(bank_accounts) and bank_accounts[i] else None,
+                                                sale_invoice=invoice,
+                                                created_by=request.user
+                                            )
                                     except PaymentMethod.DoesNotExist:
                                         pass
                         except (InvalidOperation, ValueError):
@@ -1180,21 +1186,22 @@ def bulk_invoice_create(request):
                                         pm2 = PaymentMethod.objects.get(id=payment_method_id_2)
                                         payment_details.append({'method': pm2.name, 'amount': amount_paid_2})
 
-                                        # Create ClientPayment record for second payment
-                                        pay_ref_2 = payment_references_2[i].strip() if i < len(payment_references_2) else ''
-                                        if not pay_ref_2:
-                                            pay_ref_2 = f"PAY-{invoice.reference}-2"
-                                        ClientPayment.objects.create(
-                                            reference=pay_ref_2,
-                                            date=timezone.now().date(),
-                                            payment_type=ClientPayment.PaymentType.INVOICE,
-                                            client=client,
-                                            amount=amount_paid_2,
-                                            payment_method=pm2,
-                                            bank_account_id=bank_accounts_2[i] if i < len(bank_accounts_2) and bank_accounts_2[i] else None,
-                                            sale_invoice=invoice,
-                                            created_by=request.user
-                                        )
+                                        # Create ClientPayment record only if client exists
+                                        if client:
+                                            pay_ref_2 = payment_references_2[i].strip() if i < len(payment_references_2) else ''
+                                            if not pay_ref_2:
+                                                pay_ref_2 = f"PAY-{invoice.reference}-2"
+                                            ClientPayment.objects.create(
+                                                reference=pay_ref_2,
+                                                date=timezone.now().date(),
+                                                payment_type=ClientPayment.PaymentType.INVOICE,
+                                                client=client,
+                                                amount=amount_paid_2,
+                                                payment_method=pm2,
+                                                bank_account_id=bank_accounts_2[i] if i < len(bank_accounts_2) and bank_accounts_2[i] else None,
+                                                sale_invoice=invoice,
+                                                created_by=request.user
+                                            )
                                     except PaymentMethod.DoesNotExist:
                                         pass
                         except (InvalidOperation, ValueError):
@@ -1220,6 +1227,7 @@ def bulk_invoice_create(request):
                         # Note: if status is UNPAID or PARTIAL, product stays 'indisponible' (reserved)
 
                         # Log payment activity
+                        payment_summary = ', '.join([f"{p['method']}: {p['amount']} DH" for p in payment_details]) if payment_details else f"{total_amount_paid} DH"
                         ActivityLog.objects.create(
                             user=request.user,
                             action=ActivityLog.ActionType.CREATE,
@@ -1910,20 +1918,21 @@ def pending_invoice_complete(request, reference):
                         pm1 = PaymentMethod.objects.get(id=payment_method_id_1)
                         payment_details.append({'method': pm1.name, 'amount': amount_paid_1})
 
-                        # Create ClientPayment record
-                        if not payment_ref_1:
-                            payment_ref_1 = f"PAY-{invoice.reference}-1"
-                        ClientPayment.objects.create(
-                            reference=payment_ref_1,
-                            date=timezone.now().date(),
-                            payment_type=ClientPayment.PaymentType.INVOICE,
-                            client=invoice.client,
-                            amount=amount_paid_1,
-                            payment_method=pm1,
-                            bank_account_id=bank_account_id_1 or None,
-                            sale_invoice=invoice,
-                            created_by=request.user
-                        )
+                        # Create ClientPayment record only if client exists
+                        if invoice.client:
+                            if not payment_ref_1:
+                                payment_ref_1 = f"PAY-{invoice.reference}-1"
+                            ClientPayment.objects.create(
+                                reference=payment_ref_1,
+                                date=timezone.now().date(),
+                                payment_type=ClientPayment.PaymentType.INVOICE,
+                                client=invoice.client,
+                                amount=amount_paid_1,
+                                payment_method=pm1,
+                                bank_account_id=bank_account_id_1 or None,
+                                sale_invoice=invoice,
+                                created_by=request.user
+                            )
                     except PaymentMethod.DoesNotExist:
                         pass
 
@@ -1944,20 +1953,21 @@ def pending_invoice_complete(request, reference):
                         pm2 = PaymentMethod.objects.get(id=payment_method_id_2)
                         payment_details.append({'method': pm2.name, 'amount': amount_paid_2})
 
-                        # Create ClientPayment record
-                        if not payment_ref_2:
-                            payment_ref_2 = f"PAY-{invoice.reference}-2"
-                        ClientPayment.objects.create(
-                            reference=payment_ref_2,
-                            date=timezone.now().date(),
-                            payment_type=ClientPayment.PaymentType.INVOICE,
-                            client=invoice.client,
-                            amount=amount_paid_2,
-                            payment_method=pm2,
-                            bank_account_id=bank_account_id_2 or None,
-                            sale_invoice=invoice,
-                            created_by=request.user
-                        )
+                        # Create ClientPayment record only if client exists
+                        if invoice.client:
+                            if not payment_ref_2:
+                                payment_ref_2 = f"PAY-{invoice.reference}-2"
+                            ClientPayment.objects.create(
+                                reference=payment_ref_2,
+                                date=timezone.now().date(),
+                                payment_type=ClientPayment.PaymentType.INVOICE,
+                                client=invoice.client,
+                                amount=amount_paid_2,
+                                payment_method=pm2,
+                                bank_account_id=bank_account_id_2 or None,
+                                sale_invoice=invoice,
+                                created_by=request.user
+                            )
                     except PaymentMethod.DoesNotExist:
                         pass
 
