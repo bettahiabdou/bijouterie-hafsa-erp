@@ -355,51 +355,62 @@ def purchase_invoice_detail(request, reference):
                     ip_address=get_client_ip(request)
                 )
 
-        # Handle add product action
-        elif action == 'add_product':
-            product_id = request.POST.get('product_id')
-            if product_id:
-                try:
-                    product = Product.objects.get(id=product_id)
+        # Handle add multiple products action
+        elif action == 'add_products':
+            product_ids_str = request.POST.get('product_ids', '')
+            if product_ids_str:
+                product_ids = [pid.strip() for pid in product_ids_str.split(',') if pid.strip()]
+                added_count = 0
+                errors = []
 
-                    # Validate required fields
-                    if not product.category:
-                        messages.error(request, f'Le produit {product.reference} n\'a pas de catégorie définie.')
-                    elif not product.metal_type:
-                        messages.error(request, f'Le produit {product.reference} n\'a pas de type de métal défini.')
-                    elif not product.metal_purity:
-                        messages.error(request, f'Le produit {product.reference} n\'a pas de titre défini.')
-                    else:
-                        # Create a new invoice item linked to this product
-                        PurchaseInvoiceItem.objects.create(
-                            invoice=invoice,
-                            product=product,
-                            description=f"{product.name} - {product.reference}",
-                            category=product.category,
-                            metal_type=product.metal_type,
-                            metal_purity=product.metal_purity,
-                            gross_weight=product.gross_weight or Decimal('0'),
-                            net_weight=product.net_weight or Decimal('0'),
-                            price_per_gram=product.purchase_price_per_gram or Decimal('0'),
-                            labor_cost=product.labor_cost or Decimal('0'),
-                        )
-                        # Update invoice totals
-                        invoice.calculate_totals()
-                        invoice.save()
+                for product_id in product_ids:
+                    try:
+                        product = Product.objects.get(id=product_id)
 
-                        ActivityLog.objects.create(
-                            user=request.user,
-                            action=ActivityLog.ActionType.UPDATE,
-                            model_name='PurchaseInvoice',
-                            object_id=str(invoice.id),
-                            object_repr=f'Added product {product.reference} to invoice {invoice.reference}',
-                            ip_address=get_client_ip(request)
-                        )
-                        messages.success(request, f'Produit {product.reference} ajouté à la facture.')
-                except Product.DoesNotExist:
-                    messages.error(request, 'Produit non trouvé.')
-                except Exception as e:
-                    messages.error(request, f'Erreur lors de l\'ajout: {str(e)}')
+                        # Validate required fields
+                        if not product.category:
+                            errors.append(f'{product.reference}: pas de catégorie')
+                        elif not product.metal_type:
+                            errors.append(f'{product.reference}: pas de type de métal')
+                        elif not product.metal_purity:
+                            errors.append(f'{product.reference}: pas de titre')
+                        else:
+                            # Create a new invoice item linked to this product
+                            PurchaseInvoiceItem.objects.create(
+                                invoice=invoice,
+                                product=product,
+                                description=f"{product.name} - {product.reference}",
+                                category=product.category,
+                                metal_type=product.metal_type,
+                                metal_purity=product.metal_purity,
+                                gross_weight=product.gross_weight or Decimal('0'),
+                                net_weight=product.net_weight or Decimal('0'),
+                                price_per_gram=product.purchase_price_per_gram or Decimal('0'),
+                                labor_cost=product.labor_cost or Decimal('0'),
+                            )
+                            added_count += 1
+                    except Product.DoesNotExist:
+                        errors.append(f'ID {product_id}: non trouvé')
+                    except Exception as e:
+                        errors.append(f'ID {product_id}: {str(e)}')
+
+                # Update invoice totals once after all items added
+                if added_count > 0:
+                    invoice.calculate_totals()
+                    invoice.save()
+
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.UPDATE,
+                        model_name='PurchaseInvoice',
+                        object_id=str(invoice.id),
+                        object_repr=f'Added {added_count} products to invoice {invoice.reference}',
+                        ip_address=get_client_ip(request)
+                    )
+                    messages.success(request, f'{added_count} produit(s) ajouté(s) à la facture.')
+
+                if errors:
+                    messages.error(request, f'Erreurs: {", ".join(errors)}')
 
         # Handle remove item action
         elif action == 'remove_item':

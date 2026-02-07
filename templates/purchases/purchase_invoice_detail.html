@@ -582,24 +582,58 @@
         .product-item-status {
             margin-left: var(--space-3);
         }
+
+        /* Multi-select styles */
+        .product-item.selected {
+            background: var(--primary-100);
+            border-color: var(--primary-500);
+        }
+
+        .product-item-checkbox {
+            width: 20px;
+            height: 20px;
+            margin-right: var(--space-3);
+            accent-color: var(--primary-600);
+            cursor: pointer;
+        }
+
+        .modal-footer {
+            padding: var(--space-4) var(--space-6);
+            border-top: 1px solid var(--neutral-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--neutral-50);
+        }
+
+        .selected-count {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .selected-count strong {
+            color: var(--primary-600);
+        }
+
+        .modal-footer .btn {
+            min-width: 120px;
+        }
     </style>
 
     <!-- Add Product Modal -->
     <div id="addProductModal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="fas fa-plus mr-2"></i> Ajouter un Produit</h3>
+                <h3><i class="fas fa-plus mr-2"></i> Ajouter des Produits</h3>
                 <button type="button" class="modal-close" onclick="closeAddProductModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <input type="text" id="productSearch" class="product-search-input" placeholder="Rechercher par référence ou nom..." onkeyup="filterProducts()">
                 <div class="product-list" id="productList">
                     {% for product in all_products %}
-                        <form method="post" class="product-item-form" data-ref="{{ product.reference|lower }}" data-name="{{ product.name|lower }}">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="add_product">
-                            <input type="hidden" name="product_id" value="{{ product.id }}">
-                            <div class="product-item" onclick="this.closest('form').submit();">
+                        <div class="product-item-wrapper" data-ref="{{ product.reference|lower }}" data-name="{{ product.name|lower }}" data-id="{{ product.id }}">
+                            <div class="product-item" onclick="toggleProductSelection(this)">
+                                <input type="checkbox" class="product-item-checkbox" data-product-id="{{ product.id }}" onclick="event.stopPropagation(); toggleProductSelection(this.closest('.product-item'));">
                                 <div class="product-item-info">
                                     <div class="product-item-ref">{{ product.reference }}</div>
                                     <div class="product-item-name">{{ product.name }}</div>
@@ -615,17 +649,43 @@
                                     </span>
                                 </div>
                             </div>
-                        </form>
+                        </div>
                     {% empty %}
                         <p class="text-center text-muted">Aucun produit disponible</p>
                     {% endfor %}
                 </div>
             </div>
+            <div class="modal-footer">
+                <span class="selected-count"><strong id="selectedCount">0</strong> produit(s) sélectionné(s)</span>
+                <div>
+                    <button type="button" class="btn btn-secondary" onclick="closeAddProductModal()">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="addSelectedProducts()" id="confirmAddBtn" disabled>
+                        <i class="fas fa-check mr-1"></i> Confirmer
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- Hidden form for submitting selected products -->
+    <form method="post" id="addProductsForm" style="display: none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_products">
+        <input type="hidden" name="product_ids" id="selectedProductIds" value="">
+    </form>
+
     <script>
+        let selectedProducts = new Set();
+
         function openAddProductModal() {
+            // Reset selections when opening modal
+            selectedProducts.clear();
+            document.querySelectorAll('.product-item').forEach(item => {
+                item.classList.remove('selected');
+                const checkbox = item.querySelector('.product-item-checkbox');
+                if (checkbox) checkbox.checked = false;
+            });
+            updateSelectedCount();
             document.getElementById('addProductModal').classList.add('active');
         }
 
@@ -633,9 +693,39 @@
             document.getElementById('addProductModal').classList.remove('active');
         }
 
+        function toggleProductSelection(itemElement) {
+            const checkbox = itemElement.querySelector('.product-item-checkbox');
+            const productId = checkbox.dataset.productId;
+
+            if (selectedProducts.has(productId)) {
+                selectedProducts.delete(productId);
+                itemElement.classList.remove('selected');
+                checkbox.checked = false;
+            } else {
+                selectedProducts.add(productId);
+                itemElement.classList.add('selected');
+                checkbox.checked = true;
+            }
+
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const count = selectedProducts.size;
+            document.getElementById('selectedCount').textContent = count;
+            document.getElementById('confirmAddBtn').disabled = count === 0;
+        }
+
+        function addSelectedProducts() {
+            if (selectedProducts.size === 0) return;
+
+            document.getElementById('selectedProductIds').value = Array.from(selectedProducts).join(',');
+            document.getElementById('addProductsForm').submit();
+        }
+
         function filterProducts() {
             const search = document.getElementById('productSearch').value.toLowerCase();
-            const items = document.querySelectorAll('.product-item-form');
+            const items = document.querySelectorAll('.product-item-wrapper');
 
             items.forEach(item => {
                 const ref = item.dataset.ref;
