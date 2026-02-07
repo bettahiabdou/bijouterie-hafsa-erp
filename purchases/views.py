@@ -5,6 +5,7 @@ Handles purchase orders, purchase invoices, and consignments
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib import messages
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q, Sum, Count, F, DecimalField, Value
@@ -317,10 +318,12 @@ def purchase_invoice_create(request):
 @login_required
 def purchase_invoice_detail(request, reference):
     """View purchase invoice details"""
+    from products.models import Product
+
     invoice = get_object_or_404(
         PurchaseInvoice.objects.select_related(
             'supplier', 'created_by', 'purchase_order'
-        ).prefetch_related('items'),
+        ).prefetch_related('items', 'items__product'),
         reference=reference
     )
 
@@ -334,24 +337,95 @@ def purchase_invoice_detail(request, reference):
         ip_address=get_client_ip(request)
     )
 
-    # Handle confirm action
-    if request.method == 'POST' and request.POST.get('action') == 'confirm':
-        if request.user.has_perm('purchases.change_purchaseinvoice'):
-            invoice.status = 'confirmed'
-            invoice.save()
+    if request.method == 'POST':
+        action = request.POST.get('action')
 
-            ActivityLog.objects.create(
-                user=request.user,
-                action=ActivityLog.ActionType.UPDATE,
-                model_name='PurchaseInvoice',
-                object_id=str(invoice.id),
-                object_repr=f'Confirmed purchase invoice {invoice.reference}',
-                ip_address=get_client_ip(request)
-            )
+        # Handle confirm action
+        if action == 'confirm':
+            if request.user.has_perm('purchases.change_purchaseinvoice'):
+                invoice.status = 'confirmed'
+                invoice.save()
+
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action=ActivityLog.ActionType.UPDATE,
+                    model_name='PurchaseInvoice',
+                    object_id=str(invoice.id),
+                    object_repr=f'Confirmed purchase invoice {invoice.reference}',
+                    ip_address=get_client_ip(request)
+                )
+
+        # Handle add product action
+        elif action == 'add_product':
+            product_id = request.POST.get('product_id')
+            if product_id:
+                try:
+                    product = Product.objects.get(id=product_id)
+                    # Create a new invoice item linked to this product
+                    PurchaseInvoiceItem.objects.create(
+                        invoice=invoice,
+                        product=product,
+                        description=f"{product.name} - {product.reference}",
+                        category=product.category,
+                        metal_type=product.metal_type,
+                        metal_purity=product.metal_purity,
+                        gross_weight=product.gross_weight or 0,
+                        net_weight=product.net_weight or 0,
+                        price_per_gram=product.purchase_price_per_gram or 0,
+                        labor_cost=product.labor_cost or 0,
+                        quantity=1
+                    )
+                    # Update invoice totals
+                    invoice.calculate_totals()
+                    invoice.save()
+
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.UPDATE,
+                        model_name='PurchaseInvoice',
+                        object_id=str(invoice.id),
+                        object_repr=f'Added product {product.reference} to invoice {invoice.reference}',
+                        ip_address=get_client_ip(request)
+                    )
+                    messages.success(request, f'Produit {product.reference} ajouté à la facture.')
+                except Product.DoesNotExist:
+                    messages.error(request, 'Produit non trouvé.')
+
+        # Handle remove item action
+        elif action == 'remove_item':
+            item_id = request.POST.get('item_id')
+            if item_id:
+                try:
+                    item = PurchaseInvoiceItem.objects.get(id=item_id, invoice=invoice)
+                    item_desc = item.description
+                    item.delete()
+                    # Update invoice totals
+                    invoice.calculate_totals()
+                    invoice.save()
+
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.DELETE,
+                        model_name='PurchaseInvoiceItem',
+                        object_id=str(item_id),
+                        object_repr=f'Removed item {item_desc} from invoice {invoice.reference}',
+                        ip_address=get_client_ip(request)
+                    )
+                    messages.success(request, f'Article supprimé de la facture.')
+                except PurchaseInvoiceItem.DoesNotExist:
+                    messages.error(request, 'Article non trouvé.')
+
+        return redirect('purchases:purchase_invoice_detail', reference=reference)
+
+    # Get all products for the add product modal (regardless of status)
+    all_products = Product.objects.select_related(
+        'category', 'metal_type', 'metal_purity'
+    ).order_by('-created_at')[:100]  # Limit to recent 100
 
     context = {
         'invoice': invoice,
-        'items': invoice.items.all(),
+        'items': invoice.items.select_related('product').all(),
+        'all_products': all_products,
     }
     return render(request, 'purchases/purchase_invoice_detail.html', context)
 

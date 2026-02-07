@@ -61,6 +61,10 @@
             <div class="card animate-slide-up" style="animation-delay: 100ms;">
                 <div class="card-header">
                     <h3><i class="fas fa-list mr-2"></i> Articles</h3>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="openAddProductModal()">
+                        <i class="fas fa-plus"></i>
+                        <span>Ajouter Produit</span>
+                    </button>
                 </div>
                 <div class="card-body" style="padding: 0;">
                     <!-- Desktop Table -->
@@ -68,23 +72,44 @@
                         <table class="table">
                             <thead>
                                 <tr>
+                                    <th>Produit</th>
                                     <th>Description</th>
                                     <th style="text-align: right;">Poids (g)</th>
                                     <th style="text-align: right;">Prix/g</th>
                                     <th style="text-align: right;">Total</th>
+                                    <th style="text-align: center;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in items %}
                                     <tr>
+                                        <td>
+                                            {% if item.product %}
+                                                <a href="{% url 'products:detail' item.product.reference %}" class="text-primary">
+                                                    {{ item.product.reference }}
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ item.description }}</td>
                                         <td style="text-align: right;">{{ item.gross_weight }}</td>
                                         <td style="text-align: right;">{{ item.price_per_gram }} DH</td>
                                         <td style="text-align: right;" class="font-semibold">{{ item.total_amount }} DH</td>
+                                        <td style="text-align: center;">
+                                            <form method="post" style="display: inline;" onsubmit="return confirm('Supprimer cet article?');">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="remove_item">
+                                                <input type="hidden" name="item_id" value="{{ item.id }}">
+                                                <button type="submit" class="btn btn-ghost btn-sm text-error">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="4" class="text-center text-muted">Aucun article</td>
+                                        <td colspan="6" class="text-center text-muted">Aucun article</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -448,5 +473,186 @@
                 grid-template-columns: 1fr 1fr;
             }
         }
+
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-xl);
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--neutral-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: var(--text-lg);
+        }
+
+        .modal-body {
+            padding: var(--space-4) var(--space-6);
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: var(--text-xl);
+            cursor: pointer;
+            color: var(--neutral-500);
+        }
+
+        .product-search-input {
+            width: 100%;
+            padding: var(--space-3);
+            border: 1px solid var(--neutral-300);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-4);
+        }
+
+        .product-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .product-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-3);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-2);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .product-item:hover {
+            background: var(--primary-50);
+            border-color: var(--primary-300);
+        }
+
+        .product-item-info {
+            flex: 1;
+        }
+
+        .product-item-ref {
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+        }
+
+        .product-item-name {
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .product-item-details {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .product-item-status {
+            margin-left: var(--space-3);
+        }
     </style>
+
+    <!-- Add Product Modal -->
+    <div id="addProductModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus mr-2"></i> Ajouter un Produit</h3>
+                <button type="button" class="modal-close" onclick="closeAddProductModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="productSearch" class="product-search-input" placeholder="Rechercher par référence ou nom..." onkeyup="filterProducts()">
+                <div class="product-list" id="productList">
+                    {% for product in all_products %}
+                        <form method="post" class="product-item-form" data-ref="{{ product.reference|lower }}" data-name="{{ product.name|lower }}">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="add_product">
+                            <input type="hidden" name="product_id" value="{{ product.id }}">
+                            <div class="product-item" onclick="this.closest('form').submit();">
+                                <div class="product-item-info">
+                                    <div class="product-item-ref">{{ product.reference }}</div>
+                                    <div class="product-item-name">{{ product.name }}</div>
+                                    <div class="product-item-details">
+                                        {{ product.net_weight|default:"0" }}g
+                                        {% if product.metal_purity %}| {{ product.metal_purity.name }}{% endif %}
+                                        {% if product.category %}| {{ product.category.name }}{% endif %}
+                                    </div>
+                                </div>
+                                <div class="product-item-status">
+                                    <span class="badge {% if product.status == 'available' %}badge-success{% elif product.status == 'sold' %}badge-error{% elif product.status == 'reserved' %}badge-warning{% else %}badge-neutral{% endif %}">
+                                        {{ product.get_status_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        </form>
+                    {% empty %}
+                        <p class="text-center text-muted">Aucun produit disponible</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openAddProductModal() {
+            document.getElementById('addProductModal').classList.add('active');
+        }
+
+        function closeAddProductModal() {
+            document.getElementById('addProductModal').classList.remove('active');
+        }
+
+        function filterProducts() {
+            const search = document.getElementById('productSearch').value.toLowerCase();
+            const items = document.querySelectorAll('.product-item-form');
+
+            items.forEach(item => {
+                const ref = item.dataset.ref;
+                const name = item.dataset.name;
+                if (ref.includes(search) || name.includes(search)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        // Close modal on outside click
+        document.getElementById('addProductModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAddProductModal();
+            }
+        });
+    </script>
 {% endblock %}
