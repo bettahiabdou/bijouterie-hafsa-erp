@@ -361,35 +361,45 @@ def purchase_invoice_detail(request, reference):
             if product_id:
                 try:
                     product = Product.objects.get(id=product_id)
-                    # Create a new invoice item linked to this product
-                    PurchaseInvoiceItem.objects.create(
-                        invoice=invoice,
-                        product=product,
-                        description=f"{product.name} - {product.reference}",
-                        category=product.category,
-                        metal_type=product.metal_type,
-                        metal_purity=product.metal_purity,
-                        gross_weight=product.gross_weight or 0,
-                        net_weight=product.net_weight or 0,
-                        price_per_gram=product.purchase_price_per_gram or 0,
-                        labor_cost=product.labor_cost or 0,
-                        quantity=1
-                    )
-                    # Update invoice totals
-                    invoice.calculate_totals()
-                    invoice.save()
 
-                    ActivityLog.objects.create(
-                        user=request.user,
-                        action=ActivityLog.ActionType.UPDATE,
-                        model_name='PurchaseInvoice',
-                        object_id=str(invoice.id),
-                        object_repr=f'Added product {product.reference} to invoice {invoice.reference}',
-                        ip_address=get_client_ip(request)
-                    )
-                    messages.success(request, f'Produit {product.reference} ajouté à la facture.')
+                    # Validate required fields
+                    if not product.category:
+                        messages.error(request, f'Le produit {product.reference} n\'a pas de catégorie définie.')
+                    elif not product.metal_type:
+                        messages.error(request, f'Le produit {product.reference} n\'a pas de type de métal défini.')
+                    elif not product.metal_purity:
+                        messages.error(request, f'Le produit {product.reference} n\'a pas de titre défini.')
+                    else:
+                        # Create a new invoice item linked to this product
+                        PurchaseInvoiceItem.objects.create(
+                            invoice=invoice,
+                            product=product,
+                            description=f"{product.name} - {product.reference}",
+                            category=product.category,
+                            metal_type=product.metal_type,
+                            metal_purity=product.metal_purity,
+                            gross_weight=product.gross_weight or Decimal('0'),
+                            net_weight=product.net_weight or Decimal('0'),
+                            price_per_gram=product.purchase_price_per_gram or Decimal('0'),
+                            labor_cost=product.labor_cost or Decimal('0'),
+                        )
+                        # Update invoice totals
+                        invoice.calculate_totals()
+                        invoice.save()
+
+                        ActivityLog.objects.create(
+                            user=request.user,
+                            action=ActivityLog.ActionType.UPDATE,
+                            model_name='PurchaseInvoice',
+                            object_id=str(invoice.id),
+                            object_repr=f'Added product {product.reference} to invoice {invoice.reference}',
+                            ip_address=get_client_ip(request)
+                        )
+                        messages.success(request, f'Produit {product.reference} ajouté à la facture.')
                 except Product.DoesNotExist:
                     messages.error(request, 'Produit non trouvé.')
+                except Exception as e:
+                    messages.error(request, f'Erreur lors de l\'ajout: {str(e)}')
 
         # Handle remove item action
         elif action == 'remove_item':
