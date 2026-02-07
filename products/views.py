@@ -532,26 +532,47 @@ def product_edit(request, reference):
 
     if request.method == 'POST':
         try:
+            # Text fields
             product.name = request.POST.get('name', product.name)
             product.name_ar = request.POST.get('name_ar', product.name_ar)
             product.description = request.POST.get('description', product.description)
-            product.gross_weight = request.POST.get('gross_weight', product.gross_weight)
-            product.net_weight = request.POST.get('net_weight', product.net_weight)
-            product.purchase_price_per_gram = request.POST.get('purchase_price_per_gram', product.purchase_price_per_gram)
-            product.minimum_price = request.POST.get('minimum_price', product.minimum_price)
-            product.labor_cost = request.POST.get('labor_cost', product.labor_cost)
-            product.stone_cost = request.POST.get('stone_cost', product.stone_cost)
-            product.other_cost = request.POST.get('other_cost', product.other_cost)
+            product.product_type = request.POST.get('product_type', product.product_type)
             product.margin_type = request.POST.get('margin_type', product.margin_type)
-            product.margin_value = request.POST.get('margin_value', product.margin_value)
             product.status = request.POST.get('status', product.status)
 
+            # Numeric fields - convert strings to float
+            if request.POST.get('gross_weight'):
+                product.gross_weight = float(request.POST.get('gross_weight'))
+            if request.POST.get('net_weight'):
+                product.net_weight = float(request.POST.get('net_weight'))
+            if request.POST.get('purchase_price_per_gram'):
+                product.purchase_price_per_gram = float(request.POST.get('purchase_price_per_gram'))
+            if request.POST.get('minimum_price'):
+                product.minimum_price = float(request.POST.get('minimum_price'))
+            if request.POST.get('labor_cost'):
+                product.labor_cost = float(request.POST.get('labor_cost'))
+            if request.POST.get('stone_cost'):
+                product.stone_cost = float(request.POST.get('stone_cost'))
+            if request.POST.get('other_cost'):
+                product.other_cost = float(request.POST.get('other_cost'))
+            if request.POST.get('margin_value'):
+                product.margin_value = float(request.POST.get('margin_value'))
+
+            # Foreign keys
+            if request.POST.get('category'):
+                product.category_id = request.POST.get('category')
             if request.POST.get('metal_type'):
                 product.metal_type_id = request.POST.get('metal_type')
+            else:
+                product.metal_type_id = None
             if request.POST.get('metal_purity'):
                 product.metal_purity_id = request.POST.get('metal_purity')
+            else:
+                product.metal_purity_id = None
             if request.POST.get('bank_account'):
                 product.bank_account_id = request.POST.get('bank_account')
+            else:
+                product.bank_account_id = None
 
             product.save()
 
