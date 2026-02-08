@@ -664,8 +664,8 @@ def inventory_dashboard(request):
     sold_products = Product.objects.filter(status='sold').count()
     in_repair_products = Product.objects.filter(status='in_repair').count()
 
-    # Value calculations
-    total_value = Product.objects.aggregate(
+    # Value calculations - only count available products
+    total_value = Product.objects.filter(status='available').aggregate(
         total=Sum(F('selling_price'))
     )['total'] or 0
 
