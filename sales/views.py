@@ -787,18 +787,25 @@ def invoice_create(request):
                 payment_details = []
 
                 # Process multiple payment lines
+                import logging
+                logger = logging.getLogger(__name__)
+
                 for key in request.POST:
                     if key.startswith('payments[') and key.endswith(']'):
                         try:
                             payment_json = request.POST.get(key)
+                            logger.info(f"Processing payment key={key}, json={payment_json}")
                             payment_data = json.loads(payment_json)
                             payment_amount = Decimal(str(payment_data.get('amount', 0)))
+                            method_id = payment_data.get('method_id')
 
-                            if payment_amount > 0 and payment_data.get('method_id'):
+                            logger.info(f"Payment data: amount={payment_amount}, method_id={method_id}")
+
+                            if payment_amount > 0 and method_id:
                                 total_amount_paid += payment_amount
 
                                 # Get payment method
-                                payment_method = PaymentMethod.objects.get(id=payment_data['method_id'])
+                                payment_method = PaymentMethod.objects.get(id=method_id)
 
                                 # Create ClientPayment record (works for both clients and anonymous sales)
                                 payment_ref = payment_data.get('reference', '').strip()

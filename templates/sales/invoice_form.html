@@ -1241,6 +1241,8 @@
                 const submitBtn = mainForm.querySelector('button[type="submit"]');
                 if (submitBtn) {
                     submitBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+
                         // Add items
                         if (invoiceItems.length > 0) {
                             mainForm.querySelectorAll('input[name^="items["]').forEach(el => el.remove());
@@ -1254,17 +1256,24 @@
                             });
                         }
 
-                        // Add payments
+                        // Add payments - ensure we have the latest values
                         mainForm.querySelectorAll('input[name^="payments["]').forEach(el => el.remove());
                         mainForm.querySelectorAll('input[name="amount_paid"]').forEach(el => el.remove());
 
+                        console.log('Payment lines before submit:', JSON.stringify(paymentLines));
+
                         if (paymentLines.length > 0) {
-                            paymentLines.forEach((payment, index) => {
+                            // Filter out invalid payment lines (no method or no amount)
+                            const validPayments = paymentLines.filter(p => p.method_id && p.amount > 0);
+                            console.log('Valid payments:', JSON.stringify(validPayments));
+
+                            validPayments.forEach((payment, index) => {
                                 const input = document.createElement('input');
                                 input.type = 'hidden';
                                 input.name = `payments[${index}]`;
                                 input.value = JSON.stringify(payment);
                                 mainForm.appendChild(input);
+                                console.log(`Added payment[${index}]:`, JSON.stringify(payment));
                             });
                         }
 
@@ -1276,6 +1285,7 @@
                         amountPaidInput.value = totalPaid.toFixed(2);
                         mainForm.appendChild(amountPaidInput);
 
+                        console.log('Total paid:', totalPaid);
                         mainForm.submit();
                     });
                 }
