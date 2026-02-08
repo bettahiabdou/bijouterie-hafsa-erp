@@ -920,31 +920,9 @@
                 }
             });
 
-            // Calculate remise when amount paid is changed manually
-            if (amountPaidInput) {
-                amountPaidInput.addEventListener('change', function() {
-                    const selectedOption = productSelect.options[productSelect.selectedIndex];
-                    const originalPrice = selectedOption.getAttribute('data-price');
-                    const quantity = parseFloat(quantityInput?.value) || 1;
-                    const amountPaid = parseFloat(this.value) || 0;
-
-                    if (originalPrice) {
-                        const origPriceTrimmed = parseFloat(originalPrice.replace(',', '.'));
-                        const totalOriginal = origPriceTrimmed * quantity;
-                        const remise = totalOriginal - amountPaid;
-
-                        // Auto-calculate remise based on difference between original total and amount paid
-                        if (discountInput) {
-                            if (remise > 0) {
-                                discountInput.value = remise.toFixed(2);
-                                console.log('Remise auto-calculee (montant paye): ' + remise.toFixed(2) + ' DH');
-                            } else {
-                                discountInput.value = '0';
-                            }
-                        }
-                    }
-                });
-            }
+            // Note: Remise is only based on price difference (catalogue vs selling price)
+            // NOT on amount paid. Amount paid can be partial payment.
+            // So we don't recalculate remise when amount_paid changes.
         }
 
         // Add new invoice row (desktop)
