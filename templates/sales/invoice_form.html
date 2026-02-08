@@ -86,50 +86,17 @@
                         <h3><i class="fas fa-cog mr-2"></i> Parametres</h3>
                     </div>
                     <div class="card-body">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label" for="{{ form.tax_rate.id_for_label }}">TVA (%)</label>
-                                {{ form.tax_rate }}
-                                {% if form.tax_rate.errors %}
-                                    <p class="form-error">{{ form.tax_rate.errors.0 }}</p>
-                                {% endif %}
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" for="{{ form.payment_method.id_for_label }}">Methode de Paiement</label>
-                                {{ form.payment_method }}
-                                {% if form.payment_method.errors %}
-                                    <p class="form-error">{{ form.payment_method.errors.0 }}</p>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <!-- Conditional Payment Reference -->
-                        <div id="paymentRefSection" class="form-group mt-4" style="display: none;">
-                            <label class="form-label" for="paymentReference">
-                                Reference de Paiement <span class="text-error">*</span>
-                            </label>
-                            <input type="text" id="paymentReference" name="payment_reference"
-                                   class="form-input" placeholder="N° de cheque, reference virement, n° de carte...">
-                            <p class="form-hint">Obligatoire pour virement, cheque, paiement mobile ou carte</p>
-                        </div>
-
-                        <!-- Conditional Bank Account -->
-                        <div id="bankAccountSection" class="form-group mt-4" style="display: none;">
-                            <label class="form-label" for="bankAccount">
-                                Compte Bancaire <span class="text-error">*</span>
-                            </label>
-                            <select id="bankAccount" name="bank_account" class="form-select">
-                                <option value="">-- Selectionnez un compte --</option>
-                                {% for bank in bank_accounts %}
-                                    <option value="{{ bank.id }}">{{ bank.bank_name }} - {{ bank.account_number }}</option>
-                                {% endfor %}
-                            </select>
-                            <p class="form-hint">Selectionnez le compte bancaire pour ce virement</p>
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.tax_rate.id_for_label }}">TVA (%)</label>
+                            {{ form.tax_rate }}
+                            {% if form.tax_rate.errors %}
+                                <p class="form-error">{{ form.tax_rate.errors.0 }}</p>
+                            {% endif %}
                         </div>
 
                         <div class="info-hint mt-4">
                             <i class="fas fa-info-circle"></i>
-                            Remises appliquees par produit - Livraison configuree apres creation
+                            Remises appliquees par produit - Les paiements se configurent dans la section "Paiements" ci-dessous
                         </div>
                     </div>
                 </div>
@@ -856,35 +823,6 @@
                 });
             }
 
-            // ============ PAYMENT REFERENCE & BANK ACCOUNT CONDITIONAL ============
-            const paymentMethodSelect = document.querySelector('select[name="payment_method"]');
-            const paymentRefSection = document.getElementById('paymentRefSection');
-            const bankAccountSection = document.getElementById('bankAccountSection');
-
-            function updatePaymentFieldsVisibility() {
-                if (!paymentRefSection || !bankAccountSection) return;
-
-                if (!paymentMethodSelect || !paymentMethodSelect.value) {
-                    paymentRefSection.style.display = 'none';
-                    bankAccountSection.style.display = 'none';
-                    return;
-                }
-
-                const selectedText = paymentMethodSelect.options[paymentMethodSelect.selectedIndex].text;
-                const selectedTextLower = selectedText.toLowerCase();
-                const noReferenceNeeded = ['especes', 'espece', 'cash'];
-                const showReference = !noReferenceNeeded.some(text => selectedTextLower.includes(text.toLowerCase()));
-                const isBankTransfer = selectedTextLower.includes('virement');
-
-                paymentRefSection.style.display = showReference ? 'flex' : 'none';
-                bankAccountSection.style.display = isBankTransfer ? 'flex' : 'none';
-            }
-
-            if (paymentMethodSelect) {
-                paymentMethodSelect.addEventListener('change', updatePaymentFieldsVisibility);
-                setTimeout(updatePaymentFieldsVisibility, 100);
-            }
-
             // ============ HELPER FUNCTIONS ============
             // Track current catalog price globally for calculations
             let globalCatalogPrice = 0;
@@ -992,21 +930,22 @@
 
             function updateInvoiceSummary() {
                 const invoiceTotal = invoiceItems.reduce((sum, item) => sum + item.total_amount, 0);
-                const amountPaidInput = document.getElementById('amountPaidInput');
                 const invoiceTotalDisplay = document.getElementById('invoiceTotal');
                 const balanceDueDisplay = document.getElementById('balanceDue');
                 const paymentStatusDisplay = document.getElementById('paymentStatus');
 
-                if (!invoiceTotalDisplay || !balanceDueDisplay || !amountPaidInput) return;
+                if (!invoiceTotalDisplay || !balanceDueDisplay) return;
 
                 invoiceTotalDisplay.textContent = invoiceTotal.toFixed(2) + ' DH';
 
-                const amountPaid = parseFloat(amountPaidInput.value) || 0;
+                // Get total from payment lines (will be 0 if paymentLines not yet initialized)
+                const amountPaid = (typeof paymentLines !== 'undefined') ?
+                    paymentLines.reduce((sum, p) => sum + (p.amount || 0), 0) : 0;
                 const balance = invoiceTotal - amountPaid;
 
                 balanceDueDisplay.textContent = balance.toFixed(2) + ' DH';
 
-                if (balance <= 0) {
+                if (balance <= 0 && invoiceTotal > 0) {
                     balanceDueDisplay.style.color = 'var(--success-500)';
                 } else if (balance < invoiceTotal && amountPaid > 0) {
                     balanceDueDisplay.style.color = 'var(--warning-500)';
@@ -1014,14 +953,16 @@
                     balanceDueDisplay.style.color = 'var(--error-500)';
                 }
 
-                if (invoiceTotal === 0) {
-                    paymentStatusDisplay.textContent = 'Ajoutez les articles pour voir le total';
-                } else if (balance <= 0) {
-                    paymentStatusDisplay.textContent = 'Facture payee en integralite';
-                } else if (amountPaid > 0) {
-                    paymentStatusDisplay.textContent = 'Paiement partiel - ' + balance.toFixed(2) + ' DH restants';
-                } else {
-                    paymentStatusDisplay.textContent = 'Facture non payee';
+                if (paymentStatusDisplay) {
+                    if (invoiceTotal === 0) {
+                        paymentStatusDisplay.textContent = 'Ajoutez les articles pour voir le total';
+                    } else if (balance <= 0) {
+                        paymentStatusDisplay.textContent = 'Facture payee en integralite';
+                    } else if (amountPaid > 0) {
+                        paymentStatusDisplay.textContent = 'Paiement partiel - ' + balance.toFixed(2) + ' DH restants';
+                    } else {
+                        paymentStatusDisplay.textContent = 'Facture non payee';
+                    }
                 }
             }
 
@@ -1284,22 +1225,9 @@
                 return paymentLines.reduce((sum, p) => sum + (p.amount || 0), 0);
             }
 
-            // Update the invoice summary to use payments total
-            const originalUpdateInvoiceSummary = updateInvoiceSummary;
-            updateInvoiceSummary = function() {
-                const subtotal = invoiceItems.reduce((sum, item) => sum + item.total_amount, 0);
-                const amountPaid = getTotalPayments();
-
-                const subtotalEl = document.getElementById('summarySubtotal');
-                const totalEl = document.getElementById('summaryTotal');
-                const paidEl = document.getElementById('summaryPaid');
-                const balanceEl = document.getElementById('summaryBalance');
-
-                if (subtotalEl) subtotalEl.textContent = subtotal.toFixed(2) + ' DH';
-                if (totalEl) totalEl.textContent = subtotal.toFixed(2) + ' DH';
-                if (paidEl) paidEl.textContent = amountPaid.toFixed(2) + ' DH';
-                if (balanceEl) balanceEl.textContent = Math.max(0, subtotal - amountPaid).toFixed(2) + ' DH';
-            };
+            // Expose payment functions globally for onclick handlers
+            window.removePaymentLine = removePaymentLine;
+            window.updatePaymentLine = updatePaymentLine;
 
             // Add Payment button event
             const addPaymentBtn = document.getElementById('addPaymentBtn');
