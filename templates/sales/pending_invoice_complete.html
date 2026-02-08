@@ -178,6 +178,7 @@
                     <form method="post" id="complete-form">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="complete">
+                        <input type="hidden" name="custom_reference" id="hidden-custom-reference" value="{{ invoice.reference }}">
 
                         <div class="form-group">
                             <label class="form-label">Client (optionnel)</label>
@@ -894,6 +895,18 @@
         // Initialize payment status on page load
         document.addEventListener('DOMContentLoaded', function() {
             updatePaymentStatus();
+
+            // Sync custom reference field with hidden field in form
+            const customRefInput = document.getElementById('custom-reference');
+            const hiddenRefInput = document.getElementById('hidden-custom-reference');
+            if (customRefInput && hiddenRefInput) {
+                customRefInput.addEventListener('input', function() {
+                    hiddenRefInput.value = this.value;
+                });
+                customRefInput.addEventListener('change', function() {
+                    hiddenRefInput.value = this.value;
+                });
+            }
         });
 
         // Payment Method Fields Logic
