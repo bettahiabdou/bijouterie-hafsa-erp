@@ -800,24 +800,23 @@ def invoice_create(request):
                                 # Get payment method
                                 payment_method = PaymentMethod.objects.get(id=payment_data['method_id'])
 
-                                # Create ClientPayment record only if client exists
-                                if invoice.client:
-                                    payment_ref = payment_data.get('reference', '').strip()
-                                    if not payment_ref:
-                                        # Auto-generate reference if not provided
-                                        payment_ref = f"PAY-{invoice.reference}-{len(payment_details)+1}"
+                                # Create ClientPayment record (works for both clients and anonymous sales)
+                                payment_ref = payment_data.get('reference', '').strip()
+                                if not payment_ref:
+                                    # Auto-generate reference if not provided
+                                    payment_ref = f"PAY-{invoice.reference}-{len(payment_details)+1}"
 
-                                    ClientPayment.objects.create(
-                                        reference=payment_ref,
-                                        date=timezone.now().date(),
-                                        payment_type=ClientPayment.PaymentType.INVOICE,
-                                        client=invoice.client,
-                                        amount=payment_amount,
-                                        payment_method=payment_method,
-                                        bank_account_id=payment_data.get('bank_account_id') or None,
-                                        sale_invoice=invoice,
-                                        created_by=request.user
-                                    )
+                                ClientPayment.objects.create(
+                                    reference=payment_ref,
+                                    date=timezone.now().date(),
+                                    payment_type=ClientPayment.PaymentType.INVOICE,
+                                    client=invoice.client,  # Can be None for anonymous sales
+                                    amount=payment_amount,
+                                    payment_method=payment_method,
+                                    bank_account_id=payment_data.get('bank_account_id') or None,
+                                    sale_invoice=invoice,
+                                    created_by=request.user
+                                )
 
                                 payment_details.append({
                                     'method': payment_method.name,
