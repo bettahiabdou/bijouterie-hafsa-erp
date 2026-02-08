@@ -1074,7 +1074,8 @@
             }
 
             searchTimeout = setTimeout(() => {
-                const url = `/sales/api/search-products/?q=${encodeURIComponent(query)}`;
+                const invoiceId = '{{ invoice.id }}';
+                const url = `/sales/api/search-products/?q=${encodeURIComponent(query)}&invoice_id=${invoiceId}`;
                 console.log('Searching:', url);
                 fetch(url)
                     .then(response => {

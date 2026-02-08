@@ -2035,9 +2035,14 @@ def pending_invoice_complete(request, reference):
     # Refresh invoice from database to get latest totals
     invoice.refresh_from_db()
 
-    # Get available products for selection
+    # Get IDs of products already in the invoice
+    products_in_invoice = invoice.items.values_list('product_id', flat=True)
+
+    # Get available products for selection (exclude those already in invoice)
     available_products = Product.objects.filter(
         status='available'
+    ).exclude(
+        id__in=products_in_invoice
     ).select_related('category', 'metal_type', 'purity').order_by('-created_at')[:100]
 
     # Get form options
@@ -2150,6 +2155,7 @@ def search_products_api(request):
     try:
         query = request.GET.get('q', '').strip()
         limit = min(int(request.GET.get('limit', 20)), 50)
+        invoice_id = request.GET.get('invoice_id', '')
 
         if len(query) < 2:
             return JsonResponse({'products': []})
@@ -2161,7 +2167,18 @@ def search_products_api(request):
             Q(reference__icontains=query) |
             Q(name__icontains=query) |
             Q(category__name__icontains=query)
-        ).select_related('category', 'metal_type', 'metal_purity').order_by('-created_at')[:limit]
+        )
+
+        # Exclude products already in the invoice
+        if invoice_id:
+            try:
+                invoice = SaleInvoice.objects.get(id=invoice_id)
+                products_in_invoice = invoice.items.values_list('product_id', flat=True)
+                products = products.exclude(id__in=products_in_invoice)
+            except SaleInvoice.DoesNotExist:
+                pass
+
+        products = products.select_related('category', 'metal_type', 'metal_purity').order_by('-created_at')[:limit]
 
         results = []
         for p in products:
