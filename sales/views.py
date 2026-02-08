@@ -2028,7 +2028,8 @@ def pending_invoice_complete(request, reference):
             # Quick product creation
             return _handle_quick_product_creation(request, invoice)
 
-        return redirect('sales:pending_invoice_complete', reference=reference)
+        # Use invoice.reference (not the URL parameter) in case it was updated
+        return redirect('sales:pending_invoice_complete', reference=invoice.reference)
 
     # GET request - show completion form
     # Refresh invoice from database to get latest totals
