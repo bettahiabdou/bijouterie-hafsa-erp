@@ -1809,6 +1809,13 @@ def pending_invoice_complete(request, reference):
             quantity = request.POST.get('quantity', 1)
             selling_price = request.POST.get('selling_price')
 
+            # Save custom reference if provided (preserve it across add_item actions)
+            custom_reference = request.POST.get('custom_reference', '').strip()
+            if custom_reference and custom_reference != invoice.reference:
+                if not SaleInvoice.objects.filter(reference=custom_reference).exclude(id=invoice.id).exists():
+                    invoice.reference = custom_reference
+                    invoice.save(update_fields=['reference'])
+
             try:
                 product = Product.objects.get(id=product_id)
                 quantity = Decimal(quantity)
@@ -1837,6 +1844,14 @@ def pending_invoice_complete(request, reference):
 
         elif action == 'remove_item':
             item_id = request.POST.get('item_id')
+
+            # Save custom reference if provided (preserve it across remove_item actions)
+            custom_reference = request.POST.get('custom_reference', '').strip()
+            if custom_reference and custom_reference != invoice.reference:
+                if not SaleInvoice.objects.filter(reference=custom_reference).exclude(id=invoice.id).exists():
+                    invoice.reference = custom_reference
+                    invoice.save(update_fields=['reference'])
+
             try:
                 item = SaleInvoiceItem.objects.get(id=item_id, invoice=invoice)
                 item.delete()

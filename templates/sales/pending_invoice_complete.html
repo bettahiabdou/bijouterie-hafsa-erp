@@ -138,6 +138,7 @@
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="remove_item">
                                         <input type="hidden" name="item_id" value="{{ item.id }}">
+                                        <input type="hidden" name="custom_reference" class="remove-item-custom-ref" value="{{ invoice.reference }}">
                                         <button type="submit" class="btn btn-ghost btn-sm text-error" title="Retirer">
                                             <i class="fas fa-trash"></i>
                                         </button>
@@ -380,6 +381,7 @@
                 <input type="hidden" name="action" value="add_item">
                 <input type="hidden" name="product_id" id="add-product-id">
                 <input type="hidden" name="original_price" id="add-original-price">
+                <input type="hidden" name="custom_reference" id="add-product-custom-reference" value="{{ invoice.reference }}">
                 <div class="modal-body">
                     <div class="product-preview" id="product-preview"></div>
                     <div class="form-group">
@@ -896,16 +898,22 @@
         document.addEventListener('DOMContentLoaded', function() {
             updatePaymentStatus();
 
-            // Sync custom reference field with hidden field in form
+            // Sync custom reference field with all hidden reference fields in forms
             const customRefInput = document.getElementById('custom-reference');
             const hiddenRefInput = document.getElementById('hidden-custom-reference');
-            if (customRefInput && hiddenRefInput) {
-                customRefInput.addEventListener('input', function() {
-                    hiddenRefInput.value = this.value;
-                });
-                customRefInput.addEventListener('change', function() {
-                    hiddenRefInput.value = this.value;
-                });
+            const addProductRefInput = document.getElementById('add-product-custom-reference');
+            const removeItemRefInputs = document.querySelectorAll('.remove-item-custom-ref');
+
+            function syncAllReferenceFields() {
+                const value = customRefInput.value;
+                if (hiddenRefInput) hiddenRefInput.value = value;
+                if (addProductRefInput) addProductRefInput.value = value;
+                removeItemRefInputs.forEach(input => input.value = value);
+            }
+
+            if (customRefInput) {
+                customRefInput.addEventListener('input', syncAllReferenceFields);
+                customRefInput.addEventListener('change', syncAllReferenceFields);
             }
         });
 
