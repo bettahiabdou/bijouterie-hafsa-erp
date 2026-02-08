@@ -35,7 +35,7 @@
             </div>
             <div class="stat-content">
                 <div class="stat-label">Ventes du Jour</div>
-                <div class="stat-value">{{ today_sales_amount|floatformat:0|default:"0" }}</div>
+                <div class="stat-value">{{ today_sales_amount|floatformat:2|default:"0.00" }}</div>
                 <div class="stat-meta">
                     <span>DH</span>
                     <span class="text-muted"> - {{ today_sales_count }} facture{{ today_sales_count|pluralize }}</span>
@@ -49,9 +49,9 @@
                 <i class="fas fa-boxes"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-label">Stock Total</div>
+                <div class="stat-label">Stock Disponible</div>
                 <div class="stat-value">{{ total_stock|default:"0" }}</div>
-                <div class="stat-meta">Pieces en stock</div>
+                <div class="stat-meta">Pieces disponibles</div>
             </div>
         </div>
 
@@ -61,7 +61,7 @@
                 <i class="fas fa-users"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-label">Clients Actifs</div>
+                <div class="stat-label">Nouveaux Clients</div>
                 <div class="stat-value">{{ total_clients|default:"0" }}</div>
                 <div class="stat-meta">Enregistres cette annee</div>
             </div>
@@ -74,7 +74,7 @@
             </div>
             <div class="stat-content">
                 <div class="stat-label">Revenus du Mois</div>
-                <div class="stat-value">{{ month_revenue|floatformat:0|default:"0" }}</div>
+                <div class="stat-value">{{ month_revenue|floatformat:2|default:"0.00" }}</div>
                 <div class="stat-meta">DH ce mois-ci</div>
             </div>
         </div>

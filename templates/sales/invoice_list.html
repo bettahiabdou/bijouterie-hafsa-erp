@@ -35,7 +35,7 @@
             </div>
             <div class="stat-content">
                 <div class="stat-label">Aujourd'hui</div>
-                <div class="stat-value">{{ stats.today|default:"0" }}</div>
+                <div class="stat-value">{{ stats.today|floatformat:2|default:"0.00" }}</div>
                 <div class="stat-meta">DH</div>
             </div>
         </div>
@@ -45,7 +45,7 @@
             </div>
             <div class="stat-content">
                 <div class="stat-label">Ce Mois</div>
-                <div class="stat-value">{{ stats.month|default:"0" }}</div>
+                <div class="stat-value">{{ stats.month|floatformat:2|default:"0.00" }}</div>
                 <div class="stat-meta">DH</div>
             </div>
         </div>
@@ -65,7 +65,7 @@
             </div>
             <div class="stat-content">
                 <div class="stat-label">CA Total</div>
-                <div class="stat-value">{{ stats.total_revenue|default:"0" }}</div>
+                <div class="stat-value">{{ stats.total_revenue|floatformat:2|default:"0.00" }}</div>
                 <div class="stat-meta">DH</div>
             </div>
         </div>

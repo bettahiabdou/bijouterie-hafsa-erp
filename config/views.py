@@ -69,21 +69,28 @@ def dashboard(request):
     """Main dashboard view"""
     today = timezone.now().date()
     this_month_start = today.replace(day=1)
+    this_year_start = today.replace(month=1, day=1)
 
-    # Get today's sales
-    today_sales = SaleInvoice.objects.filter(date=today)
+    # Get today's sales (exclude soft-deleted and fully returned invoices)
+    today_sales = SaleInvoice.objects.filter(
+        date=today,
+        is_deleted=False
+    ).exclude(status='returned')
     today_sales_amount = today_sales.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
     today_sales_count = today_sales.count()
 
-    # Get this month's revenue
-    month_sales = SaleInvoice.objects.filter(date__gte=this_month_start)
+    # Get this month's revenue (exclude soft-deleted and fully returned invoices)
+    month_sales = SaleInvoice.objects.filter(
+        date__gte=this_month_start,
+        is_deleted=False
+    ).exclude(status='returned')
     month_revenue = month_sales.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
 
-    # Get stock data
-    total_products = Product.objects.count()
+    # Get stock data - only count available products
+    total_products = Product.objects.filter(status='available').count()
 
-    # Get clients
-    total_clients = Client.objects.count()
+    # Get clients registered this year
+    total_clients = Client.objects.filter(created_at__gte=this_year_start).count()
 
     # Get suppliers
     total_suppliers = Supplier.objects.count()
@@ -93,8 +100,8 @@ def dashboard(request):
         status__in=['completed', 'delivered', 'cancelled']
     ).count()
 
-    # Get recent sales
-    recent_sales = SaleInvoice.objects.select_related('client').order_by('-created_at')[:5]
+    # Get recent sales (exclude soft-deleted)
+    recent_sales = SaleInvoice.objects.filter(is_deleted=False).select_related('client').order_by('-created_at')[:5]
 
     # Get recent activities
     recent_activities = ActivityLog.objects.select_related('user').order_by('-created_at')[:10]

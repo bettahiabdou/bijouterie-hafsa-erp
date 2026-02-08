@@ -75,21 +75,27 @@ def invoice_list(request):
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
-    # FIXED: Use single optimized query for statistics instead of 4 separate queries
-    today_stats = SaleInvoice.objects.filter(date=today).aggregate(
+    # FIXED: Exclude soft-deleted and returned invoices from statistics
+    today_stats = SaleInvoice.objects.filter(
+        date=today,
+        is_deleted=False
+    ).exclude(status='returned').aggregate(
         today_total=Sum('total_amount'),
         today_count=Count('id')
     )
 
     month_stats = SaleInvoice.objects.filter(
         date__year=today.year,
-        date__month=today.month
-    ).aggregate(
+        date__month=today.month,
+        is_deleted=False
+    ).exclude(status='returned').aggregate(
         month_total=Sum('total_amount'),
         month_count=Count('id')
     )
 
-    total_stats = SaleInvoice.objects.aggregate(
+    total_stats = SaleInvoice.objects.filter(
+        is_deleted=False
+    ).exclude(status='returned').aggregate(
         total_invoices=Count('id'),
         total_revenue=Sum('total_amount')
     )
