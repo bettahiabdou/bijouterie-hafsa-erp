@@ -153,6 +153,11 @@ def invoice_detail(request, reference):
                     product = item.product
                     product_ref = product.reference
 
+                    # Mark item as returned
+                    item.is_returned = True
+                    item.returned_at = timezone.now()
+                    item.save(update_fields=['is_returned', 'returned_at'])
+
                     # Create action record
                     SaleInvoiceAction.objects.create(
                         original_invoice=invoice,
@@ -168,9 +173,20 @@ def invoice_detail(request, reference):
                     product.status = 'available'
                     product.save(update_fields=['status'])
 
-                    # Update original invoice status to returned
-                    invoice.status = SaleInvoice.Status.RETURNED
-                    invoice.save(update_fields=['status'])
+                    # Check if ALL items are now returned
+                    total_items = invoice.items.count()
+                    returned_items = invoice.items.filter(is_returned=True).count()
+
+                    if returned_items >= total_items:
+                        # All items returned - mark invoice as fully returned
+                        invoice.status = SaleInvoice.Status.RETURNED
+                        invoice.save(update_fields=['status'])
+                        messages.success(request, f'Produit {product_ref} retourné. Tous les articles ont été retournés - facture marquée comme retournée.')
+                    else:
+                        # Partial return - keep invoice status but show message about remaining items
+                        remaining_items = total_items - returned_items
+                        messages.success(request, f'Produit {product_ref} retourné. Il reste {remaining_items} article(s) non retourné(s) dans cette facture.')
+                        messages.info(request, 'Vous pouvez créer une nouvelle facture avec les articles restants en cliquant sur "Créer facture avec articles restants".')
 
                     ActivityLog.objects.create(
                         user=request.user,
@@ -180,10 +196,82 @@ def invoice_detail(request, reference):
                         object_repr=f'Returned product {product_ref} from invoice {invoice.reference}',
                         ip_address=get_client_ip(request)
                     )
-                    messages.success(request, f'Produit {product_ref} retourné. Facture marquée comme retournée.')
 
                 except SaleInvoiceItem.DoesNotExist:
                     messages.error(request, 'Article non trouvé.')
+
+        # Handle creating new invoice from remaining (non-returned) items
+        elif action == 'create_from_remaining':
+            new_reference = request.POST.get('new_reference', '').strip()
+
+            # Get non-returned items
+            remaining_items = invoice.items.filter(is_returned=False)
+
+            if not remaining_items.exists():
+                messages.error(request, 'Aucun article non retourné à transférer.')
+            else:
+                # Validate new reference
+                if not new_reference:
+                    new_reference = generate_invoice_reference()
+                elif SaleInvoice.objects.filter(reference=new_reference).exists():
+                    messages.error(request, f'La référence "{new_reference}" existe déjà.')
+                    return redirect('sales:invoice_detail', reference=reference)
+
+                # Calculate totals for remaining items
+                new_subtotal = sum(item.total_amount for item in remaining_items)
+                new_discount = sum(item.discount_amount for item in remaining_items)
+
+                # Create new invoice with same client and seller
+                new_invoice = SaleInvoice.objects.create(
+                    reference=new_reference,
+                    date=timezone.now().date(),
+                    client=invoice.client,
+                    seller=request.user,
+                    status=SaleInvoice.Status.PAID,  # Assume already paid from original
+                    subtotal=new_subtotal,
+                    discount_amount=new_discount,
+                    total_amount=new_subtotal,
+                    amount_paid=new_subtotal,  # Already paid
+                    balance_due=Decimal('0'),
+                    notes=f'Créée à partir de la facture {invoice.reference} (articles restants après retour)'
+                )
+
+                # Move remaining items to new invoice
+                for item in remaining_items:
+                    # Create new item in new invoice
+                    SaleInvoiceItem.objects.create(
+                        invoice=new_invoice,
+                        product=item.product,
+                        quantity=item.quantity,
+                        unit_price=item.unit_price,
+                        original_price=item.original_price,
+                        negotiated_price=item.negotiated_price,
+                        discount_amount=item.discount_amount,
+                        total_amount=item.total_amount,
+                        notes=f'Transféré depuis {invoice.reference}'
+                    )
+                    # Mark original item as transferred (using is_returned)
+                    item.is_returned = True
+                    item.returned_at = timezone.now()
+                    item.notes = f'Transféré vers {new_reference}'
+                    item.save()
+
+                # Mark original invoice as returned (all items now handled)
+                invoice.status = SaleInvoice.Status.RETURNED
+                invoice.save(update_fields=['status'])
+
+                # Log activity
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action=ActivityLog.ActionType.CREATE,
+                    model_name='SaleInvoice',
+                    object_id=str(new_invoice.id),
+                    object_repr=f'Created {new_reference} from remaining items of {invoice.reference}',
+                    ip_address=get_client_ip(request)
+                )
+
+                messages.success(request, f'Nouvelle facture {new_reference} créée avec les {remaining_items.count()} article(s) restant(s).')
+                return redirect('sales:invoice_detail', reference=new_reference)
 
         # Handle exchange action (supports multiple products and payment)
         elif action == 'exchange_item':
@@ -469,15 +557,26 @@ def invoice_detail(request, reference):
     # Get all payments associated with this invoice
     invoice_payments = invoice.payments.select_related('payment_method', 'bank_account').all()
 
+    # Get remaining (non-returned) items for partial return handling
+    all_items = invoice.items.all()
+    remaining_items = invoice.items.filter(is_returned=False)
+    returned_items_count = invoice.items.filter(is_returned=True).count()
+    has_remaining_items = remaining_items.exists() and returned_items_count > 0
+    remaining_items_total = sum(item.total_amount for item in remaining_items) if has_remaining_items else 0
+
     context = {
         'invoice': invoice,
-        'items': invoice.items.all(),
+        'items': all_items,
         'products': products,
         'exchange_products': exchange_products,
         'invoice_actions': invoice_actions,
         'payment_methods': payment_methods,
         'bank_accounts': bank_accounts,
         'invoice_payments': invoice_payments,
+        'remaining_items': remaining_items if has_remaining_items else [],
+        'remaining_items_count': remaining_items.count() if has_remaining_items else 0,
+        'remaining_items_total': remaining_items_total,
+        'has_remaining_items': has_remaining_items,
     }
 
     return render(request, 'sales/invoice_detail.html', context)

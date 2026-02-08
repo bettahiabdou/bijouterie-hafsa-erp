@@ -99,11 +99,14 @@
                                 </thead>
                                 <tbody>
                                     {% for item in items %}
-                                        <tr>
+                                        <tr class="{% if item.is_returned %}returned-item{% endif %}">
                                             <td>
                                                 <div class="product-cell">
                                                     <span class="product-ref">{{ item.product.reference }}</span>
                                                     <span class="product-name">{{ item.product.name }}</span>
+                                                    {% if item.is_returned %}
+                                                        <span class="badge badge-error badge-sm" style="margin-left: 8px;">Retourné</span>
+                                                    {% endif %}
                                                 </div>
                                             </td>
                                             <td class="text-right">{{ item.quantity }}</td>
@@ -115,11 +118,15 @@
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                 </td>
-                                            {% elif invoice.status == 'paid' %}
+                                            {% elif invoice.status == 'paid' and not item.is_returned %}
                                                 <td class="text-center">
                                                     <button type="button" onclick="openReturnExchangeModal('{{ item.id }}', '{{ item.product.reference }}', '{{ item.total_amount }}', '{{ invoice.total_amount }}', '{{ invoice.amount_paid }}')" class="btn btn-ghost btn-sm text-warning">
                                                         <i class="fas fa-exchange-alt"></i>
                                                     </button>
+                                                </td>
+                                            {% elif item.is_returned %}
+                                                <td class="text-center">
+                                                    <span class="text-neutral-400"><i class="fas fa-undo"></i></span>
                                                 </td>
                                             {% endif %}
                                         </tr>
@@ -132,15 +139,22 @@
                     <div class="mobile-view">
                         <div class="mobile-list">
                             {% for item in items %}
-                                <div class="mobile-item-card">
+                                <div class="mobile-item-card {% if item.is_returned %}returned-item{% endif %}">
                                     <div class="mobile-item-header">
                                         <div class="mobile-item-product">
                                             <span class="mobile-item-ref">{{ item.product.reference }}</span>
                                             <span class="mobile-item-name">{{ item.product.name }}</span>
+                                            {% if item.is_returned %}
+                                                <span class="badge badge-error badge-sm">Retourné</span>
+                                            {% endif %}
                                         </div>
                                         {% if invoice.status == 'draft' %}
                                             <button type="button" onclick="deleteItem({{ item.id }})" class="btn btn-ghost btn-sm text-error">
                                                 <i class="fas fa-trash"></i>
+                                            </button>
+                                        {% elif invoice.status == 'paid' and not item.is_returned %}
+                                            <button type="button" onclick="openReturnExchangeModal('{{ item.id }}', '{{ item.product.reference }}', '{{ item.total_amount }}', '{{ invoice.total_amount }}', '{{ invoice.amount_paid }}')" class="btn btn-ghost btn-sm text-warning">
+                                                <i class="fas fa-exchange-alt"></i>
                                             </button>
                                         {% endif %}
                                     </div>
@@ -162,6 +176,25 @@
                             {% endfor %}
                         </div>
                     </div>
+
+                    <!-- Create Invoice from Remaining Items -->
+                    {% if has_remaining_items %}
+                        <div class="card-body" style="border-top: 1px solid var(--neutral-200); background: var(--warning-50);">
+                            <div class="remaining-items-notice">
+                                <h4 style="color: var(--warning-700); margin-bottom: var(--space-2);">
+                                    <i class="fas fa-exclamation-triangle"></i> Articles restants non retournés
+                                </h4>
+                                <p style="color: var(--neutral-600); margin-bottom: var(--space-3);">
+                                    Cette facture contient {{ remaining_items_count }} article(s) non retourné(s).
+                                    Vous pouvez créer une nouvelle facture pour ces articles.
+                                </p>
+                                <button type="button" onclick="openCreateFromRemainingModal()" class="btn btn-warning">
+                                    <i class="fas fa-file-invoice"></i>
+                                    Créer facture avec articles restants
+                                </button>
+                            </div>
+                        </div>
+                    {% endif %}
                 {% else %}
                     <div class="card-body">
                         <div class="empty-state">
@@ -566,7 +599,88 @@
         </div>
     </div>
 
+    <!-- Modal: Create Invoice from Remaining Items -->
+    <div class="modal fade" id="createFromRemainingModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-file-invoice text-warning"></i>
+                        Créer facture avec articles restants
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_from_remaining">
+                    <div class="modal-body">
+                        <div class="alert alert-info" style="background: var(--info-50); border: 1px solid var(--info-200); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-4);">
+                            <p style="margin: 0; color: var(--info-700);">
+                                <i class="fas fa-info-circle"></i>
+                                Cette action va créer une nouvelle facture avec les <strong>{{ remaining_items_count }} article(s)</strong> non retourné(s).
+                                La facture actuelle sera marquée comme "Retournée".
+                            </p>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Nouvelle référence de facture</label>
+                            <input type="text" name="new_reference" class="form-input"
+                                   placeholder="Laisser vide pour générer automatiquement">
+                            <p class="form-hint">La référence sera générée automatiquement si vous laissez ce champ vide.</p>
+                        </div>
+
+                        {% if remaining_items %}
+                        <div class="remaining-items-preview" style="margin-top: var(--space-4);">
+                            <h6 style="color: var(--neutral-600); margin-bottom: var(--space-2);">Articles à transférer:</h6>
+                            <ul style="list-style: none; padding: 0; margin: 0;">
+                                {% for item in remaining_items %}
+                                <li style="padding: var(--space-2); background: var(--neutral-50); border-radius: var(--radius-sm); margin-bottom: var(--space-1); display: flex; justify-content: space-between;">
+                                    <span>{{ item.product.reference }}</span>
+                                    <span class="font-mono">{{ item.total_amount }} DH</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            <div style="margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--neutral-200); display: flex; justify-content: space-between; font-weight: 600;">
+                                <span>Total:</span>
+                                <span class="font-mono">{{ remaining_items_total }} DH</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-file-invoice"></i> Créer la nouvelle facture
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <style>
+        /* Returned Items Styling */
+        .returned-item {
+            opacity: 0.6;
+            background: var(--neutral-100) !important;
+        }
+
+        .returned-item td,
+        .returned-item .mobile-item-ref,
+        .returned-item .mobile-item-name,
+        .returned-item .mobile-item-value {
+            text-decoration: line-through;
+            color: var(--neutral-500) !important;
+        }
+
+        .returned-item .badge {
+            text-decoration: none;
+        }
+
+        .remaining-items-notice {
+            padding: var(--space-3);
+        }
+
         /* Detail Layout */
         .detail-layout {
             display: grid;
@@ -1342,6 +1456,12 @@
                 console.error('Error:', error);
                 alert('Erreur: ' + error);
             });
+        }
+
+        // ===== Create from Remaining Items Modal =====
+        function openCreateFromRemainingModal() {
+            const modal = new bootstrap.Modal(document.getElementById('createFromRemainingModal'));
+            modal.show();
         }
 
         // ===== Return/Exchange Modal Functions =====

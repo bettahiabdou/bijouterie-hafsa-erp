@@ -510,6 +510,18 @@ class SaleInvoiceItem(models.Model):
     # Notes
     notes = models.TextField(_('Notes'), blank=True)
 
+    # Return tracking
+    is_returned = models.BooleanField(
+        _('Retourné'),
+        default=False,
+        help_text=_('Indique si cet article a été retourné')
+    )
+    returned_at = models.DateTimeField(
+        _('Date de retour'),
+        null=True,
+        blank=True
+    )
+
     class Meta:
         verbose_name = _('Ligne de facture vente')
         verbose_name_plural = _('Lignes de facture vente')
