@@ -267,47 +267,61 @@ def purchase_invoice_list(request):
 @login_required
 def purchase_invoice_create(request):
     """Create new purchase invoice"""
+    import logging
+    logger = logging.getLogger(__name__)
+
     if request.method == 'POST':
         try:
-            # Generate reference
-            from django.utils import timezone
-            today = timezone.now().date()
-            today_str = today.strftime('%Y%m%d')
-            last_invoice = PurchaseInvoice.objects.filter(
-                reference__startswith=f'PI-{today_str}'
-            ).last()
+            supplier_id = request.POST.get('supplier')
+            logger.info(f"Creating invoice for supplier_id: {supplier_id}")
 
-            if last_invoice:
-                seq = int(last_invoice.reference.split('-')[-1]) + 1
+            if not supplier_id:
+                messages.error(request, 'Veuillez sélectionner un fournisseur.')
+                # Fall through to re-render form
             else:
-                seq = 1
+                # Generate reference
+                from django.utils import timezone
+                today = timezone.now().date()
+                today_str = today.strftime('%Y%m%d')
+                last_invoice = PurchaseInvoice.objects.filter(
+                    reference__startswith=f'PI-{today_str}'
+                ).order_by('reference').last()
 
-            reference = f'PI-{today_str}-{seq:04d}'
+                if last_invoice:
+                    seq = int(last_invoice.reference.split('-')[-1]) + 1
+                else:
+                    seq = 1
 
-            invoice = PurchaseInvoice.objects.create(
-                reference=reference,
-                date=now().date(),
-                supplier_id=request.POST.get('supplier'),
-                supplier_invoice_ref=request.POST.get('supplier_invoice_ref', ''),
-                invoice_type=request.POST.get('invoice_type', 'finished'),
-                purchase_order_id=request.POST.get('purchase_order') or None,
-                notes=request.POST.get('notes', ''),
-                created_by=request.user,
-            )
+                reference = f'PI-{today_str}-{seq:04d}'
+                logger.info(f"Generated reference: {reference}")
 
-            # Log activity
-            ActivityLog.objects.create(
-                user=request.user,
-                action=ActivityLog.ActionType.CREATE,
-                model_name='PurchaseInvoice',
-                object_id=str(invoice.id),
-                object_repr=f'Created purchase invoice {invoice.reference}',
-                ip_address=get_client_ip(request)
-            )
+                invoice = PurchaseInvoice.objects.create(
+                    reference=reference,
+                    date=now().date(),
+                    supplier_id=supplier_id,
+                    supplier_invoice_ref=request.POST.get('supplier_invoice_ref', ''),
+                    invoice_type=request.POST.get('invoice_type', 'finished'),
+                    purchase_order_id=request.POST.get('purchase_order') or None,
+                    notes=request.POST.get('notes', ''),
+                    created_by=request.user,
+                )
+                logger.info(f"Invoice created: {invoice.reference}")
 
-            return redirect('purchases:purchase_invoice_detail', reference=invoice.reference)
+                # Log activity
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action=ActivityLog.ActionType.CREATE,
+                    model_name='PurchaseInvoice',
+                    object_id=str(invoice.id),
+                    object_repr=f'Created purchase invoice {invoice.reference}',
+                    ip_address=get_client_ip(request)
+                )
+
+                messages.success(request, f'Facture {invoice.reference} créée avec succès.')
+                return redirect('purchases:purchase_invoice_detail', reference=invoice.reference)
         except Exception as e:
-            messages.error(request, f'Erreur: {str(e)}')
+            logger.exception(f"Error creating invoice: {str(e)}")
+            messages.error(request, f'Erreur lors de la création: {str(e)}')
 
     try:
         from suppliers.models import Supplier
