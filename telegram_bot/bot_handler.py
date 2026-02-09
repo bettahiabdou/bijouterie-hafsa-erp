@@ -564,11 +564,31 @@ class TelegramBotHandler:
             await self._show_help_from_callback(query)
 
         elif data == "main_menu":
-            # Go back to main menu
-            await query.edit_message_text(
-                f"👋 Bonjour {user.get_full_name() or user.username}!\n\n🔷 Que voulez-vous faire?",
-                reply_markup=self._get_main_menu_keyboard()
-            )
+            # Go back to main menu - preserve "Ajouter des photos" button on invoice messages
+            old_text = query.message.text or ""
+            if "Facture #" in old_text:
+                # This is an invoice confirmation message - keep "Ajouter des photos" button
+                import re
+                match = re.search(r'#([\w-]+)', old_text)
+                if match:
+                    invoice_ref = match.group(1)
+                    old_keyboard = [[InlineKeyboardButton("📷 Ajouter des photos", callback_data=f"add_photos_{invoice_ref}")]]
+                    try:
+                        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(old_keyboard))
+                    except Exception:
+                        pass
+                # Send main menu as new message
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"👋 Bonjour {user.get_full_name() or user.username}!\n\n🔷 Que voulez-vous faire?",
+                    reply_markup=self._get_main_menu_keyboard()
+                )
+            else:
+                # Not an invoice message - safe to edit
+                await query.edit_message_text(
+                    f"👋 Bonjour {user.get_full_name() or user.username}!\n\n🔷 Que voulez-vous faire?",
+                    reply_markup=self._get_main_menu_keyboard()
+                )
 
         elif data.startswith("add_photos_"):
             invoice_ref = data.split("_", 2)[2]
@@ -684,8 +704,10 @@ class TelegramBotHandler:
             ]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            await query.edit_message_text(
-                f"⚠️ Vous avez déjà une vente en cours avec {active_session.photo_count} photo(s).\n\n"
+            # Send as new message to preserve old invoice's "Ajouter des photos" button
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"⚠️ Vous avez déjà une vente en cours avec {active_session.photo_count} photo(s).\n\n"
                 f"Terminez-la d'abord ou annulez-la.",
                 reply_markup=reply_markup
             )
@@ -694,11 +716,28 @@ class TelegramBotHandler:
         # Create new session
         await create_session(user, chat_id)
 
+        # Update old message to keep only "Ajouter des photos" button (extract invoice ref if present)
+        old_text = query.message.text or ""
+        if "Facture #" in old_text:
+            # Extract invoice reference from old message
+            import re
+            match = re.search(r'#([\w-]+)', old_text)
+            if match:
+                invoice_ref = match.group(1)
+                # Keep only the "Ajouter des photos" button on old message
+                old_keyboard = [[InlineKeyboardButton("📷 Ajouter des photos", callback_data=f"add_photos_{invoice_ref}")]]
+                try:
+                    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(old_keyboard))
+                except Exception:
+                    pass  # Message might not be editable
+
+        # Send NEW message for the new sale
         keyboard = [[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(
-            "📸 Nouvelle vente\n\n"
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="📸 Nouvelle vente\n\n"
             "Envoyez les photos:\n"
             "• Photo du produit\n"
             "• Facture manuscrite\n"
