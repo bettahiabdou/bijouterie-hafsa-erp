@@ -1,6 +1,7 @@
 """
 Views for Client Deposit Fund management
 """
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -16,6 +17,8 @@ from clients.models import Client
 from settings_app.models import PaymentMethod, BankAccount
 from products.models import Product
 from sales.models import SaleInvoice, SaleInvoiceItem
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -419,67 +422,82 @@ def make_purchase(request, pk):
         except BankAccount.DoesNotExist:
             pass
 
-    with transaction.atomic():
-        # Create invoice
-        invoice = SaleInvoice.objects.create(
-            date=timezone.now().date(),
-            client=account.client,
-            seller=request.user,
-            subtotal=total_amount,
-            total_amount=total_amount,
-            amount_paid=total_payment,
-            balance_due=max(Decimal('0'), total_amount - total_payment),
-            status='paid' if total_payment >= total_amount else 'partial',
-            notes=f'Achat via dépôt client. {notes}',
-            created_by=request.user
-        )
-
-        # Add invoice items
-        for product in products:
-            # Use custom price if available, otherwise use product's selling price
-            item_price = product_prices.get(product.pk, product.selling_price)
-            original_price = product.selling_price
-
-            SaleInvoiceItem.objects.create(
-                invoice=invoice,
-                product=product,
-                quantity=1,
-                unit_price=item_price,
-                original_price=original_price,
-                total_amount=item_price,
-                discount_amount=max(Decimal('0'), original_price - item_price)
-            )
-            # Mark product as sold
-            product.status = 'sold'
-            product.save()
-
-        # Create deposit transaction (purchase deduction)
-        if use_deposit > 0:
-            DepositTransaction.objects.create(
-                account=account,
-                transaction_type=DepositTransaction.TransactionType.PURCHASE,
-                amount=-use_deposit,  # Negative for purchase
-                invoice=invoice,
-                description=f'Achat facture {invoice.reference}',
-                notes=notes,
+    try:
+        with transaction.atomic():
+            # Create invoice
+            logger.info(f"Creating invoice for client {account.client.pk}, total: {total_amount}")
+            invoice = SaleInvoice.objects.create(
+                date=timezone.now().date(),
+                client=account.client,
+                seller=request.user,
+                subtotal=total_amount,
+                total_amount=total_amount,
+                amount_paid=total_payment,
+                balance_due=max(Decimal('0'), total_amount - total_payment),
+                status='paid' if total_payment >= total_amount else 'partial',
+                notes=f'Achat via dépôt client. {notes}',
                 created_by=request.user
             )
+            logger.info(f"Invoice created: {invoice.pk}")
 
-        # Record additional payment in invoice payments if any
-        if additional_payment > 0 and payment_method:
-            from sales.models import InvoicePayment
-            InvoicePayment.objects.create(
-                invoice=invoice,
-                amount=additional_payment,
-                payment_method=payment_method,
-                bank_account=bank_account,
-                reference=payment_reference,
-                notes='Paiement complémentaire (achat via dépôt)',
-                created_by=request.user
-            )
+            # Add invoice items
+            for product in products:
+                # Use custom price if available, otherwise use product's selling price
+                item_price = product_prices.get(product.pk, product.selling_price)
+                original_price = product.selling_price
 
-    messages.success(request, f'Achat effectué. Facture: {invoice.reference}')
-    return redirect('deposits:detail', pk=pk)
+                logger.info(f"Creating invoice item for product {product.pk}, price: {item_price}")
+                SaleInvoiceItem.objects.create(
+                    invoice=invoice,
+                    product=product,
+                    quantity=1,
+                    unit_price=item_price,
+                    original_price=original_price,
+                    total_amount=item_price,
+                    discount_amount=max(Decimal('0'), original_price - item_price)
+                )
+                # Mark product as sold
+                product.status = 'sold'
+                product.save()
+
+            # Create deposit transaction (purchase deduction)
+            if use_deposit > 0:
+                logger.info(f"Creating deposit transaction for {use_deposit}")
+                DepositTransaction.objects.create(
+                    account=account,
+                    transaction_type=DepositTransaction.TransactionType.PURCHASE,
+                    amount=-use_deposit,  # Negative for purchase
+                    invoice=invoice,
+                    description=f'Achat facture {invoice.reference}',
+                    notes=notes,
+                    created_by=request.user
+                )
+
+            # Record additional payment in client payments if any
+            if additional_payment > 0 and payment_method:
+                from payments.models import ClientPayment
+                logger.info(f"Creating additional payment: {additional_payment}")
+                # Generate a unique reference for the payment
+                payment_ref = payment_reference or f"DEP-{invoice.reference}"
+                ClientPayment.objects.create(
+                    date=timezone.now().date(),
+                    client=account.client,
+                    sale_invoice=invoice,
+                    payment_type=ClientPayment.PaymentType.INVOICE,
+                    amount=additional_payment,
+                    payment_method=payment_method,
+                    bank_account=bank_account,
+                    reference=payment_ref,
+                    notes='Paiement complémentaire (achat via dépôt)',
+                    created_by=request.user
+                )
+
+        messages.success(request, f'Achat effectué. Facture: {invoice.reference}')
+        return redirect('deposits:detail', pk=pk)
+    except Exception as e:
+        logger.exception(f"Error in make_purchase: {str(e)}")
+        messages.error(request, f'Erreur: {str(e)}')
+        return redirect('deposits:purchase', pk=pk)
 
 
 @login_required
