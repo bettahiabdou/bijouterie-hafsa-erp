@@ -1,0 +1,431 @@
+{% extends 'base.html' %}
+
+{% block title %}Achat via Dépôt - {{ account.client.full_name }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'deposits:list' %}" class="breadcrumb-item">Comptes Dépôt</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'deposits:detail' account.pk %}" class="breadcrumb-item">{{ account.client.full_name }}</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Achat</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Achat via Dépôt</h1>
+                <p class="page-subtitle">
+                    Client: <strong>{{ account.client.full_name }}</strong> |
+                    Solde: <strong class="{% if account.balance > 0 %}text-success{% else %}text-error{% endif %}">{{ account.balance|floatformat:2 }} DH</strong>
+                </p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'deposits:detail' account.pk %}" class="btn btn-ghost">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <form method="post" action="{% url 'deposits:make_purchase' account.pk %}" id="purchaseForm">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-3 gap-6">
+            <!-- Product Selection -->
+            <div class="card animate-slide-up" style="grid-column: span 2;">
+                <div class="card-header">
+                    <h3><i class="fas fa-gem mr-2"></i> Sélection des Produits</h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <!-- Search & Filters -->
+                    <div class="p-4 border-b" style="border-color: var(--neutral-100);">
+                        <div class="filter-grid">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <input type="text" id="productSearch" placeholder="Rechercher..." class="form-input" value="{{ search_query }}">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <select id="categoryFilter" class="form-select">
+                                    <option value="">Toutes catégories</option>
+                                    {% for cat in categories %}
+                                        <option value="{{ cat.pk }}" {% if category_id == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <button type="button" onclick="applyFilters()" class="btn btn-secondary">
+                                    <i class="fas fa-search"></i> Filtrer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Products Table -->
+                    <div class="table-wrapper" style="border: none; border-radius: 0;">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">
+                                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
+                                    </th>
+                                    <th>Référence</th>
+                                    <th>Description</th>
+                                    <th>Catégorie</th>
+                                    <th>Prix</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for product in products %}
+                                    <tr data-price="{{ product.selling_price }}">
+                                        <td>
+                                            <input type="checkbox" name="products" value="{{ product.pk }}" class="product-checkbox" onchange="updateTotal()">
+                                        </td>
+                                        <td>
+                                            <span class="font-semibold text-primary">{{ product.reference }}</span>
+                                        </td>
+                                        <td>{{ product.description|default:"-"|truncatewords:10 }}</td>
+                                        <td>
+                                            {% if product.category %}
+                                                <span class="badge badge-neutral">{{ product.category.name }}</span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td class="font-semibold">{{ product.selling_price|floatformat:2 }} DH</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="5">
+                                            <div class="empty-state" style="padding: var(--space-8);">
+                                                <div class="empty-state-icon">
+                                                    <i class="fas fa-gem"></i>
+                                                </div>
+                                                <h4 class="empty-state-title">Aucun produit disponible</h4>
+                                                <p class="empty-state-text">Il n'y a pas de produits disponibles à la vente.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if page_obj.has_other_pages %}
+                        <div class="card-footer">
+                            <div class="pagination">
+                                {% if page_obj.has_previous %}
+                                    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_id %}&category={{ category_id }}{% endif %}" class="pagination-btn">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                {% endif %}
+
+                                <span class="pagination-info">
+                                    Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                                </span>
+
+                                {% if page_obj.has_next %}
+                                    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_id %}&category={{ category_id }}{% endif %}" class="pagination-btn">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Payment Summary -->
+            <div class="card animate-slide-up sticky-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-calculator mr-2"></i> Récapitulatif</h3>
+                </div>
+                <div class="card-body">
+                    <!-- Balance Info -->
+                    <div class="balance-box mb-4">
+                        <div class="balance-label">Solde Disponible</div>
+                        <div class="balance-value {% if account.balance > 0 %}text-success{% else %}text-error{% endif %}">
+                            {{ account.balance|floatformat:2 }} DH
+                        </div>
+                    </div>
+
+                    <!-- Selected Products Summary -->
+                    <div class="summary-box mb-4">
+                        <div class="summary-row">
+                            <span>Produits sélectionnés:</span>
+                            <span id="selectedCount">0</span>
+                        </div>
+                        <div class="summary-row total">
+                            <span>Total Achat:</span>
+                            <span id="totalAmount">0.00 DH</span>
+                        </div>
+                    </div>
+
+                    <!-- Payment Options -->
+                    <div class="payment-section">
+                        <h4 class="mb-3">Paiement</h4>
+
+                        <div class="form-group">
+                            <label class="form-label">Utiliser du dépôt (DH)</label>
+                            <input type="number" name="use_deposit" id="useDeposit" class="form-input" step="0.01" min="0" max="{{ account.balance }}" value="0" onchange="updatePaymentSummary()">
+                            <small class="form-text">Max: {{ account.balance|floatformat:2 }} DH</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Paiement complémentaire (DH)</label>
+                            <input type="number" name="additional_payment" id="additionalPayment" class="form-input" step="0.01" min="0" value="0" onchange="updatePaymentSummary()">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Mode de paiement (complémentaire)</label>
+                            <select name="payment_method" class="form-select">
+                                <option value="">-- Sélectionner --</option>
+                                {% for pm in payment_methods %}
+                                    <option value="{{ pm.pk }}">{{ pm.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Compte bancaire</label>
+                            <select name="bank_account" class="form-select">
+                                <option value="">-- Sélectionner --</option>
+                                {% for ba in bank_accounts %}
+                                    <option value="{{ ba.pk }}">{{ ba.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Référence</label>
+                            <input type="text" name="payment_reference" class="form-input" placeholder="N° chèque...">
+                        </div>
+                    </div>
+
+                    <!-- Payment Summary -->
+                    <div class="payment-summary mt-4 p-3 bg-neutral-50 rounded">
+                        <div class="summary-row">
+                            <span>Dépôt utilisé:</span>
+                            <span id="depositUsed">0.00 DH</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Paiement complémentaire:</span>
+                            <span id="additionalUsed">0.00 DH</span>
+                        </div>
+                        <div class="summary-row total">
+                            <span>Total payé:</span>
+                            <span id="totalPaid">0.00 DH</span>
+                        </div>
+                        <div class="summary-row" id="remainingRow" style="display: none;">
+                            <span class="text-error">Reste à payer:</span>
+                            <span id="remaining" class="text-error">0.00 DH</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-4">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-input" rows="2" placeholder="Notes sur l'achat..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-full mt-4" id="submitBtn" disabled>
+                        <i class="fas fa-check"></i> Confirmer l'Achat
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <style>
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: var(--space-4);
+        }
+
+        .sticky-card {
+            position: sticky;
+            top: var(--space-4);
+        }
+
+        .balance-box {
+            text-align: center;
+            padding: var(--space-4);
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
+        }
+
+        .balance-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            margin-bottom: var(--space-1);
+        }
+
+        .balance-value {
+            font-size: var(--text-2xl);
+            font-weight: var(--font-bold);
+        }
+
+        .summary-box {
+            padding: var(--space-3);
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--space-2) 0;
+        }
+
+        .summary-row.total {
+            border-top: 1px solid var(--neutral-200);
+            margin-top: var(--space-2);
+            padding-top: var(--space-3);
+            font-weight: var(--font-bold);
+        }
+
+        .payment-section h4 {
+            font-size: var(--text-sm);
+            font-weight: var(--font-semibold);
+            color: var(--neutral-700);
+        }
+
+        .payment-summary {
+            font-size: var(--text-sm);
+        }
+
+        @media (max-width: 1023px) {
+            .grid-cols-3 {
+                grid-template-columns: 1fr !important;
+            }
+
+            .card[style*="grid-column: span 2"] {
+                grid-column: span 1 !important;
+            }
+
+            .sticky-card {
+                position: static;
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
+    <script>
+        const accountBalance = {{ account.balance }};
+        let selectedTotal = 0;
+
+        function toggleSelectAll(checkbox) {
+            document.querySelectorAll('.product-checkbox').forEach(cb => {
+                cb.checked = checkbox.checked;
+            });
+            updateTotal();
+        }
+
+        function updateTotal() {
+            let total = 0;
+            let count = 0;
+
+            document.querySelectorAll('.product-checkbox:checked').forEach(cb => {
+                const row = cb.closest('tr');
+                total += parseFloat(row.dataset.price);
+                count++;
+            });
+
+            selectedTotal = total;
+            document.getElementById('selectedCount').textContent = count;
+            document.getElementById('totalAmount').textContent = total.toFixed(2) + ' DH';
+
+            // Auto-fill deposit amount
+            const depositInput = document.getElementById('useDeposit');
+            const suggestedDeposit = Math.min(total, accountBalance);
+            depositInput.value = suggestedDeposit.toFixed(2);
+
+            // Calculate additional payment needed
+            const additionalNeeded = Math.max(0, total - suggestedDeposit);
+            document.getElementById('additionalPayment').value = additionalNeeded.toFixed(2);
+
+            updatePaymentSummary();
+        }
+
+        function updatePaymentSummary() {
+            const depositUsed = parseFloat(document.getElementById('useDeposit').value) || 0;
+            const additionalPayment = parseFloat(document.getElementById('additionalPayment').value) || 0;
+            const totalPaid = depositUsed + additionalPayment;
+            const remaining = selectedTotal - totalPaid;
+
+            document.getElementById('depositUsed').textContent = depositUsed.toFixed(2) + ' DH';
+            document.getElementById('additionalUsed').textContent = additionalPayment.toFixed(2) + ' DH';
+            document.getElementById('totalPaid').textContent = totalPaid.toFixed(2) + ' DH';
+
+            const remainingRow = document.getElementById('remainingRow');
+            const submitBtn = document.getElementById('submitBtn');
+
+            if (remaining > 0.01) {
+                document.getElementById('remaining').textContent = remaining.toFixed(2) + ' DH';
+                remainingRow.style.display = 'flex';
+                submitBtn.disabled = true;
+            } else {
+                remainingRow.style.display = 'none';
+                submitBtn.disabled = selectedTotal <= 0;
+            }
+
+            // Validate deposit doesn't exceed balance
+            if (depositUsed > accountBalance) {
+                document.getElementById('useDeposit').value = accountBalance.toFixed(2);
+                updatePaymentSummary();
+            }
+        }
+
+        function applyFilters() {
+            const search = document.getElementById('productSearch').value;
+            const category = document.getElementById('categoryFilter').value;
+            let url = '{% url "deposits:purchase" account.pk %}?';
+
+            if (search) url += 'search=' + encodeURIComponent(search) + '&';
+            if (category) url += 'category=' + category + '&';
+
+            window.location.href = url;
+        }
+
+        // Enter key triggers filter
+        document.getElementById('productSearch').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                applyFilters();
+            }
+        });
+
+        // Form validation
+        document.getElementById('purchaseForm').addEventListener('submit', function(e) {
+            const checkedProducts = document.querySelectorAll('.product-checkbox:checked');
+            if (checkedProducts.length === 0) {
+                e.preventDefault();
+                alert('Veuillez sélectionner au moins un produit.');
+                return;
+            }
+
+            const depositUsed = parseFloat(document.getElementById('useDeposit').value) || 0;
+            const additionalPayment = parseFloat(document.getElementById('additionalPayment').value) || 0;
+            const totalPaid = depositUsed + additionalPayment;
+
+            if (totalPaid < selectedTotal - 0.01) {
+                e.preventDefault();
+                alert('Le paiement est insuffisant. Reste à payer: ' + (selectedTotal - totalPaid).toFixed(2) + ' DH');
+                return;
+            }
+
+            if (depositUsed > accountBalance) {
+                e.preventDefault();
+                alert('Le montant dépôt dépasse le solde disponible.');
+                return;
+            }
+        });
+    </script>
+{% endblock %}

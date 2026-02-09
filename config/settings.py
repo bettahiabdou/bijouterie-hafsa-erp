@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'reports.apps.ReportsConfig',
     'settings_app.apps.SettingsAppConfig',
     'telegram_bot.apps.TelegramBotConfig',
+    'deposits.apps.DepositsConfig',
 ]
 
 MIDDLEWARE = [

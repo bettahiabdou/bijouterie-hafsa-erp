@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block title %}Comptes Dépôt - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Comptes Dépôt</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Comptes Dépôt Clients</h1>
+                <p class="page-subtitle">Gestion des fonds prépayés clients</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'deposits:create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>Nouveau Compte</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-3 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-wallet"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Comptes</div>
+                <div class="stat-value">{{ total_accounts|default:"0" }}</div>
+                <div class="stat-meta">Comptes dépôt</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Comptes Actifs</div>
+                <div class="stat-value">{{ active_accounts|default:"0" }}</div>
+                <div class="stat-meta">En service</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Solde Total</div>
+                <div class="stat-value">{{ total_balance|floatformat:2|default:"0.00" }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="card animate-slide-up">
+        <!-- Filters -->
+        <div class="card-header filter-header">
+            <form method="get" class="filter-form">
+                <div class="filter-grid">
+                    <!-- Search -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Recherche</label>
+                        <input type="text" name="search" value="{{ search_query }}" placeholder="Nom, tel, code..." class="form-input">
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="">Tous</option>
+                            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Actifs</option>
+                            <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactifs</option>
+                        </select>
+                    </div>
+
+                    <!-- Balance Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Solde</label>
+                        <select name="balance" class="form-select">
+                            <option value="">Tous</option>
+                            <option value="positive" {% if balance_filter == 'positive' %}selected{% endif %}>Avec solde</option>
+                            <option value="zero" {% if balance_filter == 'zero' %}selected{% endif %}>Solde à zéro</option>
+                        </select>
+                    </div>
+
+                    <!-- Submit -->
+                    <div class="form-group" style="margin-bottom: 0; display: flex; align-items: flex-end;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i>
+                            Filtrer
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Table -->
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Client</th>
+                        <th>Téléphone</th>
+                        <th>Solde</th>
+                        <th>Transactions</th>
+                        <th>Dernière Transaction</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for account in accounts %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'deposits:detail' account.pk %}" class="text-primary font-semibold">
+                                    {{ account.client.full_name }}
+                                </a>
+                                <br><small class="text-muted">{{ account.client.code }}</small>
+                            </td>
+                            <td>{{ account.client.phone }}</td>
+                            <td>
+                                <span class="font-semibold {% if account.balance > 0 %}text-success{% elif account.balance < 0 %}text-error{% endif %}">
+                                    {{ account.balance|floatformat:2 }} DH
+                                </span>
+                            </td>
+                            <td>{{ account.transaction_count }}</td>
+                            <td>
+                                {% if account.last_transaction_date %}
+                                    {{ account.last_transaction_date|date:"d/m/Y H:i" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if account.is_active %}
+                                    <span class="badge badge-success">Actif</span>
+                                {% else %}
+                                    <span class="badge badge-error">Inactif</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'deposits:detail' account.pk %}" class="btn btn-sm btn-ghost" title="Voir">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'deposits:purchase' account.pk %}" class="btn btn-sm btn-ghost" title="Achat">
+                                        <i class="fas fa-shopping-cart"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">
+                                        <i class="fas fa-wallet"></i>
+                                    </div>
+                                    <h4 class="empty-state-title">Aucun compte dépôt</h4>
+                                    <p class="empty-state-text">Créez le premier compte dépôt pour un client.</p>
+                                    <a href="{% url 'deposits:create' %}" class="btn btn-primary">
+                                        <i class="fas fa-plus"></i> Nouveau Compte
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <div class="card-footer">
+                <div class="pagination">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if balance_filter %}&balance={{ balance_filter }}{% endif %}" class="pagination-btn">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+
+                    <span class="pagination-info">
+                        Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                    </span>
+
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if balance_filter %}&balance={{ balance_filter }}{% endif %}" class="pagination-btn">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <style>
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}

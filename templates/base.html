@@ -432,6 +432,23 @@
             <div class="nav-section">
                 <div class="nav-section-title">Services</div>
 
+                <!-- Deposits -->
+                <div class="nav-item {% if 'deposits' in request.path %}open{% endif %}" id="nav-deposits">
+                    <a href="#" class="nav-link" onclick="toggleSubmenu('nav-deposits'); return false;">
+                        <i class="fas fa-wallet nav-icon"></i>
+                        <span class="nav-text">Dépôts Clients</span>
+                        <i class="fas fa-chevron-right nav-chevron"></i>
+                    </a>
+                    <div class="nav-submenu">
+                        <a href="{% url 'deposits:list' %}" class="nav-link {% if request.resolver_match.url_name == 'list' and 'deposits' in request.path %}active{% endif %}">
+                            <span class="nav-text">Tous les Comptes</span>
+                        </a>
+                        <a href="{% url 'deposits:create' %}" class="nav-link {% if request.resolver_match.url_name == 'create' and 'deposits' in request.path %}active{% endif %}">
+                            <span class="nav-text">Nouveau Compte</span>
+                        </a>
+                    </div>
+                </div>
+
                 <!-- Quotes -->
                 <div class="nav-item {% if 'quotes' in request.path %}open{% endif %}" id="nav-quotes">
                     <a href="#" class="nav-link" onclick="toggleSubmenu('nav-quotes'); return false;">

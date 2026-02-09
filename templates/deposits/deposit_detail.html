@@ -1,0 +1,555 @@
+{% extends 'base.html' %}
+
+{% block title %}Dépôt - {{ account.client.full_name }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'deposits:list' %}" class="breadcrumb-item">Comptes Dépôt</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ account.client.full_name }}</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">{{ account.client.full_name }}</h1>
+                <p class="page-subtitle">
+                    <span class="badge {% if account.is_active %}badge-success{% else %}badge-error{% endif %}">
+                        {% if account.is_active %}Actif{% else %}Inactif{% endif %}
+                    </span>
+                    <span class="ml-2">Code: {{ account.client.code }}</span>
+                </p>
+            </div>
+            <div class="page-actions">
+                <button onclick="openAddFundModal()" class="btn btn-success">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Ajouter Fonds</span>
+                </button>
+                <a href="{% url 'deposits:purchase' account.pk %}" class="btn btn-primary">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Faire un Achat</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Balance Card -->
+    <div class="grid grid-cols-4 gap-6 mb-8 animate-stagger">
+        <div class="stat-card" style="grid-column: span 2;">
+            <div class="stat-icon {% if account.balance > 0 %}success{% elif account.balance < 0 %}error{% else %}primary{% endif %}" style="width: 80px; height: 80px; font-size: 2rem;">
+                <i class="fas fa-wallet"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Solde Actuel</div>
+                <div class="stat-value" style="font-size: 2.5rem;">{{ account.balance|floatformat:2 }} DH</div>
+                <div class="stat-meta">Disponible pour achat</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-arrow-down"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Déposé</div>
+                <div class="stat-value">{{ account.total_deposits|floatformat:2 }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-shopping-bag"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Achats</div>
+                <div class="stat-value">{{ account.total_purchases|floatformat:2 }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="grid grid-cols-3 gap-6">
+        <!-- Client Info -->
+        <div class="card animate-slide-up">
+            <div class="card-header">
+                <h3><i class="fas fa-user mr-2"></i> Informations Client</h3>
+            </div>
+            <div class="card-body">
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">Nom</span>
+                        <span class="info-value">
+                            <a href="{% url 'clients:detail' account.client.pk %}" class="text-primary">
+                                {{ account.client.full_name }}
+                            </a>
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Téléphone</span>
+                        <span class="info-value">
+                            <a href="tel:{{ account.client.phone }}">{{ account.client.phone }}</a>
+                        </span>
+                    </div>
+                    {% if account.client.email %}
+                    <div class="info-item">
+                        <span class="info-label">Email</span>
+                        <span class="info-value">{{ account.client.email }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-item">
+                        <span class="info-label">Type</span>
+                        <span class="info-value">
+                            <span class="badge {% if account.client.client_type == 'vip' %}badge-accent{% elif account.client.client_type == 'wholesale' %}badge-info{% else %}badge-neutral{% endif %}">
+                                {{ account.client.get_client_type_display }}
+                            </span>
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Compte créé</span>
+                        <span class="info-value">{{ account.created_at|date:"d/m/Y" }}</span>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="mt-6">
+                    <h4 class="font-semibold mb-3">Actions Rapides</h4>
+                    <div class="flex flex-col gap-2">
+                        <button onclick="openWithdrawalModal()" class="btn btn-ghost btn-sm w-full justify-start">
+                            <i class="fas fa-arrow-up mr-2"></i> Retrait
+                        </button>
+                        <button onclick="openAdjustmentModal()" class="btn btn-ghost btn-sm w-full justify-start">
+                            <i class="fas fa-edit mr-2"></i> Ajustement
+                        </button>
+                    </div>
+                </div>
+
+                {% if account.notes %}
+                <div class="mt-4 p-3 bg-neutral-50 rounded">
+                    <small class="text-muted">Notes:</small>
+                    <p class="mt-1">{{ account.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Transaction History -->
+        <div class="card animate-slide-up" style="grid-column: span 2;">
+            <div class="card-header">
+                <h3><i class="fas fa-history mr-2"></i> Historique des Transactions</h3>
+                <form method="get" class="flex gap-2">
+                    <select name="type" class="form-select" style="width: auto;" onchange="this.form.submit()">
+                        <option value="">Tous types</option>
+                        {% for value, label in transaction_types %}
+                            <option value="{{ value }}" {% if trans_type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div class="table-wrapper" style="border: none; border-radius: 0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Montant</th>
+                                <th>Solde Après</th>
+                                <th>Description</th>
+                                <th>Référence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trans in transactions %}
+                                <tr>
+                                    <td>{{ trans.created_at|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        <span class="badge {% if trans.transaction_type == 'deposit' %}badge-success{% elif trans.transaction_type == 'purchase' %}badge-primary{% elif trans.transaction_type == 'withdrawal' %}badge-warning{% elif trans.transaction_type == 'refund' %}badge-info{% else %}badge-neutral{% endif %}">
+                                            {{ trans.get_transaction_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="font-semibold {% if trans.amount > 0 %}text-success{% else %}text-error{% endif %}">
+                                            {% if trans.amount > 0 %}+{% endif %}{{ trans.amount|floatformat:2 }} DH
+                                        </span>
+                                    </td>
+                                    <td>{{ trans.balance_after|floatformat:2 }} DH</td>
+                                    <td>
+                                        {{ trans.description|default:"-" }}
+                                        {% if trans.payment_method %}
+                                            <br><small class="text-muted">{{ trans.payment_method.name }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if trans.invoice %}
+                                            <a href="{% url 'sales:invoice_detail' trans.invoice.reference %}" class="text-primary">
+                                                {{ trans.invoice.reference }}
+                                            </a>
+                                        {% elif trans.payment_reference %}
+                                            {{ trans.payment_reference }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="empty-state" style="padding: var(--space-8);">
+                                            <div class="empty-state-icon">
+                                                <i class="fas fa-exchange-alt"></i>
+                                            </div>
+                                            <h4 class="empty-state-title">Aucune transaction</h4>
+                                            <p class="empty-state-text">Ce compte n'a pas encore de transactions.</p>
+                                            <button onclick="openAddFundModal()" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-plus"></i> Ajouter des fonds
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+                <div class="card-footer">
+                    <div class="pagination">
+                        {% if page_obj.has_previous %}
+                            <a href="?page={{ page_obj.previous_page_number }}{% if trans_type %}&type={{ trans_type }}{% endif %}" class="pagination-btn">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        {% endif %}
+
+                        <span class="pagination-info">
+                            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                        </span>
+
+                        {% if page_obj.has_next %}
+                            <a href="?page={{ page_obj.next_page_number }}{% if trans_type %}&type={{ trans_type }}{% endif %}" class="pagination-btn">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Add Fund Modal -->
+    <div id="addFundModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus-circle mr-2"></i> Ajouter des Fonds</h3>
+                <button onclick="closeAddFundModal()" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form method="post" action="{% url 'deposits:add_fund' account.pk %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label required">Montant (DH)</label>
+                        <input type="number" name="amount" class="form-input" step="0.01" min="0.01" required placeholder="0.00">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Mode de paiement</label>
+                            <select name="payment_method" class="form-select">
+                                <option value="">-- Sélectionner --</option>
+                                {% for pm in payment_methods %}
+                                    <option value="{{ pm.pk }}">{{ pm.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Compte bancaire</label>
+                            <select name="bank_account" class="form-select">
+                                <option value="">-- Sélectionner --</option>
+                                {% for ba in bank_accounts %}
+                                    <option value="{{ ba.pk }}">{{ ba.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Référence paiement</label>
+                        <input type="text" name="payment_reference" class="form-input" placeholder="N° chèque, virement...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <input type="text" name="description" class="form-input" placeholder="Ex: Dépôt mensuel">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-input" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" onclick="closeAddFundModal()" class="btn btn-ghost">Annuler</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-plus"></i> Ajouter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Withdrawal Modal -->
+    <div id="withdrawalModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-arrow-up mr-2"></i> Retrait de Fonds</h3>
+                <button onclick="closeWithdrawalModal()" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form method="post" action="{% url 'deposits:withdrawal' account.pk %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-warning mb-4">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        Solde disponible: <strong>{{ account.balance|floatformat:2 }} DH</strong>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required">Montant à retirer (DH)</label>
+                        <input type="number" name="amount" class="form-input" step="0.01" min="0.01" max="{{ account.balance }}" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Raison du retrait</label>
+                        <input type="text" name="description" class="form-input" placeholder="Ex: Remboursement client">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-input" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" onclick="closeWithdrawalModal()" class="btn btn-ghost">Annuler</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-arrow-up"></i> Retirer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Adjustment Modal -->
+    <div id="adjustmentModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit mr-2"></i> Ajustement</h3>
+                <button onclick="closeAdjustmentModal()" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form method="post" action="{% url 'deposits:adjustment' account.pk %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Solde actuel: <strong>{{ account.balance|floatformat:2 }} DH</strong>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required">Type d'ajustement</label>
+                        <select name="adjustment_type" class="form-select" required>
+                            <option value="add">Ajouter au solde</option>
+                            <option value="subtract">Retirer du solde</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required">Montant (DH)</label>
+                        <input type="number" name="amount" class="form-input" step="0.01" min="0.01" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required">Raison de l'ajustement</label>
+                        <input type="text" name="description" class="form-input" required placeholder="Ex: Correction d'erreur">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-input" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" onclick="closeAdjustmentModal()" class="btn btn-ghost">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check"></i> Appliquer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        .info-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .info-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            font-weight: var(--font-medium);
+        }
+
+        .info-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+            text-align: right;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: var(--text-lg);
+        }
+
+        .modal-body {
+            padding: var(--space-6);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--space-3);
+            padding: var(--space-4) var(--space-6);
+            border-top: 1px solid var(--neutral-100);
+        }
+
+        .alert {
+            padding: var(--space-3) var(--space-4);
+            border-radius: var(--radius-md);
+        }
+
+        .alert-warning {
+            background: var(--warning-50);
+            color: var(--warning-700);
+            border: 1px solid var(--warning-200);
+        }
+
+        .alert-info {
+            background: var(--info-50);
+            color: var(--info-700);
+            border: 1px solid var(--info-200);
+        }
+
+        @media (max-width: 1023px) {
+            .grid-cols-3 {
+                grid-template-columns: 1fr !important;
+            }
+
+            .grid-cols-4 {
+                grid-template-columns: 1fr !important;
+            }
+
+            .card[style*="grid-column: span 2"] {
+                grid-column: span 1 !important;
+            }
+
+            .stat-card[style*="grid-column: span 2"] {
+                grid-column: span 1 !important;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
+    <script>
+        function openAddFundModal() {
+            document.getElementById('addFundModal').style.display = 'flex';
+        }
+
+        function closeAddFundModal() {
+            document.getElementById('addFundModal').style.display = 'none';
+        }
+
+        function openWithdrawalModal() {
+            document.getElementById('withdrawalModal').style.display = 'flex';
+        }
+
+        function closeWithdrawalModal() {
+            document.getElementById('withdrawalModal').style.display = 'none';
+        }
+
+        function openAdjustmentModal() {
+            document.getElementById('adjustmentModal').style.display = 'flex';
+        }
+
+        function closeAdjustmentModal() {
+            document.getElementById('adjustmentModal').style.display = 'none';
+        }
+
+        // Close modals on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeAddFundModal();
+                closeWithdrawalModal();
+                closeAdjustmentModal();
+            }
+        });
+
+        // Close modals on outside click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.style.display = 'none';
+                }
+            });
+        });
+    </script>
+{% endblock %}
