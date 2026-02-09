@@ -220,13 +220,13 @@
 
                         <div class="form-group">
                             <label class="form-label">Utiliser du dépôt (DH)</label>
-                            <input type="number" name="use_deposit" id="useDeposit" class="form-input" step="0.01" min="0" max="{{ account.balance }}" value="0" oninput="updatePaymentSummary()">
+                            <input type="number" name="use_deposit" id="useDeposit" class="form-input" step="0.01" min="0" max="{{ account.balance }}" value="0" oninput="onDepositChange()">
                             <small class="form-text">Max: {{ account.balance|floatformat:2 }} DH</small>
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">Paiement complémentaire (DH)</label>
-                            <input type="number" name="additional_payment" id="additionalPayment" class="form-input" step="0.01" min="0" value="0" oninput="updatePaymentSummary()">
+                            <input type="number" name="additional_payment" id="additionalPayment" class="form-input" step="0.01" min="0" value="0" oninput="onAdditionalPaymentChange()">
                         </div>
 
                         <div class="form-group">
@@ -665,7 +665,30 @@
             updatePaymentSummary();
         }
 
-        function updatePaymentSummary() {
+        // Called when deposit input changes - auto-calculate additional payment
+        function onDepositChange() {
+            let depositUsed = parseFloat(document.getElementById('useDeposit').value) || 0;
+
+            // Validate deposit doesn't exceed balance
+            if (depositUsed > accountBalance) {
+                depositUsed = accountBalance;
+                document.getElementById('useDeposit').value = depositUsed.toFixed(2);
+            }
+
+            // Auto-calculate additional payment needed
+            const additionalNeeded = Math.max(0, selectedTotal - depositUsed);
+            document.getElementById('additionalPayment').value = additionalNeeded.toFixed(2);
+
+            updatePaymentDisplay();
+        }
+
+        // Called when additional payment input changes - just update display
+        function onAdditionalPaymentChange() {
+            updatePaymentDisplay();
+        }
+
+        // Update the payment summary display (no auto-calculation)
+        function updatePaymentDisplay() {
             const depositUsed = parseFloat(document.getElementById('useDeposit').value) || 0;
             const additionalPayment = parseFloat(document.getElementById('additionalPayment').value) || 0;
             const totalPaid = depositUsed + additionalPayment;
@@ -686,12 +709,11 @@
                 remainingRow.style.display = 'none';
                 submitBtn.disabled = Object.keys(confirmedProducts).length === 0;
             }
+        }
 
-            // Validate deposit doesn't exceed balance
-            if (depositUsed > accountBalance) {
-                document.getElementById('useDeposit').value = accountBalance.toFixed(2);
-                updatePaymentSummary();
-            }
+        // Legacy function for compatibility
+        function updatePaymentSummary() {
+            updatePaymentDisplay();
         }
 
         function applyFilters() {
