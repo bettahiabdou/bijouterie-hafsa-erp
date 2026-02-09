@@ -317,8 +317,8 @@ def purchase_page(request, pk):
     page_obj = paginator.get_page(page_number)
 
     # Get categories for filter
-    from products.models import Category
-    categories = Category.objects.filter(is_active=True)
+    from settings_app.models import ProductCategory
+    categories = ProductCategory.objects.filter(is_active=True)
 
     # Payment methods for additional payment
     payment_methods = PaymentMethod.objects.filter(is_active=True)
