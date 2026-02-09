@@ -451,7 +451,7 @@
     </style>
 
     <script>
-        const accountBalance = {{ account.balance }};
+        const accountBalance = parseFloat("{{ account.balance|stringformat:'f' }}".replace(',', '.')) || 0;
         let confirmedProducts = {};  // Store confirmed products {id: {reference, description, originalPrice, sellingPrice, discount}}
         let selectedTotal = 0;
         let originalTotal = 0;
