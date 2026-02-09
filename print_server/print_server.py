@@ -12,9 +12,9 @@ from functools import wraps
 
 app = Flask(__name__)
 
-# Configuration
-PRINTER_IP = "192.168.1.199"
-PRINTER_PORT = 9100
+# Configuration - Can be overridden with environment variables
+PRINTER_IP = os.environ.get("PRINTER_IP", "196.79.122.67")
+PRINTER_PORT = int(os.environ.get("PRINTER_PORT", "9100"))
 API_KEY = os.environ.get("PRINT_API_KEY", "hafsa-print-secret-2024")  # Change this!
 
 def require_api_key(f):
