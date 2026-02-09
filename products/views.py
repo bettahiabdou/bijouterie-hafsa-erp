@@ -760,3 +760,34 @@ def print_test(request):
         messages.error(request, f'Erreur d\'impression: {message}')
 
     return redirect('products:list')
+
+
+@login_required(login_url='login')
+def printer_debug(request):
+    """Debug endpoint to check printer configuration"""
+    from .print_utils import get_printer_settings
+    from settings_app.models import SystemConfig
+
+    try:
+        config = SystemConfig.get_config()
+        db_ip = config.zebra_printer_ip
+        db_port = config.zebra_printer_port
+        db_enabled = config.zebra_printer_enabled
+    except Exception as e:
+        db_ip = f"Error: {e}"
+        db_port = None
+        db_enabled = None
+
+    active_ip, active_port = get_printer_settings()
+
+    return JsonResponse({
+        'database_config': {
+            'ip': str(db_ip) if db_ip else None,
+            'port': db_port,
+            'enabled': db_enabled,
+        },
+        'active_config': {
+            'ip': active_ip,
+            'port': active_port,
+        }
+    })

@@ -20,4 +20,5 @@ urlpatterns = [
 
     # Print
     path('print/test/', views.print_test, name='print_test'),
+    path('print/debug/', views.printer_debug, name='printer_debug'),
 ]
