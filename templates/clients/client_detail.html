@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ client.full_name }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'clients:list' %}" class="breadcrumb-item">Clients</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ client.full_name }}</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">{{ client.full_name }}</h1>
+                <p class="page-subtitle">
+                    <span class="badge {% if client.client_type == 'vip' %}badge-accent{% elif client.client_type == 'wholesale' %}badge-info{% else %}badge-neutral{% endif %}">
+                        {{ client.get_client_type_display }}
+                    </span>
+                    {% if not client.is_active %}
+                        <span class="badge badge-error ml-2">Inactif</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'clients:edit' client.pk %}" class="btn btn-secondary">
+                    <i class="fas fa-edit"></i>
+                    <span>Modifier</span>
+                </a>
+                <a href="{% url 'sales:invoice_create' %}?client={{ client.pk }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>Nouvelle Vente</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-3 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-file-invoice"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Factures</div>
+                <div class="stat-value">{{ total_invoices|default:"0" }}</div>
+                <div class="stat-meta">Factures enregistrees</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Achats</div>
+                <div class="stat-value">{{ total_purchases|floatformat:2|default:"0.00" }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Factures Payees</div>
+                <div class="stat-value">{{ paid_invoices|default:"0" }}</div>
+                <div class="stat-meta">Sur {{ total_invoices }} factures</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="grid grid-cols-3 gap-6">
+        <!-- Client Info Card -->
+        <div class="card animate-slide-up">
+            <div class="card-header">
+                <h3><i class="fas fa-user mr-2"></i> Informations Client</h3>
+            </div>
+            <div class="card-body">
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">Code</span>
+                        <span class="info-value font-semibold">{{ client.code }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Nom complet</span>
+                        <span class="info-value">{{ client.full_name }}</span>
+                    </div>
+                    {% if client.full_name_ar %}
+                    <div class="info-item">
+                        <span class="info-label">Nom (Arabe)</span>
+                        <span class="info-value" dir="rtl">{{ client.full_name_ar }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-item">
+                        <span class="info-label">Telephone</span>
+                        <span class="info-value">
+                            <a href="tel:{{ client.phone }}" class="text-primary">{{ client.phone }}</a>
+                            {% if client.phone_2 %}
+                                <br><a href="tel:{{ client.phone_2 }}" class="text-muted">{{ client.phone_2 }}</a>
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% if client.email %}
+                    <div class="info-item">
+                        <span class="info-label">Email</span>
+                        <span class="info-value">
+                            <a href="mailto:{{ client.email }}" class="text-primary">{{ client.email }}</a>
+                        </span>
+                    </div>
+                    {% endif %}
+                    {% if client.cin %}
+                    <div class="info-item">
+                        <span class="info-label">CIN</span>
+                        <span class="info-value">{{ client.cin }}</span>
+                    </div>
+                    {% endif %}
+                    {% if client.address %}
+                    <div class="info-item">
+                        <span class="info-label">Adresse</span>
+                        <span class="info-value">{{ client.address }}</span>
+                    </div>
+                    {% endif %}
+                    {% if client.city %}
+                    <div class="info-item">
+                        <span class="info-label">Ville</span>
+                        <span class="info-value">{{ client.city }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-item">
+                        <span class="info-label">Type</span>
+                        <span class="info-value">
+                            <span class="badge {% if client.client_type == 'vip' %}badge-accent{% elif client.client_type == 'wholesale' %}badge-info{% else %}badge-neutral{% endif %}">
+                                {{ client.get_client_type_display }}
+                            </span>
+                        </span>
+                    </div>
+                    {% if client.credit_limit > 0 %}
+                    <div class="info-item">
+                        <span class="info-label">Limite Credit</span>
+                        <span class="info-value">{{ client.credit_limit|floatformat:2 }} DH</span>
+                    </div>
+                    {% endif %}
+                    {% if client.preferences %}
+                    <div class="info-item">
+                        <span class="info-label">Preferences</span>
+                        <span class="info-value">{{ client.preferences }}</span>
+                    </div>
+                    {% endif %}
+                    {% if client.notes %}
+                    <div class="info-item">
+                        <span class="info-label">Notes</span>
+                        <span class="info-value">{{ client.notes }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-item">
+                        <span class="info-label">Client depuis</span>
+                        <span class="info-value">{{ client.created_at|date:"d/m/Y" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Purchase History -->
+        <div class="card animate-slide-up" style="grid-column: span 2;">
+            <div class="card-header">
+                <h3><i class="fas fa-history mr-2"></i> Historique des Achats</h3>
+                {% if total_invoices > 20 %}
+                <a href="{% url 'sales:invoice_list' %}?search={{ client.full_name }}" class="btn btn-ghost btn-sm">
+                    Voir tout <i class="fas fa-arrow-right ml-2"></i>
+                </a>
+                {% endif %}
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div class="table-wrapper" style="border: none; border-radius: 0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Reference</th>
+                                <th>Date</th>
+                                <th>Montant</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invoice in invoices %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="font-semibold text-primary">
+                                            {{ invoice.reference }}
+                                        </a>
+                                    </td>
+                                    <td>{{ invoice.date|date:"d/m/Y" }}</td>
+                                    <td class="font-semibold">{{ invoice.total_amount|floatformat:2 }} DH</td>
+                                    <td>
+                                        <span class="badge {% if invoice.status == 'paid' %}badge-success{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'pending' or invoice.status == 'unpaid' %}badge-info{% elif invoice.status == 'returned' %}badge-error{% else %}badge-neutral{% endif %}">
+                                            {{ invoice.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-sm btn-ghost" title="Voir">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5">
+                                        <div class="empty-state" style="padding: var(--space-8);">
+                                            <div class="empty-state-icon">
+                                                <i class="fas fa-receipt"></i>
+                                            </div>
+                                            <h4 class="empty-state-title">Aucun achat</h4>
+                                            <p class="empty-state-text">Ce client n'a pas encore effectue d'achat.</p>
+                                            <a href="{% url 'sales:invoice_create' %}?client={{ client.pk }}" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-plus"></i> Nouvelle Vente
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Button -->
+    <div class="mt-8">
+        <form method="post" action="{% url 'clients:delete' client.pk %}" onsubmit="return confirm('Etes-vous sur de vouloir supprimer ce client?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-ghost text-error">
+                <i class="fas fa-trash"></i>
+                Supprimer ce client
+            </button>
+        </form>
+    </div>
+
+    <style>
+        .info-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .info-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            font-weight: var(--font-medium);
+        }
+
+        .info-value {
+            font-size: var(--text-sm);
+            color: var(--neutral-800);
+            text-align: right;
+        }
+
+        @media (max-width: 1023px) {
+            .grid-cols-3 {
+                grid-template-columns: 1fr !important;
+            }
+
+            .card[style*="grid-column: span 2"] {
+                grid-column: span 1 !important;
+            }
+        }
+    </style>
+{% endblock %}

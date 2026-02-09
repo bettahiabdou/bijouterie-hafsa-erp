@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block title %}Clients - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Clients</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Gestion des Clients</h1>
+                <p class="page-subtitle">Liste de tous les clients</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'clients:create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>Nouveau Client</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-3 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Clients</div>
+                <div class="stat-value">{{ total_clients|default:"0" }}</div>
+                <div class="stat-meta">Tous les clients</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Clients Actifs</div>
+                <div class="stat-value">{{ active_clients|default:"0" }}</div>
+                <div class="stat-meta">Clients actifs</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-star"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Clients VIP</div>
+                <div class="stat-value">{{ vip_clients|default:"0" }}</div>
+                <div class="stat-meta">Clients privilegies</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="card animate-slide-up">
+        <!-- Filters -->
+        <div class="card-header filter-header">
+            <form method="get" class="filter-form">
+                <div class="filter-grid">
+                    <!-- Search -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Recherche</label>
+                        <input type="text" name="search" value="{{ search_query }}" placeholder="Nom, tel, email..." class="form-input">
+                    </div>
+
+                    <!-- Type Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Type</label>
+                        <select name="type" class="form-select">
+                            <option value="">Tous</option>
+                            {% for value, label in client_types %}
+                                <option value="{{ value }}" {% if type_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="">Tous</option>
+                            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Actifs</option>
+                            <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactifs</option>
+                        </select>
+                    </div>
+
+                    <!-- Submit -->
+                    <div class="form-group" style="margin-bottom: 0; display: flex; align-items: flex-end;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i>
+                            Filtrer
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Table -->
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Nom</th>
+                        <th>Telephone</th>
+                        <th>Email</th>
+                        <th>Type</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for client in clients %}
+                        <tr>
+                            <td>
+                                <span class="font-semibold text-primary">{{ client.code }}</span>
+                            </td>
+                            <td>
+                                <a href="{% url 'clients:detail' client.pk %}" class="text-primary font-semibold">
+                                    {{ client.full_name }}
+                                </a>
+                                {% if client.city %}
+                                    <br><small class="text-muted">{{ client.city }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ client.phone }}
+                                {% if client.phone_2 %}
+                                    <br><small class="text-muted">{{ client.phone_2 }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ client.email|default:"-" }}</td>
+                            <td>
+                                <span class="badge {% if client.client_type == 'vip' %}badge-accent{% elif client.client_type == 'wholesale' %}badge-info{% else %}badge-neutral{% endif %}">
+                                    {{ client.get_client_type_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if client.is_active %}
+                                    <span class="badge badge-success">Actif</span>
+                                {% else %}
+                                    <span class="badge badge-error">Inactif</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'clients:detail' client.pk %}" class="btn btn-sm btn-ghost" title="Voir">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'clients:edit' client.pk %}" class="btn btn-sm btn-ghost" title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">
+                                        <i class="fas fa-users"></i>
+                                    </div>
+                                    <h4 class="empty-state-title">Aucun client</h4>
+                                    <p class="empty-state-text">Commencez par ajouter votre premier client.</p>
+                                    <a href="{% url 'clients:create' %}" class="btn btn-primary">
+                                        <i class="fas fa-plus"></i> Nouveau Client
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <div class="card-footer">
+                <div class="pagination">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="pagination-btn">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+
+                    <span class="pagination-info">
+                        Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                    </span>
+
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="pagination-btn">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <style>
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}

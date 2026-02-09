@@ -409,6 +409,23 @@
                         </a>
                     </div>
                 </div>
+
+                <!-- Clients -->
+                <div class="nav-item {% if 'clients' in request.path %}open{% endif %}" id="nav-clients">
+                    <a href="#" class="nav-link" onclick="toggleSubmenu('nav-clients'); return false;">
+                        <i class="fas fa-users nav-icon"></i>
+                        <span class="nav-text">Clients</span>
+                        <i class="fas fa-chevron-right nav-chevron"></i>
+                    </a>
+                    <div class="nav-submenu">
+                        <a href="{% url 'clients:list' %}" class="nav-link {% if request.resolver_match.url_name == 'list' and 'clients' in request.path %}active{% endif %}">
+                            <span class="nav-text">Tous les Clients</span>
+                        </a>
+                        <a href="{% url 'clients:create' %}" class="nav-link {% if request.resolver_match.url_name == 'create' and 'clients' in request.path %}active{% endif %}">
+                            <span class="nav-text">Nouveau Client</span>
+                        </a>
+                    </div>
+                </div>
             </div>
 
             <!-- Services Section -->
