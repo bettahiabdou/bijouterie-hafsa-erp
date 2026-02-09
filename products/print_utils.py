@@ -55,7 +55,21 @@ def send_to_printer(zpl_data):
         return False, f"Print error: {str(e)}"
 
 
-def generate_product_label_zpl(product, quantity=1):
+def string_to_hex(text):
+    """
+    Convert a string to hexadecimal representation for RFID encoding.
+    Pads to 24 hex characters (96 bits) which is standard EPC length.
+    """
+    hex_str = text.encode('utf-8').hex().upper()
+    # Pad or truncate to 24 hex characters (96 bits = standard EPC)
+    if len(hex_str) < 24:
+        hex_str = hex_str.ljust(24, '0')
+    elif len(hex_str) > 24:
+        hex_str = hex_str[:24]
+    return hex_str
+
+
+def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
     """
     Generate ZPL for RFID jewelry hang tag with loop
     Total tag: 68x26mm - print on LEFT side (the visible tag head)
@@ -65,9 +79,14 @@ def generate_product_label_zpl(product, quantity=1):
     - Line 1: Weight + Purity (e.g., "5.2g 18K")
     - Line 2: Size if available (e.g., "T: 45cm")
     - Bottom: Barcode + Reference
+
+    RFID: Encodes product reference into the RFID chip
     """
+    # Full reference for RFID encoding
+    full_reference = product.reference or "UNKNOWN"
+
     # Reference parts - get date and sequence (e.g., "20260207-0001" from "PRD-FIN-20260207-0001")
-    ref_parts = (product.reference or "").split("-")
+    ref_parts = full_reference.split("-")
     if len(ref_parts) >= 2:
         # Get last two parts: date and sequence
         short_ref = f"{ref_parts[-2]}-{ref_parts[-1]}"
@@ -88,19 +107,25 @@ def generate_product_label_zpl(product, quantity=1):
     # Size (e.g., "45" or "18")
     size = product.size.strip() if product.size else ""
 
-    # ZPL for 68x26mm tag - print on LEFT side
-    # Line 1 (Weight + Purity): X=34, Y=31
-    # Line 2 (Size): X=34, Y=55 (below purity line, only if size exists)
-    # Barcode: X=26, Y=130 (or Y=110 if size exists to make room)
-    # Reference: X=34, Y=175 (or Y=155 if size exists)
+    # RFID encoding command - writes product reference to EPC memory
+    # ^RS8 = RFID setup (8 = UHF Gen2)
+    # ^RFW,E = Write to EPC memory bank, Hex format
+    # ^RFV = Verify after write (optional, adds reliability)
+    rfid_commands = ""
+    if encode_rfid:
+        rfid_hex = string_to_hex(full_reference)
+        rfid_commands = f"""^RS8
+^RFW,H,1,12,1^FD{rfid_hex}^FS
+"""
 
+    # ZPL for 68x26mm tag - print on LEFT side
     if size:
         # Layout with size - adjust positions
         zpl = f"""^XA
 ^CI28
 ^PW544
 ^LL208
-^FO34,25^A0N,20,18^FD{weight}g {purity}^FS
+{rfid_commands}^FO34,25^A0N,20,18^FD{weight}g {purity}^FS
 ^FO34,50^A0N,18,16^FDT: {size}cm^FS
 ^FO26,110^BY1^BCN,32,N,N,N^FD{barcode_data}^FS
 ^FO34,150^A0N,14,12^FD{short_ref}^FS
@@ -112,7 +137,7 @@ def generate_product_label_zpl(product, quantity=1):
 ^CI28
 ^PW544
 ^LL208
-^FO34,31^A0N,22,20^FD{weight}g {purity}^FS
+{rfid_commands}^FO34,31^A0N,22,20^FD{weight}g {purity}^FS
 ^FO26,130^BY1^BCN,35,N,N,N^FD{barcode_data}^FS
 ^FO34,175^A0N,16,14^FD{short_ref}^FS
 ^PQ{quantity}
@@ -155,14 +180,26 @@ def print_price_tag(product, quantity=1):
     return send_to_printer(zpl)
 
 
-def print_test_label():
-    """Print a test label for jewelry RFID hang tag - LEFT side with barcode"""
-    zpl = """^XA
+def print_test_label(encode_rfid=True):
+    """Print a test label for jewelry RFID hang tag - LEFT side with barcode
+    Also encodes RFID with test reference if encode_rfid=True
+    """
+    test_reference = "PRD-TEST-20260210-0001"
+
+    # RFID encoding for test
+    rfid_commands = ""
+    if encode_rfid:
+        rfid_hex = string_to_hex(test_reference)
+        rfid_commands = f"""^RS8
+^RFW,H,1,12,1^FD{rfid_hex}^FS
+"""
+
+    zpl = f"""^XA
 ^CI28
 ^PW544
 ^LL208
-^FO34,31^A0N,22,20^FD5.2g 18K^FS
-^FO26,130^BY1^BCN,35,N,N,N^FD20260207-0001^FS
-^FO34,175^A0N,16,14^FD20260207-0001^FS
+{rfid_commands}^FO34,31^A0N,22,20^FD5.2g 18K^FS
+^FO26,130^BY1^BCN,35,N,N,N^FD20260210-0001^FS
+^FO34,175^A0N,16,14^FD20260210-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
