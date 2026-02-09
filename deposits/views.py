@@ -473,6 +473,32 @@ def make_purchase(request, pk):
                     created_by=request.user
                 )
 
+                # Also record deposit payment on invoice for visibility
+                from payments.models import ClientPayment
+                # Get or create "Dépôt Client" payment method
+                deposit_payment_method, _ = PaymentMethod.objects.get_or_create(
+                    code='depot_client',
+                    defaults={
+                        'name': 'Dépôt Client',
+                        'name_ar': 'إيداع العميل',
+                        'requires_reference': False,
+                        'requires_bank_account': False,
+                        'is_active': True,
+                        'display_order': 99
+                    }
+                )
+                ClientPayment.objects.create(
+                    date=timezone.now().date(),
+                    client=account.client,
+                    sale_invoice=invoice,
+                    payment_type=ClientPayment.PaymentType.INVOICE,
+                    amount=use_deposit,
+                    payment_method=deposit_payment_method,
+                    reference=f"FOND-{invoice.reference}",
+                    notes=f'Paiement via dépôt client (Compte #{account.pk})',
+                    created_by=request.user
+                )
+
             # Record additional payment in client payments if any
             if additional_payment > 0 and payment_method:
                 from payments.models import ClientPayment
