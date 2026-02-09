@@ -265,55 +265,61 @@ def purchase_invoice_list(request):
 
 
 @login_required
-@permission_required('purchases.add_purchaseinvoice', raise_exception=True)
 def purchase_invoice_create(request):
     """Create new purchase invoice"""
     if request.method == 'POST':
-        # Generate reference
-        from django.utils import timezone
-        today = timezone.now().date()
-        today_str = today.strftime('%Y%m%d')
-        last_invoice = PurchaseInvoice.objects.filter(
-            reference__startswith=f'PI-{today_str}'
-        ).last()
+        try:
+            # Generate reference
+            from django.utils import timezone
+            today = timezone.now().date()
+            today_str = today.strftime('%Y%m%d')
+            last_invoice = PurchaseInvoice.objects.filter(
+                reference__startswith=f'PI-{today_str}'
+            ).last()
 
-        if last_invoice:
-            seq = int(last_invoice.reference.split('-')[-1]) + 1
-        else:
-            seq = 1
+            if last_invoice:
+                seq = int(last_invoice.reference.split('-')[-1]) + 1
+            else:
+                seq = 1
 
-        reference = f'PI-{today_str}-{seq:04d}'
+            reference = f'PI-{today_str}-{seq:04d}'
 
-        invoice = PurchaseInvoice.objects.create(
-            reference=reference,
-            date=now().date(),
-            supplier_id=request.POST.get('supplier'),
-            supplier_invoice_ref=request.POST.get('supplier_invoice_ref', ''),
-            invoice_type=request.POST.get('invoice_type', 'finished'),
-            purchase_order_id=request.POST.get('purchase_order') or None,
-            notes=request.POST.get('notes', ''),
-            created_by=request.user,
-        )
+            invoice = PurchaseInvoice.objects.create(
+                reference=reference,
+                date=now().date(),
+                supplier_id=request.POST.get('supplier'),
+                supplier_invoice_ref=request.POST.get('supplier_invoice_ref', ''),
+                invoice_type=request.POST.get('invoice_type', 'finished'),
+                purchase_order_id=request.POST.get('purchase_order') or None,
+                notes=request.POST.get('notes', ''),
+                created_by=request.user,
+            )
 
-        # Log activity
-        ActivityLog.objects.create(
-            user=request.user,
-            action=ActivityLog.ActionType.CREATE,
-            model_name='PurchaseInvoice',
-            object_id=str(invoice.id),
-            object_repr=f'Created purchase invoice {invoice.reference}',
-            ip_address=get_client_ip(request)
-        )
+            # Log activity
+            ActivityLog.objects.create(
+                user=request.user,
+                action=ActivityLog.ActionType.CREATE,
+                model_name='PurchaseInvoice',
+                object_id=str(invoice.id),
+                object_repr=f'Created purchase invoice {invoice.reference}',
+                ip_address=get_client_ip(request)
+            )
 
-        return redirect('purchases:purchase_invoice_detail', reference=invoice.reference)
+            return redirect('purchases:purchase_invoice_detail', reference=invoice.reference)
+        except Exception as e:
+            messages.error(request, f'Erreur: {str(e)}')
 
-    from suppliers.models import Supplier
-    context = {
-        'suppliers': Supplier.objects.all(),
-        'purchase_orders': PurchaseOrder.objects.filter(status='approved'),
-        'type_choices': PurchaseInvoice.InvoiceType.choices,
-    }
-    return render(request, 'purchases/purchase_invoice_form.html', context)
+    try:
+        from suppliers.models import Supplier
+        context = {
+            'suppliers': Supplier.objects.all(),
+            'purchase_orders': PurchaseOrder.objects.filter(status='approved'),
+            'type_choices': PurchaseInvoice.InvoiceType.choices,
+        }
+        return render(request, 'purchases/purchase_invoice_form.html', context)
+    except Exception as e:
+        messages.error(request, f'Erreur: {str(e)}')
+        return redirect('purchases:purchase_invoice_list')
 
 
 @login_required
