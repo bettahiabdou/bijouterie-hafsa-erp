@@ -75,12 +75,14 @@
                                     <th>Référence</th>
                                     <th>Description</th>
                                     <th>Catégorie</th>
-                                    <th>Prix</th>
+                                    <th>Prix Original</th>
+                                    <th>Prix de Vente</th>
+                                    <th>Remise</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for product in products %}
-                                    <tr data-price="{{ product.selling_price }}">
+                                    <tr data-price="{{ product.selling_price }}" data-product-id="{{ product.pk }}">
                                         <td>
                                             <input type="checkbox" name="products" value="{{ product.pk }}" class="product-checkbox" onchange="updateTotal()">
                                         </td>
@@ -95,11 +97,33 @@
                                                 -
                                             {% endif %}
                                         </td>
-                                        <td class="font-semibold">{{ product.selling_price|floatformat:2 }} DH</td>
+                                        <td class="font-semibold original-price">{{ product.selling_price|floatformat:2 }} DH</td>
+                                        <td>
+                                            <input type="number"
+                                                   name="selling_price_{{ product.pk }}"
+                                                   class="form-input selling-price-input"
+                                                   style="width: 100px;"
+                                                   step="0.01"
+                                                   min="0"
+                                                   value="{{ product.selling_price|floatformat:2 }}"
+                                                   data-original="{{ product.selling_price }}"
+                                                   onchange="updateProductPrice(this, {{ product.pk }})">
+                                        </td>
+                                        <td>
+                                            <input type="number"
+                                                   name="discount_{{ product.pk }}"
+                                                   class="form-input discount-input"
+                                                   style="width: 80px;"
+                                                   step="0.01"
+                                                   min="0"
+                                                   value="0"
+                                                   data-product-id="{{ product.pk }}"
+                                                   onchange="applyDiscount(this, {{ product.pk }})">
+                                        </td>
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="5">
+                                        <td colspan="7">
                                             <div class="empty-state" style="padding: var(--space-8);">
                                                 <div class="empty-state-icon">
                                                     <i class="fas fa-gem"></i>
@@ -159,8 +183,16 @@
                             <span>Produits sélectionnés:</span>
                             <span id="selectedCount">0</span>
                         </div>
+                        <div class="summary-row">
+                            <span>Prix original:</span>
+                            <span id="originalTotal">0.00 DH</span>
+                        </div>
+                        <div class="summary-row" id="discountRow" style="display: none;">
+                            <span class="text-success">Remise totale:</span>
+                            <span id="totalDiscount" class="text-success">-0.00 DH</span>
+                        </div>
                         <div class="summary-row total">
-                            <span>Total Achat:</span>
+                            <span>Total à payer:</span>
                             <span id="totalAmount">0.00 DH</span>
                         </div>
                     </div>
@@ -171,13 +203,13 @@
 
                         <div class="form-group">
                             <label class="form-label">Utiliser du dépôt (DH)</label>
-                            <input type="number" name="use_deposit" id="useDeposit" class="form-input" step="0.01" min="0" max="{{ account.balance }}" value="0" onchange="updatePaymentSummary()">
+                            <input type="number" name="use_deposit" id="useDeposit" class="form-input" step="0.01" min="0" max="{{ account.balance }}" value="0" oninput="updatePaymentSummary()">
                             <small class="form-text">Max: {{ account.balance|floatformat:2 }} DH</small>
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">Paiement complémentaire (DH)</label>
-                            <input type="number" name="additional_payment" id="additionalPayment" class="form-input" step="0.01" min="0" value="0" onchange="updatePaymentSummary()">
+                            <input type="number" name="additional_payment" id="additionalPayment" class="form-input" step="0.01" min="0" value="0" oninput="updatePaymentSummary()">
                         </div>
 
                         <div class="form-group">
@@ -298,6 +330,17 @@
             font-size: var(--text-sm);
         }
 
+        .selling-price-input, .discount-input {
+            padding: var(--space-2);
+            font-size: var(--text-sm);
+            text-align: right;
+        }
+
+        .selling-price-input:focus, .discount-input:focus {
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px rgba(var(--primary-500-rgb), 0.1);
+        }
+
         @media (max-width: 1023px) {
             .grid-cols-3 {
                 grid-template-columns: 1fr !important;
@@ -320,6 +363,11 @@
     <script>
         const accountBalance = {{ account.balance }};
         let selectedTotal = 0;
+        let originalTotal = 0;
+        let totalDiscount = 0;
+
+        // Store custom prices for each product
+        const productPrices = {};
 
         function toggleSelectAll(checkbox) {
             document.querySelectorAll('.product-checkbox').forEach(cb => {
@@ -328,19 +376,77 @@
             updateTotal();
         }
 
+        function updateProductPrice(input, productId) {
+            const newPrice = parseFloat(input.value) || 0;
+            const originalPrice = parseFloat(input.dataset.original) || 0;
+            const row = input.closest('tr');
+
+            // Update stored price
+            productPrices[productId] = newPrice;
+
+            // Update discount field to reflect the difference
+            const discountInput = row.querySelector('.discount-input');
+            const discount = Math.max(0, originalPrice - newPrice);
+            discountInput.value = discount.toFixed(2);
+
+            // Update row data-price for calculations
+            row.dataset.price = newPrice;
+
+            updateTotal();
+        }
+
+        function applyDiscount(input, productId) {
+            const discount = parseFloat(input.value) || 0;
+            const row = input.closest('tr');
+            const priceInput = row.querySelector('.selling-price-input');
+            const originalPrice = parseFloat(priceInput.dataset.original) || 0;
+
+            // Calculate new price after discount
+            const newPrice = Math.max(0, originalPrice - discount);
+            priceInput.value = newPrice.toFixed(2);
+
+            // Update stored price
+            productPrices[productId] = newPrice;
+
+            // Update row data-price for calculations
+            row.dataset.price = newPrice;
+
+            updateTotal();
+        }
+
         function updateTotal() {
             let total = 0;
+            let origTotal = 0;
             let count = 0;
 
             document.querySelectorAll('.product-checkbox:checked').forEach(cb => {
                 const row = cb.closest('tr');
-                total += parseFloat(row.dataset.price);
+                const productId = row.dataset.productId;
+                const priceInput = row.querySelector('.selling-price-input');
+                const currentPrice = parseFloat(priceInput.value) || 0;
+                const originalPrice = parseFloat(priceInput.dataset.original) || 0;
+
+                total += currentPrice;
+                origTotal += originalPrice;
                 count++;
             });
 
             selectedTotal = total;
+            originalTotal = origTotal;
+            totalDiscount = origTotal - total;
+
             document.getElementById('selectedCount').textContent = count;
+            document.getElementById('originalTotal').textContent = origTotal.toFixed(2) + ' DH';
             document.getElementById('totalAmount').textContent = total.toFixed(2) + ' DH';
+
+            // Show/hide discount row
+            const discountRow = document.getElementById('discountRow');
+            if (totalDiscount > 0) {
+                document.getElementById('totalDiscount').textContent = '-' + totalDiscount.toFixed(2) + ' DH';
+                discountRow.style.display = 'flex';
+            } else {
+                discountRow.style.display = 'none';
+            }
 
             // Auto-fill deposit amount
             const depositInput = document.getElementById('useDeposit');

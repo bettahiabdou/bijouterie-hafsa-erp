@@ -372,8 +372,25 @@ def make_purchase(request, pk):
         messages.error(request, 'Produits non disponibles.')
         return redirect('deposits:purchase', pk=pk)
 
-    # Calculate total
-    total_amount = sum(p.selling_price for p in products)
+    # Calculate total with custom prices
+    total_amount = Decimal('0')
+    product_prices = {}  # Store custom prices for each product
+
+    for product in products:
+        # Check if custom selling price was provided
+        custom_price_key = f'selling_price_{product.pk}'
+        custom_price = request.POST.get(custom_price_key)
+
+        if custom_price:
+            try:
+                price = Decimal(custom_price)
+            except InvalidOperation:
+                price = product.selling_price
+        else:
+            price = product.selling_price
+
+        product_prices[product.pk] = price
+        total_amount += price
 
     # Validate amounts
     if use_deposit > account.balance:
@@ -414,12 +431,15 @@ def make_purchase(request, pk):
 
         # Add invoice items
         for product in products:
+            # Use custom price if available, otherwise use product's selling price
+            item_price = product_prices.get(product.pk, product.selling_price)
+
             SaleInvoiceItem.objects.create(
                 invoice=invoice,
                 product=product,
                 quantity=1,
-                unit_price=product.selling_price,
-                total_price=product.selling_price
+                unit_price=item_price,
+                total_price=item_price
             )
             # Mark product as sold
             product.status = 'sold'
