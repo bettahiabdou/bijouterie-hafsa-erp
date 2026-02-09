@@ -82,9 +82,9 @@
                             </thead>
                             <tbody>
                                 {% for product in products %}
-                                    <tr data-price="{{ product.selling_price }}" data-product-id="{{ product.pk }}">
+                                    <tr data-price="{{ product.selling_price }}" data-product-id="{{ product.pk }}" data-reference="{{ product.reference }}" data-description="{{ product.description|default:'' }}">
                                         <td>
-                                            <input type="checkbox" name="products" value="{{ product.pk }}" class="product-checkbox" onchange="updateTotal()">
+                                            <input type="checkbox" class="product-checkbox" data-product-id="{{ product.pk }}">
                                         </td>
                                         <td>
                                             <span class="font-semibold text-primary">{{ product.reference }}</span>
@@ -100,25 +100,21 @@
                                         <td class="font-semibold original-price">{{ product.selling_price|floatformat:2 }} DH</td>
                                         <td>
                                             <input type="number"
-                                                   name="selling_price_{{ product.pk }}"
                                                    class="form-input selling-price-input"
                                                    style="width: 100px;"
                                                    step="0.01"
                                                    min="0"
                                                    value="{{ product.selling_price|floatformat:2 }}"
-                                                   data-original="{{ product.selling_price }}"
-                                                   onchange="updateProductPrice(this, {{ product.pk }})">
+                                                   data-original="{{ product.selling_price }}">
                                         </td>
                                         <td>
                                             <input type="number"
-                                                   name="discount_{{ product.pk }}"
                                                    class="form-input discount-input"
                                                    style="width: 80px;"
                                                    step="0.01"
                                                    min="0"
                                                    value="0"
-                                                   data-product-id="{{ product.pk }}"
-                                                   onchange="applyDiscount(this, {{ product.pk }})">
+                                                   data-product-id="{{ product.pk }}">
                                         </td>
                                     </tr>
                                 {% empty %}
@@ -136,6 +132,13 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Confirm Selection Button -->
+                    <div class="p-4 border-t" style="border-color: var(--neutral-100);">
+                        <button type="button" onclick="confirmSelection()" class="btn btn-primary" id="confirmBtn">
+                            <i class="fas fa-check-circle mr-2"></i> Confirmer la Sélection (<span id="selectionCount">0</span>)
+                        </button>
                     </div>
 
                     <!-- Pagination -->
@@ -177,10 +180,24 @@
                         </div>
                     </div>
 
+                    <!-- Confirmed Products List -->
+                    <div class="confirmed-products-section mb-4">
+                        <h4 class="section-title mb-2">Produits Confirmés</h4>
+                        <div id="confirmedProductsList" class="confirmed-products-list">
+                            <div class="empty-selection">
+                                <i class="fas fa-hand-pointer"></i>
+                                <p>Sélectionnez des produits et cliquez sur "Confirmer la Sélection"</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden inputs for form submission -->
+                    <div id="hiddenInputsContainer"></div>
+
                     <!-- Selected Products Summary -->
                     <div class="summary-box mb-4">
                         <div class="summary-row">
-                            <span>Produits sélectionnés:</span>
+                            <span>Produits confirmés:</span>
                             <span id="selectedCount">0</span>
                         </div>
                         <div class="summary-row">
@@ -320,7 +337,7 @@
             font-weight: var(--font-bold);
         }
 
-        .payment-section h4 {
+        .payment-section h4, .section-title {
             font-size: var(--text-sm);
             font-weight: var(--font-semibold);
             color: var(--neutral-700);
@@ -339,6 +356,79 @@
         .selling-price-input:focus, .discount-input:focus {
             border-color: var(--primary-500);
             box-shadow: 0 0 0 3px rgba(var(--primary-500-rgb), 0.1);
+        }
+
+        /* Confirmed products list */
+        .confirmed-products-section {
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            padding: var(--space-3);
+        }
+
+        .confirmed-products-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .empty-selection {
+            text-align: center;
+            padding: var(--space-4);
+            color: var(--neutral-400);
+        }
+
+        .empty-selection i {
+            font-size: var(--text-2xl);
+            margin-bottom: var(--space-2);
+        }
+
+        .empty-selection p {
+            font-size: var(--text-sm);
+            margin: 0;
+        }
+
+        .confirmed-product-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-2);
+            border-bottom: 1px solid var(--neutral-100);
+            font-size: var(--text-sm);
+        }
+
+        .confirmed-product-item:last-child {
+            border-bottom: none;
+        }
+
+        .confirmed-product-info {
+            flex: 1;
+        }
+
+        .confirmed-product-ref {
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+        }
+
+        .confirmed-product-price {
+            font-weight: var(--font-semibold);
+            margin-left: var(--space-2);
+        }
+
+        .confirmed-product-discount {
+            color: var(--success-600);
+            font-size: var(--text-xs);
+        }
+
+        .remove-product-btn {
+            background: none;
+            border: none;
+            color: var(--error-500);
+            cursor: pointer;
+            padding: var(--space-1);
+            margin-left: var(--space-2);
+        }
+
+        .remove-product-btn:hover {
+            color: var(--error-700);
         }
 
         @media (max-width: 1023px) {
@@ -362,78 +452,178 @@
 
     <script>
         const accountBalance = {{ account.balance }};
+        let confirmedProducts = {};  // Store confirmed products {id: {reference, description, originalPrice, sellingPrice, discount}}
         let selectedTotal = 0;
         let originalTotal = 0;
         let totalDiscount = 0;
 
-        // Store custom prices for each product
-        const productPrices = {};
+        // Handle discount input change
+        document.querySelectorAll('.discount-input').forEach(input => {
+            input.addEventListener('input', function() {
+                const row = this.closest('tr');
+                const priceInput = row.querySelector('.selling-price-input');
+                const originalPrice = parseFloat(priceInput.dataset.original) || 0;
+                const discount = parseFloat(this.value) || 0;
+
+                // Calculate new price after discount
+                const newPrice = Math.max(0, originalPrice - discount);
+                priceInput.value = newPrice.toFixed(2);
+            });
+        });
+
+        // Handle selling price input change
+        document.querySelectorAll('.selling-price-input').forEach(input => {
+            input.addEventListener('input', function() {
+                const row = this.closest('tr');
+                const discountInput = row.querySelector('.discount-input');
+                const originalPrice = parseFloat(this.dataset.original) || 0;
+                const newPrice = parseFloat(this.value) || 0;
+
+                // Calculate discount
+                const discount = Math.max(0, originalPrice - newPrice);
+                discountInput.value = discount.toFixed(2);
+            });
+        });
 
         function toggleSelectAll(checkbox) {
             document.querySelectorAll('.product-checkbox').forEach(cb => {
                 cb.checked = checkbox.checked;
             });
-            updateTotal();
+            updateSelectionCount();
         }
 
-        function updateProductPrice(input, productId) {
-            const newPrice = parseFloat(input.value) || 0;
-            const originalPrice = parseFloat(input.dataset.original) || 0;
-            const row = input.closest('tr');
+        // Update selection count when checkboxes change
+        document.querySelectorAll('.product-checkbox').forEach(cb => {
+            cb.addEventListener('change', updateSelectionCount);
+        });
 
-            // Update stored price
-            productPrices[productId] = newPrice;
-
-            // Update discount field to reflect the difference
-            const discountInput = row.querySelector('.discount-input');
-            const discount = Math.max(0, originalPrice - newPrice);
-            discountInput.value = discount.toFixed(2);
-
-            // Update row data-price for calculations
-            row.dataset.price = newPrice;
-
-            updateTotal();
+        function updateSelectionCount() {
+            const count = document.querySelectorAll('.product-checkbox:checked').length;
+            document.getElementById('selectionCount').textContent = count;
         }
 
-        function applyDiscount(input, productId) {
-            const discount = parseFloat(input.value) || 0;
-            const row = input.closest('tr');
-            const priceInput = row.querySelector('.selling-price-input');
-            const originalPrice = parseFloat(priceInput.dataset.original) || 0;
+        function confirmSelection() {
+            const checkedBoxes = document.querySelectorAll('.product-checkbox:checked');
 
-            // Calculate new price after discount
-            const newPrice = Math.max(0, originalPrice - discount);
-            priceInput.value = newPrice.toFixed(2);
+            if (checkedBoxes.length === 0) {
+                alert('Veuillez sélectionner au moins un produit.');
+                return;
+            }
 
-            // Update stored price
-            productPrices[productId] = newPrice;
-
-            // Update row data-price for calculations
-            row.dataset.price = newPrice;
-
-            updateTotal();
-        }
-
-        function updateTotal() {
-            let total = 0;
-            let origTotal = 0;
-            let count = 0;
-
-            document.querySelectorAll('.product-checkbox:checked').forEach(cb => {
+            checkedBoxes.forEach(cb => {
                 const row = cb.closest('tr');
                 const productId = row.dataset.productId;
+                const reference = row.dataset.reference;
+                const description = row.dataset.description;
                 const priceInput = row.querySelector('.selling-price-input');
-                const currentPrice = parseFloat(priceInput.value) || 0;
-                const originalPrice = parseFloat(priceInput.dataset.original) || 0;
+                const discountInput = row.querySelector('.discount-input');
 
-                total += currentPrice;
-                origTotal += originalPrice;
+                const originalPrice = parseFloat(priceInput.dataset.original) || 0;
+                const sellingPrice = parseFloat(priceInput.value) || 0;
+                const discount = parseFloat(discountInput.value) || 0;
+
+                // Add to confirmed products (overwrites if already exists)
+                confirmedProducts[productId] = {
+                    reference: reference,
+                    description: description,
+                    originalPrice: originalPrice,
+                    sellingPrice: sellingPrice,
+                    discount: discount
+                };
+
+                // Uncheck the checkbox
+                cb.checked = false;
+
+                // Visually mark the row as confirmed
+                row.classList.add('confirmed-row');
+            });
+
+            // Update the selection count
+            updateSelectionCount();
+
+            // Update the confirmed products list
+            renderConfirmedProducts();
+
+            // Update totals and payment fields
+            updateTotals();
+        }
+
+        function renderConfirmedProducts() {
+            const container = document.getElementById('confirmedProductsList');
+            const hiddenContainer = document.getElementById('hiddenInputsContainer');
+            const productIds = Object.keys(confirmedProducts);
+
+            if (productIds.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-selection">
+                        <i class="fas fa-hand-pointer"></i>
+                        <p>Sélectionnez des produits et cliquez sur "Confirmer la Sélection"</p>
+                    </div>
+                `;
+                hiddenContainer.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            let hiddenInputs = '';
+
+            productIds.forEach(id => {
+                const product = confirmedProducts[id];
+                const discountText = product.discount > 0 ? `<span class="confirmed-product-discount">(-${product.discount.toFixed(2)} DH)</span>` : '';
+
+                html += `
+                    <div class="confirmed-product-item" data-product-id="${id}">
+                        <div class="confirmed-product-info">
+                            <span class="confirmed-product-ref">${product.reference}</span>
+                            ${discountText}
+                        </div>
+                        <span class="confirmed-product-price">${product.sellingPrice.toFixed(2)} DH</span>
+                        <button type="button" class="remove-product-btn" onclick="removeProduct('${id}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+
+                // Hidden inputs for form submission
+                hiddenInputs += `
+                    <input type="hidden" name="products" value="${id}">
+                    <input type="hidden" name="selling_price_${id}" value="${product.sellingPrice.toFixed(2)}">
+                `;
+            });
+
+            container.innerHTML = html;
+            hiddenContainer.innerHTML = hiddenInputs;
+        }
+
+        function removeProduct(productId) {
+            delete confirmedProducts[productId];
+
+            // Remove the confirmed-row class from the table row if visible
+            const row = document.querySelector(`tr[data-product-id="${productId}"]`);
+            if (row) {
+                row.classList.remove('confirmed-row');
+            }
+
+            renderConfirmedProducts();
+            updateTotals();
+        }
+
+        function updateTotals() {
+            let total = 0;
+            let origTotal = 0;
+            let discount = 0;
+            let count = 0;
+
+            Object.values(confirmedProducts).forEach(product => {
+                total += product.sellingPrice;
+                origTotal += product.originalPrice;
+                discount += product.discount;
                 count++;
             });
 
             selectedTotal = total;
             originalTotal = origTotal;
-            totalDiscount = origTotal - total;
+            totalDiscount = discount;
 
             document.getElementById('selectedCount').textContent = count;
             document.getElementById('originalTotal').textContent = origTotal.toFixed(2) + ' DH';
@@ -479,7 +669,7 @@
                 submitBtn.disabled = true;
             } else {
                 remainingRow.style.display = 'none';
-                submitBtn.disabled = selectedTotal <= 0;
+                submitBtn.disabled = Object.keys(confirmedProducts).length === 0;
             }
 
             // Validate deposit doesn't exceed balance
@@ -510,10 +700,9 @@
 
         // Form validation
         document.getElementById('purchaseForm').addEventListener('submit', function(e) {
-            const checkedProducts = document.querySelectorAll('.product-checkbox:checked');
-            if (checkedProducts.length === 0) {
+            if (Object.keys(confirmedProducts).length === 0) {
                 e.preventDefault();
-                alert('Veuillez sélectionner au moins un produit.');
+                alert('Veuillez confirmer au moins un produit.');
                 return;
             }
 
@@ -533,5 +722,8 @@
                 return;
             }
         });
+
+        // Initialize selection count
+        updateSelectionCount();
     </script>
 {% endblock %}
