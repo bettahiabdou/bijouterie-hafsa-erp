@@ -82,7 +82,7 @@
                             </thead>
                             <tbody>
                                 {% for product in products %}
-                                    <tr data-price="{{ product.selling_price }}" data-product-id="{{ product.pk }}" data-reference="{{ product.reference }}" data-description="{{ product.description|default:'' }}">
+                                    <tr data-price="{{ product.selling_price|stringformat:'.2f' }}" data-product-id="{{ product.pk }}" data-reference="{{ product.reference }}" data-description="{{ product.description|default:'' }}">
                                         <td>
                                             <input type="checkbox" class="product-checkbox" data-product-id="{{ product.pk }}">
                                         </td>
@@ -104,8 +104,8 @@
                                                    style="width: 100px;"
                                                    step="0.01"
                                                    min="0"
-                                                   value="{{ product.selling_price|floatformat:2 }}"
-                                                   data-original="{{ product.selling_price }}">
+                                                   value="{{ product.selling_price|stringformat:'.2f' }}"
+                                                   data-original="{{ product.selling_price|stringformat:'.2f' }}">
                                         </td>
                                         <td>
                                             <input type="number"
@@ -231,15 +231,15 @@
 
                         <div class="form-group">
                             <label class="form-label">Mode de paiement (complémentaire)</label>
-                            <select name="payment_method" class="form-select">
-                                <option value="">-- Sélectionner --</option>
+                            <select name="payment_method" id="paymentMethod" class="form-select" onchange="onPaymentMethodChange()">
+                                <option value="" data-code="">-- Sélectionner --</option>
                                 {% for pm in payment_methods %}
-                                    <option value="{{ pm.pk }}">{{ pm.name }}</option>
+                                    <option value="{{ pm.pk }}" data-code="{{ pm.code|default:pm.name|lower }}">{{ pm.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" id="bankAccountGroup" style="display: none;">
                             <label class="form-label">Compte bancaire</label>
                             <select name="bank_account" class="form-select">
                                 <option value="">-- Sélectionner --</option>
@@ -249,9 +249,9 @@
                             </select>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" id="paymentReferenceGroup" style="display: none;">
                             <label class="form-label">Référence</label>
-                            <input type="text" name="payment_reference" class="form-input" placeholder="N° chèque...">
+                            <input type="text" name="payment_reference" class="form-input" placeholder="N° chèque, N° virement...">
                         </div>
                     </div>
 
@@ -685,6 +685,26 @@
         // Called when additional payment input changes - just update display
         function onAdditionalPaymentChange() {
             updatePaymentDisplay();
+        }
+
+        // Called when payment method changes - show/hide bank account and reference fields
+        function onPaymentMethodChange() {
+            const select = document.getElementById('paymentMethod');
+            const selectedOption = select.options[select.selectedIndex];
+            const code = (selectedOption.dataset.code || '').toLowerCase();
+            const methodName = selectedOption.text.toLowerCase();
+
+            const bankAccountGroup = document.getElementById('bankAccountGroup');
+            const paymentReferenceGroup = document.getElementById('paymentReferenceGroup');
+
+            // Show bank account only for "virement" (transfer)
+            const isVirement = code.includes('virement') || methodName.includes('virement');
+            bankAccountGroup.style.display = isVirement ? 'block' : 'none';
+
+            // Show reference for everything except "espèces" (cash) and empty selection
+            const isEspeces = code.includes('espece') || code.includes('cash') || methodName.includes('espèce') || methodName.includes('espece');
+            const isEmpty = !select.value;
+            paymentReferenceGroup.style.display = (!isEmpty && !isEspeces) ? 'block' : 'none';
         }
 
         // Update the payment summary display (no auto-calculation)

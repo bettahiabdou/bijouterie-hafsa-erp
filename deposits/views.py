@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.core.paginator import Paginator
 from django.http import JsonResponse
+from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 
 from .models import DepositAccount, DepositTransaction
@@ -421,9 +422,13 @@ def make_purchase(request, pk):
     with transaction.atomic():
         # Create invoice
         invoice = SaleInvoice.objects.create(
+            date=timezone.now().date(),
             client=account.client,
+            seller=request.user,
+            subtotal=total_amount,
             total_amount=total_amount,
-            paid_amount=total_payment,
+            amount_paid=total_payment,
+            balance_due=max(Decimal('0'), total_amount - total_payment),
             status='paid' if total_payment >= total_amount else 'partial',
             notes=f'Achat via dépôt client. {notes}',
             created_by=request.user
