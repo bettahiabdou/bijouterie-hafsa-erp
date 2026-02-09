@@ -438,13 +438,16 @@ def make_purchase(request, pk):
         for product in products:
             # Use custom price if available, otherwise use product's selling price
             item_price = product_prices.get(product.pk, product.selling_price)
+            original_price = product.selling_price
 
             SaleInvoiceItem.objects.create(
                 invoice=invoice,
                 product=product,
                 quantity=1,
                 unit_price=item_price,
-                total_price=item_price
+                original_price=original_price,
+                total_amount=item_price,
+                discount_amount=max(Decimal('0'), original_price - item_price)
             )
             # Mark product as sold
             product.status = 'sold'
