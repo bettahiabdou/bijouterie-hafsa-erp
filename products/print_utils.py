@@ -11,17 +11,22 @@ def get_printer_settings():
     """
     Get printer settings from SystemConfig (database) or fall back to Django settings.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     try:
         from settings_app.models import SystemConfig
         config = SystemConfig.get_config()
+        logger.info(f"Printer config from DB: IP={config.zebra_printer_ip}, Port={config.zebra_printer_port}, Enabled={config.zebra_printer_enabled}")
         if config.zebra_printer_ip and config.zebra_printer_enabled:
             return str(config.zebra_printer_ip), config.zebra_printer_port or 9100
-    except Exception:
-        pass  # Fall back to Django settings
+    except Exception as e:
+        logger.exception(f"Error getting printer config from DB: {e}")
 
     # Fallback to environment variables
     host = getattr(settings, 'ZEBRA_PRINTER_HOST', '')
     port = getattr(settings, 'ZEBRA_PRINTER_PORT', 9100)
+    logger.info(f"Using fallback printer config: IP={host}, Port={port}")
     return host, port
 
 
