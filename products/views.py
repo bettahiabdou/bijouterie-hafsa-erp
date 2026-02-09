@@ -764,7 +764,8 @@ def print_test(request):
 
 @login_required(login_url='login')
 def printer_debug(request):
-    """Debug endpoint to check printer configuration"""
+    """Debug endpoint to check printer configuration and test connection"""
+    import socket
     from .print_utils import get_printer_settings
     from settings_app.models import SystemConfig
 
@@ -780,6 +781,29 @@ def printer_debug(request):
 
     active_ip, active_port = get_printer_settings()
 
+    # Test connection to printer
+    connection_test = {
+        'tested': False,
+        'success': False,
+        'message': 'Not tested'
+    }
+
+    if active_ip and active_port:
+        connection_test['tested'] = True
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)  # 5 second timeout for test
+            sock.connect((active_ip, active_port))
+            sock.close()
+            connection_test['success'] = True
+            connection_test['message'] = f'Successfully connected to {active_ip}:{active_port}'
+        except socket.timeout:
+            connection_test['message'] = f'Connection timeout to {active_ip}:{active_port}'
+        except ConnectionRefusedError:
+            connection_test['message'] = f'Connection refused by {active_ip}:{active_port}'
+        except Exception as e:
+            connection_test['message'] = f'Connection error: {str(e)}'
+
     return JsonResponse({
         'database_config': {
             'ip': str(db_ip) if db_ip else None,
@@ -789,5 +813,6 @@ def printer_debug(request):
         'active_config': {
             'ip': active_ip,
             'port': active_port,
-        }
+        },
+        'connection_test': connection_test
     })
