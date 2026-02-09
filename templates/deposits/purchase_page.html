@@ -244,7 +244,7 @@
                             <select name="bank_account" class="form-select">
                                 <option value="">-- Sélectionner --</option>
                                 {% for ba in bank_accounts %}
-                                    <option value="{{ ba.pk }}">{{ ba.name }}</option>
+                                    <option value="{{ ba.pk }}">{{ ba.bank_name }} - {{ ba.account_name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
