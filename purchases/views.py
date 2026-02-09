@@ -419,6 +419,145 @@ def purchase_invoice_detail(request, reference):
                 if errors:
                     messages.error(request, f'Erreurs: {", ".join(errors)}')
 
+        # Handle bulk product creation (create new products and add to invoice)
+        elif action == 'bulk_create_products':
+            from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount
+
+            # Get common parameters
+            purchase_price_per_gram = Decimal(request.POST.get('purchase_price_per_gram', '0') or '0')
+            labor_cost = Decimal(request.POST.get('labor_cost', '0') or '0')
+            stone_cost = Decimal(request.POST.get('stone_cost', '0') or '0')
+            other_cost = Decimal(request.POST.get('other_cost', '0') or '0')
+            margin_type = request.POST.get('margin_type', 'percentage')
+            margin_value = Decimal(request.POST.get('margin_value', '25') or '25')
+
+            # Get product data lists
+            names = request.POST.getlist('product_name')
+            categories_list = request.POST.getlist('product_category')
+            types = request.POST.getlist('product_type')
+            weights = request.POST.getlist('product_weight')
+            selling_prices = request.POST.getlist('product_selling_price')
+            metal_types = request.POST.getlist('product_metal_type')
+            purities_list = request.POST.getlist('product_purity')
+            sizes = request.POST.getlist('product_size')
+
+            created_count = 0
+            errors = []
+
+            for i, weight in enumerate(weights):
+                try:
+                    net_weight = Decimal(weight or '0')
+                    if net_weight <= 0:
+                        continue
+
+                    # Get optional fields
+                    name = names[i] if i < len(names) else f'Produit {i+1}'
+                    category_id = categories_list[i] if i < len(categories_list) else ''
+                    product_type = types[i] if i < len(types) else 'finished'
+                    selling_price_str = selling_prices[i] if i < len(selling_prices) else ''
+                    metal_type_id = metal_types[i] if i < len(metal_types) else ''
+                    purity_id = purities_list[i] if i < len(purities_list) else ''
+                    size = sizes[i] if i < len(sizes) else ''
+
+                    # Get related objects
+                    category = ProductCategory.objects.filter(pk=category_id).first() if category_id else None
+                    metal_type = MetalType.objects.filter(pk=metal_type_id).first() if metal_type_id else None
+                    metal_purity = MetalPurity.objects.filter(pk=purity_id).first() if purity_id else None
+
+                    # Validate required fields
+                    if not category:
+                        errors.append(f'Produit {i+1}: catégorie requise')
+                        continue
+                    if not metal_type:
+                        errors.append(f'Produit {i+1}: type de métal requis')
+                        continue
+                    if not metal_purity:
+                        errors.append(f'Produit {i+1}: pureté requise')
+                        continue
+
+                    # Calculate costs
+                    metal_cost = net_weight * purchase_price_per_gram
+                    total_cost = metal_cost + labor_cost + stone_cost + other_cost
+
+                    # Calculate selling price
+                    if selling_price_str:
+                        selling_price = Decimal(selling_price_str)
+                    else:
+                        if margin_type == 'percentage':
+                            selling_price = total_cost * (1 + margin_value / 100)
+                        else:
+                            selling_price = total_cost + margin_value
+
+                    # Create the product
+                    product = Product(
+                        name=name or f'Produit {invoice.reference}',
+                        category=category,
+                        product_type=product_type,
+                        metal_type=metal_type,
+                        metal_purity=metal_purity,
+                        gross_weight=net_weight,
+                        net_weight=net_weight,
+                        size=size,
+                        supplier=invoice.supplier,
+                        purchase_price_per_gram=purchase_price_per_gram,
+                        labor_cost=labor_cost,
+                        stone_cost=stone_cost,
+                        other_cost=other_cost,
+                        selling_price=selling_price,
+                        status='available',
+                        created_by=request.user
+                    )
+                    product.save()
+
+                    # Create invoice item linked to product
+                    PurchaseInvoiceItem.objects.create(
+                        invoice=invoice,
+                        product=product,
+                        description=f"{product.name} - {product.reference}",
+                        category=category,
+                        metal_type=metal_type,
+                        metal_purity=metal_purity,
+                        gross_weight=net_weight,
+                        net_weight=net_weight,
+                        price_per_gram=purchase_price_per_gram,
+                        labor_cost=labor_cost,
+                    )
+
+                    created_count += 1
+
+                    # Log the creation
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.CREATE,
+                        model_name='Product',
+                        object_id=str(product.id),
+                        object_repr=f'Created product {product.reference} from invoice {invoice.reference}',
+                        ip_address=get_client_ip(request)
+                    )
+
+                except Exception as e:
+                    errors.append(f'Produit {i+1}: {str(e)}')
+
+            if created_count > 0:
+                # Update invoice totals
+                invoice.calculate_totals()
+                invoice.save()
+
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action=ActivityLog.ActionType.UPDATE,
+                    model_name='PurchaseInvoice',
+                    object_id=str(invoice.id),
+                    object_repr=f'Bulk created {created_count} products for invoice {invoice.reference}',
+                    ip_address=get_client_ip(request)
+                )
+                messages.success(request, f'{created_count} produit(s) créé(s) et ajouté(s) à la facture.')
+
+            if errors:
+                messages.error(request, f'Erreurs: {"; ".join(errors[:5])}')  # Show first 5 errors
+
+            return redirect('purchases:purchase_invoice_detail', reference=invoice.reference)
+
         # Handle return item action (Retour au fournisseur)
         elif action == 'return_item':
             item_id = request.POST.get('item_id')
@@ -579,6 +718,14 @@ def purchase_invoice_detail(request, reference):
         'original_product', 'replacement_product', 'created_by'
     ).all()
 
+    # Get data for bulk product creation modal
+    from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount
+    categories = ProductCategory.objects.filter(is_active=True)
+    metals = MetalType.objects.all()
+    purities = MetalPurity.objects.all()
+    bank_accounts = BankAccount.objects.filter(is_active=True)
+    product_types = Product.ProductType.choices
+
     context = {
         'invoice': invoice,
         'items': items,
@@ -589,6 +736,12 @@ def purchase_invoice_detail(request, reference):
         'total_gross_weight': total_gross_weight,
         'total_net_weight': total_net_weight,
         'invoice_actions': invoice_actions,
+        # For bulk product creation
+        'categories': categories,
+        'metals': metals,
+        'purities': purities,
+        'bank_accounts': bank_accounts,
+        'product_types': product_types,
     }
     return render(request, 'purchases/purchase_invoice_detail.html', context)
 

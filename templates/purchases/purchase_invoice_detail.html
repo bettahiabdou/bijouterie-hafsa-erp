@@ -61,10 +61,16 @@
             <div class="card animate-slide-up" style="animation-delay: 100ms;">
                 <div class="card-header">
                     <h3><i class="fas fa-list mr-2"></i> Articles</h3>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="openAddProductModal()">
-                        <i class="fas fa-plus"></i>
-                        <span>Ajouter Produit</span>
-                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="openAddProductModal()">
+                            <i class="fas fa-search"></i>
+                            <span>Sélectionner Existants</span>
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="openBulkCreateModal()">
+                            <i class="fas fa-plus"></i>
+                            <span>Créer en Lot</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body" style="padding: 0;">
                     <!-- Desktop Table -->
@@ -1132,5 +1138,325 @@
                 closeRemoveModal();
             }
         });
+
+        // ===== Bulk Create Modal Functions =====
+        let bulkProductIndex = 0;
+
+        function openBulkCreateModal() {
+            document.getElementById('bulkCreateModal').classList.add('active');
+            calculateBulkPreview();
+        }
+
+        function closeBulkCreateModal() {
+            document.getElementById('bulkCreateModal').classList.remove('active');
+        }
+
+        function addBulkProductRow() {
+            bulkProductIndex++;
+            const tbody = document.getElementById('bulk_products_list');
+            const template = document.getElementById('bulk_row_template');
+            const clone = template.content.cloneNode(true);
+
+            // Update index references
+            clone.querySelectorAll('[name]').forEach(el => {
+                if (el.name.includes('_0')) {
+                    el.name = el.name.replace('_0', `_${bulkProductIndex}`);
+                }
+            });
+            clone.querySelector('.product-row-number').textContent = bulkProductIndex + 1;
+            clone.querySelector('.bulk_remove_btn').style.display = 'inline-flex';
+
+            tbody.appendChild(clone);
+            calculateBulkPreview();
+            updateBulkRemoveButtons();
+        }
+
+        function removeBulkProductRow(btn) {
+            const row = btn.closest('.bulk-product-row');
+            if (row) {
+                row.remove();
+                updateBulkRowNumbers();
+                calculateBulkPreview();
+                updateBulkRemoveButtons();
+            }
+        }
+
+        function updateBulkRowNumbers() {
+            const rows = document.querySelectorAll('.bulk-product-row');
+            rows.forEach((row, index) => {
+                row.querySelector('.product-row-number').textContent = index + 1;
+            });
+        }
+
+        function updateBulkRemoveButtons() {
+            const rows = document.querySelectorAll('.bulk-product-row');
+            rows.forEach((row, index) => {
+                const btn = row.querySelector('.bulk_remove_btn');
+                btn.style.display = rows.length > 1 ? 'inline-flex' : 'none';
+            });
+        }
+
+        function calculateBulkPreview() {
+            const pricePerGram = parseFloat(document.getElementById('bulk_purchase_price_per_gram').value) || 0;
+            const laborCost = parseFloat(document.getElementById('bulk_labor_cost').value) || 0;
+            const stoneCost = parseFloat(document.getElementById('bulk_stone_cost').value) || 0;
+            const otherCost = parseFloat(document.getElementById('bulk_other_cost').value) || 0;
+            const marginType = document.getElementById('bulk_margin_type').value;
+            const marginValue = parseFloat(document.getElementById('bulk_margin_value').value) || 0;
+
+            let totalCost = 0;
+            let productCount = 0;
+
+            document.querySelectorAll('.bulk-product-row').forEach(row => {
+                const weightInput = row.querySelector('.bulk_product_weight');
+                const sellingPriceInput = row.querySelector('.bulk_product_selling_price');
+                const costDisplay = row.querySelector('.bulk_product_cost');
+
+                const weight = parseFloat(weightInput?.value) || 0;
+                if (weight > 0) {
+                    productCount++;
+                    const metalCost = weight * pricePerGram;
+                    const itemCost = metalCost + laborCost + stoneCost + otherCost;
+                    totalCost += itemCost;
+
+                    if (costDisplay) {
+                        costDisplay.value = itemCost.toFixed(2);
+                    }
+
+                    // Auto-calculate selling price if not manually edited
+                    if (sellingPriceInput && !sellingPriceInput.dataset.manuallyEdited) {
+                        let sellingPrice;
+                        if (marginType === 'percentage') {
+                            sellingPrice = itemCost * (1 + marginValue / 100);
+                        } else {
+                            sellingPrice = itemCost + marginValue;
+                        }
+                        sellingPriceInput.value = sellingPrice.toFixed(2);
+                    }
+                }
+            });
+
+            document.getElementById('bulk_preview_count').textContent = productCount;
+            document.getElementById('bulk_preview_total').textContent = totalCost.toFixed(2);
+        }
+
+        function markSellingPriceEdited(input) {
+            input.dataset.manuallyEdited = 'true';
+        }
+
+        function resetSellingPrice(input) {
+            input.dataset.manuallyEdited = '';
+            calculateBulkPreview();
+        }
+
+        function submitBulkCreate() {
+            document.getElementById('bulkCreateForm').submit();
+        }
+
+        // Close bulk create modal on outside click
+        document.getElementById('bulkCreateModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeBulkCreateModal();
+            }
+        });
     </script>
+
+    <!-- Bulk Create Modal -->
+    <div id="bulkCreateModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 95%; width: 1200px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus-circle mr-2"></i> Créer des Produits en Lot</h3>
+                <button type="button" class="modal-close" onclick="closeBulkCreateModal()">&times;</button>
+            </div>
+            <form method="post" id="bulkCreateForm">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="bulk_create_products">
+
+                <div class="modal-body">
+                    <!-- Common Parameters -->
+                    <div class="mb-6 p-4 rounded-lg" style="background: var(--neutral-50); border: 1px solid var(--neutral-200);">
+                        <h4 class="font-semibold mb-4"><i class="fas fa-sliders-h text-primary mr-2"></i> Paramètres Communs</h4>
+                        <div class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Prix/g (DH) *</label>
+                                <input type="number" id="bulk_purchase_price_per_gram" name="purchase_price_per_gram" value="0"
+                                    step="0.01" min="0" class="form-input" onchange="calculateBulkPreview()">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Main d'Oeuvre</label>
+                                <input type="number" id="bulk_labor_cost" name="labor_cost" value="0"
+                                    step="0.01" min="0" class="form-input" onchange="calculateBulkPreview()">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Pierres</label>
+                                <input type="number" id="bulk_stone_cost" name="stone_cost" value="0"
+                                    step="0.01" min="0" class="form-input" onchange="calculateBulkPreview()">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Autres</label>
+                                <input type="number" id="bulk_other_cost" name="other_cost" value="0"
+                                    step="0.01" min="0" class="form-input" onchange="calculateBulkPreview()">
+                            </div>
+                        </div>
+                        <div class="grid mt-4" style="grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Type de Marge</label>
+                                <select id="bulk_margin_type" name="margin_type" class="form-select" onchange="calculateBulkPreview()">
+                                    <option value="percentage">Pourcentage (%)</option>
+                                    <option value="fixed">Montant Fixe (DH)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Valeur de Marge</label>
+                                <input type="number" id="bulk_margin_value" name="margin_value" value="25"
+                                    step="0.01" min="0" class="form-input" onchange="calculateBulkPreview()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Products Table -->
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="font-semibold"><i class="fas fa-list text-primary mr-2"></i> Produits à Créer</h4>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="addBulkProductRow()">
+                                <i class="fas fa-plus"></i> Ajouter Ligne
+                            </button>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table class="table" style="font-size: 0.875rem;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px;">#</th>
+                                        <th>Nom</th>
+                                        <th>Catégorie *</th>
+                                        <th>Métal *</th>
+                                        <th>Pureté *</th>
+                                        <th>Poids (g) *</th>
+                                        <th>Coût</th>
+                                        <th>Prix Vente</th>
+                                        <th style="width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bulk_products_list">
+                                    <!-- First row -->
+                                    <tr class="bulk-product-row">
+                                        <td><span class="product-row-number">1</span></td>
+                                        <td><input type="text" name="product_name" class="form-input" placeholder="Produit 1" style="min-width: 120px;"></td>
+                                        <td>
+                                            <select name="product_category" class="form-select" style="min-width: 120px;">
+                                                <option value="">--</option>
+                                                {% for cat in categories %}
+                                                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select name="product_metal_type" class="form-select" style="min-width: 80px;">
+                                                <option value="">--</option>
+                                                {% for metal in metals %}
+                                                    <option value="{{ metal.id }}" {% if metal.name == 'Or' %}selected{% endif %}>{{ metal.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select name="product_purity" class="form-select" style="min-width: 100px;">
+                                                <option value="">--</option>
+                                                {% for purity in purities %}
+                                                    <option value="{{ purity.id }}">{{ purity.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" name="product_weight" class="bulk_product_weight form-input"
+                                                step="0.001" min="0" style="width: 80px;" onchange="calculateBulkPreview()">
+                                        </td>
+                                        <td>
+                                            <input type="number" class="bulk_product_cost form-input" readonly
+                                                style="width: 90px; background: var(--success-50); color: var(--success-700);">
+                                        </td>
+                                        <td>
+                                            <input type="number" name="product_selling_price" class="bulk_product_selling_price form-input"
+                                                step="0.01" min="0" style="width: 90px; background: var(--accent-50);"
+                                                onchange="markSellingPriceEdited(this)" ondblclick="resetSellingPrice(this)">
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-ghost btn-sm bulk_remove_btn" style="display: none; color: var(--error-500);" onclick="removeBulkProductRow(this)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Preview -->
+                    <div class="p-4 rounded-lg" style="background: var(--primary-50); border: 1px solid var(--primary-200);">
+                        <div class="flex justify-between items-center">
+                            <span><strong><span id="bulk_preview_count">0</span></strong> produit(s)</span>
+                            <span>Coût total estimé: <strong><span id="bulk_preview_total">0.00</span> DH</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeBulkCreateModal()">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check mr-1"></i> Créer les Produits
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Row Template -->
+    <template id="bulk_row_template">
+        <tr class="bulk-product-row">
+            <td><span class="product-row-number">1</span></td>
+            <td><input type="text" name="product_name" class="form-input" placeholder="Produit" style="min-width: 120px;"></td>
+            <td>
+                <select name="product_category" class="form-select" style="min-width: 120px;">
+                    <option value="">--</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select name="product_metal_type" class="form-select" style="min-width: 80px;">
+                    <option value="">--</option>
+                    {% for metal in metals %}
+                        <option value="{{ metal.id }}" {% if metal.name == 'Or' %}selected{% endif %}>{{ metal.name }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select name="product_purity" class="form-select" style="min-width: 100px;">
+                    <option value="">--</option>
+                    {% for purity in purities %}
+                        <option value="{{ purity.id }}">{{ purity.name }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <input type="number" name="product_weight" class="bulk_product_weight form-input"
+                    step="0.001" min="0" style="width: 80px;" onchange="calculateBulkPreview()">
+            </td>
+            <td>
+                <input type="number" class="bulk_product_cost form-input" readonly
+                    style="width: 90px; background: var(--success-50); color: var(--success-700);">
+            </td>
+            <td>
+                <input type="number" name="product_selling_price" class="bulk_product_selling_price form-input"
+                    step="0.01" min="0" style="width: 90px; background: var(--accent-50);"
+                    onchange="markSellingPriceEdited(this)" ondblclick="resetSellingPrice(this)">
+            </td>
+            <td>
+                <button type="button" class="btn btn-ghost btn-sm bulk_remove_btn" style="color: var(--error-500);" onclick="removeBulkProductRow(this)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>
+    </template>
 {% endblock %}
