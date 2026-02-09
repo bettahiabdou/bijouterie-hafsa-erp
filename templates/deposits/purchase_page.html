@@ -457,45 +457,60 @@
         let originalTotal = 0;
         let totalDiscount = 0;
 
-        // Handle discount input change
-        document.querySelectorAll('.discount-input').forEach(input => {
-            input.addEventListener('input', function() {
-                const row = this.closest('tr');
-                const priceInput = row.querySelector('.selling-price-input');
-                const originalPrice = parseFloat(priceInput.dataset.original) || 0;
-                const discount = parseFloat(this.value) || 0;
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle discount input change
+            document.querySelectorAll('.discount-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const row = this.closest('tr');
+                    const priceInput = row.querySelector('.selling-price-input');
+                    const originalPrice = parseFloat(priceInput.dataset.original) || 0;
+                    const discount = parseFloat(this.value) || 0;
 
-                // Calculate new price after discount
-                const newPrice = Math.max(0, originalPrice - discount);
-                priceInput.value = newPrice.toFixed(2);
+                    // Calculate new price after discount
+                    const newPrice = Math.max(0, originalPrice - discount);
+                    priceInput.value = newPrice.toFixed(2);
+                });
             });
-        });
 
-        // Handle selling price input change
-        document.querySelectorAll('.selling-price-input').forEach(input => {
-            input.addEventListener('input', function() {
-                const row = this.closest('tr');
-                const discountInput = row.querySelector('.discount-input');
-                const originalPrice = parseFloat(this.dataset.original) || 0;
-                const newPrice = parseFloat(this.value) || 0;
+            // Handle selling price input change
+            document.querySelectorAll('.selling-price-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const row = this.closest('tr');
+                    const discountInput = row.querySelector('.discount-input');
+                    const originalPrice = parseFloat(this.dataset.original) || 0;
+                    const newPrice = parseFloat(this.value) || 0;
 
-                // Calculate discount
-                const discount = Math.max(0, originalPrice - newPrice);
-                discountInput.value = discount.toFixed(2);
+                    // Calculate discount
+                    const discount = Math.max(0, originalPrice - newPrice);
+                    discountInput.value = discount.toFixed(2);
+                });
             });
+
+            // Update selection count when checkboxes change
+            document.querySelectorAll('.product-checkbox').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    updateSelectionCount();
+                    // Update selectAll checkbox state
+                    const allCheckboxes = document.querySelectorAll('.product-checkbox');
+                    const checkedCheckboxes = document.querySelectorAll('.product-checkbox:checked');
+                    const selectAllCheckbox = document.getElementById('selectAll');
+                    selectAllCheckbox.checked = allCheckboxes.length > 0 && allCheckboxes.length === checkedCheckboxes.length;
+                    selectAllCheckbox.indeterminate = checkedCheckboxes.length > 0 && checkedCheckboxes.length < allCheckboxes.length;
+                });
+            });
+
+            // Initialize selection count
+            updateSelectionCount();
         });
 
         function toggleSelectAll(checkbox) {
-            document.querySelectorAll('.product-checkbox').forEach(cb => {
+            const checkboxes = document.querySelectorAll('.product-checkbox');
+            checkboxes.forEach(cb => {
                 cb.checked = checkbox.checked;
             });
             updateSelectionCount();
         }
-
-        // Update selection count when checkboxes change
-        document.querySelectorAll('.product-checkbox').forEach(cb => {
-            cb.addEventListener('change', updateSelectionCount);
-        });
 
         function updateSelectionCount() {
             const count = document.querySelectorAll('.product-checkbox:checked').length;
@@ -722,8 +737,5 @@
                 return;
             }
         });
-
-        // Initialize selection count
-        updateSelectionCount();
     </script>
 {% endblock %}
