@@ -12,8 +12,8 @@ class Migration(migrations.Migration):
     dependencies = [
         ('clients', '0002_initial'),
         ('products', '0003_product_bank_account'),
-        ('sales', '0009_rename_sales_saleinvoice_is_deleted_date_idx_sales_salei_is_dele_9f08b3_idx_and_more'),
-        ('settings_app', '0004_systemconfig'),
+        ('sales', '0008_add_return_exchange'),
+        ('settings_app', '0003_systemconfig_alter_metaltype_code_and_more'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
