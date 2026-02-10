@@ -2255,6 +2255,7 @@ def _handle_quick_product_creation(request, invoice):
         reference = f"{prefix}-{existing_count + 1:04d}"
 
         # Create product with correct field names
+        # Use margin_type='fixed' with margin_value=selling_price so the save() calculation works
         product = ProductModel.objects.create(
             reference=reference,
             name=f"{category.name} - Création rapide",
@@ -2263,9 +2264,14 @@ def _handle_quick_product_creation(request, invoice):
             metal_purity=metal_purity,
             gross_weight=weight_decimal,
             net_weight=weight_decimal,
-            selling_price=selling_price,
+            margin_type='fixed',
+            margin_value=selling_price,  # This will be added to total_cost (which is 0) = selling_price
             status='available',
         )
+
+        # Update selling_price directly in case save() calculation differs
+        ProductModel.objects.filter(pk=product.pk).update(selling_price=selling_price)
+        product.refresh_from_db()
 
         # Add to invoice with negotiated_price for proper totals calculation
         SaleInvoiceItem.objects.create(
