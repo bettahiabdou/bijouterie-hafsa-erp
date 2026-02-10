@@ -57,6 +57,23 @@
             </div>
         </div>
 
+        <!-- Date Section -->
+        <div class="card mb-6 animate-slide-up" style="animation-delay: 25ms;">
+            <div class="card-header">
+                <h3><i class="fas fa-calendar-alt mr-2"></i> Date des Transactions</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row" style="max-width: 400px;">
+                    <div class="form-group">
+                        <label for="transaction_date" class="form-label">Date de facture et paiement</label>
+                        <input type="date" name="transaction_date" id="transaction_date" class="form-input"
+                               value="{{ today|date:'Y-m-d' }}">
+                        <p class="form-hint">Date appliquee a toutes les factures et paiements (aujourd'hui par defaut)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Invoice Entry Table -->
         <div class="card mb-6 animate-slide-up" style="animation-delay: 50ms;">
             <div class="card-header">

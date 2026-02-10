@@ -1059,6 +1059,14 @@ def bulk_invoice_create(request):
         logger = logging.getLogger(__name__)
 
         try:
+            # Get transaction date (default to today)
+            from datetime import datetime
+            transaction_date_str = request.POST.get('transaction_date', '')
+            if transaction_date_str:
+                transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d').date()
+            else:
+                transaction_date = timezone.now().date()
+
             # Extract invoice rows from form
             custom_references = request.POST.getlist('custom_reference')
             client_ids = request.POST.getlist('client_id')
@@ -1189,10 +1197,10 @@ def bulk_invoice_create(request):
                     if discount_amount == 0 and calculated_discount > 0:
                         discount_amount = calculated_discount
 
-                    # Create invoice
+                    # Create invoice with custom transaction date
                     invoice = SaleInvoice.objects.create(
                         reference=reference,
-                        date=timezone.now().date(),
+                        date=transaction_date,
                         client=client,
                         seller=request.user,
                         status=SaleInvoice.Status.UNPAID,
@@ -1272,7 +1280,7 @@ def bulk_invoice_create(request):
                                             pay_ref = f"PAY-{invoice.reference}-1"
                                         ClientPayment.objects.create(
                                             reference=pay_ref,
-                                            date=timezone.now().date(),
+                                            date=transaction_date,
                                             payment_type=ClientPayment.PaymentType.INVOICE,
                                             client=client,  # Can be None for anonymous sales
                                             amount=amount_paid_1,
@@ -1304,7 +1312,7 @@ def bulk_invoice_create(request):
                                             pay_ref_2 = f"PAY-{invoice.reference}-2"
                                         ClientPayment.objects.create(
                                             reference=pay_ref_2,
-                                            date=timezone.now().date(),
+                                            date=transaction_date,
                                             payment_type=ClientPayment.PaymentType.INVOICE,
                                             client=client,  # Can be None for anonymous sales
                                             amount=amount_paid_2,
@@ -1393,6 +1401,7 @@ def bulk_invoice_create(request):
         'products': Product.objects.filter(status='available'),
         'payment_methods': PaymentMethod.objects.filter(is_active=True),
         'bank_accounts': BankAccount.objects.filter(is_active=True),
+        'today': timezone.now().date(),
     }
 
     return render(request, 'sales/bulk_invoice_form.html', context)
@@ -1656,8 +1665,12 @@ def invoice_delete(request, reference):
 @login_required(login_url='login')
 @require_http_methods(["GET", "POST"])
 def invoice_payment(request, reference):
-    """Record payment for invoice"""
-    from .forms import PaymentForm
+    """Record payment for invoice - supports dual/hybrid payments with custom date"""
+    from django.db import transaction
+    from django.utils import timezone
+    from datetime import timedelta, datetime
+    from decimal import Decimal
+    from payments.models import ClientPayment
 
     invoice = get_object_or_404(SaleInvoice, reference=reference)
 
@@ -1666,108 +1679,140 @@ def invoice_payment(request, reference):
         messages.error(request, 'Vous n\'avez pas la permission d\'enregistrer un paiement.')
         return redirect('sales:invoice_detail', reference=reference)
 
-    form = None
-
     if request.method == 'POST':
         try:
-            form = PaymentForm(request.POST)
-            if form.is_valid():
-                amount = form.cleaned_data['amount']
-                payment_method = form.cleaned_data.get('payment_method')
-                payment_reference = form.cleaned_data.get('payment_reference', '').strip()
-                bank_account = form.cleaned_data.get('bank_account')
+            # Get payment date (default to today)
+            payment_date_str = request.POST.get('payment_date', '')
+            if payment_date_str:
+                payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
+            else:
+                payment_date = timezone.now().date()
 
-                # SECURITY: Use transaction lock to prevent race conditions
-                from django.db import transaction
-                with transaction.atomic():
-                    # Re-fetch with lock to get current state
-                    invoice = SaleInvoice.objects.select_for_update().get(id=invoice.id)
+            # Payment 1
+            amount_1 = Decimal(request.POST.get('amount', '0') or '0')
+            payment_method_id_1 = request.POST.get('payment_method', '')
+            payment_ref_1 = request.POST.get('payment_reference', '').strip()
+            bank_account_id_1 = request.POST.get('bank_account', '')
 
-                    # Validate amount doesn't exceed balance (re-check after lock)
-                    if amount > invoice.balance_due:
-                        messages.error(
-                            request,
-                            f'Le paiement ne peut pas dépasser le solde dû ({invoice.balance_due} DH)'
-                        )
-                    else:
-                        # SECURITY: Check for duplicate payment (same amount within 10 seconds)
-                        from django.utils import timezone
-                        from datetime import timedelta
+            # Payment 2 (optional hybrid)
+            amount_2 = Decimal(request.POST.get('amount_2', '0') or '0')
+            payment_method_id_2 = request.POST.get('payment_method_2', '')
+            payment_ref_2 = request.POST.get('payment_reference_2', '').strip()
+            bank_account_id_2 = request.POST.get('bank_account_2', '')
 
-                        recent_payments = ActivityLog.objects.filter(
-                            user=request.user,
-                            action=ActivityLog.ActionType.CREATE,
-                            model_name='SaleInvoice',
-                            object_id=str(invoice.id),
-                            created_at__gte=timezone.now() - timedelta(seconds=10),
-                            object_repr__icontains=f'Paiement {amount} DH'
-                        ).count()
+            notes = request.POST.get('notes', '').strip()
 
-                        if recent_payments > 0:
-                            messages.error(
-                                request,
-                                'Un paiement de ce montant a été enregistré récemment. Veuillez patienter.'
-                            )
-                        else:
-                            # Record payment in activity log (or payment model if exists)
-                            # Update invoice payment status
-                            paid_amount = invoice.amount_paid + amount
+            total_payment = amount_1 + amount_2
 
-                            if paid_amount >= invoice.total_amount:
-                                invoice.status = SaleInvoice.Status.PAID
-                            elif paid_amount > 0:
-                                invoice.status = SaleInvoice.Status.PARTIAL_PAID
+            if total_payment <= 0:
+                messages.error(request, 'Le montant du paiement doit être supérieur à 0.')
+                return redirect('sales:invoice_payment', reference=reference)
 
-                            invoice.amount_paid = paid_amount
+            # SECURITY: Use transaction lock to prevent race conditions
+            with transaction.atomic():
+                # Re-fetch with lock to get current state
+                invoice = SaleInvoice.objects.select_for_update().get(id=invoice.id)
 
-                            # Update payment method details if provided
-                            if payment_method:
-                                invoice.payment_method = payment_method
-                            if payment_reference:
-                                invoice.payment_reference = payment_reference
-                            if bank_account:
-                                invoice.bank_account = bank_account
+                # Validate amount doesn't exceed balance (re-check after lock)
+                if total_payment > invoice.balance_due:
+                    messages.error(
+                        request,
+                        f'Le paiement ne peut pas dépasser le solde dû ({invoice.balance_due} DH)'
+                    )
+                    return redirect('sales:invoice_payment', reference=reference)
 
-                            # Determine which fields to update
-                            update_fields = ['status', 'amount_paid']
-                            if payment_method:
-                                update_fields.append('payment_method')
-                            if payment_reference:
-                                update_fields.append('payment_reference')
-                            if bank_account:
-                                update_fields.append('bank_account')
+                # SECURITY: Check for duplicate payment (same amount within 10 seconds)
+                recent_payments = ActivityLog.objects.filter(
+                    user=request.user,
+                    action=ActivityLog.ActionType.CREATE,
+                    model_name='ClientPayment',
+                    created_at__gte=timezone.now() - timedelta(seconds=10),
+                    object_repr__icontains=invoice.reference
+                ).count()
 
-                            invoice.save(update_fields=update_fields)
+                if recent_payments > 0:
+                    messages.error(
+                        request,
+                        'Un paiement a été enregistré récemment. Veuillez patienter.'
+                    )
+                    return redirect('sales:invoice_payment', reference=reference)
 
-                    # Log activity
-                    ActivityLog.objects.create(
-                        user=request.user,
-                        action=ActivityLog.ActionType.CREATE,
-                        model_name='SaleInvoice',
-                        object_id=str(invoice.id),
-                        object_repr=f'{invoice.reference} - Paiement {amount} DH',
-                        ip_address=get_client_ip(request)
+                # Create Payment 1
+                if amount_1 > 0 and payment_method_id_1:
+                    pm1 = PaymentMethod.objects.get(id=payment_method_id_1)
+                    ClientPayment.objects.create(
+                        reference=payment_ref_1 or f"PAY-{invoice.reference}-1",
+                        date=payment_date,
+                        payment_type=ClientPayment.PaymentType.INVOICE,
+                        client=invoice.client,
+                        amount=amount_1,
+                        payment_method=pm1,
+                        bank_account_id=bank_account_id_1 if bank_account_id_1 else None,
+                        sale_invoice=invoice,
+                        notes=notes,
+                        created_by=request.user
                     )
 
-                    messages.success(request, f'Paiement de {amount} DH enregistré.')
-                    return redirect('sales:invoice_detail', reference=reference)
-            else:
-                for field, errors in form.errors.items():
-                    for error in errors:
-                        messages.error(request, f'{field}: {error}')
+                    # Update invoice with payment 1 method
+                    invoice.payment_method = pm1
+                    if payment_ref_1:
+                        invoice.payment_reference = payment_ref_1
+                    if bank_account_id_1:
+                        invoice.bank_account_id = bank_account_id_1
+
+                # Create Payment 2 (hybrid)
+                if amount_2 > 0 and payment_method_id_2:
+                    pm2 = PaymentMethod.objects.get(id=payment_method_id_2)
+                    ClientPayment.objects.create(
+                        reference=payment_ref_2 or f"PAY-{invoice.reference}-2",
+                        date=payment_date,
+                        payment_type=ClientPayment.PaymentType.INVOICE,
+                        client=invoice.client,
+                        amount=amount_2,
+                        payment_method=pm2,
+                        bank_account_id=bank_account_id_2 if bank_account_id_2 else None,
+                        sale_invoice=invoice,
+                        notes=notes,
+                        created_by=request.user
+                    )
+
+                # Update invoice totals and status
+                paid_amount = invoice.amount_paid + total_payment
+
+                if paid_amount >= invoice.total_amount:
+                    invoice.status = SaleInvoice.Status.PAID
+                elif paid_amount > 0:
+                    invoice.status = SaleInvoice.Status.PARTIAL_PAID
+
+                invoice.amount_paid = paid_amount
+                invoice.save()
+
+                # Log activity
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action=ActivityLog.ActionType.CREATE,
+                    model_name='ClientPayment',
+                    object_id=str(invoice.id),
+                    object_repr=f'{invoice.reference} - Paiement {total_payment} DH',
+                    ip_address=get_client_ip(request)
+                )
+
+                messages.success(request, f'Paiement de {total_payment} DH enregistré.')
+                return redirect('sales:invoice_detail', reference=reference)
+
         except Exception as e:
             messages.error(request, f'Erreur lors de l\'enregistrement du paiement: {str(e)}')
             import logging
             logger = logging.getLogger(__name__)
             logger.exception(f'Error recording payment for {reference}: {str(e)}')
 
-    if form is None:
-        form = PaymentForm()
-
+    # GET request - show form
     context = {
         'invoice': invoice,
-        'form': form,
         'remaining': invoice.balance_due,
+        'today': timezone.now().date(),
+        'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order', 'name'),
+        'bank_accounts': BankAccount.objects.filter(is_active=True),
     }
 
     return render(request, 'sales/invoice_payment.html', context)
