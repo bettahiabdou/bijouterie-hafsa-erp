@@ -296,7 +296,7 @@
         const amount1 = parseFloat(document.getElementById('amount').value) || 0;
         const amount2 = parseFloat(document.getElementById('amount_2').value) || 0;
         const total = amount1 + amount2;
-        const remaining = {{ remaining|floatformat:2 }};
+        const remaining = parseFloat("{{ remaining }}".replace(',', '.').replace(/\s/g, '')) || 0;
 
         document.getElementById('total-payments').textContent = total.toFixed(2) + ' DH';
 
