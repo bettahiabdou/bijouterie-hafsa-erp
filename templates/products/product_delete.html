@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Supprimer Produit - {{ product.reference }}{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:list' %}" class="breadcrumb-item">Produits</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:detail' product.reference %}" class="breadcrumb-item">{{ product.reference }}</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Supprimer</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Supprimer Produit</h1>
+                <p class="page-subtitle">Cette action est irreversible</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="card animate-slide-up" style="max-width: 600px; margin: 0 auto;">
+        <div class="card-header" style="background: var(--error-50); border-bottom-color: var(--error-200);">
+            <h3 style="color: var(--error-700);"><i class="fas fa-exclamation-triangle mr-2"></i> Confirmation de Suppression</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning mb-4">
+                <i class="alert-icon fas fa-exclamation-circle"></i>
+                <div class="alert-content">
+                    <p class="alert-title">Attention!</p>
+                    <p class="alert-message">Vous etes sur le point de supprimer ce produit. Cette action ne peut pas etre annulee.</p>
+                </div>
+            </div>
+
+            <div class="product-summary" style="background: var(--neutral-50); padding: var(--space-4); border-radius: var(--radius-md); margin-bottom: var(--space-4);">
+                <div style="display: flex; gap: var(--space-4); align-items: center;">
+                    {% if product.main_image %}
+                        <img src="{{ product.main_image.url }}" alt="{{ product.name }}"
+                             style="width: 80px; height: 80px; object-fit: cover; border-radius: var(--radius-md);">
+                    {% else %}
+                        <div style="width: 80px; height: 80px; background: var(--neutral-200); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-gem" style="font-size: 24px; color: var(--neutral-400);"></i>
+                        </div>
+                    {% endif %}
+                    <div>
+                        <p style="font-weight: 600; font-size: var(--text-lg); margin-bottom: var(--space-1);">{{ product.name }}</p>
+                        <p style="color: var(--neutral-600); font-size: var(--text-sm);">Reference: {{ product.reference }}</p>
+                        <p style="color: var(--neutral-600); font-size: var(--text-sm);">
+                            {{ product.category.name|default:"-" }} | {{ product.metal_type.name|default:"-" }} | {{ product.net_weight|default:product.gross_weight }} g
+                        </p>
+                        <p style="color: var(--primary-600); font-weight: 600;">{{ product.selling_price|floatformat:2 }} DH</p>
+                    </div>
+                </div>
+            </div>
+
+            {% if product.status == 'sold' %}
+                <div class="alert alert-error mb-4">
+                    <i class="alert-icon fas fa-exclamation-triangle"></i>
+                    <div class="alert-content">
+                        <p class="alert-message">Ce produit est marque comme <strong>VENDU</strong>. La suppression peut affecter les rapports de ventes.</p>
+                    </div>
+                </div>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+                <div class="flex gap-4 justify-end">
+                    <a href="{% url 'products:detail' product.reference %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i>
+                        <span>Annuler</span>
+                    </a>
+                    <button type="submit" class="btn btn-error">
+                        <i class="fas fa-trash"></i>
+                        <span>Supprimer Definitivement</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

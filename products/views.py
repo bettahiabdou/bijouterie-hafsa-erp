@@ -652,6 +652,55 @@ def product_edit(request, reference):
 
 
 @login_required(login_url='login')
+@require_http_methods(["GET", "POST"])
+def product_delete(request, reference):
+    """Delete a product"""
+    product = get_object_or_404(Product, reference=reference)
+
+    if not request.user.is_staff:
+        messages.error(request, 'Vous n\'avez pas la permission de supprimer des produits.')
+        return redirect('products:detail', reference=reference)
+
+    # Check if product is sold - warn but still allow deletion
+    if product.status == 'sold':
+        messages.warning(request, 'Attention: Ce produit est marqué comme vendu.')
+
+    if request.method == 'POST':
+        try:
+            product_name = product.name
+            product_ref = product.reference
+
+            # Delete related images first
+            product.images.all().delete()
+
+            # Delete the product
+            product.delete()
+
+            # Log activity
+            ActivityLog.objects.create(
+                user=request.user,
+                action=ActivityLog.ActionType.DELETE,
+                model_name='Product',
+                object_id=str(product.id),
+                object_repr=product_ref,
+                ip_address=get_client_ip(request)
+            )
+
+            messages.success(request, f'Produit "{product_name}" ({product_ref}) supprimé avec succès.')
+            return redirect('products:list')
+
+        except Exception as e:
+            messages.error(request, f'Erreur lors de la suppression: {str(e)}')
+            return redirect('products:detail', reference=reference)
+
+    context = {
+        'product': product,
+    }
+
+    return render(request, 'products/product_delete.html', context)
+
+
+@login_required(login_url='login')
 def inventory_dashboard(request):
     """Display inventory statistics and alerts"""
     if not request.user.is_staff and not request.user.is_staff:

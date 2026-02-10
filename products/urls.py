@@ -13,6 +13,7 @@ urlpatterns = [
     path('batch-create/', views.batch_product_create, name='batch_create'),
     path('<str:reference>/', views.product_detail, name='detail'),
     path('<str:reference>/edit/', views.product_edit, name='edit'),
+    path('<str:reference>/delete/', views.product_delete, name='delete'),
     path('<str:reference>/print/', views.print_label, name='print_label'),
 
     # Inventory
