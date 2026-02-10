@@ -2248,6 +2248,13 @@ def _handle_quick_product_creation(request, invoice):
     from settings_app.models import ProductCategory, MetalType, MetalPurity
     from products.models import Product as ProductModel
 
+    # Preserve custom reference if provided
+    custom_reference = request.POST.get('custom_reference', '').strip()
+    if custom_reference and custom_reference != invoice.reference:
+        if not SaleInvoice.objects.filter(reference=custom_reference).exclude(id=invoice.id).exists():
+            invoice.reference = custom_reference
+            invoice.save(update_fields=['reference'])
+
     try:
         category_id = request.POST.get('quick_category')
         metal_type_id = request.POST.get('quick_metal_type')

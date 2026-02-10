@@ -329,6 +329,7 @@
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="quick_create_product">
+                <input type="hidden" name="custom_reference" id="quick-create-custom-reference" value="{{ invoice.reference }}">
                 <div class="modal-body">
                     <div class="form-row">
                         <div class="form-group">
@@ -916,12 +917,14 @@
             const customRefInput = document.getElementById('custom-reference');
             const hiddenRefInput = document.getElementById('hidden-custom-reference');
             const addProductRefInput = document.getElementById('add-product-custom-reference');
+            const quickCreateRefInput = document.getElementById('quick-create-custom-reference');
             const removeItemRefInputs = document.querySelectorAll('.remove-item-custom-ref');
 
             function syncAllReferenceFields() {
                 const value = customRefInput.value;
                 if (hiddenRefInput) hiddenRefInput.value = value;
                 if (addProductRefInput) addProductRefInput.value = value;
+                if (quickCreateRefInput) quickCreateRefInput.value = value;
                 removeItemRefInputs.forEach(input => input.value = value);
             }
 
