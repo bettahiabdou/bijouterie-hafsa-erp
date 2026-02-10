@@ -51,7 +51,7 @@
                                 <label for="payment_method" class="form-label">
                                     Mode de paiement <span class="required">*</span>
                                 </label>
-                                <select name="payment_method" id="payment_method" class="form-select" onchange="updatePaymentFields(1)">
+                                <select name="payment_method" id="payment_method" class="form-select">
                                     <option value="" data-name="">-- Selectionner --</option>
                                     {% for pm in payment_methods %}
                                         <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
@@ -94,8 +94,7 @@
                             </label>
                             <input type="number" name="amount" id="amount" class="form-input"
                                    step="0.01" min="0.01" max="{{ remaining }}"
-                                   value="{{ remaining|floatformat:2 }}"
-                                   oninput="updatePaymentSummary()" required>
+                                   value="{{ remaining|floatformat:2 }}" required>
                         </div>
                     </div>
 
@@ -108,7 +107,7 @@
                         <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
                             <div class="form-group">
                                 <label for="payment_method_2" class="form-label">Mode de paiement 2</label>
-                                <select name="payment_method_2" id="payment_method_2" class="form-select" onchange="updatePaymentFields(2)">
+                                <select name="payment_method_2" id="payment_method_2" class="form-select">
                                     <option value="" data-name="">-- Aucun --</option>
                                     {% for pm in payment_methods %}
                                         <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
@@ -142,8 +141,7 @@
                         <div class="form-group">
                             <label for="amount_2" class="form-label">Montant 2 (DH)</label>
                             <input type="number" name="amount_2" id="amount_2" class="form-input"
-                                   step="0.01" min="0" placeholder="0.00"
-                                   oninput="updatePaymentSummary()">
+                                   step="0.01" min="0" placeholder="0.00">
                         </div>
                     </div>
 
@@ -256,7 +254,10 @@
         </div>
     </div>
 
-    <script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
     function updatePaymentFields(paymentNum) {
         const select = document.getElementById(paymentNum === 1 ? 'payment_method' : 'payment_method_2');
         const selectedOption = select.options[select.selectedIndex];
@@ -311,7 +312,18 @@
 
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
+        // Attach event handlers
+        document.getElementById('payment_method').addEventListener('change', function() {
+            updatePaymentFields(1);
+        });
+        document.getElementById('payment_method_2').addEventListener('change', function() {
+            updatePaymentFields(2);
+        });
+        document.getElementById('amount').addEventListener('input', updatePaymentSummary);
+        document.getElementById('amount_2').addEventListener('input', updatePaymentSummary);
+
+        // Initialize
         updatePaymentSummary();
     });
-    </script>
+</script>
 {% endblock %}
