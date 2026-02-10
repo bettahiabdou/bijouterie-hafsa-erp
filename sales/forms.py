@@ -31,10 +31,18 @@ class SaleInvoiceForm(forms.ModelForm):
     class Meta:
         model = SaleInvoice
         fields = [
-            'client', 'payment_method', 'bank_account',
+            'reference', 'date', 'client', 'payment_method', 'bank_account',
             'tax_rate', 'notes', 'payment_reference'
         ]
         widgets = {
+            'reference': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+                'placeholder': 'INV-20260210-0001'
+            }),
+            'date': forms.DateInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+                'type': 'date'
+            }),
             'client': forms.Select(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
             }),
@@ -82,10 +90,22 @@ class SaleInvoiceForm(forms.ModelForm):
     def clean(self):
         """Validate form data"""
         cleaned_data = super().clean()
+        reference = cleaned_data.get('reference')
         client = cleaned_data.get('client')
         tax_rate = cleaned_data.get('tax_rate')
         payment_method = cleaned_data.get('payment_method')
         payment_reference = cleaned_data.get('payment_reference')
+
+        # Validate reference is unique (if changed)
+        if reference:
+            from sales.models import SaleInvoice
+            existing = SaleInvoice.objects.filter(reference=reference).exclude(
+                id=self.instance.id if self.instance.id else None
+            )
+            if existing.exists():
+                raise ValidationError(
+                    f'La référence "{reference}" existe déjà. Veuillez en choisir une autre.'
+                )
 
         # Validate tax rate
         if tax_rate and (tax_rate < 0 or tax_rate > 100):
