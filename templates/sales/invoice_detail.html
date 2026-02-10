@@ -28,6 +28,16 @@
                         <span>Enregistrer Paiement</span>
                     </a>
                 {% endif %}
+                {% if user.is_staff %}
+                    <a href="{% url 'sales:invoice_edit' invoice.reference %}" class="btn btn-warning">
+                        <i class="fas fa-edit"></i>
+                        <span>Modifier</span>
+                    </a>
+                    <a href="{% url 'sales:invoice_delete' invoice.reference %}" class="btn btn-error">
+                        <i class="fas fa-trash"></i>
+                        <span>Supprimer</span>
+                    </a>
+                {% endif %}
                 <a href="{% url 'sales:invoice_list' %}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i>
                     <span>Retour</span>

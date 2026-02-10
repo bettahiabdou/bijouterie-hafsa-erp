@@ -24,7 +24,7 @@
                 {% endif %}
 
                 <div class="card-body">
-                    {% if invoice.status != 'draft' %}
+                    {% if invoice.status != 'draft' and not user.is_staff %}
                         <div class="alert alert-warning" role="alert">
                             <i class="fas fa-exclamation-triangle"></i>
                             <strong>Action impossible:</strong> Seules les factures en brouillon peuvent être supprimées.
@@ -33,6 +33,16 @@
                             <i class="fas fa-arrow-left"></i> Retour
                         </a>
                     {% else %}
+                        {% if invoice.status != 'draft' %}
+                            <div class="alert alert-danger" role="alert">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>ATTENTION CRITIQUE:</strong> Cette facture est {{ invoice.get_status_display|upper }}!
+                                {% if invoice.amount_paid > 0 %}
+                                    <br>Des paiements de <strong>{{ invoice.amount_paid }} DH</strong> ont ete enregistres.
+                                {% endif %}
+                                <br>Supprimer cette facture peut causer des incoherences comptables.
+                            </div>
+                        {% endif %}
                         <div class="alert alert-danger" role="alert">
                             <i class="fas fa-exclamation-circle"></i>
                             <strong>Attention!</strong> Cette action va supprimer la facture <code>{{ invoice.reference }}</code> définitivement.

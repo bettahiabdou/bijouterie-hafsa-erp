@@ -24,12 +24,18 @@
                 {% endif %}
 
                 <div class="card-body">
-                    {% if invoice.status != 'draft' %}
+                    {% if invoice.status != 'draft' and not user.is_staff %}
                         <div class="alert alert-warning" role="alert">
                             <i class="fas fa-exclamation-triangle"></i>
                             Seules les factures en brouillon peuvent être éditées.
                         </div>
                     {% else %}
+                        {% if invoice.status != 'draft' %}
+                            <div class="alert alert-warning" role="alert">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Attention: Cette facture n'est pas un brouillon ({{ invoice.get_status_display }}). Modifier une facture finalisee peut affecter la comptabilite.
+                            </div>
+                        {% endif %}
                         <form method="POST" novalidate>
                             {% csrf_token %}
 

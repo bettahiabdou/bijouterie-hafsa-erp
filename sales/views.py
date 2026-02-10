@@ -1558,20 +1558,19 @@ def get_client_ip(request):
 @login_required(login_url='login')
 @require_http_methods(["GET", "POST"])
 def invoice_edit(request, reference):
-    """Edit existing invoice (DRAFT invoices only)"""
+    """Edit existing invoice - staff can edit any invoice"""
     from .forms import SaleInvoiceForm
 
     invoice = get_object_or_404(SaleInvoice, reference=reference)
 
-    # Check status - only draft can be edited
-    if invoice.status != SaleInvoice.Status.DRAFT:
-        messages.error(request, 'Seuls les brouillons peuvent être édités.')
-        return redirect('sales:invoice_detail', reference=reference)
-
-    # Check permissions
-    if request.user != invoice.created_by and not request.user.is_staff:
-        messages.error(request, 'Vous n\'avez pas la permission d\'éditer cette facture.')
-        return redirect('sales:invoice_detail', reference=reference)
+    # Check permissions - staff can edit any, others only their own drafts
+    if not request.user.is_staff:
+        if invoice.status != SaleInvoice.Status.DRAFT:
+            messages.error(request, 'Seuls les brouillons peuvent être édités.')
+            return redirect('sales:invoice_detail', reference=reference)
+        if request.user != invoice.created_by:
+            messages.error(request, 'Vous n\'avez pas la permission d\'éditer cette facture.')
+            return redirect('sales:invoice_detail', reference=reference)
 
     form = None
 
@@ -1618,18 +1617,17 @@ def invoice_edit(request, reference):
 @login_required(login_url='login')
 @require_http_methods(["GET", "POST"])
 def invoice_delete(request, reference):
-    """Delete (soft delete) invoice - only DRAFT invoices"""
+    """Delete (soft delete) invoice - staff can delete any invoice"""
     invoice = get_object_or_404(SaleInvoice, reference=reference)
 
-    # Only allow deleting DRAFT invoices
-    if invoice.status != SaleInvoice.Status.DRAFT:
-        messages.error(request, 'Seules les factures brouillons peuvent être supprimées.')
-        return redirect('sales:invoice_detail', reference=reference)
-
-    # Check permissions
-    if request.user != invoice.created_by and not request.user.is_staff:
-        messages.error(request, 'Vous n\'avez pas la permission de supprimer cette facture.')
-        return redirect('sales:invoice_detail', reference=reference)
+    # Check permissions - staff can delete any, others only their own drafts
+    if not request.user.is_staff:
+        if invoice.status != SaleInvoice.Status.DRAFT:
+            messages.error(request, 'Seules les factures brouillons peuvent être supprimées.')
+            return redirect('sales:invoice_detail', reference=reference)
+        if request.user != invoice.created_by:
+            messages.error(request, 'Vous n\'avez pas la permission de supprimer cette facture.')
+            return redirect('sales:invoice_detail', reference=reference)
 
     if request.method == 'POST':
         try:

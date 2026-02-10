@@ -164,9 +164,19 @@
                                     </span>
                                 </td>
                                 <td style="text-align: center;" onclick="event.stopPropagation();">
-                                    <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-ghost btn-sm btn-icon" title="Voir">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
+                                    <div style="display: flex; gap: 4px; justify-content: center;">
+                                        <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-ghost btn-sm btn-icon" title="Voir">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if user.is_staff %}
+                                            <a href="{% url 'sales:invoice_edit' invoice.reference %}" class="btn btn-ghost btn-sm btn-icon text-warning" title="Modifier">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'sales:invoice_delete' invoice.reference %}" class="btn btn-ghost btn-sm btn-icon text-error" title="Supprimer">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                         {% empty %}
@@ -224,6 +234,16 @@
                             <span class="invoice-card-date">
                                 <i class="fas fa-calendar"></i> {{ invoice.date|date:"d/m/Y" }}
                             </span>
+                            {% if user.is_staff %}
+                                <div class="invoice-card-actions" onclick="event.stopPropagation();">
+                                    <a href="{% url 'sales:invoice_edit' invoice.reference %}" class="btn btn-ghost btn-sm btn-icon text-warning" title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'sales:invoice_delete' invoice.reference %}" class="btn btn-ghost btn-sm btn-icon text-error" title="Supprimer">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 {% empty %}
