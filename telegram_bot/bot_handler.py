@@ -149,23 +149,27 @@ def get_temp_photos(session):
 @sync_to_async
 def create_draft_invoice(user):
     from sales.models import SaleInvoice
-    from django.db import IntegrityError
+    from django.db import IntegrityError, transaction
     import time
 
     max_retries = 5
     for attempt in range(max_retries):
         try:
-            return SaleInvoice.objects.create(
-                date=timezone.now().date(),
-                status=SaleInvoice.Status.DRAFT,
-                seller=user,
-                created_by=user,
-                notes=f"Créé via Telegram par {user.get_full_name() or user.username}"
-            )
+            with transaction.atomic():
+                invoice = SaleInvoice(
+                    date=timezone.now().date(),
+                    status=SaleInvoice.Status.DRAFT,
+                    seller=user,
+                    created_by=user,
+                    notes=f"Créé via Telegram par {user.get_full_name() or user.username}"
+                )
+                # Reference will be generated fresh in save() using max existing reference
+                invoice.save()
+                return invoice
         except IntegrityError as e:
             if 'duplicate key' in str(e) and attempt < max_retries - 1:
-                # Wait a bit and retry - the reference will be regenerated
-                time.sleep(0.1)
+                # Wait a bit and retry - the reference generator will find the new max
+                time.sleep(0.2 * (attempt + 1))
                 continue
             raise
     raise Exception("Failed to create invoice after multiple retries")
