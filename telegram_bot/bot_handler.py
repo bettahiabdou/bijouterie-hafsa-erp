@@ -149,13 +149,26 @@ def get_temp_photos(session):
 @sync_to_async
 def create_draft_invoice(user):
     from sales.models import SaleInvoice
-    return SaleInvoice.objects.create(
-        date=timezone.now().date(),
-        status=SaleInvoice.Status.DRAFT,
-        seller=user,
-        created_by=user,
-        notes=f"Créé via Telegram par {user.get_full_name() or user.username}"
-    )
+    from django.db import IntegrityError
+    import time
+
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            return SaleInvoice.objects.create(
+                date=timezone.now().date(),
+                status=SaleInvoice.Status.DRAFT,
+                seller=user,
+                created_by=user,
+                notes=f"Créé via Telegram par {user.get_full_name() or user.username}"
+            )
+        except IntegrityError as e:
+            if 'duplicate key' in str(e) and attempt < max_retries - 1:
+                # Wait a bit and retry - the reference will be regenerated
+                time.sleep(0.1)
+                continue
+            raise
+    raise Exception("Failed to create invoice after multiple retries")
 
 
 @sync_to_async
@@ -956,13 +969,30 @@ class TelegramBotHandler:
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
         application.add_handler(CallbackQueryHandler(self.callback_handler))
 
+    async def error_handler(self, update, context):
+        """Handle errors in the bot"""
+        logger.error(f"Bot error: {context.error}", exc_info=context.error)
+
+        # Try to notify user of the error
+        try:
+            if update and update.effective_chat:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="⚠️ Une erreur s'est produite. Veuillez réessayer."
+                )
+        except Exception as e:
+            logger.error(f"Failed to send error message: {e}")
+
     def run(self):
         """Start the bot"""
         self.application = Application.builder().token(self.token).build()
         self.setup_handlers(self.application)
 
+        # Add error handler to prevent crashes
+        self.application.add_error_handler(self.error_handler)
+
         logger.info("Starting Telegram bot...")
-        self.application.run_polling()
+        self.application.run_polling(drop_pending_updates=True)
 
 
 def run_bot():
