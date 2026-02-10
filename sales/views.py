@@ -2080,6 +2080,17 @@ def pending_invoice_complete(request, reference):
                 payment_method_id_1 = request.POST.get('payment_method', '')
                 payment_ref_1 = request.POST.get('payment_reference', '').strip()
                 bank_account_id_1 = request.POST.get('bank_account', '')
+                payment_date_1_str = request.POST.get('payment_date', '')
+
+                # Parse payment date 1
+                from datetime import datetime
+                if payment_date_1_str:
+                    try:
+                        payment_date_1 = datetime.strptime(payment_date_1_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        payment_date_1 = timezone.now().date()
+                else:
+                    payment_date_1 = timezone.now().date()
 
                 try:
                     amount_paid_1 = Decimal(amount_paid_1_str)
@@ -2097,7 +2108,7 @@ def pending_invoice_complete(request, reference):
                             payment_ref_1 = f"PAY-{invoice.reference}-1"
                         ClientPayment.objects.create(
                             reference=payment_ref_1,
-                            date=timezone.now().date(),
+                            date=payment_date_1,
                             payment_type=ClientPayment.PaymentType.INVOICE,
                             client=invoice.client,  # Can be None for anonymous sales
                             amount=amount_paid_1,
@@ -2114,6 +2125,16 @@ def pending_invoice_complete(request, reference):
                 payment_method_id_2 = request.POST.get('payment_method_2', '')
                 payment_ref_2 = request.POST.get('payment_reference_2', '').strip()
                 bank_account_id_2 = request.POST.get('bank_account_2', '')
+                payment_date_2_str = request.POST.get('payment_date_2', '')
+
+                # Parse payment date 2
+                if payment_date_2_str:
+                    try:
+                        payment_date_2 = datetime.strptime(payment_date_2_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        payment_date_2 = timezone.now().date()
+                else:
+                    payment_date_2 = timezone.now().date()
 
                 try:
                     amount_paid_2 = Decimal(amount_paid_2_str)
@@ -2131,7 +2152,7 @@ def pending_invoice_complete(request, reference):
                             payment_ref_2 = f"PAY-{invoice.reference}-2"
                         ClientPayment.objects.create(
                             reference=payment_ref_2,
-                            date=timezone.now().date(),
+                            date=payment_date_2,
                             payment_type=ClientPayment.PaymentType.INVOICE,
                             client=invoice.client,  # Can be None for anonymous sales
                             amount=amount_paid_2,

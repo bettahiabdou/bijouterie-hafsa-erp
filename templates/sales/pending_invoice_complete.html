@@ -196,14 +196,21 @@
                             <h4 style="font-size: var(--text-sm); color: var(--primary-600); margin-bottom: var(--space-3);">
                                 <i class="fas fa-credit-card"></i> Paiement 1
                             </h4>
-                            <div class="form-group">
-                                <label class="form-label">Mode de paiement</label>
-                                <select name="payment_method" id="payment-method-select" class="form-select" onchange="updatePaymentFields()">
-                                    <option value="" data-name="">-- Sélectionner --</option>
-                                    {% for pm in payment_methods %}
-                                        <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
-                                    {% endfor %}
-                                </select>
+                            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                                <div class="form-group">
+                                    <label class="form-label">Mode de paiement</label>
+                                    <select name="payment_method" id="payment-method-select" class="form-select" onchange="updatePaymentFields()">
+                                        <option value="" data-name="">-- Sélectionner --</option>
+                                        {% for pm in payment_methods %}
+                                            <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Date de paiement</label>
+                                    <input type="date" name="payment_date" id="payment-date" class="form-input"
+                                           value="{% now 'Y-m-d' %}">
+                                </div>
                             </div>
 
                             <!-- Reference field - hidden for Espèces -->
@@ -237,14 +244,21 @@
                             <h4 style="font-size: var(--text-sm); color: var(--neutral-500); margin-bottom: var(--space-3);">
                                 <i class="fas fa-plus-circle"></i> Paiement 2 (optionnel)
                             </h4>
-                            <div class="form-group">
-                                <label class="form-label">Mode de paiement 2</label>
-                                <select name="payment_method_2" id="payment-method-select-2" class="form-select" onchange="updatePaymentFields2()">
-                                    <option value="" data-name="">-- Aucun --</option>
-                                    {% for pm in payment_methods %}
-                                        <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
-                                    {% endfor %}
-                                </select>
+                            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                                <div class="form-group">
+                                    <label class="form-label">Mode de paiement 2</label>
+                                    <select name="payment_method_2" id="payment-method-select-2" class="form-select" onchange="updatePaymentFields2()">
+                                        <option value="" data-name="">-- Aucun --</option>
+                                        {% for pm in payment_methods %}
+                                            <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Date de paiement 2</label>
+                                    <input type="date" name="payment_date_2" id="payment-date-2" class="form-input"
+                                           value="{% now 'Y-m-d' %}">
+                                </div>
                             </div>
 
                             <div class="form-group" id="reference-group-2" style="display: none;">
