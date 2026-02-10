@@ -260,7 +260,7 @@
     function updatePaymentFields(paymentNum) {
         const select = document.getElementById(paymentNum === 1 ? 'payment_method' : 'payment_method_2');
         const selectedOption = select.options[select.selectedIndex];
-        const paymentName = selectedOption.getAttribute('data-name') || '';
+        const paymentName = (selectedOption.getAttribute('data-name') || '').toLowerCase();
 
         const referenceGroup = document.getElementById('referenceGroup' + paymentNum);
         const bankAccountGroup = document.getElementById('bankAccountGroup' + paymentNum);
@@ -269,12 +269,14 @@
         referenceGroup.style.display = 'none';
         bankAccountGroup.style.display = 'none';
 
-        if (!paymentName) return;
+        // No payment method selected
+        if (!paymentName || !select.value) return;
 
-        const isEspeces = paymentName.includes('espece') || paymentName.includes('especes') || paymentName === 'cash';
-        const isVirement = paymentName.includes('virement');
+        // Check payment method type
+        const isVirement = paymentName.includes('virement') || paymentName.includes('bank');
+        const isEspece = paymentName.includes('espece') || paymentName.includes('especes') || paymentName.includes('espèce') || paymentName === 'cash';
 
-        if (isEspeces) {
+        if (isEspece) {
             // Cash - no reference, no bank account
             referenceGroup.style.display = 'none';
             bankAccountGroup.style.display = 'none';

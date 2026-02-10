@@ -1591,7 +1591,7 @@ def invoice_edit(request, reference):
                 )
 
                 messages.success(request, 'Facture mise à jour avec succès.')
-                return redirect('sales:invoice_detail', reference=reference)
+                return redirect('sales:invoice_detail', reference=invoice.reference)
             else:
                 for field, errors in form.errors.items():
                     for error in errors:
