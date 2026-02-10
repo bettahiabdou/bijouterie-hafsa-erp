@@ -1681,24 +1681,29 @@ def invoice_payment(request, reference):
 
     if request.method == 'POST':
         try:
-            # Get payment date (default to today)
-            payment_date_str = request.POST.get('payment_date', '')
-            if payment_date_str:
-                payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
-            else:
-                payment_date = timezone.now().date()
-
             # Payment 1
             amount_1 = Decimal(request.POST.get('amount', '0') or '0')
             payment_method_id_1 = request.POST.get('payment_method', '')
             payment_ref_1 = request.POST.get('payment_reference', '').strip()
             bank_account_id_1 = request.POST.get('bank_account', '')
+            # Payment 1 date
+            payment_date_1_str = request.POST.get('payment_date', '')
+            if payment_date_1_str:
+                payment_date_1 = datetime.strptime(payment_date_1_str, '%Y-%m-%d').date()
+            else:
+                payment_date_1 = timezone.now().date()
 
             # Payment 2 (optional hybrid)
             amount_2 = Decimal(request.POST.get('amount_2', '0') or '0')
             payment_method_id_2 = request.POST.get('payment_method_2', '')
             payment_ref_2 = request.POST.get('payment_reference_2', '').strip()
             bank_account_id_2 = request.POST.get('bank_account_2', '')
+            # Payment 2 date
+            payment_date_2_str = request.POST.get('payment_date_2', '')
+            if payment_date_2_str:
+                payment_date_2 = datetime.strptime(payment_date_2_str, '%Y-%m-%d').date()
+            else:
+                payment_date_2 = timezone.now().date()
 
             notes = request.POST.get('notes', '').strip()
 
@@ -1742,7 +1747,7 @@ def invoice_payment(request, reference):
                     pm1 = PaymentMethod.objects.get(id=payment_method_id_1)
                     ClientPayment.objects.create(
                         reference=payment_ref_1 or f"PAY-{invoice.reference}-1",
-                        date=payment_date,
+                        date=payment_date_1,
                         payment_type=ClientPayment.PaymentType.INVOICE,
                         client=invoice.client,
                         amount=amount_1,
@@ -1765,7 +1770,7 @@ def invoice_payment(request, reference):
                     pm2 = PaymentMethod.objects.get(id=payment_method_id_2)
                     ClientPayment.objects.create(
                         reference=payment_ref_2 or f"PAY-{invoice.reference}-2",
-                        date=payment_date,
+                        date=payment_date_2,
                         payment_type=ClientPayment.PaymentType.INVOICE,
                         client=invoice.client,
                         amount=amount_2,

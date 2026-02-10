@@ -40,32 +40,32 @@
                 <form method="POST" novalidate>
                     {% csrf_token %}
 
-                    <!-- Payment Date -->
-                    <div class="form-group">
-                        <label for="payment_date" class="form-label">
-                            Date de paiement <span class="required">*</span>
-                        </label>
-                        <input type="date" name="payment_date" id="payment_date" class="form-input"
-                               value="{{ today|date:'Y-m-d' }}" required>
-                        <p class="form-help">Date de la transaction (aujourd'hui par defaut)</p>
-                    </div>
-
                     <!-- Payment 1 -->
                     <div class="payment-section" style="border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4);">
                         <h4 style="font-size: var(--text-sm); color: var(--primary-600); margin-bottom: var(--space-3);">
                             <i class="fas fa-credit-card"></i> Paiement 1
                         </h4>
 
-                        <div class="form-group">
-                            <label for="payment_method" class="form-label">
-                                Mode de paiement <span class="required">*</span>
-                            </label>
-                            <select name="payment_method" id="payment_method" class="form-select" onchange="updatePaymentFields(1)">
-                                <option value="" data-name="">-- Selectionner --</option>
-                                {% for pm in payment_methods %}
-                                    <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                            <div class="form-group">
+                                <label for="payment_method" class="form-label">
+                                    Mode de paiement <span class="required">*</span>
+                                </label>
+                                <select name="payment_method" id="payment_method" class="form-select" onchange="updatePaymentFields(1)">
+                                    <option value="" data-name="">-- Selectionner --</option>
+                                    {% for pm in payment_methods %}
+                                        <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="payment_date" class="form-label">
+                                    Date <span class="required">*</span>
+                                </label>
+                                <input type="date" name="payment_date" id="payment_date" class="form-input"
+                                       value="{{ today|date:'Y-m-d' }}" required>
+                            </div>
                         </div>
 
                         <div class="form-group" id="referenceGroup1" style="display: none;">
@@ -105,14 +105,22 @@
                             <i class="fas fa-plus-circle"></i> Paiement 2 (optionnel)
                         </h4>
 
-                        <div class="form-group">
-                            <label for="payment_method_2" class="form-label">Mode de paiement 2</label>
-                            <select name="payment_method_2" id="payment_method_2" class="form-select" onchange="updatePaymentFields(2)">
-                                <option value="" data-name="">-- Aucun --</option>
-                                {% for pm in payment_methods %}
-                                    <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                            <div class="form-group">
+                                <label for="payment_method_2" class="form-label">Mode de paiement 2</label>
+                                <select name="payment_method_2" id="payment_method_2" class="form-select" onchange="updatePaymentFields(2)">
+                                    <option value="" data-name="">-- Aucun --</option>
+                                    {% for pm in payment_methods %}
+                                        <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="payment_date_2" class="form-label">Date 2</label>
+                                <input type="date" name="payment_date_2" id="payment_date_2" class="form-input"
+                                       value="{{ today|date:'Y-m-d' }}">
+                            </div>
                         </div>
 
                         <div class="form-group" id="referenceGroup2" style="display: none;">
