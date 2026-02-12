@@ -911,7 +911,9 @@ class Delivery(models.Model):
     class Status(models.TextChoices):
         PENDING = 'pending', _('En attente')
         IN_TRANSIT = 'in_transit', _('En transit')
+        TO_PICKUP = 'to_pickup', _('À récupérer')
         DELIVERED = 'delivered', _('Livré')
+        RETURNED = 'returned', _('Retourné')
 
     # Reference
     reference = models.CharField(

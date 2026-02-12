@@ -81,7 +81,9 @@
                             <option value="">Tous les statuts</option>
                             <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>En Attente</option>
                             <option value="in_transit" {% if status_filter == 'in_transit' %}selected{% endif %}>En Transit</option>
+                            <option value="to_pickup" {% if status_filter == 'to_pickup' %}selected{% endif %}>À Récupérer</option>
                             <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Livré</option>
+                            <option value="returned" {% if status_filter == 'returned' %}selected{% endif %}>Retourné</option>
                         </select>
                     </div>
                     <div class="filter-group">
@@ -164,8 +166,12 @@
                                     <span class="badge badge-secondary">En Attente</span>
                                 {% elif delivery.status == 'in_transit' %}
                                     <span class="badge badge-warning">En Transit</span>
+                                {% elif delivery.status == 'to_pickup' %}
+                                    <span class="badge badge-info">À Récupérer</span>
                                 {% elif delivery.status == 'delivered' %}
                                     <span class="badge badge-success">Livré</span>
+                                {% elif delivery.status == 'returned' %}
+                                    <span class="badge badge-danger">Retourné</span>
                                 {% endif %}
                             </td>
                             <td>

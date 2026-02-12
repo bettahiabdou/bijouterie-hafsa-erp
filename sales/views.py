@@ -2596,20 +2596,6 @@ def delivery_update_from_client(request, reference):
     delivery.delivery_date = data.get('delivery_date', '') or ''
     delivery.last_checked_at = timezone.now()
 
-    # Determine status
-    if data.get('delivery_date'):
-        delivery.status = 'delivered'
-    elif data.get('timeline'):
-        delivery.status = 'in_transit'
-    else:
-        delivery.status = 'pending'
-
-    delivery.save(update_fields=[
-        'status', 'product', 'weight', 'amount_cod',
-        'current_position', 'destination', 'origin',
-        'deposit_date', 'delivery_date', 'last_checked_at'
-    ])
-
     # Update timeline if we have events
     timeline_data = data.get('timeline', [])
     if timeline_data:
@@ -2628,12 +2614,53 @@ def delivery_update_from_client(request, reference):
                 source='amana'
             )
 
+    # Determine status from the last timeline event description
+    def detect_status_from_timeline(timeline_data, delivery_date):
+        """Detect delivery status based on the last timeline event"""
+        if delivery_date:
+            return 'delivered'
+
+        if not timeline_data:
+            return 'pending'
+
+        # Get the last (most recent) event - it's the first in the list (highest number)
+        last_event = timeline_data[0] if timeline_data else None
+        if not last_event:
+            return 'in_transit'
+
+        description = last_event.get('description', '').lower()
+
+        # Check for "livré" (delivered)
+        if 'livré' in description or 'livre' in description:
+            return 'delivered'
+
+        # Check for "à récupérer" (to pickup)
+        if 'récupérer' in description or 'recuperer' in description:
+            return 'to_pickup'
+
+        # Check for "retourné" or "retour" (returned)
+        if 'retourné' in description or 'retourne' in description or 'retour à l' in description:
+            return 'returned'
+
+        # Default to in_transit
+        return 'in_transit'
+
+    delivery.status = detect_status_from_timeline(timeline_data, data.get('delivery_date'))
+
+    delivery.save(update_fields=[
+        'status', 'product', 'weight', 'amount_cod',
+        'current_position', 'destination', 'origin',
+        'deposit_date', 'delivery_date', 'last_checked_at'
+    ])
+
     # Update invoice delivery status if different
     if delivery.invoice:
         status_map = {
             'pending': 'pending',
             'in_transit': 'in_transit',
-            'delivered': 'delivered'
+            'to_pickup': 'in_transit',  # Map to_pickup to in_transit for invoice
+            'delivered': 'delivered',
+            'returned': 'pending'  # Map returned to pending for invoice
         }
         new_invoice_status = status_map.get(delivery.status, 'pending')
         if delivery.invoice.delivery_status != new_invoice_status:
