@@ -2518,12 +2518,14 @@ def delivery_check(request, reference):
         return redirect('sales:delivery_detail', reference=reference)
 
     tracker = AmanaTracker()
-    success = tracker.update_delivery(delivery)
-
-    if success:
-        messages.success(request, f"Statut mis à jour: {delivery.get_status_display()}")
-    else:
-        messages.warning(request, "Impossible de récupérer les informations de suivi.")
+    try:
+        success = tracker.update_delivery(delivery)
+        if success:
+            messages.success(request, f"Statut mis à jour: {delivery.get_status_display()}")
+        else:
+            messages.warning(request, "Impossible de récupérer les informations de suivi.")
+    except Exception as e:
+        messages.error(request, "Erreur de connexion au service AMANA. Le service est temporairement indisponible.")
 
     return redirect('sales:delivery_detail', reference=reference)
 
@@ -2535,12 +2537,14 @@ def delivery_bulk_check(request):
     from .services import AmanaTracker
 
     tracker = AmanaTracker()
-    stats = tracker.bulk_update_deliveries()
-
-    messages.success(
-        request,
-        f"Vérification terminée: {stats['updated']}/{stats['total']} livraisons mises à jour."
-    )
+    try:
+        stats = tracker.bulk_update_deliveries()
+        messages.success(
+            request,
+            f"Vérification terminée: {stats['updated']}/{stats['total']} livraisons mises à jour."
+        )
+    except Exception as e:
+        messages.error(request, "Erreur de connexion au service AMANA. Le service est temporairement indisponible.")
 
     if stats['errors']:
         for error in stats['errors'][:5]:  # Show first 5 errors
