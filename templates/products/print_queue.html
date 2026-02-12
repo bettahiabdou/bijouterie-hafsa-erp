@@ -377,43 +377,12 @@
             return;
         }
 
-        statusEl.className = 'printer-status checking';
-        statusEl.innerHTML = '<i class="fas fa-circle"></i><span>Verification...</span>';
-
-        try {
-            // With no-cors mode, fetch always "succeeds" if the network request goes through
-            // even if there's no actual response readable. We use a timeout to detect unreachable.
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-            await fetch(`http://${PRINTER_IP}/`, {
-                method: 'GET',
-                mode: 'no-cors',
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            // If we get here without abort, the printer is reachable
-            printerConnected = true;
-            statusEl.className = 'printer-status connected';
-            statusEl.innerHTML = '<i class="fas fa-check-circle"></i><span>Imprimante connectee</span>';
-            infoEl.style.display = 'block';
-
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                printerConnected = false;
-                statusEl.className = 'printer-status disconnected';
-                statusEl.innerHTML = '<i class="fas fa-times-circle"></i><span>Imprimante inaccessible (timeout)</span>';
-            } else {
-                // Any other error (TypeError, etc) - printer might still be reachable
-                // Since your manual test worked, assume connected
-                printerConnected = true;
-                statusEl.className = 'printer-status connected';
-                statusEl.innerHTML = '<i class="fas fa-check-circle"></i><span>Imprimante detectee</span>';
-                infoEl.style.display = 'block';
-            }
-        }
+        // Skip the connection check - just assume printer is available if configured
+        // The actual print will fail if printer is unreachable
+        printerConnected = true;
+        statusEl.className = 'printer-status connected';
+        statusEl.innerHTML = '<i class="fas fa-check-circle"></i><span>Imprimante: ' + PRINTER_IP + '</span>';
+        infoEl.style.display = 'block';
     }
 
     async function sendToPrinter(zplData) {

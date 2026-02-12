@@ -853,30 +853,10 @@
 
         async function checkPrinterConnection() {
             if (!PRINTER_IP) return;
-
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-                await fetch(`http://${PRINTER_IP}/`, {
-                    method: 'GET',
-                    mode: 'no-cors',
-                    signal: controller.signal
-                });
-
-                clearTimeout(timeoutId);
-                printerConnected = true;
-                console.log('Printer connected:', PRINTER_IP);
-            } catch (error) {
-                if (error.name === 'AbortError') {
-                    printerConnected = false;
-                    console.log('Printer timeout:', PRINTER_IP);
-                } else {
-                    // Any other error - printer might still be reachable
-                    printerConnected = true;
-                    console.log('Printer detected (error ignored):', PRINTER_IP);
-                }
-            }
+            // Skip connection check - just assume printer is available if configured
+            // The actual print will fail if printer is unreachable
+            printerConnected = true;
+            console.log('Printer configured:', PRINTER_IP);
         }
 
         async function sendToPrinter(zplData) {
