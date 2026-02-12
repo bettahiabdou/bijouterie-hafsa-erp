@@ -856,22 +856,25 @@
 
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000);
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
 
                 await fetch(`http://${PRINTER_IP}/`, {
-                    method: 'HEAD',
+                    method: 'GET',
                     mode: 'no-cors',
                     signal: controller.signal
                 });
 
                 clearTimeout(timeoutId);
                 printerConnected = true;
+                console.log('Printer connected:', PRINTER_IP);
             } catch (error) {
                 if (error.name === 'AbortError') {
                     printerConnected = false;
+                    console.log('Printer timeout:', PRINTER_IP);
                 } else {
-                    // Network error could mean printer is there but CORS blocking
+                    // Any other error - printer might still be reachable
                     printerConnected = true;
+                    console.log('Printer detected (error ignored):', PRINTER_IP);
                 }
             }
         }
