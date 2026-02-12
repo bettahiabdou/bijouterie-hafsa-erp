@@ -69,17 +69,30 @@ def link_user_by_username(telegram_username, chat_id):
     username_clean = telegram_username.lstrip('@')
     username_with_at = f'@{username_clean}'
 
+    print(f"[DEBUG] link_user_by_username: clean='{username_clean}', with_at='{username_with_at}'")
+
+    # Debug: check all users
+    all_users = User.objects.all()
+    print(f"[DEBUG] Total users in DB: {all_users.count()}")
+    for u in all_users:
+        print(f"[DEBUG]   User: {u.username}, telegram={u.telegram_username}, verified={u.is_telegram_verified}")
+
     try:
         # Try to find user with either format: @username or username
         user = User.objects.get(
             Q(telegram_username__iexact=username_clean) | Q(telegram_username__iexact=username_with_at),
             is_telegram_verified=False
         )
+        print(f"[DEBUG] Found matching user: {user.username}")
         user.telegram_chat_id = chat_id
         user.is_telegram_verified = True
         user.save()
         return user
     except User.DoesNotExist:
+        print(f"[DEBUG] No matching user found")
+        return None
+    except Exception as e:
+        print(f"[DEBUG] Error: {e}")
         return None
 
 
