@@ -931,6 +931,48 @@ def product_zpl_api(request, reference):
 
 
 # =============================================================================
+# Product Search API - For barcode scanner
+# =============================================================================
+
+@login_required(login_url='login')
+def product_search_api(request):
+    """API endpoint to search products by barcode, reference, or name"""
+    query = request.GET.get('q', '').strip()
+
+    if not query:
+        return JsonResponse({'products': []})
+
+    # Search by exact barcode first
+    products = Product.objects.filter(barcode=query)
+
+    # If not found, search by reference (exact or partial)
+    if not products.exists():
+        products = Product.objects.filter(reference__icontains=query)
+
+    # If still not found, search by RFID tag
+    if not products.exists():
+        products = Product.objects.filter(rfid_tag__icontains=query)
+
+    # If still not found, search by name
+    if not products.exists():
+        products = Product.objects.filter(name__icontains=query)
+
+    # Limit results
+    products = products[:10]
+
+    results = [{
+        'id': p.id,
+        'reference': p.reference,
+        'name': p.name,
+        'barcode': p.barcode,
+        'status': p.status,
+        'selling_price': str(p.selling_price) if p.selling_price else None,
+    } for p in products]
+
+    return JsonResponse({'products': results})
+
+
+# =============================================================================
 # Print Queue API - For local print agent
 # =============================================================================
 
