@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('settings_app', '0003_increase_code_field_length'),
+        ('settings_app', '0003_systemconfig_alter_metaltype_code_and_more'),
     ]
 
     operations = [
