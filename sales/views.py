@@ -2532,22 +2532,104 @@ def delivery_check(request, reference):
 
 @login_required(login_url='login')
 def delivery_bulk_check(request):
-    """Bulk check all pending AMANA deliveries"""
-    from .models import Delivery
-    from .services import AmanaTracker
+    """Bulk check all pending AMANA deliveries via Cloudflare proxy"""
+    import requests
+    from django.conf import settings
+    from .models import Delivery, DeliveryTimelineEvent
 
-    tracker = AmanaTracker()
-    try:
-        stats = tracker.bulk_update_deliveries()
-        messages.success(
-            request,
-            f"Vérification terminée: {stats['updated']}/{stats['total']} livraisons mises à jour."
-        )
-    except Exception as e:
-        messages.error(request, "Erreur de connexion au service AMANA. Le service est temporairement indisponible.")
+    proxy_url = getattr(settings, 'AMANA_PROXY_URL', '')
+    if not proxy_url:
+        messages.error(request, "Proxy AMANA non configuré.")
+        return redirect('sales:delivery_list')
 
-    if stats['errors']:
-        for error in stats['errors'][:5]:  # Show first 5 errors
+    # Get all AMANA deliveries that are not delivered
+    deliveries = Delivery.objects.filter(
+        delivery_method_type='amana',
+        tracking_number__isnull=False
+    ).exclude(
+        tracking_number=''
+    ).exclude(
+        status='delivered'
+    )
+
+    updated = 0
+    errors = []
+
+    for delivery in deliveries[:20]:  # Limit to 20 to avoid timeout
+        try:
+            # Fetch from Cloudflare proxy
+            response = requests.get(
+                f"{proxy_url}?trackingCode={delivery.tracking_number}",
+                timeout=10
+            )
+            data = response.json()
+
+            if not data.get('OperationSuccess') or not data.get('Html'):
+                continue
+
+            html = data['Html']
+
+            # Extract data using regex (same as JavaScript version)
+            import re
+
+            def extract_text(html, class_name):
+                patterns = [
+                    rf'class="[^"]*{class_name}[^"]*"[^>]*>\s*([^<]+)',
+                    rf"class='[^']*{class_name}[^']*'[^>]*>\s*([^<]+)"
+                ]
+                for pattern in patterns:
+                    match = re.search(pattern, html, re.IGNORECASE)
+                    if match and match.group(1).strip() != '...':
+                        return match.group(1).strip()
+                return ''
+
+            # Update delivery fields
+            delivery.product = extract_text(html, 'lblProductName') or ''
+            delivery.weight = extract_text(html, 'lblWeight') or ''
+            delivery.amount_cod = extract_text(html, 'lblMttCrbt') or ''
+            delivery.current_position = extract_text(html, 'lblCurrentPosition') or ''
+            delivery.destination = extract_text(html, 'lblRecipient') or ''
+            delivery.deposit_date = extract_text(html, 'lblDepositDate') or ''
+
+            # Extract origin
+            origin_match = re.search(r'class="tooltip_depart"[^>]*>([^<]+)', html, re.IGNORECASE)
+            if origin_match:
+                delivery.origin = origin_match.group(1).strip()
+
+            delivery.last_checked_at = timezone.now()
+            delivery.status = 'in_transit'
+            delivery.save()
+
+            # Extract and save timeline
+            timeline_pattern = r'<li>[\s\S]*?class="bullet">(\d+)</div>[\s\S]*?class="container_date">([^<]+)</div>[\s\S]*?class="container_time">([^<]+)</div>[\s\S]*?<div[^>]*class="mt-3[^>]*>([^<]+(?:<b>[^<]*</b>)?[^<]*)</div>'
+            timeline_matches = re.findall(timeline_pattern, html, re.IGNORECASE)
+
+            if timeline_matches:
+                delivery.timeline.filter(source='amana').delete()
+                for match in timeline_matches:
+                    description = re.sub(r'<[^>]*>', ' ', match[3]).strip()
+                    description = re.sub(r'\s+', ' ', description)
+                    DeliveryTimelineEvent.objects.create(
+                        delivery=delivery,
+                        event_number=match[0],
+                        event_date=match[1],
+                        event_time=match[2],
+                        description=description,
+                        source='amana'
+                    )
+
+            updated += 1
+
+        except Exception as e:
+            errors.append(f"{delivery.tracking_number}: {str(e)}")
+
+    messages.success(
+        request,
+        f"Vérification terminée: {updated}/{deliveries.count()} livraisons mises à jour."
+    )
+
+    if errors:
+        for error in errors[:3]:
             messages.warning(request, error)
 
     return redirect('sales:delivery_list')
