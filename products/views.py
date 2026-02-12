@@ -906,6 +906,30 @@ def printer_config_api(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required(login_url='login')
+def product_zpl_api(request, reference):
+    """API endpoint to get ZPL data for a product (for browser-based printing)"""
+    product = get_object_or_404(Product, reference=reference)
+
+    label_type = request.GET.get('label_type', 'product')
+    quantity = int(request.GET.get('quantity', 1))
+
+    if quantity < 1 or quantity > 10:
+        quantity = 1
+
+    if label_type == 'price':
+        zpl_data = generate_price_tag_zpl(product, quantity)
+    else:
+        zpl_data = generate_product_label_zpl(product, quantity)
+
+    return JsonResponse({
+        'zpl': zpl_data,
+        'product': product.reference,
+        'label_type': label_type,
+        'quantity': quantity
+    })
+
+
 # =============================================================================
 # Print Queue API - For local print agent
 # =============================================================================

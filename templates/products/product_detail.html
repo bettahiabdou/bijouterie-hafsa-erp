@@ -825,12 +825,184 @@
     </div>
 
     <script>
+        // Printer configuration
+        let PRINTER_IP = null;
+        let PRINTER_URL = null;
+        let printerConnected = false;
+
+        // Load printer config on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadPrinterConfig();
+            if (PRINTER_IP) {
+                checkPrinterConnection();
+            }
+        });
+
+        async function loadPrinterConfig() {
+            try {
+                const response = await fetch('/products/api/printer-config/');
+                const config = await response.json();
+                if (config.ip && config.enabled) {
+                    PRINTER_IP = config.ip;
+                    PRINTER_URL = config.http_url || `http://${PRINTER_IP}/pstprnt`;
+                }
+            } catch (e) {
+                console.error('Failed to load printer config:', e);
+            }
+        }
+
+        async function checkPrinterConnection() {
+            if (!PRINTER_IP) return;
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                await fetch(`http://${PRINTER_IP}/`, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+                printerConnected = true;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    printerConnected = false;
+                } else {
+                    // Network error could mean printer is there but CORS blocking
+                    printerConnected = true;
+                }
+            }
+        }
+
+        async function sendToPrinter(zplData) {
+            if (!PRINTER_URL) {
+                return { success: false, error: 'Imprimante non configuree' };
+            }
+            try {
+                await fetch(PRINTER_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: zplData
+                });
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
         function printLabel() {
             document.getElementById('printModal').style.display = 'flex';
         }
 
         function closePrintModal() {
             document.getElementById('printModal').style.display = 'none';
+        }
+
+        // Handle print form submission - try browser printing first
+        document.getElementById('printForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+
+            // Show loading state
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 6px;"></i> Impression...';
+            submitBtn.disabled = true;
+
+            const labelType = form.querySelector('select[name="label_type"]').value;
+            const quantity = form.querySelector('input[name="quantity"]').value;
+
+            // Try browser-based printing first if printer is connected
+            if (printerConnected && PRINTER_URL) {
+                try {
+                    // Fetch ZPL data from API
+                    const zplResponse = await fetch(`/products/api/product-zpl/{{ product.reference }}/?label_type=${labelType}&quantity=${quantity}`);
+                    const zplData = await zplResponse.json();
+
+                    if (zplData.zpl) {
+                        const result = await sendToPrinter(zplData.zpl);
+
+                        if (result.success) {
+                            // Success! Show message and close modal
+                            closePrintModal();
+                            showNotification('success', 'Etiquette envoyee a l\'imprimante!');
+                            submitBtn.innerHTML = originalText;
+                            submitBtn.disabled = false;
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Browser print failed:', error);
+                }
+            }
+
+            // Fall back to server-side queue
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+
+                closePrintModal();
+
+                if (data.success) {
+                    if (data.queued) {
+                        showNotification('info', 'Etiquette ajoutee a la file d\'impression');
+                    } else {
+                        showNotification('success', 'Etiquette imprimee!');
+                    }
+                } else {
+                    showNotification('error', 'Erreur: ' + data.message);
+                }
+            } catch (error) {
+                showNotification('error', 'Erreur de connexion');
+            }
+
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        });
+
+        function showNotification(type, message) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 16px 24px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 100001;
+                animation: slideIn 0.3s ease;
+                max-width: 400px;
+            `;
+
+            if (type === 'success') {
+                notification.style.background = '#22c55e';
+            } else if (type === 'error') {
+                notification.style.background = '#ef4444';
+            } else {
+                notification.style.background = '#3b82f6';
+            }
+
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
         }
 
         // Gallery functions
@@ -860,4 +1032,15 @@
             }
         });
     </script>
+
+    <style>
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    </style>
 {% endblock %}

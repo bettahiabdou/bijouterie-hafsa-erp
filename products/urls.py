@@ -20,6 +20,7 @@ urlpatterns = [
     path('print/debug/', views.printer_debug, name='printer_debug'),
     path('print-queue/', views.print_queue_view, name='print_queue'),
     path('api/printer-config/', views.printer_config_api, name='printer_config_api'),
+    path('api/product-zpl/<str:reference>/', views.product_zpl_api, name='product_zpl_api'),
     path('api/print-queue/', views.print_queue_list, name='print_queue_list'),
     path('api/print-queue/pending/', views.print_queue_pending, name='print_queue_pending'),
     path('api/print-queue/<int:job_id>/complete/', views.print_queue_complete, name='print_queue_complete'),
