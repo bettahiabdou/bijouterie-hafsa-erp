@@ -2555,13 +2555,22 @@ def delivery_bulk_check(request):
     updated = 0
     errors = []
 
-    for delivery in deliveries[:20]:  # Limit to 20 to avoid timeout
+    import time
+
+    for delivery in deliveries[:10]:  # Limit to 10 to avoid timeout
         try:
-            # Fetch from Cloudflare proxy
+            # Fetch from Cloudflare proxy with longer timeout
             response = requests.get(
                 f"{proxy_url}?trackingCode={delivery.tracking_number}",
-                timeout=10
+                timeout=30,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (compatible; HafsaERP/1.0)',
+                    'Accept': 'application/json',
+                }
             )
+
+            # Small delay between requests to avoid rate limiting
+            time.sleep(1)
             data = response.json()
 
             if not data.get('OperationSuccess') or not data.get('Html'):
