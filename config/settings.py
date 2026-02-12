@@ -214,8 +214,7 @@ ZEBRA_PRINTER_PORT = int(os.getenv('ZEBRA_PRINTER_PORT', '19100'))
 
 # AMANA Tracking Proxy (Cloudflare Worker)
 # Set this to your deployed Cloudflare Worker URL
-# Example: https://amana-proxy.your-subdomain.workers.dev
-AMANA_PROXY_URL = os.getenv('AMANA_PROXY_URL', '')
+AMANA_PROXY_URL = os.getenv('AMANA_PROXY_URL', 'https://amana-proxy.abdelkarimbettahi.workers.dev')
 
 
 # Media files (uploaded images)
