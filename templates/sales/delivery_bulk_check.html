@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+
+{% block title %}Vérification en Masse - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:delivery_list' %}" class="breadcrumb-item">Livraisons</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Vérification en Masse</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Vérification en Masse</h1>
+                <p class="page-subtitle">Mise à jour automatique de {{ deliveries|length }} livraisons AMANA</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:delivery_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-sync-alt mr-2"></i> Progression</h3>
+    </div>
+    <div class="card-body">
+        <div class="progress-container mb-4">
+            <div class="progress" style="height: 24px;">
+                <div class="progress-bar" role="progressbar" style="width: 0%;" id="progressBar">0%</div>
+            </div>
+        </div>
+
+        <div id="statusMessage" class="alert alert-info">
+            <i class="fas fa-info-circle mr-2"></i>
+            Cliquez sur "Démarrer" pour commencer la vérification.
+        </div>
+
+        <div class="text-center mb-4">
+            <button type="button" id="startBtn" class="btn btn-primary btn-lg" onclick="startBulkCheck()">
+                <i class="fas fa-play mr-2"></i> Démarrer la Vérification
+            </button>
+        </div>
+
+        <div id="resultsContainer" style="display: none;">
+            <h4 class="mb-3">Résultats</h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Code Suivi</th>
+                        <th>Statut</th>
+                        <th>Position</th>
+                        <th>Résultat</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .progress {
+        background-color: var(--neutral-200);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+    .progress-bar {
+        background-color: var(--primary-500);
+        transition: width 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: var(--font-semibold);
+    }
+    .result-success { color: var(--green-600); }
+    .result-error { color: var(--red-600); }
+    .result-pending { color: var(--neutral-500); }
+</style>
+
+<script>
+    const PROXY_URL = '{{ proxy_url }}';
+    const CSRF_TOKEN = '{{ csrf_token }}';
+    const deliveries = [
+        {% for d in deliveries %}
+        {
+            reference: '{{ d.reference }}',
+            tracking_number: '{{ d.tracking_number }}',
+            update_url: '{% url "sales:delivery_update_from_client" d.reference %}'
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // HTML entity decode mapping
+    const HTML_ENTITIES = {
+        '&#xE9;': 'é', '&#xE0;': 'à', '&#xC0;': 'À',
+        '&#xE8;': 'è', '&#xE7;': 'ç', '&#x27;': "'",
+        '&#39;': "'", '&amp;': '&', '&lt;': '<',
+        '&gt;': '>', '&quot;': '"'
+    };
+
+    function decodeHtmlEntities(text) {
+        if (!text) return '';
+        for (const [entity, char] of Object.entries(HTML_ENTITIES)) {
+            text = text.split(entity).join(char);
+        }
+        text = text.replace(/&#(\d+);/g, (m, n) => String.fromCharCode(parseInt(n)));
+        text = text.replace(/&#x([0-9A-Fa-f]+);/g, (m, n) => String.fromCharCode(parseInt(n, 16)));
+        return text;
+    }
+
+    function extractText(html, className) {
+        const patterns = [
+            new RegExp(`class="[^"]*${className}[^"]*"[^>]*>\\s*([^<]+)`, 'i'),
+            new RegExp(`class='[^']*${className}[^']*'[^>]*>\\s*([^<]+)`, 'i')
+        ];
+        for (const pattern of patterns) {
+            const match = html.match(pattern);
+            if (match && match[1].trim() !== '...') {
+                return match[1].trim();
+            }
+        }
+        return null;
+    }
+
+    function extractTimeline(html) {
+        const timeline = [];
+        const pattern = /<li>[\s\S]*?class="bullet">(\d+)<\/div>[\s\S]*?class="container_date">([^<]+)<\/div>[\s\S]*?class="container_time">([^<]+)<\/div>[\s\S]*?<div[^>]*class="mt-3[^>]*>([^<]+(?:<b>[^<]*<\/b>)?[^<]*)<\/div>/gi;
+
+        let match;
+        while ((match = pattern.exec(html)) !== null) {
+            let description = match[4].trim()
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+            description = decodeHtmlEntities(description);
+
+            timeline.push({
+                number: match[1].trim(),
+                date: match[2].trim(),
+                time: match[3].trim(),
+                description: description,
+                location: ''
+            });
+        }
+        return timeline;
+    }
+
+    function parseAmanaResponse(data, trackingCode) {
+        if (!data.OperationSuccess || !data.Html) {
+            return { success: false, error: 'Aucune information trouvée' };
+        }
+
+        const html = data.Html;
+
+        return {
+            success: true,
+            tracking_code: trackingCode,
+            product: extractText(html, 'lblProductName') || '',
+            weight: extractText(html, 'lblWeight') || '',
+            amount: extractText(html, 'lblMttCrbt') || '',
+            current_position: extractText(html, 'lblCurrentPosition') || '',
+            destination: extractText(html, 'lblRecipient') || '',
+            origin: (html.match(/class="tooltip_depart"[^>]*>([^<]+)/i) || [])[1] || '',
+            deposit_date: extractText(html, 'lblDepositDate') || '',
+            delivery_date: '',
+            timeline: extractTimeline(html)
+        };
+    }
+
+    async function checkDelivery(delivery) {
+        try {
+            // Fetch from proxy
+            const response = await fetch(`${PROXY_URL}?trackingCode=${encodeURIComponent(delivery.tracking_number)}`);
+            const data = await response.json();
+
+            if (data.error) {
+                return { success: false, error: data.error };
+            }
+
+            const trackingData = parseAmanaResponse(data, delivery.tracking_number);
+            if (!trackingData.success) {
+                return trackingData;
+            }
+
+            // Save to server
+            const saveResponse = await fetch(delivery.update_url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': CSRF_TOKEN
+                },
+                body: JSON.stringify(trackingData)
+            });
+
+            const result = await saveResponse.json();
+            return {
+                success: result.success,
+                current_position: trackingData.current_position,
+                status: result.status_display || 'Mis à jour',
+                error: result.error
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async function startBulkCheck() {
+        const startBtn = document.getElementById('startBtn');
+        const progressBar = document.getElementById('progressBar');
+        const statusMessage = document.getElementById('statusMessage');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const resultsBody = document.getElementById('resultsBody');
+
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> En cours...';
+        resultsContainer.style.display = 'block';
+        resultsBody.innerHTML = '';
+
+        let completed = 0;
+        let success = 0;
+        let errors = 0;
+        const total = deliveries.length;
+
+        for (const delivery of deliveries) {
+            // Add pending row
+            const row = document.createElement('tr');
+            row.id = `row-${delivery.reference}`;
+            row.innerHTML = `
+                <td><code>${delivery.tracking_number}</code></td>
+                <td><span class="result-pending"><i class="fas fa-spinner fa-spin"></i> En cours...</span></td>
+                <td>-</td>
+                <td>-</td>
+            `;
+            resultsBody.appendChild(row);
+
+            // Check this delivery
+            const result = await checkDelivery(delivery);
+            completed++;
+
+            // Update progress
+            const percent = Math.round((completed / total) * 100);
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+
+            // Update row with result
+            if (result.success) {
+                success++;
+                row.innerHTML = `
+                    <td><code>${delivery.tracking_number}</code></td>
+                    <td><span class="badge badge-success">${result.status || 'OK'}</span></td>
+                    <td>${result.current_position || '-'}</td>
+                    <td class="result-success"><i class="fas fa-check"></i> Mis à jour</td>
+                `;
+            } else {
+                errors++;
+                row.innerHTML = `
+                    <td><code>${delivery.tracking_number}</code></td>
+                    <td><span class="badge badge-danger">Erreur</span></td>
+                    <td>-</td>
+                    <td class="result-error"><i class="fas fa-times"></i> ${result.error || 'Erreur'}</td>
+                `;
+            }
+
+            statusMessage.innerHTML = `<i class="fas fa-sync fa-spin mr-2"></i> Vérification en cours: ${completed}/${total} (${success} succès, ${errors} erreurs)`;
+
+            // Small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        // Done
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="fas fa-redo mr-2"></i> Recommencer';
+        statusMessage.className = success > 0 ? 'alert alert-success' : 'alert alert-warning';
+        statusMessage.innerHTML = `<i class="fas fa-check-circle mr-2"></i> Terminé! ${success}/${total} livraisons mises à jour. ${errors > 0 ? `${errors} erreurs.` : ''}`;
+    }
+</script>
+{% endblock %}
