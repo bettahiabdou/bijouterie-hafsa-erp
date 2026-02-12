@@ -79,6 +79,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'config.context_processors.amana_settings',
             ],
         },
     },
@@ -210,6 +211,11 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
 # Zebra Printer Configuration
 ZEBRA_PRINTER_HOST = os.getenv('ZEBRA_PRINTER_HOST', '')
 ZEBRA_PRINTER_PORT = int(os.getenv('ZEBRA_PRINTER_PORT', '19100'))
+
+# AMANA Tracking Proxy (Cloudflare Worker)
+# Set this to your deployed Cloudflare Worker URL
+# Example: https://amana-proxy.your-subdomain.workers.dev
+AMANA_PROXY_URL = os.getenv('AMANA_PROXY_URL', '')
 
 
 # Media files (uploaded images)

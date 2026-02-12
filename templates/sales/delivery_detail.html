@@ -31,9 +31,9 @@
             </div>
             <div class="page-actions">
                 {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
-                    <button type="button" class="btn btn-primary" onclick="openImportModal()">
-                        <i class="fas fa-sync-alt"></i>
-                        <span>Importer Suivi</span>
+                    <button type="button" id="btn-refresh-tracking" class="btn btn-primary" onclick="refreshTracking()">
+                        <i class="fas fa-sync-alt" id="refresh-icon"></i>
+                        <span id="refresh-text">Actualiser</span>
                     </button>
                     <a href="https://bam-tracking.barid.ma/?trackingCode={{ delivery.tracking_number }}" target="_blank" class="btn btn-secondary">
                         <i class="fas fa-external-link-alt"></i>
@@ -520,6 +520,8 @@
         const TRACKING_CODE = '{{ delivery.tracking_number }}';
         const UPDATE_URL = '{% url "sales:delivery_update_from_client" delivery.reference %}';
         const CSRF_TOKEN = '{{ csrf_token }}';
+        // Cloudflare Worker proxy URL - set via Django settings
+        const PROXY_URL = '{{ settings.AMANA_PROXY_URL }}';
 
         // HTML entity decode mapping
         const HTML_ENTITIES = {
@@ -583,6 +585,113 @@
             return timeline;
         }
 
+        function parseAmanaResponse(data) {
+            if (!data.OperationSuccess || !data.Html) {
+                return { success: false, error: 'Aucune information trouvée' };
+            }
+
+            const html = data.Html;
+
+            const trackingData = {
+                success: true,
+                tracking_code: TRACKING_CODE,
+                product: extractText(html, 'lblProductName') || '',
+                weight: extractText(html, 'lblWeight') || '',
+                amount: extractText(html, 'lblMttCrbt') || '',
+                current_position: extractText(html, 'lblCurrentPosition') || '',
+                destination: extractText(html, 'lblRecipient') || '',
+                origin: '',
+                deposit_date: extractText(html, 'lblDepositDate') || '',
+                delivery_date: '',
+                timeline: extractTimeline(html)
+            };
+
+            const originMatch = html.match(/class="tooltip_depart"[^>]*>([^<]+)/i);
+            if (originMatch) {
+                trackingData.origin = originMatch[1].trim();
+            }
+
+            return trackingData;
+        }
+
+        async function refreshTracking() {
+            const btn = document.getElementById('btn-refresh-tracking');
+            const icon = document.getElementById('refresh-icon');
+            const text = document.getElementById('refresh-text');
+
+            // Show loading state
+            btn.disabled = true;
+            icon.classList.add('fa-spin');
+            text.textContent = 'Chargement...';
+
+            try {
+                // Check if proxy is configured
+                if (!PROXY_URL) {
+                    showMessage('error', 'Proxy AMANA non configuré. Contactez l\'administrateur.');
+                    return;
+                }
+
+                // Fetch via Cloudflare Worker proxy
+                const proxyUrl = `${PROXY_URL}?trackingCode=${encodeURIComponent(TRACKING_CODE)}`;
+                const response = await fetch(proxyUrl);
+                const data = await response.json();
+
+                if (data.error) {
+                    showMessage('error', data.error);
+                    return;
+                }
+
+                // Parse the AMANA response
+                const trackingData = parseAmanaResponse(data);
+
+                if (!trackingData.success) {
+                    showMessage('error', trackingData.error || 'Erreur de parsing');
+                    return;
+                }
+
+                // Send to our server to save
+                const saveResponse = await fetch(UPDATE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify(trackingData)
+                });
+
+                const result = await saveResponse.json();
+
+                if (result.success) {
+                    showMessage('success', 'Statut mis à jour! Rechargement...');
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    showMessage('error', result.error || 'Erreur de sauvegarde');
+                }
+            } catch (error) {
+                console.error('Tracking error:', error);
+                showMessage('error', 'Erreur: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                icon.classList.remove('fa-spin');
+                text.textContent = 'Actualiser';
+            }
+        }
+
+        function showMessage(type, message) {
+            // Remove existing messages
+            const existing = document.querySelector('.tracking-message');
+            if (existing) existing.remove();
+
+            const div = document.createElement('div');
+            div.className = `tracking-message alert alert-${type === 'error' ? 'danger' : 'success'}`;
+            div.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 1rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px;';
+            div.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 'check-circle'} mr-2"></i>${message}`;
+            document.body.appendChild(div);
+
+            setTimeout(() => div.remove(), 5000);
+        }
+
+        // Manual import modal functions (fallback)
         function openImportModal() {
             document.getElementById('importModal').classList.add('active');
             document.getElementById('jsonInput').value = '';
@@ -617,36 +726,14 @@
                 return;
             }
 
-            if (!data.OperationSuccess || !data.Html) {
-                errorDiv.textContent = 'Données AMANA invalides ou code de suivi non trouvé';
+            const trackingData = parseAmanaResponse(data);
+
+            if (!trackingData.success) {
+                errorDiv.textContent = trackingData.error || 'Données AMANA invalides';
                 errorDiv.style.display = 'block';
                 return;
             }
 
-            const html = data.Html;
-
-            // Parse the data
-            const trackingData = {
-                success: true,
-                tracking_code: TRACKING_CODE,
-                product: extractText(html, 'lblProductName') || '',
-                weight: extractText(html, 'lblWeight') || '',
-                amount: extractText(html, 'lblMttCrbt') || '',
-                current_position: extractText(html, 'lblCurrentPosition') || '',
-                destination: extractText(html, 'lblRecipient') || '',
-                origin: '',
-                deposit_date: extractText(html, 'lblDepositDate') || '',
-                delivery_date: '',
-                timeline: extractTimeline(html)
-            };
-
-            // Extract origin
-            const originMatch = html.match(/class="tooltip_depart"[^>]*>([^<]+)/i);
-            if (originMatch) {
-                trackingData.origin = originMatch[1].trim();
-            }
-
-            // Send to server
             try {
                 const response = await fetch(UPDATE_URL, {
                     method: 'POST',
