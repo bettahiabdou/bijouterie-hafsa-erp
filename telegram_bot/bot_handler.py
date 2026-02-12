@@ -282,8 +282,12 @@ class TelegramBotHandler:
         telegram_username = update.effective_user.username or ""
         first_name = update.effective_user.first_name or ""
 
+        # Debug logging
+        print(f"[DEBUG] /start received from chat_id={chat_id}, username={telegram_username}, first_name={first_name}")
+
         # Check if user is already linked
         user = await get_user_by_chat_id(chat_id)
+        print(f"[DEBUG] get_user_by_chat_id result: {user}")
         if user:
             await self._send_main_menu(
                 chat_id,
@@ -295,7 +299,9 @@ class TelegramBotHandler:
 
         # Check if there's a user with matching telegram_username waiting to be linked
         if telegram_username:
+            print(f"[DEBUG] Trying to link username={telegram_username}")
             user = await link_user_by_username(telegram_username, chat_id)
+            print(f"[DEBUG] link_user_by_username result: {user}")
             if user:
                 await self._send_main_menu(
                     chat_id,
