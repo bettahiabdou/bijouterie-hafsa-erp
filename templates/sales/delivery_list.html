@@ -1,0 +1,311 @@
+{% extends 'base.html' %}
+
+{% block title %}Livraisons - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Livraisons</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Livraisons</h1>
+                <p class="page-subtitle">Suivi des expéditions AMANA et transporteurs</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:delivery_bulk_check' %}" class="btn btn-primary">
+                    <i class="fas fa-sync-alt"></i>
+                    <span>Vérifier Tout</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- Stats Cards -->
+    <div class="stats-grid mb-6">
+        <div class="stat-card">
+            <div class="stat-icon bg-primary-100 text-primary-600">
+                <i class="fas fa-truck"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats.total }}</span>
+                <span class="stat-label">Total</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-gray-100 text-gray-600">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats.pending }}</span>
+                <span class="stat-label">En Attente</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-warning-100 text-warning-600">
+                <i class="fas fa-shipping-fast"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats.in_transit }}</span>
+                <span class="stat-label">En Transit</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-success-100 text-success-600">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats.delivered }}</span>
+                <span class="stat-label">Livrés</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="filter-form">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label class="form-label">Recherche</label>
+                        <input type="text" name="search" class="form-input" placeholder="Référence, tracking, client..."
+                               value="{{ search_query }}">
+                    </div>
+                    <div class="filter-group">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="">Tous les statuts</option>
+                            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>En Attente</option>
+                            <option value="in_transit" {% if status_filter == 'in_transit' %}selected{% endif %}>En Transit</option>
+                            <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Livré</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="form-label">Type</label>
+                        <select name="method" class="form-select">
+                            <option value="">Tous les types</option>
+                            <option value="amana" {% if method_filter == 'amana' %}selected{% endif %}>AMANA</option>
+                            <option value="transporteur" {% if method_filter == 'transporteur' %}selected{% endif %}>Transporteur</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i>
+                            Filtrer
+                        </button>
+                        <a href="{% url 'sales:delivery_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Deliveries Table -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-list mr-2"></i> Liste des Livraisons</h3>
+        </div>
+        {% if deliveries %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Facture</th>
+                        <th>Client</th>
+                        <th>Type</th>
+                        <th>N° Suivi</th>
+                        <th>Statut</th>
+                        <th>Position</th>
+                        <th>Dernière Vérif.</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for delivery in deliveries %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="font-mono font-semibold text-primary">
+                                    {{ delivery.reference }}
+                                </a>
+                            </td>
+                            <td>
+                                {% if delivery.invoice %}
+                                    <a href="{% url 'sales:invoice_detail' delivery.invoice.reference %}" class="font-mono text-sm">
+                                        {{ delivery.invoice.reference }}
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>{{ delivery.client_name|default:'-' }}</div>
+                                {% if delivery.client_phone %}
+                                    <div class="text-sm text-muted">{{ delivery.client_phone }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if delivery.delivery_method_type == 'amana' %}
+                                    <span class="badge badge-info">AMANA</span>
+                                {% else %}
+                                    <span class="badge badge-secondary">{{ delivery.carrier.name|default:'Transporteur' }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="font-mono text-sm">{{ delivery.tracking_number|default:'-' }}</span>
+                            </td>
+                            <td>
+                                {% if delivery.status == 'pending' %}
+                                    <span class="badge badge-secondary">En Attente</span>
+                                {% elif delivery.status == 'in_transit' %}
+                                    <span class="badge badge-warning">En Transit</span>
+                                {% elif delivery.status == 'delivered' %}
+                                    <span class="badge badge-success">Livré</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="text-sm">{{ delivery.current_position|default:'-'|truncatechars:30 }}</span>
+                            </td>
+                            <td>
+                                {% if delivery.last_checked_at %}
+                                    <span class="text-sm text-muted">{{ delivery.last_checked_at|date:"d/m H:i" }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-right">
+                                <div class="btn-group">
+                                    <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="btn btn-ghost btn-sm" title="Détails">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
+                                        <a href="{% url 'sales:delivery_check' delivery.reference %}" class="btn btn-ghost btn-sm" title="Vérifier">
+                                            <i class="fas fa-sync-alt"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+                <div class="card-footer">
+                    <div class="pagination">
+                        {% if page_obj.has_previous %}
+                            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}" class="pagination-btn">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        {% endif %}
+
+                        <span class="pagination-info">
+                            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                        </span>
+
+                        {% if page_obj.has_next %}
+                            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}" class="pagination-btn">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="card-body text-center py-8">
+                <i class="fas fa-truck text-4xl text-gray-300 mb-4"></i>
+                <p class="text-gray-600 mb-4">Aucune livraison trouvée</p>
+                <p class="text-sm text-gray-500">Les livraisons apparaîtront ici lorsque des factures seront créées avec le mode AMANA ou transporteur.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <style>
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+        }
+
+        .stat-card {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            padding: var(--space-4);
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--text-xl);
+        }
+
+        .stat-content {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-value {
+            font-size: var(--text-2xl);
+            font-weight: var(--font-bold);
+            color: var(--neutral-800);
+        }
+
+        .stat-label {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .filter-form .filter-row {
+            display: flex;
+            gap: var(--space-4);
+            align-items: flex-end;
+        }
+
+        .filter-form .filter-group {
+            flex: 1;
+        }
+
+        .filter-form .filter-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        @media (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .filter-form .filter-row {
+                flex-wrap: wrap;
+            }
+
+            .filter-form .filter-group {
+                flex: 1 1 45%;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-form .filter-group {
+                flex: 1 1 100%;
+            }
+        }
+    </style>
+{% endblock %}

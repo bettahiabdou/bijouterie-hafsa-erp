@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         ('clients', '0002_initial'),
         ('products', '0003_product_bank_account'),
         ('sales', '0008_add_return_exchange'),
-        ('settings_app', '0003_systemconfig_alter_metaltype_code_and_more'),
+        ('settings_app', '0003_increase_code_field_length'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

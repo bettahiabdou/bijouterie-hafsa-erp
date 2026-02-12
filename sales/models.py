@@ -195,12 +195,37 @@ class SaleInvoice(models.Model):
     )
 
     # Delivery
+    class DeliveryMethodChoice(models.TextChoices):
+        MAGASIN = 'magasin', _('Magasin (Retrait)')
+        AMANA = 'amana', _('AMANA')
+        TRANSPORTEUR = 'transporteur', _('Autre Transporteur')
+
+    delivery_method_type = models.CharField(
+        _('Type de livraison'),
+        max_length=20,
+        choices=DeliveryMethodChoice.choices,
+        default=DeliveryMethodChoice.MAGASIN
+    )
     delivery_method = models.ForeignKey(
         'settings_app.DeliveryMethod',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        verbose_name=_('Mode de livraison')
+        verbose_name=_('Mode de livraison (legacy)')
+    )
+    carrier = models.ForeignKey(
+        'settings_app.Carrier',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_('Transporteur'),
+        help_text=_('Transporteur externe (AMANA, autre)')
+    )
+    tracking_number = models.CharField(
+        _('Numéro de suivi'),
+        max_length=100,
+        blank=True,
+        help_text=_('Code de suivi pour AMANA ou autre transporteur')
     )
     delivery_person = models.ForeignKey(
         'settings_app.DeliveryPerson',
@@ -875,6 +900,157 @@ class InvoicePhoto(models.Model):
 
     def __str__(self):
         return f"Photo {self.id} - {self.invoice.reference}"
+
+
+class Delivery(models.Model):
+    """
+    Delivery tracking for external shipments (AMANA, transporteurs)
+    Created when invoice is completed with non-magasin delivery method
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', _('En attente')
+        IN_TRANSIT = 'in_transit', _('En transit')
+        DELIVERED = 'delivered', _('Livré')
+
+    # Reference
+    reference = models.CharField(
+        _('Référence'),
+        max_length=50,
+        unique=True
+    )
+
+    # Link to invoice (OneToOne - one delivery per invoice)
+    invoice = models.OneToOneField(
+        SaleInvoice,
+        on_delete=models.CASCADE,
+        related_name='delivery',
+        verbose_name=_('Facture')
+    )
+
+    # Client info (copied from invoice for easy display)
+    client_name = models.CharField(_('Nom client'), max_length=200, blank=True)
+    client_phone = models.CharField(_('Téléphone client'), max_length=20, blank=True)
+
+    # Amount info
+    total_amount = models.DecimalField(
+        _('Montant total'),
+        max_digits=14,
+        decimal_places=2,
+        default=0
+    )
+
+    # Delivery method
+    delivery_method_type = models.CharField(
+        _('Type de livraison'),
+        max_length=20,
+        choices=SaleInvoice.DeliveryMethodChoice.choices,
+        default=SaleInvoice.DeliveryMethodChoice.AMANA
+    )
+    carrier = models.ForeignKey(
+        'settings_app.Carrier',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_('Transporteur')
+    )
+    tracking_number = models.CharField(
+        _('Numéro de suivi'),
+        max_length=100,
+        blank=True,
+        db_index=True
+    )
+
+    # AMANA-specific data (from scraping)
+    status = models.CharField(
+        _('Statut'),
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+    product = models.CharField(_('Produit AMANA'), max_length=200, blank=True)
+    weight = models.CharField(_('Poids'), max_length=50, blank=True)
+    amount_cod = models.CharField(_('Montant contre remboursement'), max_length=50, blank=True)
+    current_position = models.CharField(_('Position actuelle'), max_length=200, blank=True)
+    destination = models.CharField(_('Destination'), max_length=200, blank=True)
+    origin = models.CharField(_('Origine'), max_length=200, blank=True)
+    deposit_date = models.CharField(_('Date de dépôt'), max_length=50, blank=True)
+    delivery_date = models.CharField(_('Date de livraison'), max_length=50, blank=True)
+
+    # Tracking timestamps
+    last_checked_at = models.DateTimeField(
+        _('Dernière vérification'),
+        null=True,
+        blank=True
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('Livraison')
+        verbose_name_plural = _('Livraisons')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['tracking_number']),
+        ]
+
+    def __str__(self):
+        return f"{self.reference} - {self.client_name} - {self.tracking_number}"
+
+    def save(self, *args, **kwargs):
+        # Auto-generate reference if not present
+        if not self.reference:
+            from utils import generate_delivery_reference
+            self.reference = generate_delivery_reference()
+        super().save(*args, **kwargs)
+
+
+class DeliveryTimelineEvent(models.Model):
+    """
+    Timeline events for delivery tracking (from AMANA scraping or manual entry)
+    """
+
+    class Source(models.TextChoices):
+        AMANA = 'amana', _('AMANA (automatique)')
+        MANUAL = 'manual', _('Manuel')
+
+    delivery = models.ForeignKey(
+        Delivery,
+        on_delete=models.CASCADE,
+        related_name='timeline',
+        verbose_name=_('Livraison')
+    )
+
+    # Event info (from AMANA)
+    event_number = models.CharField(_('Numéro événement'), max_length=10)
+    event_date = models.CharField(_('Date'), max_length=50)
+    event_time = models.CharField(_('Heure'), max_length=20)
+    description = models.TextField(_('Description'))
+    location = models.CharField(_('Localisation'), max_length=200, blank=True)
+
+    # Source tracking
+    source = models.CharField(
+        _('Source'),
+        max_length=20,
+        choices=Source.choices,
+        default=Source.AMANA
+    )
+
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('Événement livraison')
+        verbose_name_plural = _('Événements livraison')
+        ordering = ['-event_number']
+        indexes = [
+            models.Index(fields=['delivery', '-event_number']),
+        ]
+
+    def __str__(self):
+        return f"{self.event_number} - {self.event_date} {self.event_time} - {self.description[:50]}"
 
 
 class SaleInvoiceAction(models.Model):

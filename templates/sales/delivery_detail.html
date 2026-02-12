@@ -1,0 +1,383 @@
+{% extends 'base.html' %}
+
+{% block title %}Livraison {{ delivery.reference }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:delivery_list' %}" class="breadcrumb-item">Livraisons</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ delivery.reference }}</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">{{ delivery.reference }}</h1>
+                <p class="page-subtitle">
+                    {% if delivery.status == 'pending' %}
+                        <span class="badge badge-secondary">En Attente</span>
+                    {% elif delivery.status == 'in_transit' %}
+                        <span class="badge badge-warning">En Transit</span>
+                    {% elif delivery.status == 'delivered' %}
+                        <span class="badge badge-success">Livré</span>
+                    {% endif %}
+                    {% if delivery.delivery_method_type == 'amana' %}
+                        <span class="badge badge-info ml-2">AMANA</span>
+                    {% else %}
+                        <span class="badge badge-secondary ml-2">{{ delivery.carrier.name|default:'Transporteur' }}</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="page-actions">
+                {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
+                    <a href="{% url 'sales:delivery_check' delivery.reference %}" class="btn btn-primary">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Actualiser</span>
+                    </a>
+                {% endif %}
+                <a href="{% url 'sales:delivery_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="delivery-layout">
+        <!-- Left Column: Info Cards -->
+        <div class="info-column">
+            <!-- Delivery Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3><i class="fas fa-truck mr-2"></i> Informations de Livraison</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Numéro de Suivi</label>
+                            <span class="font-mono font-semibold">{{ delivery.tracking_number|default:'-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Position Actuelle</label>
+                            <span>{{ delivery.current_position|default:'-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Origine</label>
+                            <span>{{ delivery.origin|default:'-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Destination</label>
+                            <span>{{ delivery.destination|default:'-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Date de Dépôt</label>
+                            <span>{{ delivery.deposit_date|default:'-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Date de Livraison</label>
+                            <span>{{ delivery.delivery_date|default:'-' }}</span>
+                        </div>
+                        {% if delivery.product %}
+                            <div class="info-item">
+                                <label>Type Colis (AMANA)</label>
+                                <span>{{ delivery.product }}</span>
+                            </div>
+                        {% endif %}
+                        {% if delivery.weight %}
+                            <div class="info-item">
+                                <label>Poids</label>
+                                <span>{{ delivery.weight }}</span>
+                            </div>
+                        {% endif %}
+                        {% if delivery.amount_cod %}
+                            <div class="info-item">
+                                <label>Contre Remboursement</label>
+                                <span class="font-semibold text-success">{{ delivery.amount_cod }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% if delivery.last_checked_at %}
+                        <div class="text-sm text-muted mt-4 pt-4 border-t">
+                            <i class="fas fa-clock mr-1"></i>
+                            Dernière vérification: {{ delivery.last_checked_at|date:"d/m/Y H:i" }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Client Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3><i class="fas fa-user mr-2"></i> Client</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Nom</label>
+                            <span>{{ delivery.client_name|default:'-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Téléphone</label>
+                            <span>{{ delivery.client_phone|default:'-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Montant Total</label>
+                            <span class="font-semibold">{{ delivery.total_amount|floatformat:2 }} DH</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invoice Link -->
+            {% if delivery.invoice %}
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-file-invoice mr-2"></i> Facture Liée</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="invoice-link-card">
+                            <div class="invoice-ref">{{ delivery.invoice.reference }}</div>
+                            <div class="invoice-details">
+                                <span>{{ delivery.invoice.date|date:"d/m/Y" }}</span>
+                                <span>{{ delivery.invoice.total_amount|floatformat:2 }} DH</span>
+                                {% if delivery.invoice.status == 'paid' %}
+                                    <span class="badge badge-success">Payée</span>
+                                {% elif delivery.invoice.status == 'partial' %}
+                                    <span class="badge badge-warning">Partielle</span>
+                                {% else %}
+                                    <span class="badge badge-secondary">{{ delivery.invoice.get_status_display }}</span>
+                                {% endif %}
+                            </div>
+                            <a href="{% url 'sales:invoice_detail' delivery.invoice.reference %}" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-eye"></i>
+                                Voir Facture
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Column: Timeline -->
+        <div class="timeline-column">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-history mr-2"></i> Historique de Suivi</h3>
+                </div>
+                <div class="card-body">
+                    {% if timeline %}
+                        <div class="timeline">
+                            {% for event in timeline %}
+                                <div class="timeline-item {% if forloop.first %}active{% endif %}">
+                                    <div class="timeline-marker">
+                                        {% if forloop.first %}
+                                            <i class="fas fa-circle"></i>
+                                        {% else %}
+                                            <i class="far fa-circle"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="timeline-content">
+                                        <div class="timeline-header">
+                                            <span class="timeline-date">{{ event.event_date }}</span>
+                                            <span class="timeline-time">{{ event.event_time }}</span>
+                                        </div>
+                                        <div class="timeline-description">
+                                            {{ event.description }}
+                                        </div>
+                                        {% if event.location %}
+                                            <div class="timeline-location">
+                                                <i class="fas fa-map-marker-alt"></i>
+                                                {{ event.location }}
+                                            </div>
+                                        {% endif %}
+                                        <div class="timeline-source text-xs text-muted">
+                                            {% if event.source == 'amana' %}
+                                                <i class="fas fa-robot"></i> Automatique
+                                            {% else %}
+                                                <i class="fas fa-user"></i> Manuel
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty-timeline">
+                            <i class="fas fa-history"></i>
+                            <p>Aucun événement de suivi</p>
+                            {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
+                                <a href="{% url 'sales:delivery_check' delivery.reference %}" class="btn btn-primary btn-sm mt-2">
+                                    <i class="fas fa-sync-alt"></i>
+                                    Récupérer le Suivi
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .delivery-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-6);
+            align-items: start;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+        }
+
+        .info-item label {
+            display: block;
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            margin-bottom: var(--space-1);
+        }
+
+        .info-item span {
+            font-weight: var(--font-medium);
+        }
+
+        .invoice-link-card {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            padding: var(--space-4);
+            background: var(--neutral-50);
+            border-radius: var(--radius-lg);
+        }
+
+        .invoice-ref {
+            font-family: var(--font-mono);
+            font-weight: var(--font-semibold);
+            font-size: var(--text-lg);
+            color: var(--primary-700);
+        }
+
+        .invoice-details {
+            flex: 1;
+            display: flex;
+            gap: var(--space-3);
+            align-items: center;
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-left: var(--space-8);
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 11px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--neutral-200);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-bottom: var(--space-6);
+        }
+
+        .timeline-item:last-child {
+            padding-bottom: 0;
+        }
+
+        .timeline-marker {
+            position: absolute;
+            left: -32px;
+            top: 2px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            z-index: 1;
+        }
+
+        .timeline-marker i {
+            font-size: var(--text-sm);
+            color: var(--neutral-300);
+        }
+
+        .timeline-item.active .timeline-marker i {
+            color: var(--primary-500);
+        }
+
+        .timeline-content {
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+        }
+
+        .timeline-item.active .timeline-content {
+            background: var(--primary-50);
+            border: 1px solid var(--primary-200);
+        }
+
+        .timeline-header {
+            display: flex;
+            gap: var(--space-3);
+            margin-bottom: var(--space-2);
+        }
+
+        .timeline-date {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-700);
+        }
+
+        .timeline-time {
+            color: var(--neutral-500);
+        }
+
+        .timeline-description {
+            color: var(--neutral-700);
+            line-height: 1.5;
+        }
+
+        .timeline-location {
+            margin-top: var(--space-2);
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .timeline-location i {
+            margin-right: var(--space-1);
+        }
+
+        .timeline-source {
+            margin-top: var(--space-2);
+        }
+
+        .empty-timeline {
+            text-align: center;
+            padding: var(--space-8);
+            color: var(--neutral-400);
+        }
+
+        .empty-timeline i {
+            font-size: 2.5rem;
+            margin-bottom: var(--space-4);
+        }
+
+        @media (max-width: 1024px) {
+            .delivery-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}

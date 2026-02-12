@@ -170,6 +170,58 @@
                 </div>
             </div>
 
+            <!-- Delivery Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3><i class="fas fa-truck mr-2"></i> Mode de Livraison</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label">Type de livraison</label>
+                        <div class="delivery-options">
+                            <label class="delivery-option">
+                                <input type="radio" name="delivery_method_type" value="magasin" checked onchange="toggleDeliveryFields()">
+                                <div class="delivery-option-content">
+                                    <i class="fas fa-store"></i>
+                                    <span>Magasin (Retrait)</span>
+                                </div>
+                            </label>
+                            <label class="delivery-option">
+                                <input type="radio" name="delivery_method_type" value="amana" onchange="toggleDeliveryFields()">
+                                <div class="delivery-option-content">
+                                    <i class="fas fa-box"></i>
+                                    <span>AMANA</span>
+                                </div>
+                            </label>
+                            <label class="delivery-option">
+                                <input type="radio" name="delivery_method_type" value="transporteur" onchange="toggleDeliveryFields()">
+                                <div class="delivery-option-content">
+                                    <i class="fas fa-truck"></i>
+                                    <span>Autre Transporteur</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Tracking Fields (hidden for Magasin) -->
+                    <div id="delivery-tracking-fields" style="display: none;">
+                        <div class="form-group" id="carrier-group" style="display: none;">
+                            <label class="form-label">Transporteur</label>
+                            <select name="carrier_id" class="form-select">
+                                <option value="">-- Sélectionner --</option>
+                                {% for carrier in carriers %}
+                                    <option value="{{ carrier.id }}">{{ carrier.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Numéro de suivi</label>
+                            <input type="text" name="tracking_number" id="tracking-number" class="form-input" placeholder="Code de suivi AMANA ou transporteur">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Finalize Section -->
             <div class="card">
                 <div class="card-header">
@@ -180,6 +232,9 @@
                         {% csrf_token %}
                         <input type="hidden" name="action" value="complete">
                         <input type="hidden" name="custom_reference" id="hidden-custom-reference" value="{{ invoice.reference }}">
+                        <input type="hidden" name="delivery_method_type_hidden" id="delivery-method-type-hidden" value="magasin">
+                        <input type="hidden" name="carrier_id_hidden" id="carrier-id-hidden" value="">
+                        <input type="hidden" name="tracking_number_hidden" id="tracking-number-hidden" value="">
 
                         <div class="form-group">
                             <label class="form-label">Client (optionnel)</label>
@@ -854,6 +909,62 @@
             margin-bottom: var(--space-4);
         }
 
+        /* Delivery Options */
+        .delivery-options {
+            display: flex;
+            gap: var(--space-3);
+            margin-top: var(--space-2);
+        }
+
+        .delivery-option {
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .delivery-option input {
+            display: none;
+        }
+
+        .delivery-option-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-4);
+            border: 2px solid var(--neutral-200);
+            border-radius: var(--radius-lg);
+            transition: all 0.2s;
+            gap: var(--space-2);
+        }
+
+        .delivery-option-content i {
+            font-size: var(--text-2xl);
+            color: var(--neutral-400);
+        }
+
+        .delivery-option-content span {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--neutral-600);
+        }
+
+        .delivery-option input:checked + .delivery-option-content {
+            border-color: var(--primary-500);
+            background: var(--primary-50);
+        }
+
+        .delivery-option input:checked + .delivery-option-content i {
+            color: var(--primary-600);
+        }
+
+        .delivery-option input:checked + .delivery-option-content span {
+            color: var(--primary-700);
+        }
+
+        .delivery-option:hover .delivery-option-content {
+            border-color: var(--primary-300);
+        }
+
         @media (max-width: 1024px) {
             .completion-layout {
                 grid-template-columns: 1fr;
@@ -862,6 +973,10 @@
             .photos-panel {
                 position: relative;
                 top: 0;
+            }
+
+            .delivery-options {
+                flex-direction: column;
             }
         }
     </style>
@@ -1145,6 +1260,45 @@
                 closePhotoModal();
                 closeQuickCreateModal();
                 closeAddProductModal();
+            }
+        });
+
+        // Delivery Method Toggle
+        function toggleDeliveryFields() {
+            const selectedType = document.querySelector('input[name="delivery_method_type"]:checked').value;
+            const trackingFields = document.getElementById('delivery-tracking-fields');
+            const carrierGroup = document.getElementById('carrier-group');
+
+            // Update hidden fields for form submission
+            document.getElementById('delivery-method-type-hidden').value = selectedType;
+
+            if (selectedType === 'magasin') {
+                // Hide all tracking fields for magasin
+                trackingFields.style.display = 'none';
+            } else if (selectedType === 'amana') {
+                // AMANA - show tracking, hide carrier select
+                trackingFields.style.display = 'block';
+                carrierGroup.style.display = 'none';
+            } else if (selectedType === 'transporteur') {
+                // Other transporteur - show tracking and carrier select
+                trackingFields.style.display = 'block';
+                carrierGroup.style.display = 'block';
+            }
+        }
+
+        // Sync delivery fields with hidden inputs before form submission
+        document.getElementById('complete-form').addEventListener('submit', function(e) {
+            const selectedType = document.querySelector('input[name="delivery_method_type"]:checked').value;
+            document.getElementById('delivery-method-type-hidden').value = selectedType;
+
+            const trackingInput = document.getElementById('tracking-number');
+            if (trackingInput) {
+                document.getElementById('tracking-number-hidden').value = trackingInput.value;
+            }
+
+            const carrierSelect = document.querySelector('select[name="carrier_id"]');
+            if (carrierSelect) {
+                document.getElementById('carrier-id-hidden').value = carrierSelect.value;
             }
         });
     </script>

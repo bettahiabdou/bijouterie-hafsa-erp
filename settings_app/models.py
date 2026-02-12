@@ -417,6 +417,43 @@ class DeliveryPerson(models.Model):
         return self.name
 
 
+class Carrier(models.Model):
+    """
+    External carriers/transporteurs for delivery (e.g., AMANA, custom transporters)
+    """
+    name = models.CharField(_('Nom'), max_length=100, unique=True)
+    code = models.CharField(_('Code'), max_length=20, unique=True)
+    phone = models.CharField(_('Téléphone'), max_length=20, blank=True)
+    tracking_url_template = models.URLField(
+        _('URL de suivi'),
+        blank=True,
+        help_text=_('URL template avec {tracking_code} pour le numéro de suivi')
+    )
+    is_active = models.BooleanField(_('Actif'), default=True)
+    supports_auto_tracking = models.BooleanField(
+        _('Suivi automatique'),
+        default=False,
+        help_text=_('Permet le suivi automatique via scraping (ex: AMANA)')
+    )
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('Transporteur')
+        verbose_name_plural = _('Transporteurs')
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        # Auto-generate code if not present
+        if not self.code:
+            from utils import generate_carrier_code
+            self.code = generate_carrier_code()
+        super().save(*args, **kwargs)
+
+
 class RepairType(models.Model):
     """
     Types of repairs (Mise à taille, Soudure, Polissage, etc.)

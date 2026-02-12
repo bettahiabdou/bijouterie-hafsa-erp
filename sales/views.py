@@ -1939,7 +1939,7 @@ def pending_invoices_list(request):
 @login_required(login_url='login')
 def pending_invoice_complete(request, reference):
     """Complete a draft invoice - add products and finalize"""
-    from settings_app.models import ProductCategory, MetalType, MetalPurity
+    from settings_app.models import ProductCategory, MetalType, MetalPurity, Carrier
 
     invoice = get_object_or_404(
         SaleInvoice.objects.select_related('seller', 'client').prefetch_related('photos', 'items__product'),
@@ -2176,7 +2176,38 @@ def pending_invoice_complete(request, reference):
                 else:
                     invoice.status = SaleInvoice.Status.UNPAID
 
+                # Handle delivery method
+                delivery_method_type = request.POST.get('delivery_method_type_hidden', 'magasin')
+                invoice.delivery_method_type = delivery_method_type
+
+                tracking_number = request.POST.get('tracking_number_hidden', '').strip()
+                invoice.tracking_number = tracking_number
+
+                # Set carrier if transporteur
+                carrier_id = request.POST.get('carrier_id_hidden', '')
+                if carrier_id and delivery_method_type == 'transporteur':
+                    try:
+                        from settings_app.models import Carrier
+                        invoice.carrier = Carrier.objects.get(id=carrier_id)
+                    except Carrier.DoesNotExist:
+                        pass
+
                 invoice.save()
+
+                # Create Delivery object for non-magasin deliveries
+                if delivery_method_type in ['amana', 'transporteur']:
+                    from sales.models import Delivery
+                    # Create delivery record
+                    Delivery.objects.create(
+                        invoice=invoice,
+                        client_name=invoice.client.full_name if invoice.client else '',
+                        client_phone=invoice.client.phone if invoice.client else '',
+                        total_amount=invoice.total_amount,
+                        delivery_method_type=delivery_method_type,
+                        carrier=invoice.carrier,
+                        tracking_number=tracking_number,
+                        status='pending'
+                    )
 
                 # Mark all products in the invoice as sold
                 for item in invoice.items.all():
@@ -2226,6 +2257,7 @@ def pending_invoice_complete(request, reference):
     clients = Client.objects.filter(is_active=True).order_by('first_name')
     payment_methods = PaymentMethod.objects.filter(is_active=True)
     bank_accounts = BankAccount.objects.filter(is_active=True)
+    carriers = Carrier.objects.filter(is_active=True)
 
     context = {
         'invoice': invoice,
@@ -2238,6 +2270,7 @@ def pending_invoice_complete(request, reference):
         'clients': clients,
         'payment_methods': payment_methods,
         'bank_accounts': bank_accounts,
+        'carriers': carriers,
     }
 
     return render(request, 'sales/pending_invoice_complete.html', context)
@@ -2394,3 +2427,123 @@ def search_products_api(request):
             'error': str(e),
             'traceback': traceback.format_exc()
         })
+
+
+# =============================================================================
+# LIVRAISONS (DELIVERY TRACKING) VIEWS
+# =============================================================================
+
+@login_required(login_url='login')
+def delivery_list(request):
+    """List all deliveries (non-magasin) with status tracking"""
+    from .models import Delivery
+
+    deliveries = Delivery.objects.select_related(
+        'invoice', 'carrier'
+    ).prefetch_related('timeline').order_by('-created_at')
+
+    # Search
+    search_query = request.GET.get('search', '')
+    if search_query:
+        deliveries = deliveries.filter(
+            Q(reference__icontains=search_query) |
+            Q(tracking_number__icontains=search_query) |
+            Q(client_name__icontains=search_query) |
+            Q(invoice__reference__icontains=search_query)
+        )
+
+    # Filter by status
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        deliveries = deliveries.filter(status=status_filter)
+
+    # Filter by delivery method type
+    method_filter = request.GET.get('method', '')
+    if method_filter:
+        deliveries = deliveries.filter(delivery_method_type=method_filter)
+
+    # Stats
+    stats = {
+        'total': Delivery.objects.count(),
+        'pending': Delivery.objects.filter(status='pending').count(),
+        'in_transit': Delivery.objects.filter(status='in_transit').count(),
+        'delivered': Delivery.objects.filter(status='delivered').count(),
+    }
+
+    # Pagination
+    paginator = Paginator(deliveries, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'deliveries': page_obj,
+        'page_obj': page_obj,
+        'stats': stats,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'method_filter': method_filter,
+    }
+
+    return render(request, 'sales/delivery_list.html', context)
+
+
+@login_required(login_url='login')
+def delivery_detail(request, reference):
+    """View delivery details and timeline"""
+    from .models import Delivery
+
+    delivery = get_object_or_404(
+        Delivery.objects.select_related('invoice', 'carrier').prefetch_related('timeline'),
+        reference=reference
+    )
+
+    context = {
+        'delivery': delivery,
+        'timeline': delivery.timeline.all().order_by('-event_number'),
+    }
+
+    return render(request, 'sales/delivery_detail.html', context)
+
+
+@login_required(login_url='login')
+def delivery_check(request, reference):
+    """Manually trigger AMANA tracking check for a delivery"""
+    from .models import Delivery
+    from .services import AmanaTracker
+
+    delivery = get_object_or_404(Delivery, reference=reference)
+
+    if delivery.delivery_method_type != 'amana' or not delivery.tracking_number:
+        messages.warning(request, "Cette livraison n'a pas de numéro de suivi AMANA.")
+        return redirect('sales:delivery_detail', reference=reference)
+
+    tracker = AmanaTracker()
+    success = tracker.update_delivery(delivery)
+
+    if success:
+        messages.success(request, f"Statut mis à jour: {delivery.get_status_display()}")
+    else:
+        messages.warning(request, "Impossible de récupérer les informations de suivi.")
+
+    return redirect('sales:delivery_detail', reference=reference)
+
+
+@login_required(login_url='login')
+def delivery_bulk_check(request):
+    """Bulk check all pending AMANA deliveries"""
+    from .models import Delivery
+    from .services import AmanaTracker
+
+    tracker = AmanaTracker()
+    stats = tracker.bulk_update_deliveries()
+
+    messages.success(
+        request,
+        f"Vérification terminée: {stats['updated']}/{stats['total']} livraisons mises à jour."
+    )
+
+    if stats['errors']:
+        for error in stats['errors'][:5]:  # Show first 5 errors
+            messages.warning(request, error)
+
+    return redirect('sales:delivery_list')

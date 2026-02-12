@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from .models import (
     MetalType, MetalPurity, ProductCategory, StoneType, StoneClarity,
     StoneColor, StoneCut, PaymentMethod, BankAccount, StockLocation,
-    DeliveryMethod, RepairType
+    DeliveryMethod, DeliveryPerson, Carrier, RepairType
 )
 
 
@@ -108,3 +108,32 @@ class RepairTypeAdmin(ReadOnlyMixin, admin.ModelAdmin):
     list_display = ('name', 'code', 'default_price')
     search_fields = ('name',)
     list_filter = ('is_active',)
+
+
+@admin.register(DeliveryPerson)
+class DeliveryPersonAdmin(admin.ModelAdmin):
+    """Admin for delivery persons (internal)"""
+    list_display = ('name', 'phone', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'phone')
+
+
+@admin.register(Carrier)
+class CarrierAdmin(admin.ModelAdmin):
+    """Admin for carriers/transporteurs (external)"""
+    list_display = ('name', 'code', 'phone', 'supports_auto_tracking', 'is_active')
+    list_filter = ('is_active', 'supports_auto_tracking')
+    search_fields = ('name', 'code', 'phone')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'code', 'phone')
+        }),
+        ('Options', {
+            'fields': ('is_active', 'supports_auto_tracking', 'tracking_url_template')
+        }),
+        ('Info', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )

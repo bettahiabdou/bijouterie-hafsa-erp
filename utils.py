@@ -325,6 +325,42 @@ def generate_certificate_issuer_code():
     return f'CERT-{today.strftime("%Y%m%d")}-{count:04d}'
 
 
+def generate_carrier_code():
+    """Generate a unique carrier code: TRP-YYYYMMDD-####"""
+    from settings_app.models import Carrier
+    today = timezone.now().date()
+    count = Carrier.objects.filter(created_at__date=today).count() + 1
+    return f'TRP-{today.strftime("%Y%m%d")}-{count:04d}'
+
+
+def generate_delivery_reference():
+    """Generate a unique delivery reference: LIV-YYYYMMDD-####"""
+    from sales.models import Delivery
+    from django.db.models import Max
+    import re
+
+    today = timezone.now().date()
+    date_str = today.strftime("%Y%m%d")
+    prefix = f'LIV-{date_str}-'
+
+    # Find the highest existing reference number for today
+    last_delivery = Delivery.objects.filter(
+        reference__startswith=prefix
+    ).aggregate(max_ref=Max('reference'))
+
+    max_ref = last_delivery['max_ref']
+    if max_ref:
+        match = re.search(r'-(\d{4})$', max_ref)
+        if match:
+            next_num = int(match.group(1)) + 1
+        else:
+            next_num = 1
+    else:
+        next_num = 1
+
+    return f'{prefix}{next_num:04d}'
+
+
 # ============================================================================
 # GOLD PRICE SERVICE
 # ============================================================================
