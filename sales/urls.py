@@ -39,5 +39,6 @@ urlpatterns = [
     path('livraisons/', views.delivery_list, name='delivery_list'),
     path('livraisons/<str:reference>/', views.delivery_detail, name='delivery_detail'),
     path('livraisons/<str:reference>/check/', views.delivery_check, name='delivery_check'),
+    path('livraisons/<str:reference>/update-from-client/', views.delivery_update_from_client, name='delivery_update_from_client'),
     path('livraisons/bulk-check/', views.delivery_bulk_check, name='delivery_bulk_check'),
 ]

@@ -31,10 +31,10 @@
             </div>
             <div class="page-actions">
                 {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
-                    <a href="{% url 'sales:delivery_check' delivery.reference %}" class="btn btn-primary">
-                        <i class="fas fa-sync-alt"></i>
-                        <span>Actualiser</span>
-                    </a>
+                    <button type="button" id="btn-refresh-tracking" class="btn btn-primary" onclick="refreshTracking()">
+                        <i class="fas fa-sync-alt" id="refresh-icon"></i>
+                        <span id="refresh-text">Actualiser</span>
+                    </button>
                 {% endif %}
                 <a href="{% url 'sales:delivery_list' %}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i>
@@ -379,5 +379,240 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Loading state */
+        .btn-loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .fa-spin {
+            animation: fa-spin 1s infinite linear;
+        }
+
+        @keyframes fa-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tracking-error {
+            background-color: var(--red-50);
+            border: 1px solid var(--red-200);
+            color: var(--red-700);
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            margin-top: var(--space-4);
+        }
+
+        .tracking-success {
+            background-color: var(--green-50);
+            border: 1px solid var(--green-200);
+            color: var(--green-700);
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            margin-top: var(--space-4);
+        }
     </style>
+
+    {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
+    <script>
+        // AMANA tracking from client browser (bypasses geo-blocking)
+        const TRACKING_CODE = '{{ delivery.tracking_number }}';
+        const DELIVERY_REF = '{{ delivery.reference }}';
+        const UPDATE_URL = '{% url "sales:delivery_update_from_client" delivery.reference %}';
+        const CSRF_TOKEN = '{{ csrf_token }}';
+
+        // HTML entity decode mapping
+        const HTML_ENTITIES = {
+            '&#xE9;': 'é', '&#xE0;': 'à', '&#xC0;': 'À',
+            '&#xE8;': 'è', '&#xE7;': 'ç', '&#x27;': "'",
+            '&#39;': "'", '&amp;': '&', '&lt;': '<',
+            '&gt;': '>', '&quot;': '"'
+        };
+
+        function decodeHtmlEntities(text) {
+            if (!text) return '';
+            for (const [entity, char] of Object.entries(HTML_ENTITIES)) {
+                text = text.split(entity).join(char);
+            }
+            // Decode numeric entities
+            text = text.replace(/&#(\d+);/g, (m, n) => String.fromCharCode(parseInt(n)));
+            text = text.replace(/&#x([0-9A-Fa-f]+);/g, (m, n) => String.fromCharCode(parseInt(n, 16)));
+            return text;
+        }
+
+        function extractText(html, className) {
+            const patterns = [
+                new RegExp(`class="[^"]*${className}[^"]*"[^>]*>\\s*([^<]+)`, 'i'),
+                new RegExp(`class='[^']*${className}[^']*'[^>]*>\\s*([^<]+)`, 'i')
+            ];
+            for (const pattern of patterns) {
+                const match = html.match(pattern);
+                if (match && match[1].trim() !== '...') {
+                    return match[1].trim();
+                }
+            }
+            return null;
+        }
+
+        function extractTimeline(html) {
+            const timeline = [];
+            const pattern = /<li>[\s\S]*?class="bullet">(\d+)<\/div>[\s\S]*?class="container_date">([^<]+)<\/div>[\s\S]*?class="container_time">([^<]+)<\/div>[\s\S]*?<div[^>]*class="mt-3[^>]*>([^<]+(?:<b>[^<]*<\/b>)?[^<]*)<\/div>/gi;
+
+            let match;
+            while ((match = pattern.exec(html)) !== null) {
+                let description = match[4].trim()
+                    .replace(/<[^>]*>/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                description = decodeHtmlEntities(description);
+
+                const eventTime = match[3].trim();
+                if (description.startsWith(eventTime)) {
+                    description = description.slice(eventTime.length).trim();
+                }
+
+                if (description) {
+                    timeline.push({
+                        number: match[1].trim(),
+                        date: match[2].trim(),
+                        time: eventTime,
+                        description: description,
+                        location: ''
+                    });
+                }
+            }
+            return timeline;
+        }
+
+        async function fetchAmanaTracking() {
+            const timestamp = Date.now();
+            const url = `https://bam-tracking.barid.ma/Tracking/Search?trackingCode=${TRACKING_CODE}&_=${timestamp}`;
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                mode: 'cors'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.OperationSuccess || !data.Html) {
+                return {
+                    success: false,
+                    tracking_code: TRACKING_CODE,
+                    error: 'Aucune information trouvée'
+                };
+            }
+
+            const html = data.Html;
+
+            // Extract package info
+            const product = extractText(html, 'lblProductName') || '';
+            const weight = extractText(html, 'lblWeight') || '';
+            const amount = extractText(html, 'lblMttCrbt') || '';
+            const currentPosition = extractText(html, 'lblCurrentPosition') || '';
+            const depositDate = extractText(html, 'lblDepositDate') || '';
+            const destination = extractText(html, 'lblRecipient') || '';
+
+            // Extract origin
+            let origin = '';
+            const originMatch = html.match(/class="tooltip_depart"[^>]*>([^<]+)/i);
+            if (originMatch) {
+                origin = originMatch[1].trim();
+            }
+
+            // Extract timeline
+            const timeline = extractTimeline(html);
+
+            return {
+                success: true,
+                tracking_code: TRACKING_CODE,
+                product: product,
+                weight: weight,
+                amount: amount,
+                current_position: currentPosition,
+                destination: destination,
+                origin: origin,
+                deposit_date: depositDate,
+                delivery_date: '',
+                timeline: timeline
+            };
+        }
+
+        async function refreshTracking() {
+            const btn = document.getElementById('btn-refresh-tracking');
+            const icon = document.getElementById('refresh-icon');
+            const text = document.getElementById('refresh-text');
+
+            // Show loading state
+            btn.classList.add('btn-loading');
+            icon.classList.remove('fa-sync-alt');
+            icon.classList.add('fa-spinner', 'fa-spin');
+            text.textContent = 'Chargement...';
+
+            try {
+                // Fetch from AMANA (client-side, using user's IP)
+                const trackingData = await fetchAmanaTracking();
+
+                // Send to our server to save
+                const response = await fetch(UPDATE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify(trackingData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Reload page to show updated data
+                    window.location.reload();
+                } else {
+                    showMessage('error', result.error || 'Erreur lors de la mise à jour');
+                }
+            } catch (error) {
+                console.error('Tracking error:', error);
+
+                // Check if it's a CORS error (likely means the service is blocked)
+                if (error.message.includes('CORS') || error.message.includes('NetworkError') || error.name === 'TypeError') {
+                    showMessage('error', 'Impossible de contacter le service AMANA. Essayez depuis un réseau marocain.');
+                } else {
+                    showMessage('error', 'Erreur: ' + error.message);
+                }
+            } finally {
+                // Reset button state
+                btn.classList.remove('btn-loading');
+                icon.classList.remove('fa-spinner', 'fa-spin');
+                icon.classList.add('fa-sync-alt');
+                text.textContent = 'Actualiser';
+            }
+        }
+
+        function showMessage(type, message) {
+            // Remove existing messages
+            const existing = document.querySelector('.tracking-error, .tracking-success');
+            if (existing) existing.remove();
+
+            const div = document.createElement('div');
+            div.className = type === 'error' ? 'tracking-error' : 'tracking-success';
+            div.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 'check-circle'} mr-2"></i>${message}`;
+
+            const header = document.querySelector('.page-header');
+            header.parentNode.insertBefore(div, header.nextSibling);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => div.remove(), 5000);
+        }
+    </script>
+    {% endif %}
 {% endblock %}

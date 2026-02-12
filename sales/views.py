@@ -2551,3 +2551,93 @@ def delivery_bulk_check(request):
             messages.warning(request, error)
 
     return redirect('sales:delivery_list')
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def delivery_update_from_client(request, reference):
+    """
+    API endpoint to receive tracking data fetched from client-side.
+    The client's browser fetches from AMANA (using their IP) and sends results here.
+    This bypasses geo-blocking since the request comes from the user's location.
+    """
+    import json
+    from .models import Delivery, DeliveryTimelineEvent
+
+    delivery = get_object_or_404(Delivery, reference=reference)
+
+    if delivery.delivery_method_type != 'amana':
+        return JsonResponse({'success': False, 'error': 'Not an AMANA delivery'}, status=400)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    if not data.get('success'):
+        return JsonResponse({
+            'success': False,
+            'error': data.get('error', 'Tracking fetch failed')
+        })
+
+    # Update delivery fields from client-side data
+    delivery.product = data.get('product', '') or ''
+    delivery.weight = data.get('weight', '') or ''
+    delivery.amount_cod = data.get('amount', '') or ''
+    delivery.current_position = data.get('current_position', '') or ''
+    delivery.destination = data.get('destination', '') or ''
+    delivery.origin = data.get('origin', '') or ''
+    delivery.deposit_date = data.get('deposit_date', '') or ''
+    delivery.delivery_date = data.get('delivery_date', '') or ''
+    delivery.last_checked_at = timezone.now()
+
+    # Determine status
+    if data.get('delivery_date'):
+        delivery.status = 'delivered'
+    elif data.get('timeline'):
+        delivery.status = 'in_transit'
+    else:
+        delivery.status = 'pending'
+
+    delivery.save(update_fields=[
+        'status', 'product', 'weight', 'amount_cod',
+        'current_position', 'destination', 'origin',
+        'deposit_date', 'delivery_date', 'last_checked_at'
+    ])
+
+    # Update timeline if we have events
+    timeline_data = data.get('timeline', [])
+    if timeline_data:
+        # Delete old timeline events from AMANA
+        delivery.timeline.filter(source='amana').delete()
+
+        # Create new timeline events
+        for event in timeline_data:
+            DeliveryTimelineEvent.objects.create(
+                delivery=delivery,
+                event_number=event.get('number', ''),
+                event_date=event.get('date', ''),
+                event_time=event.get('time', ''),
+                description=event.get('description', ''),
+                location=event.get('location', ''),
+                source='amana'
+            )
+
+    # Update invoice delivery status if different
+    if delivery.invoice:
+        status_map = {
+            'pending': 'pending',
+            'in_transit': 'in_transit',
+            'delivered': 'delivered'
+        }
+        new_invoice_status = status_map.get(delivery.status, 'pending')
+        if delivery.invoice.delivery_status != new_invoice_status:
+            delivery.invoice.delivery_status = new_invoice_status
+            delivery.invoice.save(update_fields=['delivery_status'])
+
+    return JsonResponse({
+        'success': True,
+        'status': delivery.status,
+        'status_display': delivery.get_status_display(),
+        'message': f'Statut mis à jour: {delivery.get_status_display()}'
+    })
