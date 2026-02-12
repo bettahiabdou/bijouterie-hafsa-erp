@@ -10,7 +10,7 @@ from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from .models import Product, ProductImage, ProductStone
-from .print_utils import print_product_label, print_price_tag, print_test_label
+from .print_utils import print_product_label, print_price_tag, print_test_label, generate_product_label_zpl, generate_price_tag_zpl, queue_print_job
 from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount
 from suppliers.models import Supplier
 from users.models import ActivityLog
@@ -759,7 +759,7 @@ def get_client_ip(request):
 @login_required(login_url='login')
 @require_http_methods(["POST"])
 def print_label(request, reference):
-    """Print a product label"""
+    """Print a product label - tries direct print first, then queues if unreachable"""
     product = get_object_or_404(Product, reference=reference)
 
     label_type = request.POST.get('label_type', 'product')
@@ -768,10 +768,29 @@ def print_label(request, reference):
     if quantity < 1 or quantity > 10:
         quantity = 1
 
+    # Generate ZPL data
     if label_type == 'price':
-        success, message = print_price_tag(product, quantity)
+        zpl_data = generate_price_tag_zpl(product, quantity)
     else:
-        success, message = print_product_label(product, quantity)
+        zpl_data = generate_product_label_zpl(product, quantity)
+
+    # Try direct print first, fall back to queue
+    success, message = print_product_label(product, quantity) if label_type != 'price' else print_price_tag(product, quantity)
+
+    # If direct print failed, add to queue
+    queued = False
+    if not success:
+        queue_success, queue_message = queue_print_job(
+            zpl_data=zpl_data,
+            product=product,
+            label_type=label_type,
+            quantity=quantity,
+            user=request.user
+        )
+        if queue_success:
+            success = True
+            message = f"Imprimante inaccessible. {queue_message}"
+            queued = True
 
     # Log activity
     ActivityLog.objects.create(
@@ -779,15 +798,18 @@ def print_label(request, reference):
         action=ActivityLog.ActionType.PRINT,
         model_name='Product',
         object_id=str(product.id),
-        object_repr=f"{product.reference} - {label_type} x{quantity}",
+        object_repr=f"{product.reference} - {label_type} x{quantity}" + (" (queued)" if queued else ""),
         ip_address=get_client_ip(request)
     )
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({'success': success, 'message': message})
+        return JsonResponse({'success': success, 'message': message, 'queued': queued})
 
     if success:
-        messages.success(request, f'Étiquette imprimée pour {product.reference}')
+        if queued:
+            messages.info(request, f'Étiquette ajoutée à la file d\'impression pour {product.reference}')
+        else:
+            messages.success(request, f'Étiquette imprimée pour {product.reference}')
     else:
         messages.error(request, f'Erreur d\'impression: {message}')
 
