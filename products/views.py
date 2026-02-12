@@ -865,3 +865,246 @@ def printer_debug(request):
         },
         'connection_test': connection_test
     })
+
+
+@login_required(login_url='login')
+def printer_config_api(request):
+    """API endpoint to get printer configuration for browser-based printing"""
+    from settings_app.models import SystemConfig
+
+    try:
+        config = SystemConfig.get_config()
+        return JsonResponse({
+            'ip': str(config.zebra_printer_ip) if config.zebra_printer_ip else None,
+            'port': config.zebra_printer_port or 9100,
+            'enabled': config.zebra_printer_enabled,
+            'http_url': f'http://{config.zebra_printer_ip}/pstprnt' if config.zebra_printer_ip else None
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# =============================================================================
+# Print Queue API - For local print agent
+# =============================================================================
+
+@login_required(login_url='login')
+def print_queue_view(request):
+    """Display print queue UI"""
+    from .models import PrintQueue
+
+    # Handle actions
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        job_ids = request.POST.getlist('job_ids')
+
+        if action == 'cancel' and job_ids:
+            PrintQueue.objects.filter(
+                id__in=job_ids,
+                status=PrintQueue.Status.PENDING
+            ).update(status=PrintQueue.Status.CANCELLED)
+            messages.success(request, f'{len(job_ids)} job(s) annulé(s)')
+
+        elif action == 'retry' and job_ids:
+            PrintQueue.objects.filter(
+                id__in=job_ids,
+                status__in=[PrintQueue.Status.FAILED, PrintQueue.Status.CANCELLED]
+            ).update(status=PrintQueue.Status.PENDING, attempts=0, error_message='')
+            messages.success(request, f'{len(job_ids)} job(s) relancé(s)')
+
+        elif action == 'delete' and job_ids:
+            PrintQueue.objects.filter(id__in=job_ids).delete()
+            messages.success(request, f'{len(job_ids)} job(s) supprimé(s)')
+
+        return redirect('products:print_queue')
+
+    # Get jobs with filtering
+    status_filter = request.GET.get('status', '')
+    jobs = PrintQueue.objects.select_related('product', 'created_by').order_by('-created_at')
+
+    if status_filter:
+        jobs = jobs.filter(status=status_filter)
+
+    # Pagination
+    paginator = Paginator(jobs, 50)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    # Stats
+    stats = {
+        'pending': PrintQueue.objects.filter(status=PrintQueue.Status.PENDING).count(),
+        'printing': PrintQueue.objects.filter(status=PrintQueue.Status.PRINTING).count(),
+        'printed': PrintQueue.objects.filter(status=PrintQueue.Status.PRINTED).count(),
+        'failed': PrintQueue.objects.filter(status=PrintQueue.Status.FAILED).count(),
+    }
+
+    context = {
+        'page_obj': page_obj,
+        'jobs': page_obj.object_list,
+        'status_filter': status_filter,
+        'statuses': PrintQueue.Status.choices,
+        'stats': stats,
+    }
+
+    return render(request, 'products/print_queue.html', context)
+
+
+def print_queue_list(request):
+    """
+    API endpoint to list print queue jobs.
+    Used by the local print agent.
+    Requires API key authentication.
+    """
+    from .models import PrintQueue
+    from django.conf import settings
+    import json
+
+    # Check API key
+    api_key = request.headers.get('X-API-Key') or request.GET.get('api_key')
+    expected_key = getattr(settings, 'PRINT_API_KEY', 'hafsa-print-2024')
+
+    if api_key != expected_key:
+        return JsonResponse({'error': 'Invalid API key'}, status=401)
+
+    # Get all jobs with optional status filter
+    status = request.GET.get('status')
+    jobs = PrintQueue.objects.select_related('product').order_by('created_at')
+
+    if status:
+        jobs = jobs.filter(status=status)
+
+    jobs_data = []
+    for job in jobs[:100]:  # Limit to 100 jobs
+        jobs_data.append({
+            'id': job.id,
+            'product_reference': job.product.reference if job.product else None,
+            'label_type': job.label_type,
+            'quantity': job.quantity,
+            'status': job.status,
+            'zpl_data': job.zpl_data,
+            'attempts': job.attempts,
+            'error_message': job.error_message,
+            'created_at': job.created_at.isoformat(),
+        })
+
+    return JsonResponse({'jobs': jobs_data})
+
+
+def print_queue_pending(request):
+    """
+    API endpoint to get pending print jobs.
+    Used by the local print agent to fetch jobs to print.
+    """
+    from .models import PrintQueue
+    from django.conf import settings
+    from django.utils import timezone
+
+    # Check API key
+    api_key = request.headers.get('X-API-Key') or request.GET.get('api_key')
+    expected_key = getattr(settings, 'PRINT_API_KEY', 'hafsa-print-2024')
+
+    if api_key != expected_key:
+        return JsonResponse({'error': 'Invalid API key'}, status=401)
+
+    # Get pending jobs (oldest first)
+    pending_jobs = PrintQueue.objects.filter(
+        status=PrintQueue.Status.PENDING
+    ).select_related('product').order_by('created_at')[:10]  # Process 10 at a time
+
+    # Mark them as printing
+    job_ids = [job.id for job in pending_jobs]
+    if job_ids:
+        PrintQueue.objects.filter(id__in=job_ids).update(
+            status=PrintQueue.Status.PRINTING
+        )
+
+    jobs_data = []
+    for job in pending_jobs:
+        jobs_data.append({
+            'id': job.id,
+            'product_reference': job.product.reference if job.product else None,
+            'label_type': job.label_type,
+            'quantity': job.quantity,
+            'zpl_data': job.zpl_data,
+        })
+
+    return JsonResponse({
+        'jobs': jobs_data,
+        'total_pending': PrintQueue.get_pending_count()
+    })
+
+
+@require_http_methods(["POST"])
+def print_queue_complete(request, job_id):
+    """
+    API endpoint to mark a print job as completed.
+    Called by the local print agent after successful print.
+    """
+    from .models import PrintQueue
+    from django.conf import settings
+    from django.utils import timezone
+
+    # Check API key
+    api_key = request.headers.get('X-API-Key') or request.GET.get('api_key')
+    expected_key = getattr(settings, 'PRINT_API_KEY', 'hafsa-print-2024')
+
+    if api_key != expected_key:
+        return JsonResponse({'error': 'Invalid API key'}, status=401)
+
+    try:
+        job = PrintQueue.objects.get(id=job_id)
+        job.status = PrintQueue.Status.PRINTED
+        job.printed_at = timezone.now()
+        job.save()
+        return JsonResponse({'success': True, 'message': 'Job marked as printed'})
+    except PrintQueue.DoesNotExist:
+        return JsonResponse({'error': 'Job not found'}, status=404)
+
+
+@require_http_methods(["POST"])
+def print_queue_fail(request, job_id):
+    """
+    API endpoint to mark a print job as failed.
+    Called by the local print agent after failed print attempt.
+    """
+    from .models import PrintQueue
+    from django.conf import settings
+    import json
+
+    # Check API key
+    api_key = request.headers.get('X-API-Key') or request.GET.get('api_key')
+    expected_key = getattr(settings, 'PRINT_API_KEY', 'hafsa-print-2024')
+
+    if api_key != expected_key:
+        return JsonResponse({'error': 'Invalid API key'}, status=401)
+
+    try:
+        job = PrintQueue.objects.get(id=job_id)
+
+        # Get error message from request body
+        try:
+            data = json.loads(request.body)
+            error_message = data.get('error', 'Unknown error')
+        except:
+            error_message = request.POST.get('error', 'Unknown error')
+
+        job.attempts += 1
+        job.error_message = error_message
+
+        # If max attempts reached, mark as failed
+        if job.attempts >= 3:
+            job.status = PrintQueue.Status.FAILED
+        else:
+            # Reset to pending for retry
+            job.status = PrintQueue.Status.PENDING
+
+        job.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Job attempt {job.attempts} recorded',
+            'status': job.status,
+            'will_retry': job.status == PrintQueue.Status.PENDING
+        })
+    except PrintQueue.DoesNotExist:
+        return JsonResponse({'error': 'Job not found'}, status=404)

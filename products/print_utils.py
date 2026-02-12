@@ -1,6 +1,12 @@
 """
 Zebra Printer Utilities for Bijouterie Hafsa ERP
-Sends ZPL commands to Zebra printer via TCP
+
+Two printing modes:
+1. Direct TCP (port 9100) - for local network access
+2. Queue-based - jobs stored in DB, printed via browser when in shop
+
+The browser-based approach uses HTTP POST to the printer's web interface
+at http://<printer_ip>/pstprnt when the user is on the local network.
 """
 
 import socket
@@ -53,6 +59,54 @@ def send_to_printer(zpl_data):
         return False, "Printer connection refused"
     except Exception as e:
         return False, f"Print error: {str(e)}"
+
+
+def queue_print_job(zpl_data, product=None, label_type='product', quantity=1, user=None):
+    """
+    Add a print job to the queue for later printing via browser.
+    This is used when the server can't directly reach the printer.
+
+    Returns (success, message)
+    """
+    from .models import PrintQueue
+
+    try:
+        job = PrintQueue.objects.create(
+            product=product,
+            label_type=label_type,
+            quantity=quantity,
+            zpl_data=zpl_data,
+            created_by=user
+        )
+        return True, f"Job #{job.id} ajouté à la file d'impression"
+    except Exception as e:
+        return False, f"Erreur lors de l'ajout à la file: {str(e)}"
+
+
+def print_or_queue(zpl_data, product=None, label_type='product', quantity=1, user=None):
+    """
+    Try to print directly. If that fails, queue the job.
+    Returns (success, message, queued)
+    """
+    # First try direct printing
+    success, message = send_to_printer(zpl_data)
+
+    if success:
+        return True, message, False
+
+    # If direct print failed, queue the job
+    queue_success, queue_message = queue_print_job(
+        zpl_data=zpl_data,
+        product=product,
+        label_type=label_type,
+        quantity=quantity,
+        user=user
+    )
+
+    if queue_success:
+        return True, f"Imprimante inaccessible. {queue_message}", True
+
+    return False, f"Impression échouée et mise en file échouée: {message}", False
 
 
 def string_to_hex(text):

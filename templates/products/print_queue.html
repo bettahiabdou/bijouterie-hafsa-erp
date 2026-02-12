@@ -1,0 +1,586 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}File d'Impression - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:list' %}" class="breadcrumb-item">Produits</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">File d'Impression</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">File d'Impression</h1>
+                <p class="page-subtitle">Gestion des etiquettes en attente</p>
+            </div>
+            <div class="page-actions">
+                <button type="button" id="printAllBtn" class="btn btn-primary" onclick="printAllPending()">
+                    <i class="fas fa-print"></i>
+                    <span>Imprimer Tout (<span id="pendingCount">{{ stats.pending }}</span>)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-row mb-6 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">En attente</div>
+                <div class="stat-value">{{ stats.pending|default:"0" }}</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fas fa-spinner"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">En cours</div>
+                <div class="stat-value">{{ stats.printing|default:"0" }}</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Imprime</div>
+                <div class="stat-value">{{ stats.printed|default:"0" }}</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon danger">
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Echec</div>
+                <div class="stat-value">{{ stats.failed|default:"0" }}</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- Printer Connection Status -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div id="printerStatus" class="printer-status checking">
+                        <i class="fas fa-circle"></i>
+                        <span>Verification de l'imprimante...</span>
+                    </div>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="checkPrinterConnection()">
+                        <i class="fas fa-sync-alt"></i> Verifier
+                    </button>
+                </div>
+            </div>
+            <div id="printerInfo" class="mt-2 text-sm text-gray-500" style="display: none;">
+                Imprimante: <strong>192.168.1.199</strong> (HTTP sur /pstprnt)
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="filter-form">
+                <div class="flex items-center gap-4">
+                    <div class="form-group mb-0">
+                        <select name="status" class="form-select" onchange="this.form.submit()">
+                            <option value="">Tous les statuts</option>
+                            {% for value, label in statuses %}
+                                <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Jobs Table -->
+    <div class="card">
+        <div class="card-body">
+            {% if jobs %}
+            <form method="post" id="jobsForm">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                                </th>
+                                <th>Produit</th>
+                                <th>Type</th>
+                                <th>Statut</th>
+                                <th>Tentatives</th>
+                                <th>Cree le</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for job in jobs %}
+                            <tr data-job-id="{{ job.id }}" data-zpl="{{ job.zpl_data|escapejs }}">
+                                <td>
+                                    <input type="checkbox" name="job_ids" value="{{ job.id }}" class="job-checkbox">
+                                </td>
+                                <td>
+                                    {% if job.product %}
+                                        <a href="{% url 'products:detail' job.product.reference %}">
+                                            {{ job.product.reference }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-gray-400">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ job.get_label_type_display }}</td>
+                                <td>
+                                    {% if job.status == 'pending' %}
+                                        <span class="badge badge-warning">En attente</span>
+                                    {% elif job.status == 'printing' %}
+                                        <span class="badge badge-info">En cours</span>
+                                    {% elif job.status == 'printed' %}
+                                        <span class="badge badge-success">Imprime</span>
+                                    {% elif job.status == 'failed' %}
+                                        <span class="badge badge-danger" title="{{ job.error_message }}">Echec</span>
+                                    {% elif job.status == 'cancelled' %}
+                                        <span class="badge badge-secondary">Annule</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ job.attempts }}</td>
+                                <td>{{ job.created_at|date:"d/m H:i" }}</td>
+                                <td>
+                                    <div class="flex gap-2">
+                                        {% if job.status == 'pending' or job.status == 'failed' %}
+                                        <button type="button" class="btn btn-sm btn-primary" onclick="printJob({{ job.id }})" title="Imprimer">
+                                            <i class="fas fa-print"></i>
+                                        </button>
+                                        {% endif %}
+                                        {% if job.status == 'pending' %}
+                                        <button type="submit" name="action" value="cancel" class="btn btn-sm btn-secondary" onclick="document.querySelector('input[value=\'{{ job.id }}\']').checked=true;" title="Annuler">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Bulk Actions -->
+                <div class="flex items-center gap-2 mt-4">
+                    <button type="submit" name="action" value="cancel" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-times"></i> Annuler
+                    </button>
+                    <button type="submit" name="action" value="retry" class="btn btn-sm btn-warning">
+                        <i class="fas fa-redo"></i> Relancer
+                    </button>
+                    <button type="submit" name="action" value="delete" class="btn btn-sm btn-danger" onclick="return confirm('Supprimer les jobs selectionnes?')">
+                        <i class="fas fa-trash"></i> Supprimer
+                    </button>
+                </div>
+            </form>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <div class="pagination-wrapper mt-4">
+                <nav class="pagination">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="pagination-link">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+
+                    <span class="pagination-info">
+                        Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                    </span>
+
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="pagination-link">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </nav>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-print empty-icon"></i>
+                <h3>Aucun job d'impression</h3>
+                <p>La file d'impression est vide</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Print Progress Modal -->
+    <div id="printModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Impression en cours...</h3>
+            </div>
+            <div class="modal-body">
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div id="printProgress" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div id="printStatus" class="mt-2 text-center">Preparation...</div>
+                </div>
+                <div id="printResults" class="mt-4" style="display: none;">
+                    <div class="flex justify-between">
+                        <span>Reussis:</span>
+                        <span id="successCount" class="text-success font-bold">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Echecs:</span>
+                        <span id="failCount" class="text-danger font-bold">0</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" id="printModalFooter" style="display: none;">
+                <button type="button" class="btn btn-primary" onclick="closePrintModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .printer-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+    .printer-status.checking {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    .printer-status.checking i {
+        animation: pulse 1s infinite;
+    }
+    .printer-status.connected {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    .printer-status.disconnected {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 400px;
+        padding: 24px;
+    }
+    .modal-header h3 {
+        margin: 0 0 16px;
+        font-size: 18px;
+    }
+    .modal-footer {
+        margin-top: 20px;
+        text-align: right;
+    }
+
+    .progress-container {
+        padding: 10px 0;
+    }
+    .progress-bar {
+        height: 8px;
+        background: #e5e7eb;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+        transition: width 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let PRINTER_IP = null;
+    let PRINTER_URL = null;
+    let printerConnected = false;
+
+    // Load printer config and check connection on page load
+    document.addEventListener('DOMContentLoaded', async function() {
+        await loadPrinterConfig();
+        if (PRINTER_IP) {
+            checkPrinterConnection();
+        }
+    });
+
+    async function loadPrinterConfig() {
+        try {
+            const response = await fetch('/products/api/printer-config/');
+            const config = await response.json();
+            if (config.ip && config.enabled) {
+                PRINTER_IP = config.ip;
+                PRINTER_URL = config.http_url || `http://${PRINTER_IP}/pstprnt`;
+                document.getElementById('printerInfo').innerHTML =
+                    `Imprimante: <strong>${PRINTER_IP}</strong> (HTTP sur /pstprnt)`;
+            } else {
+                const statusEl = document.getElementById('printerStatus');
+                statusEl.className = 'printer-status disconnected';
+                statusEl.innerHTML = '<i class="fas fa-times-circle"></i><span>Imprimante non configuree</span>';
+            }
+        } catch (e) {
+            console.error('Failed to load printer config:', e);
+        }
+    }
+
+    async function checkPrinterConnection() {
+        const statusEl = document.getElementById('printerStatus');
+        const infoEl = document.getElementById('printerInfo');
+
+        if (!PRINTER_IP) {
+            statusEl.className = 'printer-status disconnected';
+            statusEl.innerHTML = '<i class="fas fa-times-circle"></i><span>Imprimante non configuree</span>';
+            return;
+        }
+
+        statusEl.className = 'printer-status checking';
+        statusEl.innerHTML = '<i class="fas fa-circle"></i><span>Verification...</span>';
+
+        try {
+            // Try to reach printer - will fail with CORS but that's OK
+            // If we get any response (even error), printer is reachable
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+            await fetch(`http://${PRINTER_IP}/`, {
+                method: 'HEAD',
+                mode: 'no-cors',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            // If we get here, printer responded (even if CORS blocked it)
+            printerConnected = true;
+            statusEl.className = 'printer-status connected';
+            statusEl.innerHTML = '<i class="fas fa-check-circle"></i><span>Imprimante connectee</span>';
+            infoEl.style.display = 'block';
+
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                printerConnected = false;
+                statusEl.className = 'printer-status disconnected';
+                statusEl.innerHTML = '<i class="fas fa-times-circle"></i><span>Imprimante inaccessible (timeout)</span>';
+            } else {
+                // Network error could mean printer is there but CORS blocking
+                // Try the actual print endpoint
+                printerConnected = true;
+                statusEl.className = 'printer-status connected';
+                statusEl.innerHTML = '<i class="fas fa-check-circle"></i><span>Imprimante detectee</span>';
+                infoEl.style.display = 'block';
+            }
+        }
+    }
+
+    async function sendToPrinter(zplData) {
+        if (!PRINTER_URL) {
+            return { success: false, error: 'Imprimante non configuree' };
+        }
+        try {
+            const response = await fetch(PRINTER_URL, {
+                method: 'POST',
+                mode: 'no-cors',  // Printer doesn't send CORS headers
+                body: zplData
+            });
+            // With no-cors, we can't read the response
+            // But if no exception thrown, it likely worked
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async function printJob(jobId) {
+        const row = document.querySelector(`tr[data-job-id="${jobId}"]`);
+        if (!row) return;
+
+        const zplData = row.dataset.zpl;
+        if (!zplData) {
+            alert('Pas de donnees ZPL pour ce job');
+            return;
+        }
+
+        // Check connection first
+        if (!printerConnected) {
+            if (!confirm('Imprimante non detectee. Essayer quand meme?')) {
+                return;
+            }
+        }
+
+        const btn = row.querySelector('.btn-primary');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+
+        const result = await sendToPrinter(zplData);
+
+        if (result.success) {
+            // Mark as printed on server
+            await markJobComplete(jobId);
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            btn.className = 'btn btn-sm btn-success';
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            alert('Erreur d\'impression: ' + result.error);
+        }
+    }
+
+    async function printAllPending() {
+        const rows = document.querySelectorAll('tr[data-job-id]');
+        const pendingJobs = [];
+
+        rows.forEach(row => {
+            const statusBadge = row.querySelector('.badge');
+            if (statusBadge && (statusBadge.classList.contains('badge-warning') || statusBadge.classList.contains('badge-danger'))) {
+                pendingJobs.push({
+                    id: row.dataset.jobId,
+                    zpl: row.dataset.zpl
+                });
+            }
+        });
+
+        if (pendingJobs.length === 0) {
+            alert('Aucun job en attente');
+            return;
+        }
+
+        if (!printerConnected) {
+            if (!confirm(`Imprimante non detectee. Imprimer ${pendingJobs.length} job(s) quand meme?`)) {
+                return;
+            }
+        }
+
+        // Show modal
+        const modal = document.getElementById('printModal');
+        const progress = document.getElementById('printProgress');
+        const status = document.getElementById('printStatus');
+        const results = document.getElementById('printResults');
+        const footer = document.getElementById('printModalFooter');
+        const successCount = document.getElementById('successCount');
+        const failCount = document.getElementById('failCount');
+
+        modal.style.display = 'flex';
+        results.style.display = 'none';
+        footer.style.display = 'none';
+
+        let success = 0;
+        let failed = 0;
+
+        for (let i = 0; i < pendingJobs.length; i++) {
+            const job = pendingJobs[i];
+            const percent = Math.round(((i + 1) / pendingJobs.length) * 100);
+
+            status.textContent = `Impression ${i + 1}/${pendingJobs.length}...`;
+            progress.style.width = percent + '%';
+
+            const result = await sendToPrinter(job.zpl);
+
+            if (result.success) {
+                await markJobComplete(job.id);
+                success++;
+            } else {
+                await markJobFailed(job.id, result.error);
+                failed++;
+            }
+
+            // Small delay between prints
+            await new Promise(r => setTimeout(r, 300));
+        }
+
+        // Show results
+        status.textContent = 'Termine!';
+        progress.style.width = '100%';
+        results.style.display = 'block';
+        footer.style.display = 'block';
+        successCount.textContent = success;
+        failCount.textContent = failed;
+    }
+
+    function closePrintModal() {
+        document.getElementById('printModal').style.display = 'none';
+        location.reload();
+    }
+
+    async function markJobComplete(jobId) {
+        try {
+            await fetch(`/products/api/print-queue/${jobId}/complete/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-API-Key': 'hafsa-print-2024'
+                }
+            });
+        } catch (e) {
+            console.error('Failed to mark job complete:', e);
+        }
+    }
+
+    async function markJobFailed(jobId, error) {
+        try {
+            await fetch(`/products/api/print-queue/${jobId}/fail/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-API-Key': 'hafsa-print-2024',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ error: error || 'Unknown error' })
+            });
+        } catch (e) {
+            console.error('Failed to mark job failed:', e);
+        }
+    }
+
+    function toggleSelectAll() {
+        const selectAll = document.getElementById('selectAll');
+        const checkboxes = document.querySelectorAll('.job-checkbox');
+        checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    }
+</script>
+{% endblock %}

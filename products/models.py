@@ -728,3 +728,100 @@ class RawMaterialMovement(models.Model):
             self.raw_material.average_cost_per_gram = total_in_cost / total_in_weight
 
         self.raw_material.save()
+
+
+class PrintQueue(models.Model):
+    """
+    Print queue for Zebra printer labels.
+    Stores print jobs when the printer is not directly accessible from the server.
+    A local print agent (running in Morocco) polls this queue and sends to printer.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', _('En attente')
+        PRINTING = 'printing', _('En cours')
+        PRINTED = 'printed', _('Imprimé')
+        FAILED = 'failed', _('Échec')
+        CANCELLED = 'cancelled', _('Annulé')
+
+    class LabelType(models.TextChoices):
+        PRODUCT = 'product', _('Étiquette produit')
+        PRICE = 'price', _('Étiquette prix')
+        TEST = 'test', _('Test')
+
+    # Reference to product (optional for test labels)
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='print_jobs',
+        verbose_name=_('Produit')
+    )
+
+    # Label details
+    label_type = models.CharField(
+        _('Type d\'étiquette'),
+        max_length=20,
+        choices=LabelType.choices,
+        default=LabelType.PRODUCT
+    )
+    quantity = models.PositiveIntegerField(
+        _('Quantité'),
+        default=1
+    )
+
+    # ZPL data (the raw print data)
+    zpl_data = models.TextField(
+        _('Données ZPL'),
+        help_text=_('Commandes ZPL brutes à envoyer à l\'imprimante')
+    )
+
+    # Status tracking
+    status = models.CharField(
+        _('Statut'),
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+    error_message = models.TextField(
+        _('Message d\'erreur'),
+        blank=True
+    )
+    attempts = models.PositiveIntegerField(
+        _('Tentatives'),
+        default=0
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
+    printed_at = models.DateTimeField(_('Imprimé le'), null=True, blank=True)
+    created_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_('Créé par'),
+        related_name='print_jobs'
+    )
+
+    class Meta:
+        verbose_name = _('File d\'impression')
+        verbose_name_plural = _('File d\'impression')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        if self.product:
+            return f"Print: {self.product.reference} ({self.get_status_display()})"
+        return f"Print: {self.get_label_type_display()} ({self.get_status_display()})"
+
+    @classmethod
+    def get_pending_count(cls):
+        """Return count of pending print jobs"""
+        return cls.objects.filter(status=cls.Status.PENDING).count()
+
+    @classmethod
+    def get_pending_jobs(cls):
+        """Return all pending print jobs ordered by creation"""
+        return cls.objects.filter(status=cls.Status.PENDING).order_by('created_at')
