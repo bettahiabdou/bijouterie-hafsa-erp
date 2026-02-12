@@ -765,6 +765,17 @@
             <div class="scanner-overlay">
                 <div class="scanner-line"></div>
             </div>
+            <!-- Zoom control -->
+            <div class="scanner-zoom" id="scannerZoom" style="position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 20px; display: flex; align-items: center; gap: 12px; z-index: 10;">
+                <i class="fas fa-search-minus" style="color: white;"></i>
+                <input type="range" id="zoomSlider" min="1" max="5" step="0.5" value="1" style="width: 120px; cursor: pointer;">
+                <i class="fas fa-search-plus" style="color: white;"></i>
+                <span id="zoomLevel" style="color: white; min-width: 40px;">1.0x</span>
+            </div>
+            <!-- Scan button -->
+            <button class="scan-capture-btn" id="scanCaptureBtn" onclick="captureAndScan()" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: #4CAF50; color: white; border: none; padding: 15px 40px; border-radius: 30px; font-size: 18px; font-weight: bold; cursor: pointer; z-index: 10; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                <i class="fas fa-camera" style="margin-right: 8px;"></i> Scanner
+            </button>
         </div>
         <!-- Manual input fallback -->
         <div class="scanner-manual" id="scannerManual" style="display: none;">
@@ -778,7 +789,7 @@
                 </div>
             </div>
         </div>
-        <div class="scanner-status" id="scannerStatus">Positionnez le code-barres dans le cadre</div>
+        <div class="scanner-status" id="scannerStatus">Positionnez le code-barres et appuyez sur Scanner</div>
         <div class="scanner-result" id="scannerResult" style="display: none;"></div>
     </div>
 
@@ -903,6 +914,8 @@
 
         // Barcode Scanner Functions
         let scannerActive = false;
+        let cameraStream = null;
+        let videoTrack = null;
 
         function openBarcodeScanner() {
             const modal = document.getElementById('scannerModal');
@@ -910,39 +923,109 @@
             const result = document.getElementById('scannerResult');
             const scannerContainer = document.getElementById('scannerContainer');
             const manualInput = document.getElementById('scannerManual');
+            const captureBtn = document.getElementById('scanCaptureBtn');
 
             modal.classList.add('active');
             status.textContent = 'Initialisation de la camera...';
             result.style.display = 'none';
             scannerContainer.style.display = 'block';
             manualInput.style.display = 'none';
+            captureBtn.disabled = false;
+            captureBtn.innerHTML = '<i class="fas fa-camera" style="margin-right: 8px;"></i> Scanner';
 
             // Check if we're on HTTPS or localhost (required for camera)
             const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
             if (!isSecure) {
-                // Show manual input instead
                 showManualInput('Camera requiert HTTPS. Utilisez la saisie manuelle.');
                 return;
             }
 
-            // Initialize Quagga
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#scannerVideo').parentElement,
-                    constraints: {
-                        facingMode: "environment",  // Use back camera
-                        width: { min: 640, ideal: 1280, max: 1920 },
-                        height: { min: 480, ideal: 720, max: 1080 }
+            // Start camera preview (high resolution for small codes)
+            startCameraPreview();
+        }
+
+        async function startCameraPreview() {
+            const video = document.getElementById('scannerVideo');
+            const status = document.getElementById('scannerStatus');
+            const zoomSlider = document.getElementById('zoomSlider');
+
+            try {
+                // Request high resolution camera
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1920, min: 1280 },
+                        height: { ideal: 1080, min: 720 },
+                        focusMode: { ideal: 'continuous' },
+                        zoom: true
                     }
+                });
+
+                video.srcObject = cameraStream;
+                videoTrack = cameraStream.getVideoTracks()[0];
+
+                // Check zoom capability
+                const capabilities = videoTrack.getCapabilities();
+                if (capabilities.zoom) {
+                    zoomSlider.min = capabilities.zoom.min;
+                    zoomSlider.max = Math.min(capabilities.zoom.max, 10);
+                    zoomSlider.value = 1;
+                    document.getElementById('scannerZoom').style.display = 'flex';
+
+                    zoomSlider.oninput = function() {
+                        const zoomValue = parseFloat(this.value);
+                        videoTrack.applyConstraints({ advanced: [{ zoom: zoomValue }] });
+                        document.getElementById('zoomLevel').textContent = zoomValue.toFixed(1) + 'x';
+                    };
+                } else {
+                    document.getElementById('scannerZoom').style.display = 'none';
+                }
+
+                // Try to enable continuous autofocus
+                if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                    await videoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+                }
+
+                scannerActive = true;
+                status.textContent = 'Positionnez le code-barres et appuyez sur Scanner';
+
+            } catch (err) {
+                console.error('Camera error:', err);
+                showManualInput('Camera non disponible: ' + err.message);
+            }
+        }
+
+        function captureAndScan() {
+            if (!scannerActive || !cameraStream) return;
+
+            const video = document.getElementById('scannerVideo');
+            const status = document.getElementById('scannerStatus');
+            const captureBtn = document.getElementById('scanCaptureBtn');
+
+            captureBtn.disabled = true;
+            captureBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 8px;"></i> Analyse...';
+            status.textContent = 'Analyse du code-barres...';
+
+            // Create canvas to capture frame
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            // Use Quagga to decode the captured image
+            Quagga.decodeSingle({
+                src: canvas.toDataURL('image/png'),
+                numOfWorkers: 0,
+                locate: true,
+                inputStream: {
+                    size: Math.max(video.videoWidth, 1920)
                 },
                 locator: {
-                    patchSize: "medium",
-                    halfSample: true
+                    patchSize: "small",  // Better for small codes
+                    halfSample: false    // Full resolution for accuracy
                 },
-                numOfWorkers: navigator.hardwareConcurrency || 4,
                 decoder: {
                     readers: [
                         "code_128_reader",
@@ -952,46 +1035,47 @@
                         "code_39_vin_reader",
                         "codabar_reader",
                         "upc_reader",
-                        "upc_e_reader"
-                    ]
-                },
-                locate: true
-            }, function(err) {
-                if (err) {
-                    console.error('Scanner error:', err);
-                    // Show manual input as fallback
-                    showManualInput('Camera non disponible. Utilisez la saisie manuelle.');
-                    return;
+                        "upc_e_reader",
+                        "i2of5_reader"
+                    ],
+                    multiple: false
                 }
-                Quagga.start();
-                scannerActive = true;
-                status.textContent = 'Positionnez le code-barres dans le cadre';
-            });
+            }, function(result) {
+                if (result && result.codeResult) {
+                    const code = result.codeResult.code;
+                    console.log('Barcode detected:', code);
+                    
+                    // Success feedback
+                    if (navigator.vibrate) navigator.vibrate(200);
+                    
+                    const resultDiv = document.getElementById('scannerResult');
+                    resultDiv.textContent = 'Code: ' + code;
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.background = '#4CAF50';
+                    status.textContent = 'Code detecte! Recherche...';
 
-            // Handle barcode detection
-            Quagga.onDetected(function(data) {
-                if (!scannerActive) return;
-
-                const code = data.codeResult.code;
-                console.log('Barcode detected:', code);
-
-                // Show result
-                result.textContent = 'Code: ' + code;
-                result.style.display = 'block';
-                status.textContent = 'Code detecte! Recherche du produit...';
-
-                // Vibrate on success (if supported)
-                if (navigator.vibrate) {
-                    navigator.vibrate(200);
+                    // Stop camera and search
+                    stopCamera();
+                    searchProductByBarcode(code);
+                } else {
+                    // Not found - allow retry
+                    status.textContent = 'Code non detecte. Rapprochez ou ajustez le zoom, puis reessayez.';
+                    captureBtn.disabled = false;
+                    captureBtn.innerHTML = '<i class="fas fa-redo" style="margin-right: 8px;"></i> Reessayer';
+                    
+                    // Brief vibration for feedback
+                    if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
                 }
-
-                // Stop scanner
-                scannerActive = false;
-                Quagga.stop();
-
-                // Search for the product
-                searchProductByBarcode(code);
             });
+        }
+
+        function stopCamera() {
+            scannerActive = false;
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            videoTrack = null;
         }
 
         function showManualInput(message) {
@@ -999,6 +1083,7 @@
             const manualInput = document.getElementById('scannerManual');
             const status = document.getElementById('scannerStatus');
 
+            stopCamera();
             scannerContainer.style.display = 'none';
             manualInput.style.display = 'flex';
             manualInput.style.justifyContent = 'center';
@@ -1006,7 +1091,6 @@
             manualInput.style.height = '100%';
             status.textContent = message;
 
-            // Focus input
             setTimeout(() => {
                 document.getElementById('manualBarcodeInput').focus();
             }, 100);
@@ -1026,7 +1110,7 @@
 
             result.textContent = 'Code: ' + code;
             result.style.display = 'block';
-            result.style.background = 'var(--success-500)';
+            result.style.background = '#4CAF50';
             status.textContent = 'Recherche du produit...';
 
             searchProductByBarcode(code);
@@ -1048,14 +1132,10 @@
             const modal = document.getElementById('scannerModal');
             modal.classList.remove('active');
 
-            // Reset manual input
             const manualInput = document.getElementById('manualBarcodeInput');
             if (manualInput) manualInput.value = '';
 
-            if (scannerActive) {
-                Quagga.stop();
-                scannerActive = false;
-            }
+            stopCamera();
         }
 
         async function searchProductByBarcode(code) {
@@ -1063,7 +1143,6 @@
             const result = document.getElementById('scannerResult');
 
             try {
-                // Search for product by barcode or reference
                 const response = await fetch(`/products/api/search/?q=${encodeURIComponent(code)}`);
                 const data = await response.json();
 
@@ -1072,16 +1151,14 @@
                     status.textContent = 'Produit trouve! Redirection...';
                     result.textContent = product.reference + ' - ' + product.name;
 
-                    // Redirect to product page
                     setTimeout(() => {
                         window.location.href = `/products/${product.reference}/`;
                     }, 1000);
                 } else {
                     status.textContent = 'Aucun produit trouve pour ce code';
-                    result.style.background = 'var(--warning-500)';
+                    result.style.background = '#FF9800';
                     result.textContent = 'Code: ' + code + ' - Non trouve';
 
-                    // Close after 2 seconds
                     setTimeout(() => {
                         closeBarcodeScanner();
                     }, 2000);
@@ -1095,6 +1172,15 @@
                 }, 2000);
             }
         }
+
+        // Handle escape key to close scanner
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && document.getElementById('scannerModal').classList.contains('active')) {
+                closeBarcodeScanner();
+            }
+        });
+
+
 
         // Handle escape key to close scanner
         document.addEventListener('keydown', function(event) {

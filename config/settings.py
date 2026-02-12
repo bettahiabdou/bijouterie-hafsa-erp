@@ -220,3 +220,27 @@ AMANA_PROXY_URL = os.getenv('AMANA_PROXY_URL', 'https://amana-proxy.abdelkarimbe
 # Media files (uploaded images)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Error logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': '/var/www/bijouterie-hafsa-erp/django_errors.log',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+    },
+}
+
+# HTTPS/Proxy settings
+CSRF_TRUSTED_ORIGINS = ['https://hafsaerp.duckdns.org', 'https://89.167.27.57']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
