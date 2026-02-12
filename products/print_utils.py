@@ -109,17 +109,23 @@ def print_or_queue(zpl_data, product=None, label_type='product', quantity=1, use
     return False, f"Impression échouée et mise en file échouée: {message}", False
 
 
-def string_to_hex(text):
+def string_to_hex(text, max_bytes=12):
     """
     Convert a string to hexadecimal representation for RFID encoding.
-    Pads to 24 hex characters (96 bits) which is standard EPC length.
+    Default: 24 hex characters (12 bytes = 96 bits) which is standard EPC length.
+
+    If text is longer than max_bytes, takes the LAST max_bytes characters
+    to preserve the unique part (e.g., date-sequence from product reference).
     """
+    # If text is too long, take the last part (the unique identifier)
+    if len(text) > max_bytes:
+        text = text[-max_bytes:]
+
     hex_str = text.encode('utf-8').hex().upper()
-    # Pad or truncate to 24 hex characters (96 bits = standard EPC)
-    if len(hex_str) < 24:
-        hex_str = hex_str.ljust(24, '0')
-    elif len(hex_str) > 24:
-        hex_str = hex_str[:24]
+    # Pad to max_bytes * 2 hex characters
+    target_len = max_bytes * 2
+    if len(hex_str) < target_len:
+        hex_str = hex_str.ljust(target_len, '0')
     return hex_str
 
 
