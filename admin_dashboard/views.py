@@ -34,7 +34,7 @@ from settings_app.models import (
     StoneClarity, StoneColor, StoneCut, PaymentMethod,
     BankAccount, StockLocation, DeliveryMethod,
     DeliveryPerson, RepairType, CertificateIssuer,
-    CompanySettings
+    CompanySettings, Carrier
 )
 # SystemConfig is imported in the view function to avoid migration issues
 
@@ -155,6 +155,14 @@ class ConfigurationRegistry:
             'fields': ['name', 'phone', 'is_active', 'notes'],
             'list_display': ['name', 'phone', 'is_active'],
             'search_fields': ['name', 'phone'],
+        },
+        'carriers': {
+            'model': Carrier,
+            'label': 'Transporteurs',
+            'singular': 'Transporteur',
+            'fields': ['name', 'code', 'phone', 'tracking_url_template', 'is_active', 'supports_auto_tracking'],
+            'list_display': ['name', 'code', 'phone', 'is_active'],
+            'search_fields': ['name', 'code'],
         },
         'repair-types': {
             'model': RepairType,
@@ -517,6 +525,7 @@ def system_configuration(request):
         'stock_locations_count': all_configs.get('stock-locations', {}).get('count', 0),
         'delivery_methods_count': all_configs.get('delivery-methods', {}).get('count', 0),
         'delivery_persons_count': all_configs.get('delivery-persons', {}).get('count', 0),
+        'carriers_count': all_configs.get('carriers', {}).get('count', 0),
         'repair_types_count': all_configs.get('repair-types', {}).get('count', 0),
         'certificate_issuers_count': all_configs.get('certificate-issuers', {}).get('count', 0),
     }
