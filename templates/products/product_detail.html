@@ -1185,9 +1185,9 @@
                 setTimeout(() => { progress.style.display = 'none'; }, 3000);
             }
 
-            // Reset file inputs
-            document.getElementById('cameraInput').value = '';
-            document.getElementById('fileInput').value = '';
+            // Reset file input
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput) fileInput.value = '';
         }
 
         // Gallery functions
