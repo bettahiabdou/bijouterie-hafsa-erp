@@ -108,113 +108,175 @@
         </div>
     </div>
 
-    <!-- Deliveries Table -->
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-list mr-2"></i> Liste des Livraisons</h3>
-        </div>
-        {% if deliveries %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Référence</th>
-                        <th>Facture</th>
-                        <th>Client</th>
-                        <th>Type</th>
-                        <th>N° Suivi</th>
-                        <th>Statut</th>
-                        <th>Position</th>
-                        <th>Dernière Vérif.</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for delivery in deliveries %}
+    <!-- Deliveries List -->
+    {% if deliveries %}
+        <!-- Desktop Table (hidden on tablet/mobile) -->
+        <div class="card delivery-table-desktop">
+            <div class="card-header">
+                <h3><i class="fas fa-list mr-2"></i> Liste des Livraisons</h3>
+            </div>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
                         <tr>
-                            <td>
-                                <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="font-mono font-semibold text-primary">
-                                    {{ delivery.reference }}
-                                </a>
-                            </td>
-                            <td>
-                                {% if delivery.invoice %}
-                                    <a href="{% url 'sales:invoice_detail' delivery.invoice.reference %}" class="font-mono text-sm">
-                                        {{ delivery.invoice.reference }}
-                                    </a>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div>{{ delivery.client_name|default:'-' }}</div>
-                                {% if delivery.client_phone %}
-                                    <div class="text-sm text-muted">{{ delivery.client_phone }}</div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if delivery.delivery_method_type == 'amana' %}
-                                    <span class="badge badge-info">AMANA</span>
-                                {% else %}
-                                    <span class="badge badge-secondary">{{ delivery.carrier.name|default:'Transporteur' }}</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="font-mono text-sm">{{ delivery.tracking_number|default:'-' }}</span>
-                            </td>
-                            <td>
-                                {% if delivery.status == 'pending' %}
-                                    <span class="badge badge-secondary">En Attente</span>
-                                {% elif delivery.status == 'in_transit' %}
-                                    <span class="badge badge-warning">En Transit</span>
-                                {% elif delivery.status == 'to_pickup' %}
-                                    <span class="badge badge-info">À Récupérer</span>
-                                {% elif delivery.status == 'delivered' %}
-                                    <span class="badge badge-success">Livré</span>
-                                {% elif delivery.status == 'returned' %}
-                                    <span class="badge badge-danger">Retourné</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="text-sm">{{ delivery.current_position|default:'-'|truncatechars:30 }}</span>
-                            </td>
-                            <td>
-                                {% if delivery.last_checked_at %}
-                                    <span class="text-sm text-muted">{{ delivery.last_checked_at|date:"d/m H:i" }}</span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-right">
-                                <div class="btn-group">
-                                    <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="btn btn-ghost btn-sm" title="Détails">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
-                                        <a href="{% url 'sales:delivery_check' delivery.reference %}" class="btn btn-ghost btn-sm" title="Vérifier">
-                                            <i class="fas fa-sync-alt"></i>
-                                        </a>
-                                    {% endif %}
-                                </div>
-                            </td>
+                            <th>Référence</th>
+                            <th>Client</th>
+                            <th>Type</th>
+                            <th>N° Suivi</th>
+                            <th>Statut</th>
+                            <th>Position</th>
+                            <th>Dernière Vérif.</th>
+                            <th></th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for delivery in deliveries %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="font-mono font-semibold text-primary">
+                                        {{ delivery.reference|truncatechars:16 }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <div>{{ delivery.client_name|default:'-' }}</div>
+                                    {% if delivery.client_phone %}
+                                        <div class="text-sm text-muted">{{ delivery.client_phone }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if delivery.delivery_method_type == 'amana' %}
+                                        <span class="badge badge-info">AMANA</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">{{ delivery.carrier.name|default:'Transporteur' }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="font-mono text-sm">{{ delivery.tracking_number|default:'-' }}</span>
+                                </td>
+                                <td>
+                                    {% if delivery.status == 'pending' %}
+                                        <span class="badge badge-secondary">En Attente</span>
+                                    {% elif delivery.status == 'in_transit' %}
+                                        <span class="badge badge-warning">En Transit</span>
+                                    {% elif delivery.status == 'to_pickup' %}
+                                        <span class="badge badge-info">À Récupérer</span>
+                                    {% elif delivery.status == 'delivered' %}
+                                        <span class="badge badge-success">Livré</span>
+                                    {% elif delivery.status == 'returned' %}
+                                        <span class="badge badge-danger">Retourné</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="text-sm">{{ delivery.current_position|default:'-'|truncatechars:25 }}</span>
+                                </td>
+                                <td>
+                                    {% if delivery.last_checked_at %}
+                                        <span class="text-sm text-muted">{{ delivery.last_checked_at|date:"d/m H:i" }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-right">
+                                    <div class="btn-group">
+                                        <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="btn btn-ghost btn-sm" title="Détails">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
+                                            <a href="{% url 'sales:delivery_check' delivery.reference %}" class="btn btn-ghost btn-sm" title="Vérifier">
+                                                <i class="fas fa-sync-alt"></i>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-            <!-- Pagination -->
-            {% if page_obj.has_other_pages %}
-                <div class="card-footer">
+        <!-- Mobile/Tablet Cards (hidden on desktop) -->
+        <div class="delivery-cards-mobile">
+            {% for delivery in deliveries %}
+                <div class="delivery-card">
+                    <div class="delivery-card-header">
+                        <div class="delivery-card-badges">
+                            {% if delivery.delivery_method_type == 'amana' %}
+                                <span class="badge badge-info">AMANA</span>
+                            {% else %}
+                                <span class="badge badge-secondary">{{ delivery.carrier.name|default:'Transporteur' }}</span>
+                            {% endif %}
+                            {% if delivery.status == 'pending' %}
+                                <span class="badge badge-secondary">En Attente</span>
+                            {% elif delivery.status == 'in_transit' %}
+                                <span class="badge badge-warning">En Transit</span>
+                            {% elif delivery.status == 'to_pickup' %}
+                                <span class="badge badge-info">À Récupérer</span>
+                            {% elif delivery.status == 'delivered' %}
+                                <span class="badge badge-success">Livré</span>
+                            {% elif delivery.status == 'returned' %}
+                                <span class="badge badge-danger">Retourné</span>
+                            {% endif %}
+                        </div>
+                        <div class="delivery-card-actions">
+                            <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="btn btn-ghost btn-sm" title="Détails">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
+                                <a href="{% url 'sales:delivery_check' delivery.reference %}" class="btn btn-ghost btn-sm" title="Vérifier">
+                                    <i class="fas fa-sync-alt"></i>
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="delivery-card-body">
+                        <div class="delivery-card-client">
+                            <i class="fas fa-user"></i>
+                            <strong>{{ delivery.client_name|default:'-' }}</strong>
+                            {% if delivery.client_phone %}
+                                <span class="text-muted">{{ delivery.client_phone }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="delivery-card-info">
+                            <div class="delivery-info-item">
+                                <span class="delivery-info-label">Réf</span>
+                                <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="font-mono text-primary">{{ delivery.reference|truncatechars:20 }}</a>
+                            </div>
+                            <div class="delivery-info-item">
+                                <span class="delivery-info-label">Suivi</span>
+                                <span class="font-mono">{{ delivery.tracking_number|default:'-' }}</span>
+                            </div>
+                            {% if delivery.current_position %}
+                                <div class="delivery-info-item">
+                                    <span class="delivery-info-label">Position</span>
+                                    <span>{{ delivery.current_position|truncatechars:30 }}</span>
+                                </div>
+                            {% endif %}
+                            {% if delivery.last_checked_at %}
+                                <div class="delivery-info-item">
+                                    <span class="delivery-info-label">Vérif.</span>
+                                    <span class="text-muted">{{ delivery.last_checked_at|date:"d/m H:i" }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <div class="card mt-4">
+                <div class="card-body" style="display: flex; justify-content: center; padding: var(--space-3);">
                     <div class="pagination">
                         {% if page_obj.has_previous %}
                             <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}" class="pagination-btn">
                                 <i class="fas fa-chevron-left"></i>
                             </a>
                         {% endif %}
-
                         <span class="pagination-info">
-                            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                            Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
                         </span>
-
                         {% if page_obj.has_next %}
                             <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}" class="pagination-btn">
                                 <i class="fas fa-chevron-right"></i>
@@ -222,15 +284,17 @@
                         {% endif %}
                     </div>
                 </div>
-            {% endif %}
-        {% else %}
-            <div class="card-body text-center py-8">
-                <i class="fas fa-truck text-4xl text-gray-300 mb-4"></i>
-                <p class="text-gray-600 mb-4">Aucune livraison trouvée</p>
-                <p class="text-sm text-gray-500">Les livraisons apparaîtront ici lorsque des factures seront créées avec le mode AMANA ou transporteur.</p>
             </div>
         {% endif %}
-    </div>
+    {% else %}
+        <div class="card">
+            <div class="card-body text-center" style="padding: var(--space-8);">
+                <i class="fas fa-truck" style="font-size: 3rem; color: var(--neutral-300); margin-bottom: var(--space-4); display: block;"></i>
+                <p style="color: var(--neutral-600); margin-bottom: var(--space-2); font-size: var(--text-lg);">Aucune livraison trouvée</p>
+                <p style="color: var(--neutral-400); font-size: var(--text-sm);">Les livraisons apparaîtront ici lorsque des factures seront créées avec le mode AMANA ou transporteur.</p>
+            </div>
+        </div>
+    {% endif %}
 
     <style>
         .stats-grid {
@@ -290,7 +354,89 @@
             gap: var(--space-2);
         }
 
-        @media (max-width: 1024px) {
+        /* Desktop table visible, mobile cards hidden */
+        .delivery-table-desktop { display: block; }
+        .delivery-cards-mobile { display: none; }
+
+        /* Mobile/Tablet card styles */
+        .delivery-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--neutral-100);
+            margin-bottom: var(--space-3);
+            overflow: hidden;
+        }
+
+        .delivery-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-3) var(--space-4);
+            background: var(--neutral-50);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .delivery-card-badges {
+            display: flex;
+            gap: var(--space-2);
+            flex-wrap: wrap;
+        }
+
+        .delivery-card-actions {
+            display: flex;
+            gap: var(--space-1);
+        }
+
+        .delivery-card-body {
+            padding: var(--space-4);
+        }
+
+        .delivery-card-client {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin-bottom: var(--space-3);
+            font-size: var(--text-base);
+        }
+
+        .delivery-card-client i {
+            color: var(--neutral-400);
+            font-size: var(--text-sm);
+        }
+
+        .delivery-card-client .text-muted {
+            margin-left: var(--space-2);
+            font-size: var(--text-sm);
+        }
+
+        .delivery-card-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-2);
+        }
+
+        .delivery-info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .delivery-info-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-400);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: var(--font-semibold);
+        }
+
+        .delivery-info-item span:not(.delivery-info-label),
+        .delivery-info-item a {
+            font-size: var(--text-sm);
+            color: var(--neutral-700);
+        }
+
+        @media (max-width: 1399px) {
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
@@ -302,15 +448,38 @@
             .filter-form .filter-group {
                 flex: 1 1 45%;
             }
+
+            /* Switch to card layout on tablet */
+            .delivery-table-desktop { display: none; }
+            .delivery-cards-mobile { display: block; }
         }
 
         @media (max-width: 640px) {
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stat-card {
+                padding: var(--space-3);
+                gap: var(--space-3);
+            }
+
+            .stat-icon {
+                width: 40px;
+                height: 40px;
+                font-size: var(--text-lg);
+            }
+
+            .stat-value {
+                font-size: var(--text-xl);
             }
 
             .filter-form .filter-group {
                 flex: 1 1 100%;
+            }
+
+            .delivery-card-info {
+                grid-template-columns: 1fr;
             }
         }
     </style>
