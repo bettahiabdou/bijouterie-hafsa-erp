@@ -942,11 +942,20 @@
 
         // Handle print form submission
         document.getElementById('printForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-
             const form = e.target;
             const submitBtn = form.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
+
+            // On mobile: just submit the form normally (no JS interception)
+            // The server will handle everything and redirect back
+            if (isMobileDevice) {
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 6px;"></i> Impression...';
+                submitBtn.disabled = true;
+                return; // Let the form submit normally (no e.preventDefault)
+            }
+
+            // Desktop: intercept and try browser-direct printing first
+            e.preventDefault();
 
             // Show loading state
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 6px;"></i> Impression...';
@@ -955,8 +964,7 @@
             const labelType = form.querySelector('select[name="label_type"]').value;
             const quantity = form.querySelector('input[name="quantity"]').value;
 
-            // Desktop: try browser-based direct printing first
-            if (!isMobileDevice && printerConnected && PRINTER_URL) {
+            if (printerConnected && PRINTER_URL) {
                 try {
                     const zplResponse = await fetch(`/products/api/product-zpl/{{ product.reference }}/?label_type=${labelType}&quantity=${quantity}`);
                     const zplData = await zplResponse.json();
@@ -977,7 +985,7 @@
                 }
             }
 
-            // Server-side printing (always used on mobile, fallback on desktop)
+            // Desktop fallback: server-side printing via AJAX
             try {
                 const formData = new FormData(form);
                 const response = await fetch(form.action, {
