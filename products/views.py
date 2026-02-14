@@ -10,7 +10,7 @@ from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from .models import Product, ProductImage, ProductStone
-from .print_utils import print_product_label, print_price_tag, print_test_label, generate_product_label_zpl, generate_price_tag_zpl, queue_print_job
+from .print_utils import print_product_label, print_price_tag, print_test_label, generate_product_label_zpl, generate_price_tag_zpl, queue_print_job, send_to_printer
 from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount
 from suppliers.models import Supplier
 from users.models import ActivityLog
@@ -928,6 +928,33 @@ def product_zpl_api(request, reference):
         'label_type': label_type,
         'quantity': quantity
     })
+
+
+# =============================================================================
+# Print Direct API - Server sends ZPL to printer via TCP (for mobile devices)
+# =============================================================================
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def print_direct_api(request):
+    """
+    API endpoint for mobile devices to print via server.
+    Mobile browsers can't reach the printer's local IP directly,
+    so this endpoint receives ZPL data and sends it to the printer via TCP.
+    """
+    import json
+    try:
+        data = json.loads(request.body)
+        zpl_data = data.get('zpl', '')
+        if not zpl_data:
+            return JsonResponse({'success': False, 'message': 'Pas de donnees ZPL'}, status=400)
+
+        success, message = send_to_printer(zpl_data)
+        return JsonResponse({'success': success, 'message': message})
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'Donnees invalides'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
 
 # =============================================================================

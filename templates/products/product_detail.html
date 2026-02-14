@@ -884,10 +884,13 @@
         let PRINTER_URL = null;
         let printerConnected = false;
 
+        // Detect if mobile device (iPhone/Android) - these can't reach local printer IP
+        const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
         // Load printer config on page load
         document.addEventListener('DOMContentLoaded', async function() {
             await loadPrinterConfig();
-            if (PRINTER_IP) {
+            if (PRINTER_IP && !isMobileDevice) {
                 checkPrinterConnection();
             }
         });
@@ -906,16 +909,16 @@
         }
 
         async function checkPrinterConnection() {
-            if (!PRINTER_IP) return;
-            // Skip connection check - just assume printer is available if configured
-            // The actual print will fail if printer is unreachable
+            if (!PRINTER_IP || isMobileDevice) return;
+            // Only allow browser-direct printing from desktop/laptop
+            // Mobile devices use server-side printing (server can reach the printer)
             printerConnected = true;
-            console.log('Printer configured:', PRINTER_IP);
+            console.log('Printer configured (desktop direct):', PRINTER_IP);
         }
 
         async function sendToPrinter(zplData) {
-            if (!PRINTER_URL) {
-                return { success: false, error: 'Imprimante non configuree' };
+            if (!PRINTER_URL || isMobileDevice) {
+                return { success: false, error: 'Impression via serveur' };
             }
             try {
                 await fetch(PRINTER_URL, {

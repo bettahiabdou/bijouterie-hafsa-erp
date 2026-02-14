@@ -340,10 +340,13 @@
     let PRINTER_URL = null;
     let printerConnected = false;
 
+    // Detect mobile - these can't reach local printer IP directly
+    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
     // Load printer config and check connection on page load
     document.addEventListener('DOMContentLoaded', async function() {
         await loadPrinterConfig();
-        if (PRINTER_IP) {
+        if (PRINTER_IP && !isMobileDevice) {
             checkPrinterConnection();
         }
     });
@@ -355,8 +358,13 @@
             if (config.ip && config.enabled) {
                 PRINTER_IP = config.ip;
                 PRINTER_URL = config.http_url || `http://${PRINTER_IP}/pstprnt`;
-                document.getElementById('printerInfo').innerHTML =
-                    `Imprimante: <strong>${PRINTER_IP}</strong> (HTTP sur /pstprnt)`;
+                if (isMobileDevice) {
+                    document.getElementById('printerInfo').innerHTML =
+                        `Imprimante: <strong>${PRINTER_IP}</strong> (via serveur)`;
+                } else {
+                    document.getElementById('printerInfo').innerHTML =
+                        `Imprimante: <strong>${PRINTER_IP}</strong> (HTTP sur /pstprnt)`;
+                }
             } else {
                 const statusEl = document.getElementById('printerStatus');
                 statusEl.className = 'printer-status disconnected';
@@ -377,8 +385,7 @@
             return;
         }
 
-        // Skip the connection check - just assume printer is available if configured
-        // The actual print will fail if printer is unreachable
+        // Only desktop can print directly to printer
         printerConnected = true;
         statusEl.className = 'printer-status connected';
         statusEl.innerHTML = '<i class="fas fa-check-circle"></i><span>Imprimante: ' + PRINTER_IP + '</span>';
@@ -386,17 +393,30 @@
     }
 
     async function sendToPrinter(zplData) {
-        if (!PRINTER_URL) {
-            return { success: false, error: 'Imprimante non configuree' };
+        // Mobile devices: send ZPL through the server (server → printer via TCP)
+        if (isMobileDevice || !PRINTER_URL) {
+            try {
+                const response = await fetch('/products/api/print-direct/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}',
+                    },
+                    body: JSON.stringify({ zpl: zplData })
+                });
+                const data = await response.json();
+                return { success: data.success, error: data.message || '' };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
         }
+        // Desktop: send directly to printer HTTP interface
         try {
             const response = await fetch(PRINTER_URL, {
                 method: 'POST',
-                mode: 'no-cors',  // Printer doesn't send CORS headers
+                mode: 'no-cors',
                 body: zplData
             });
-            // With no-cors, we can't read the response
-            // But if no exception thrown, it likely worked
             return { success: true };
         } catch (error) {
             return { success: false, error: error.message };
