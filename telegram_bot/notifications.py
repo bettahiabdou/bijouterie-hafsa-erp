@@ -16,17 +16,24 @@ logger = logging.getLogger(__name__)
 
 def notify_admin_new_sale(invoice):
     """
-    Send a Telegram notification to admin about a new/completed sale.
+    Send a Telegram notification to all admins about a new/completed sale.
     Sends invoice photos (if any) with sale details as caption.
+    Supports multiple admin chat IDs (comma-separated in TELEGRAM_ADMIN_CHAT_ID).
 
     Args:
         invoice: SaleInvoice instance (should have items, photos, payments prefetched ideally)
     """
     bot_token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
-    admin_chat_id = getattr(settings, 'TELEGRAM_ADMIN_CHAT_ID', '')
+    admin_chat_ids_str = getattr(settings, 'TELEGRAM_ADMIN_CHAT_ID', '')
 
-    if not bot_token or not admin_chat_id:
+    if not bot_token or not admin_chat_ids_str:
         logger.warning("Telegram admin notification skipped: missing bot token or admin chat ID")
+        return
+
+    # Support multiple admin chat IDs (comma-separated)
+    admin_chat_ids = [cid.strip() for cid in admin_chat_ids_str.split(',') if cid.strip()]
+
+    if not admin_chat_ids:
         return
 
     try:
@@ -36,12 +43,15 @@ def notify_admin_new_sale(invoice):
         # Get invoice photos
         photos = list(invoice.photos.all())
 
-        if photos:
-            # Send photos with caption
-            _send_photos_with_caption(bot_token, admin_chat_id, photos, message)
-        else:
-            # No photos - send text only
-            _send_text_message(bot_token, admin_chat_id, message)
+        # Send to each admin
+        for chat_id in admin_chat_ids:
+            try:
+                if photos:
+                    _send_photos_with_caption(bot_token, chat_id, photos, message)
+                else:
+                    _send_text_message(bot_token, chat_id, message)
+            except Exception as e:
+                logger.error(f"Error sending notification to {chat_id} for {invoice.reference}: {e}")
 
     except Exception as e:
         logger.error(f"Error sending admin notification for invoice {invoice.reference}: {e}")
