@@ -55,10 +55,9 @@
                     <h3><i class="fas fa-images mr-2"></i> Images du Produit</h3>
                     {% if request.user.is_staff %}
                     <div style="display: flex; gap: 8px;">
-                        <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="openWebcam()" style="margin: 0;">
                             <i class="fas fa-camera"></i> <span class="desktop-only">Photo</span>
-                            <input type="file" id="cameraInput" accept="image/*" capture="environment" multiple style="display: none;" onchange="uploadImages(this.files)">
-                        </label>
+                        </button>
                         <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin: 0;">
                             <i class="fas fa-folder-open"></i> <span class="desktop-only">Fichier</span>
                             <input type="file" id="fileInput" accept="image/*" multiple style="display: none;" onchange="uploadImages(this.files)">
@@ -109,10 +108,9 @@
                             <i class="fas fa-image"></i>
                             <p>Aucune image disponible</p>
                             {% if request.user.is_staff %}
-                            <label class="btn btn-primary btn-sm" style="cursor: pointer;">
+                            <button type="button" class="btn btn-primary btn-sm" onclick="openWebcam()">
                                 <i class="fas fa-camera"></i> Prendre une photo
-                                <input type="file" accept="image/*" capture="environment" multiple style="display: none;" onchange="uploadImages(this.files)">
-                            </label>
+                            </button>
                             {% else %}
                             <a href="{% url 'products:edit' product.reference %}" class="btn btn-secondary btn-sm">
                                 <i class="fas fa-upload"></i> Ajouter des images
@@ -812,6 +810,35 @@
         }
     </style>
 
+    <!-- Webcam Capture Modal -->
+    <div id="webcamModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 99999; align-items: center; justify-content: center;">
+        <div onclick="closeWebcam()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8);"></div>
+        <div style="position: relative; background: #1a1a1a; border-radius: 12px; width: 95%; max-width: 640px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); z-index: 100000; overflow: hidden;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #222;">
+                <h3 style="margin: 0; font-size: 16px; color: white;"><i class="fas fa-camera" style="margin-right: 8px;"></i> Prendre une photo</h3>
+                <button type="button" onclick="closeWebcam()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
+            </div>
+            <div style="position: relative;">
+                <video id="webcamVideo" autoplay playsinline style="width: 100%; display: block; background: #000;"></video>
+                <canvas id="webcamCanvas" style="display: none;"></canvas>
+                <img id="webcamPreview" style="width: 100%; display: none;">
+            </div>
+            <div id="webcamControls" style="display: flex; justify-content: center; gap: 16px; padding: 16px; background: #222;">
+                <button type="button" id="webcamCaptureBtn" onclick="capturePhoto()" style="padding: 14px 32px; background: #3b82f6; color: white; border: none; border-radius: 30px; cursor: pointer; font-size: 16px; font-weight: 600;">
+                    <i class="fas fa-camera" style="margin-right: 8px;"></i> Capturer
+                </button>
+            </div>
+            <div id="webcamPreviewControls" style="display: none; justify-content: center; gap: 16px; padding: 16px; background: #222;">
+                <button type="button" onclick="retakePhoto()" style="padding: 14px 24px; background: #6b7280; color: white; border: none; border-radius: 30px; cursor: pointer; font-size: 14px;">
+                    <i class="fas fa-redo" style="margin-right: 6px;"></i> Reprendre
+                </button>
+                <button type="button" onclick="savePhoto()" style="padding: 14px 24px; background: #22c55e; color: white; border: none; border-radius: 30px; cursor: pointer; font-size: 14px;">
+                    <i class="fas fa-check" style="margin-right: 6px;"></i> Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Print Modal - Using inline styles to avoid conflicts -->
     <div id="printModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 99999; align-items: center; justify-content: center;">
         <div onclick="closePrintModal()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);"></div>
@@ -1015,6 +1042,92 @@
             }, 3000);
         }
 
+        // Webcam Functions
+        let webcamStream = null;
+
+        async function openWebcam() {
+            const modal = document.getElementById('webcamModal');
+            const video = document.getElementById('webcamVideo');
+            const preview = document.getElementById('webcamPreview');
+            const controls = document.getElementById('webcamControls');
+            const previewControls = document.getElementById('webcamPreviewControls');
+
+            modal.style.display = 'flex';
+            video.style.display = 'block';
+            preview.style.display = 'none';
+            controls.style.display = 'flex';
+            previewControls.style.display = 'none';
+
+            try {
+                webcamStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                });
+                video.srcObject = webcamStream;
+            } catch (err) {
+                console.error('Webcam error:', err);
+                closeWebcam();
+                showNotification('error', 'Camera non disponible: ' + err.message);
+            }
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('webcamVideo');
+            const canvas = document.getElementById('webcamCanvas');
+            const preview = document.getElementById('webcamPreview');
+            const controls = document.getElementById('webcamControls');
+            const previewControls = document.getElementById('webcamPreviewControls');
+
+            // Capture frame
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            // Show preview
+            preview.src = canvas.toDataURL('image/jpeg', 0.92);
+            video.style.display = 'none';
+            preview.style.display = 'block';
+            controls.style.display = 'none';
+            previewControls.style.display = 'flex';
+        }
+
+        function retakePhoto() {
+            const video = document.getElementById('webcamVideo');
+            const preview = document.getElementById('webcamPreview');
+            const controls = document.getElementById('webcamControls');
+            const previewControls = document.getElementById('webcamPreviewControls');
+
+            video.style.display = 'block';
+            preview.style.display = 'none';
+            controls.style.display = 'flex';
+            previewControls.style.display = 'none';
+        }
+
+        function savePhoto() {
+            const canvas = document.getElementById('webcamCanvas');
+
+            canvas.toBlob(function(blob) {
+                const file = new File([blob], 'photo_' + Date.now() + '.jpg', { type: 'image/jpeg' });
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                closeWebcam();
+                uploadImages(dataTransfer.files);
+            }, 'image/jpeg', 0.92);
+        }
+
+        function closeWebcam() {
+            const modal = document.getElementById('webcamModal');
+            modal.style.display = 'none';
+
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(track => track.stop());
+                webcamStream = null;
+            }
+        }
+
         // Image Upload Functions
         async function uploadImages(files) {
             if (!files || files.length === 0) return;
@@ -1101,6 +1214,7 @@
             if (e.key === 'Escape') {
                 closePrintModal();
                 closeLightbox();
+                closeWebcam();
             }
         });
     </script>
