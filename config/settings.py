@@ -207,6 +207,8 @@ REST_FRAMEWORK = {
 # Telegram Bot Configuration
 # Get token from @BotFather on Telegram
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
+# Admin chat ID for receiving sale notifications
+TELEGRAM_ADMIN_CHAT_ID = os.getenv('TELEGRAM_ADMIN_CHAT_ID', '')
 
 # Zebra Printer Configuration
 ZEBRA_PRINTER_HOST = os.getenv('ZEBRA_PRINTER_HOST', '')

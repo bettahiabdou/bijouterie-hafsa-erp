@@ -1261,6 +1261,15 @@ def invoice_create(request):
                         message += f' (Solde: {remaining} DH)'
                 message += '.'
                 messages.success(request, message)
+
+                # Send Telegram notification to admin
+                try:
+                    from telegram_bot.notifications import notify_admin_new_sale
+                    notify_admin_new_sale(invoice)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Telegram notification error: {e}")
+
                 return redirect('sales:invoice_detail', reference=invoice.reference)
             else:
                 # Form validation failed
@@ -1627,6 +1636,13 @@ def bulk_invoice_create(request):
                     )
 
                     created_count += 1
+
+                    # Send Telegram notification to admin
+                    try:
+                        from telegram_bot.notifications import notify_admin_new_sale
+                        notify_admin_new_sale(invoice)
+                    except Exception as notif_err:
+                        logger.error(f"Telegram notification error for {invoice.reference}: {notif_err}")
 
                 except Product.DoesNotExist:
                     failed_rows.append((i + 1, 'Produit non trouvé'))
@@ -2455,6 +2471,15 @@ def pending_invoice_complete(request, reference):
                 )
 
                 messages.success(request, f"Facture {invoice.reference} validée avec succès!")
+
+                # Send Telegram notification to admin
+                try:
+                    from telegram_bot.notifications import notify_admin_new_sale
+                    notify_admin_new_sale(invoice)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Telegram notification error: {e}")
+
                 return redirect('sales:invoice_detail', reference=invoice.reference)
 
         elif action == 'quick_create_product':
