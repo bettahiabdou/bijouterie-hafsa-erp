@@ -940,7 +940,7 @@
             document.getElementById('printModal').style.display = 'none';
         }
 
-        // Handle print form submission - try browser printing first
+        // Handle print form submission
         document.getElementById('printForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
@@ -955,10 +955,9 @@
             const labelType = form.querySelector('select[name="label_type"]').value;
             const quantity = form.querySelector('input[name="quantity"]').value;
 
-            // Try browser-based printing first if printer is connected
-            if (printerConnected && PRINTER_URL) {
+            // Desktop: try browser-based direct printing first
+            if (!isMobileDevice && printerConnected && PRINTER_URL) {
                 try {
-                    // Fetch ZPL data from API
                     const zplResponse = await fetch(`/products/api/product-zpl/{{ product.reference }}/?label_type=${labelType}&quantity=${quantity}`);
                     const zplData = await zplResponse.json();
 
@@ -966,7 +965,6 @@
                         const result = await sendToPrinter(zplData.zpl);
 
                         if (result.success) {
-                            // Success! Show message and close modal
                             closePrintModal();
                             showNotification('success', 'Etiquette envoyee a l\'imprimante!');
                             submitBtn.innerHTML = originalText;
@@ -979,7 +977,7 @@
                 }
             }
 
-            // Fall back to server-side queue
+            // Server-side printing (always used on mobile, fallback on desktop)
             try {
                 const formData = new FormData(form);
                 const response = await fetch(form.action, {
