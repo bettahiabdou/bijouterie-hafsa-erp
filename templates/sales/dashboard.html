@@ -27,10 +27,54 @@
 {% block content %}
 <div class="dashboard-container">
 
-    <!-- ============ TODAY KPIs ============ -->
+    <!-- ============ FILTERS ============ -->
+    <div class="card filter-card">
+        <form method="get" class="dash-filter-form">
+            <div class="dash-filter-grid">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Periode</label>
+                    <select name="period" class="form-select" onchange="toggleDateFields(this.value)">
+                        <option value="today" {% if period_filter == 'today' %}selected{% endif %}>Aujourd'hui</option>
+                        <option value="month" {% if period_filter == 'month' %}selected{% endif %}>Ce Mois</option>
+                        <option value="all" {% if period_filter == 'all' %}selected{% endif %}>Tout</option>
+                        <option value="custom" {% if date_from or date_to %}selected{% endif %}>Personnalise</option>
+                    </select>
+                </div>
+                <div class="form-group date-field" style="margin-bottom:0; {% if not date_from and not date_to %}display:none;{% endif %}">
+                    <label class="form-label">Du</label>
+                    <input type="date" name="date_from" value="{{ date_from }}" class="form-input">
+                </div>
+                <div class="form-group date-field" style="margin-bottom:0; {% if not date_from and not date_to %}display:none;{% endif %}">
+                    <label class="form-label">Au</label>
+                    <input type="date" name="date_to" value="{{ date_to }}" class="form-input">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Vendeur</label>
+                    <select name="seller" class="form-select">
+                        <option value="">Tous</option>
+                        {% for s in sellers %}
+                            <option value="{{ s.id }}" {% if seller_filter == s.id|stringformat:"d" %}selected{% endif %}>
+                                {{ s.get_full_name|default:s.username }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="dash-filter-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter"></i> Filtrer
+                </button>
+                <a href="{% url 'sales:sales_dashboard' %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- ============ TODAY KPIs (always visible) ============ -->
     <div class="dash-section">
         <h2 class="dash-section-title"><i class="fas fa-calendar-day"></i> Aujourd'hui</h2>
-        <div class="kpi-grid kpi-grid-4">
+        <div class="kpi-grid kpi-grid-5">
             <div class="kpi-card kpi-primary">
                 <div class="kpi-icon"><i class="fas fa-coins"></i></div>
                 <div class="kpi-content">
@@ -41,10 +85,19 @@
             <div class="kpi-card kpi-success">
                 <div class="kpi-icon"><i class="fas fa-hand-holding-usd"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ today_stats.paid|floatformat:2 }}</div>
+                    <div class="kpi-value">{{ today_stats.encaisse|floatformat:2 }}</div>
                     <div class="kpi-label">Encaisse (DH)</div>
                 </div>
             </div>
+            {% if today_stats.amana_pending > 0 %}
+            <div class="kpi-card kpi-warning">
+                <div class="kpi-icon"><i class="fas fa-box"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ today_stats.amana_pending|floatformat:2 }}</div>
+                    <div class="kpi-label">AMANA en attente (DH)</div>
+                </div>
+            </div>
+            {% endif %}
             <div class="kpi-card kpi-info">
                 <div class="kpi-icon"><i class="fas fa-file-invoice"></i></div>
                 <div class="kpi-content">
@@ -62,42 +115,50 @@
         </div>
     </div>
 
-    <!-- ============ MONTH KPIs ============ -->
+    <!-- ============ FILTERED PERIOD KPIs ============ -->
     <div class="dash-section">
-        <h2 class="dash-section-title"><i class="fas fa-calendar-alt"></i> Ce Mois</h2>
+        <h2 class="dash-section-title">
+            <i class="fas fa-chart-line"></i>
+            {% if date_from and date_to %}Periode: {{ date_from }} - {{ date_to }}
+            {% elif date_from %}Depuis {{ date_from }}
+            {% elif period_filter == 'today' %}Aujourd'hui
+            {% elif period_filter == 'all' %}Historique Global
+            {% else %}Ce Mois{% endif %}
+            {% if seller_filter %}(filtre vendeur){% endif %}
+        </h2>
         <div class="kpi-grid kpi-grid-5">
             <div class="kpi-card kpi-primary">
                 <div class="kpi-icon"><i class="fas fa-chart-line"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ month_stats.revenue|floatformat:2 }}</div>
-                    <div class="kpi-label">CA du Mois (DH)</div>
+                    <div class="kpi-value">{{ period_stats.revenue|floatformat:2 }}</div>
+                    <div class="kpi-label">Chiffre d'Affaires (DH)</div>
                 </div>
             </div>
             <div class="kpi-card kpi-success">
                 <div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ month_stats.paid|floatformat:2 }}</div>
-                    <div class="kpi-label">Encaisse (DH)</div>
+                    <div class="kpi-value">{{ period_stats.encaisse|floatformat:2 }}</div>
+                    <div class="kpi-label">Encaisse Reel (DH)</div>
                 </div>
             </div>
             <div class="kpi-card kpi-error">
-                <div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="kpi-icon"><i class="fas fa-box"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ month_stats.balance|floatformat:2 }}</div>
-                    <div class="kpi-label">Solde Restant (DH)</div>
+                    <div class="kpi-value">{{ period_stats.amana_pending|floatformat:2 }}</div>
+                    <div class="kpi-label">AMANA Non Livre (DH)</div>
                 </div>
             </div>
             <div class="kpi-card kpi-info">
                 <div class="kpi-icon"><i class="fas fa-receipt"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ month_stats.count }}</div>
+                    <div class="kpi-value">{{ period_stats.count }}</div>
                     <div class="kpi-label">Factures</div>
                 </div>
             </div>
             <div class="kpi-card kpi-warning">
                 <div class="kpi-icon"><i class="fas fa-balance-scale"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ month_stats.weight|floatformat:2 }}</div>
+                    <div class="kpi-value">{{ period_stats.weight|floatformat:2 }}</div>
                     <div class="kpi-label">Grammes</div>
                 </div>
             </div>
@@ -111,7 +172,7 @@
         <div class="dash-section">
             <div class="card">
                 <div class="card-header">
-                    <h3><i class="fas fa-user-tie mr-2"></i> Performance Vendeurs (Ce Mois)</h3>
+                    <h3><i class="fas fa-user-tie mr-2"></i> Performance Vendeurs</h3>
                 </div>
                 <div class="card-body" style="padding: 0;">
                     {% if seller_stats %}
@@ -122,7 +183,6 @@
                                     <th>Vendeur</th>
                                     <th>Ventes</th>
                                     <th>CA (DH)</th>
-                                    <th>Encaisse</th>
                                     <th>Grammes</th>
                                 </tr>
                             </thead>
@@ -134,7 +194,6 @@
                                     </td>
                                     <td>{{ s.count }}</td>
                                     <td class="font-semibold text-primary">{{ s.revenue|floatformat:2 }}</td>
-                                    <td class="text-success">{{ s.paid|floatformat:2 }}</td>
                                     <td>{{ s.weight|floatformat:2|default:"0.00" }}</td>
                                 </tr>
                                 {% endfor %}
@@ -144,7 +203,7 @@
                     {% else %}
                         <div class="empty-state-sm">
                             <i class="fas fa-users"></i>
-                            <p>Aucune vente ce mois</p>
+                            <p>Aucune vente pour cette periode</p>
                         </div>
                     {% endif %}
                 </div>
@@ -192,41 +251,41 @@
             <div class="card amana-alert-card">
                 <div class="card-header" style="background: var(--warning-50); border-bottom-color: var(--warning-200);">
                     <h3 style="color: var(--warning-700);">
-                        <i class="fas fa-box mr-2"></i> AMANA - En Attente de Paiement
+                        <i class="fas fa-box mr-2"></i> AMANA - Non Livre (Argent en attente)
                     </h3>
                     <div class="amana-summary">
                         <span class="badge badge-warning" style="font-size: var(--text-sm);">
-                            {{ amana_pending_stats.count }} colis
+                            {{ amana_pending_count }} colis
                         </span>
-                        <span class="font-bold" style="color: var(--warning-700); font-size: var(--text-lg);">
-                            {{ amana_pending_stats.total_pending|floatformat:2 }} DH
+                        <span class="font-bold" style="color: var(--error-600); font-size: var(--text-lg);">
+                            {{ amana_pending_total|floatformat:2 }} DH
                         </span>
                     </div>
                 </div>
-                <div class="card-body" style="padding: 0; max-height: 350px; overflow-y: auto;">
-                    {% if amana_pending %}
-                        {% for inv in amana_pending %}
-                        <div class="amana-item" onclick="window.location='{% url 'sales:invoice_detail' inv.reference %}'">
+                <div class="card-body" style="padding: 0; max-height: 400px; overflow-y: auto;">
+                    {% if amana_pending_list %}
+                        {% for item in amana_pending_list %}
+                        <div class="amana-item" onclick="window.location='{% url 'sales:invoice_detail' item.invoice.reference %}'">
                             <div class="amana-item-main">
-                                <span class="amana-ref">{{ inv.reference }}</span>
-                                <span class="amana-amount text-error font-semibold">{{ inv.balance_due|floatformat:2 }} DH</span>
+                                <span class="amana-ref">{{ item.invoice.reference }}</span>
+                                <span class="amana-amount text-error font-semibold">{{ item.amana_amount|floatformat:2 }} DH</span>
                             </div>
                             <div class="amana-item-sub">
                                 <span>
                                     <i class="fas fa-user"></i>
-                                    {% if inv.client %}{{ inv.client.first_name }} {{ inv.client.last_name }}{% else %}Anonyme{% endif %}
+                                    {% if item.invoice.client %}{{ item.invoice.client.first_name }} {{ item.invoice.client.last_name }}{% else %}Anonyme{% endif %}
                                 </span>
                                 <span>
                                     <i class="fas fa-user-tie"></i>
-                                    {{ inv.seller.get_full_name|default:inv.seller.username }}
+                                    {{ item.invoice.seller.get_full_name|default:item.invoice.seller.username }}
                                 </span>
                                 <span>
                                     <i class="fas fa-calendar"></i>
-                                    {{ inv.date|date:"d/m" }}
+                                    {{ item.invoice.date|date:"d/m" }}
                                 </span>
-                                {% if inv.delivery %}
-                                <span class="badge {% if inv.delivery.status == 'in_transit' %}badge-info{% elif inv.delivery.status == 'to_pickup' %}badge-warning{% else %}badge-neutral{% endif %}" style="font-size: 10px;">
-                                    {{ inv.delivery.get_status_display }}
+                                {% if item.invoice.delivery %}
+                                <span class="badge {% if item.invoice.delivery.status == 'in_transit' %}badge-info{% elif item.invoice.delivery.status == 'to_pickup' %}badge-warning{% else %}badge-neutral{% endif %}" style="font-size: 10px;">
+                                    {{ item.invoice.delivery.get_status_display }}
                                 </span>
                                 {% endif %}
                             </div>
@@ -273,10 +332,10 @@
                 </div>
             </div>
 
-            <!-- Payment Status Breakdown (This Month) -->
+            <!-- Payment Status Breakdown -->
             <div class="card" style="margin-top: var(--space-4);">
                 <div class="card-header">
-                    <h3><i class="fas fa-chart-pie mr-2"></i> Statut Paiements (Ce Mois)</h3>
+                    <h3><i class="fas fa-chart-pie mr-2"></i> Statut Paiements</h3>
                 </div>
                 <div class="card-body">
                     <div class="status-bars">
@@ -289,10 +348,10 @@
                                 </span>
                                 <span class="font-semibold">{{ sb.total|floatformat:2 }} DH</span>
                             </div>
-                            {% if month_stats.revenue %}
+                            {% if period_stats.revenue %}
                             <div class="status-bar-track">
                                 <div class="status-bar-fill {% if sb.status == 'paid' %}fill-success{% elif sb.status == 'partial' %}fill-warning{% elif sb.status == 'unpaid' %}fill-error{% else %}fill-neutral{% endif %}"
-                                     style="width: {% widthratio sb.total month_stats.revenue 100 %}%"></div>
+                                     style="width: {% widthratio sb.total period_stats.revenue 100 %}%"></div>
                             </div>
                             {% endif %}
                         </div>
@@ -324,11 +383,11 @@
         </div>
     </div>
 
-    <!-- ============ TOP INVOICES THIS MONTH ============ -->
+    <!-- ============ TOP INVOICES ============ -->
     <div class="dash-section">
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-trophy mr-2"></i> Top Factures du Mois</h3>
+                <h3><i class="fas fa-trophy mr-2"></i> Top Factures</h3>
             </div>
             <div class="card-body" style="padding: 0;">
                 {% if recent_large %}
@@ -365,7 +424,7 @@
                 {% else %}
                     <div class="empty-state-sm">
                         <i class="fas fa-file-invoice"></i>
-                        <p>Aucune facture ce mois</p>
+                        <p>Aucune facture</p>
                     </div>
                 {% endif %}
             </div>
@@ -378,6 +437,29 @@
         display: flex;
         flex-direction: column;
         gap: var(--space-6);
+    }
+
+    /* Filter card */
+    .filter-card {
+        padding: var(--space-4) var(--space-5);
+    }
+
+    .dash-filter-form {
+        display: flex;
+        gap: var(--space-4);
+        align-items: flex-end;
+    }
+
+    .dash-filter-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: var(--space-4);
+        flex: 1;
+    }
+
+    .dash-filter-actions {
+        display: flex;
+        gap: var(--space-2);
     }
 
     .dash-section-title {
@@ -654,6 +736,7 @@
         .kpi-grid-5 { grid-template-columns: repeat(3, 1fr); }
         .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); }
         .dash-grid-2 { grid-template-columns: 1fr; }
+        .dash-filter-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
     @media (max-width: 768px) {
@@ -679,10 +762,33 @@
             align-items: flex-end;
             gap: var(--space-1);
         }
+        .dash-filter-form {
+            flex-direction: column;
+        }
+        .dash-filter-grid {
+            grid-template-columns: 1fr 1fr;
+            width: 100%;
+        }
+        .dash-filter-actions {
+            width: 100%;
+        }
+        .dash-filter-actions .btn {
+            flex: 1;
+        }
     }
 </style>
 
 <script>
+    // Toggle date fields based on period selection
+    function toggleDateFields(value) {
+        const dateFields = document.querySelectorAll('.date-field');
+        if (value === 'custom') {
+            dateFields.forEach(f => f.style.display = 'block');
+        } else {
+            dateFields.forEach(f => f.style.display = 'none');
+        }
+    }
+
     // Animate chart bars on load
     document.addEventListener('DOMContentLoaded', function() {
         const bars = document.querySelectorAll('.chart-bar');

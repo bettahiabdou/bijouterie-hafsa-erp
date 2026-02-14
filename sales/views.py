@@ -23,48 +23,137 @@ from settings_app.models import PaymentMethod, BankAccount
 @login_required(login_url='login')
 def sales_dashboard(request):
     """Sales dashboard with KPIs, seller performance, and delivery tracking"""
-    from django.db.models import Avg, Min, Max
-    from django.db.models.functions import TruncDate, TruncMonth
+    from django.db.models import Avg, Min, Max, Subquery, OuterRef, Value, Case, When, DecimalField as DjDecimalField
+    from django.db.models.functions import TruncDate, TruncMonth, Coalesce
     from django.contrib.auth import get_user_model
+    from payments.models import ClientPayment
+    from .models import Delivery
+    from datetime import timedelta
     User = get_user_model()
 
     today = timezone.now().date()
     current_month_start = today.replace(day=1)
 
+    # ============ FILTERS ============
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    seller_filter = request.GET.get('seller', '')
+    period_filter = request.GET.get('period', 'month')  # today, month, all
+
     # Base queryset - exclude deleted and returned
     base_qs = SaleInvoice.objects.filter(is_deleted=False).exclude(status='returned')
 
-    # ============ GLOBAL KPIs ============
-    # Today
-    today_stats = base_qs.filter(date=today).aggregate(
+    # Apply date filters
+    if date_from:
+        base_qs = base_qs.filter(date__gte=date_from)
+    elif period_filter == 'today':
+        base_qs = base_qs.filter(date=today)
+    elif period_filter == 'month':
+        base_qs = base_qs.filter(date__gte=current_month_start)
+    # 'all' = no date filter
+
+    if date_to:
+        base_qs = base_qs.filter(date__lte=date_to)
+
+    # Apply seller filter
+    if seller_filter:
+        base_qs = base_qs.filter(seller_id=seller_filter)
+
+    # ============ CALCULATE REAL "ENCAISSE" ============
+    # "Encaissé" = actually received money = all ClientPayments EXCEPT
+    # AMANA payments where delivery is NOT yet "delivered"
+    #
+    # Logic: For each invoice, sum its ClientPayment amounts, but exclude
+    # payments where payment_method name contains 'amana' AND the invoice
+    # delivery status is NOT 'delivered'
+
+    # Get all AMANA payment method IDs
+    amana_method_ids = list(
+        PaymentMethod.objects.filter(name__icontains='amana').values_list('id', flat=True)
+    )
+
+    # Total revenue from filtered invoices
+    filtered_stats = base_qs.aggregate(
         revenue=Sum('total_amount'),
-        paid=Sum('amount_paid'),
         count=Count('id'),
         weight=Sum('items__product__gross_weight'),
     )
 
-    # This month
-    month_stats = base_qs.filter(date__gte=current_month_start).aggregate(
-        revenue=Sum('total_amount'),
-        paid=Sum('amount_paid'),
-        balance=Sum('balance_due'),
-        count=Count('id'),
-        weight=Sum('items__product__gross_weight'),
-    )
+    # Get all ClientPayments linked to our filtered invoices
+    filtered_invoice_ids = base_qs.values_list('id', flat=True)
 
-    # All time
-    total_stats = base_qs.aggregate(
+    # Actually collected: all payments minus AMANA payments on undelivered invoices
+    all_payments_total = ClientPayment.objects.filter(
+        sale_invoice_id__in=filtered_invoice_ids
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    # AMANA payments on invoices NOT yet delivered (= money not received)
+    amana_not_received = Decimal('0')
+    if amana_method_ids:
+        amana_not_received = ClientPayment.objects.filter(
+            sale_invoice_id__in=filtered_invoice_ids,
+            payment_method_id__in=amana_method_ids,
+        ).exclude(
+            sale_invoice__delivery__status='delivered'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    real_encaisse = all_payments_total - amana_not_received
+
+    # ============ TODAY KPIs (always unfiltered by period) ============
+    today_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(status='returned')
+    if seller_filter:
+        today_base = today_base.filter(seller_id=seller_filter)
+
+    today_stats_raw = today_base.aggregate(
         revenue=Sum('total_amount'),
-        paid=Sum('amount_paid'),
-        balance=Sum('balance_due'),
         count=Count('id'),
         weight=Sum('items__product__gross_weight'),
     )
+    today_invoice_ids = today_base.values_list('id', flat=True)
+    today_all_payments = ClientPayment.objects.filter(
+        sale_invoice_id__in=today_invoice_ids
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    today_amana_pending = Decimal('0')
+    if amana_method_ids:
+        today_amana_pending = ClientPayment.objects.filter(
+            sale_invoice_id__in=today_invoice_ids,
+            payment_method_id__in=amana_method_ids,
+        ).exclude(
+            sale_invoice__delivery__status='delivered'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    today_encaisse = today_all_payments - today_amana_pending
+
+    # ============ AMANA PENDING PAYMENTS (always global, unfiltered) ============
+    # Invoices that have AMANA payments but delivery NOT delivered
+    amana_pending_invoices = SaleInvoice.objects.filter(
+        is_deleted=False,
+    ).exclude(status='returned').filter(
+        delivery_method_type='amana',
+    ).exclude(
+        delivery__status='delivered'
+    ).select_related('client', 'seller', 'delivery').order_by('-date')
+
+    # Calculate pending AMANA amounts per invoice
+    amana_pending_list = []
+    amana_pending_total = Decimal('0')
+    for inv in amana_pending_invoices[:30]:
+        # Get AMANA payment amount for this invoice
+        inv_amana_amount = Decimal('0')
+        if amana_method_ids:
+            inv_amana_amount = ClientPayment.objects.filter(
+                sale_invoice=inv,
+                payment_method_id__in=amana_method_ids,
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        if inv_amana_amount > 0:
+            amana_pending_list.append({
+                'invoice': inv,
+                'amana_amount': inv_amana_amount,
+            })
+            amana_pending_total += inv_amana_amount
 
     # ============ PAYMENT STATUS BREAKDOWN ============
     status_breakdown = list(
-        base_qs.filter(date__gte=current_month_start)
-        .values('status')
+        base_qs.values('status')
         .annotate(
             count=Count('id'),
             total=Sum('total_amount'),
@@ -73,29 +162,9 @@ def sales_dashboard(request):
         .order_by('status')
     )
 
-    # ============ AMANA / DELIVERY PENDING PAYMENTS ============
-    from .models import Delivery
-    amana_pending = (
-        base_qs.filter(
-            delivery_method_type='amana',
-        )
-        .exclude(delivery__status='delivered')
-        .filter(balance_due__gt=0)
-        .select_related('client', 'seller', 'delivery')
-        .order_by('-date')[:20]
-    )
-
-    amana_pending_stats = base_qs.filter(
-        delivery_method_type='amana',
-    ).exclude(delivery__status='delivered').filter(balance_due__gt=0).aggregate(
-        total_pending=Sum('balance_due'),
-        count=Count('id'),
-    )
-
-    # ============ SELLER PERFORMANCE ============
+    # ============ SELLER PERFORMANCE (for filtered period) ============
     seller_stats = list(
-        base_qs.filter(date__gte=current_month_start)
-        .values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
+        base_qs.values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
         .annotate(
             count=Count('id'),
             revenue=Sum('total_amount'),
@@ -106,9 +175,10 @@ def sales_dashboard(request):
         .order_by('-revenue')
     )
 
-    # Seller stats today
+    # Seller stats today (always show today regardless of filter)
+    today_seller_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(status='returned')
     seller_stats_today = list(
-        base_qs.filter(date=today)
+        today_seller_base
         .values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
         .annotate(
             count=Count('id'),
@@ -119,10 +189,12 @@ def sales_dashboard(request):
     )
 
     # ============ DAILY REVENUE (last 30 days) ============
-    from datetime import timedelta
     thirty_days_ago = today - timedelta(days=30)
+    daily_base = SaleInvoice.objects.filter(is_deleted=False, date__gte=thirty_days_ago).exclude(status='returned')
+    if seller_filter:
+        daily_base = daily_base.filter(seller_id=seller_filter)
     daily_revenue = list(
-        base_qs.filter(date__gte=thirty_days_ago)
+        daily_base
         .annotate(day=TruncDate('date'))
         .values('day')
         .annotate(
@@ -142,41 +214,51 @@ def sales_dashboard(request):
         .order_by('status')
     )
 
-    # ============ RECENT LARGE INVOICES ============
+    # ============ TOP INVOICES ============
     recent_large = (
-        base_qs.filter(date__gte=current_month_start)
-        .select_related('client', 'seller')
+        base_qs.select_related('client', 'seller')
         .order_by('-total_amount')[:10]
     )
 
+    # ============ SELLERS LIST FOR FILTER ============
+    sellers = User.objects.filter(
+        sales__isnull=False
+    ).distinct().order_by('first_name', 'last_name')
+
+    # Filter display info
+    filter_revenue = filtered_stats['revenue'] or Decimal('0')
+    filter_balance = filter_revenue - real_encaisse - amana_not_received
+    if filter_balance < 0:
+        filter_balance = Decimal('0')
+
     context = {
         'today': today,
+        # Filters
+        'date_from': date_from,
+        'date_to': date_to,
+        'seller_filter': seller_filter,
+        'period_filter': period_filter,
+        'sellers': sellers,
+        # Today stats (always today)
         'today_stats': {
-            'revenue': today_stats['revenue'] or Decimal('0'),
-            'paid': today_stats['paid'] or Decimal('0'),
-            'count': today_stats['count'] or 0,
-            'weight': today_stats['weight'] or Decimal('0'),
+            'revenue': today_stats_raw['revenue'] or Decimal('0'),
+            'encaisse': today_encaisse,
+            'amana_pending': today_amana_pending,
+            'count': today_stats_raw['count'] or 0,
+            'weight': today_stats_raw['weight'] or Decimal('0'),
         },
-        'month_stats': {
-            'revenue': month_stats['revenue'] or Decimal('0'),
-            'paid': month_stats['paid'] or Decimal('0'),
-            'balance': month_stats['balance'] or Decimal('0'),
-            'count': month_stats['count'] or 0,
-            'weight': month_stats['weight'] or Decimal('0'),
-        },
-        'total_stats': {
-            'revenue': total_stats['revenue'] or Decimal('0'),
-            'paid': total_stats['paid'] or Decimal('0'),
-            'balance': total_stats['balance'] or Decimal('0'),
-            'count': total_stats['count'] or 0,
-            'weight': total_stats['weight'] or Decimal('0'),
+        # Filtered period stats
+        'period_stats': {
+            'revenue': filter_revenue,
+            'encaisse': real_encaisse,
+            'amana_pending': amana_not_received,
+            'count': filtered_stats['count'] or 0,
+            'weight': filtered_stats['weight'] or Decimal('0'),
         },
         'status_breakdown': status_breakdown,
-        'amana_pending': amana_pending,
-        'amana_pending_stats': {
-            'total_pending': amana_pending_stats['total_pending'] or Decimal('0'),
-            'count': amana_pending_stats['count'] or 0,
-        },
+        'amana_pending_list': amana_pending_list,
+        'amana_pending_total': amana_pending_total,
+        'amana_pending_count': len(amana_pending_list),
         'seller_stats': seller_stats,
         'seller_stats_today': seller_stats_today,
         'daily_revenue': daily_revenue,
