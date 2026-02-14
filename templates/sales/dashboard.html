@@ -1,0 +1,708 @@
+{% extends 'base.html' %}
+
+{% block title %}Tableau de Bord Ventes - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Tableau de Bord</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Tableau de Bord Ventes</h1>
+                <p class="page-subtitle">{{ today|date:"l d F Y" }}</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:invoice_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>Nouvelle Vente</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+
+    <!-- ============ TODAY KPIs ============ -->
+    <div class="dash-section">
+        <h2 class="dash-section-title"><i class="fas fa-calendar-day"></i> Aujourd'hui</h2>
+        <div class="kpi-grid kpi-grid-4">
+            <div class="kpi-card kpi-primary">
+                <div class="kpi-icon"><i class="fas fa-coins"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ today_stats.revenue|floatformat:2 }}</div>
+                    <div class="kpi-label">CA du Jour (DH)</div>
+                </div>
+            </div>
+            <div class="kpi-card kpi-success">
+                <div class="kpi-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ today_stats.paid|floatformat:2 }}</div>
+                    <div class="kpi-label">Encaisse (DH)</div>
+                </div>
+            </div>
+            <div class="kpi-card kpi-info">
+                <div class="kpi-icon"><i class="fas fa-file-invoice"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ today_stats.count }}</div>
+                    <div class="kpi-label">Factures</div>
+                </div>
+            </div>
+            <div class="kpi-card kpi-warning">
+                <div class="kpi-icon"><i class="fas fa-weight-hanging"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ today_stats.weight|floatformat:2 }}</div>
+                    <div class="kpi-label">Grammes Vendus</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MONTH KPIs ============ -->
+    <div class="dash-section">
+        <h2 class="dash-section-title"><i class="fas fa-calendar-alt"></i> Ce Mois</h2>
+        <div class="kpi-grid kpi-grid-5">
+            <div class="kpi-card kpi-primary">
+                <div class="kpi-icon"><i class="fas fa-chart-line"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ month_stats.revenue|floatformat:2 }}</div>
+                    <div class="kpi-label">CA du Mois (DH)</div>
+                </div>
+            </div>
+            <div class="kpi-card kpi-success">
+                <div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ month_stats.paid|floatformat:2 }}</div>
+                    <div class="kpi-label">Encaisse (DH)</div>
+                </div>
+            </div>
+            <div class="kpi-card kpi-error">
+                <div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ month_stats.balance|floatformat:2 }}</div>
+                    <div class="kpi-label">Solde Restant (DH)</div>
+                </div>
+            </div>
+            <div class="kpi-card kpi-info">
+                <div class="kpi-icon"><i class="fas fa-receipt"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ month_stats.count }}</div>
+                    <div class="kpi-label">Factures</div>
+                </div>
+            </div>
+            <div class="kpi-card kpi-warning">
+                <div class="kpi-icon"><i class="fas fa-balance-scale"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ month_stats.weight|floatformat:2 }}</div>
+                    <div class="kpi-label">Grammes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ TWO COLUMN LAYOUT ============ -->
+    <div class="dash-grid-2">
+
+        <!-- LEFT: Seller Performance -->
+        <div class="dash-section">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-user-tie mr-2"></i> Performance Vendeurs (Ce Mois)</h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    {% if seller_stats %}
+                    <div class="table-wrapper" style="border: none; border-radius: 0;">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Vendeur</th>
+                                    <th>Ventes</th>
+                                    <th>CA (DH)</th>
+                                    <th>Encaisse</th>
+                                    <th>Grammes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in seller_stats %}
+                                <tr>
+                                    <td class="font-semibold">
+                                        {% if s.seller__first_name %}{{ s.seller__first_name }} {{ s.seller__last_name }}{% else %}{{ s.seller__username }}{% endif %}
+                                    </td>
+                                    <td>{{ s.count }}</td>
+                                    <td class="font-semibold text-primary">{{ s.revenue|floatformat:2 }}</td>
+                                    <td class="text-success">{{ s.paid|floatformat:2 }}</td>
+                                    <td>{{ s.weight|floatformat:2|default:"0.00" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                        <div class="empty-state-sm">
+                            <i class="fas fa-users"></i>
+                            <p>Aucune vente ce mois</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Seller today -->
+            {% if seller_stats_today %}
+            <div class="card" style="margin-top: var(--space-4);">
+                <div class="card-header">
+                    <h3><i class="fas fa-star mr-2"></i> Vendeurs Aujourd'hui</h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-wrapper" style="border: none; border-radius: 0;">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Vendeur</th>
+                                    <th>Ventes</th>
+                                    <th>CA (DH)</th>
+                                    <th>Grammes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in seller_stats_today %}
+                                <tr>
+                                    <td class="font-semibold">
+                                        {% if s.seller__first_name %}{{ s.seller__first_name }} {{ s.seller__last_name }}{% else %}{{ s.seller__username }}{% endif %}
+                                    </td>
+                                    <td>{{ s.count }}</td>
+                                    <td class="font-semibold text-primary">{{ s.revenue|floatformat:2 }}</td>
+                                    <td>{{ s.weight|floatformat:2|default:"0.00" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- RIGHT: AMANA Pending + Delivery Stats -->
+        <div class="dash-section">
+            <!-- AMANA Pending Alert -->
+            <div class="card amana-alert-card">
+                <div class="card-header" style="background: var(--warning-50); border-bottom-color: var(--warning-200);">
+                    <h3 style="color: var(--warning-700);">
+                        <i class="fas fa-box mr-2"></i> AMANA - En Attente de Paiement
+                    </h3>
+                    <div class="amana-summary">
+                        <span class="badge badge-warning" style="font-size: var(--text-sm);">
+                            {{ amana_pending_stats.count }} colis
+                        </span>
+                        <span class="font-bold" style="color: var(--warning-700); font-size: var(--text-lg);">
+                            {{ amana_pending_stats.total_pending|floatformat:2 }} DH
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body" style="padding: 0; max-height: 350px; overflow-y: auto;">
+                    {% if amana_pending %}
+                        {% for inv in amana_pending %}
+                        <div class="amana-item" onclick="window.location='{% url 'sales:invoice_detail' inv.reference %}'">
+                            <div class="amana-item-main">
+                                <span class="amana-ref">{{ inv.reference }}</span>
+                                <span class="amana-amount text-error font-semibold">{{ inv.balance_due|floatformat:2 }} DH</span>
+                            </div>
+                            <div class="amana-item-sub">
+                                <span>
+                                    <i class="fas fa-user"></i>
+                                    {% if inv.client %}{{ inv.client.first_name }} {{ inv.client.last_name }}{% else %}Anonyme{% endif %}
+                                </span>
+                                <span>
+                                    <i class="fas fa-user-tie"></i>
+                                    {{ inv.seller.get_full_name|default:inv.seller.username }}
+                                </span>
+                                <span>
+                                    <i class="fas fa-calendar"></i>
+                                    {{ inv.date|date:"d/m" }}
+                                </span>
+                                {% if inv.delivery %}
+                                <span class="badge {% if inv.delivery.status == 'in_transit' %}badge-info{% elif inv.delivery.status == 'to_pickup' %}badge-warning{% else %}badge-neutral{% endif %}" style="font-size: 10px;">
+                                    {{ inv.delivery.get_status_display }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state-sm">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <p>Aucun colis AMANA en attente</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Delivery Status Overview -->
+            <div class="card" style="margin-top: var(--space-4);">
+                <div class="card-header">
+                    <h3><i class="fas fa-truck mr-2"></i> Statut Livraisons</h3>
+                </div>
+                <div class="card-body">
+                    <div class="delivery-status-grid">
+                        {% for ds in delivery_stats %}
+                        <div class="delivery-stat-card {% if ds.status == 'delivered' %}ds-success{% elif ds.status == 'in_transit' %}ds-info{% elif ds.status == 'returned' %}ds-error{% elif ds.status == 'to_pickup' %}ds-warning{% else %}ds-neutral{% endif %}">
+                            <div class="ds-count">{{ ds.count }}</div>
+                            <div class="ds-label">
+                                {% if ds.status == 'pending' %}En attente
+                                {% elif ds.status == 'in_transit' %}En transit
+                                {% elif ds.status == 'to_pickup' %}A recuperer
+                                {% elif ds.status == 'delivered' %}Livre
+                                {% elif ds.status == 'returned' %}Retourne
+                                {% else %}{{ ds.status }}
+                                {% endif %}
+                            </div>
+                            {% if ds.total %}
+                            <div class="ds-amount">{{ ds.total|floatformat:0 }} DH</div>
+                            {% endif %}
+                        </div>
+                        {% empty %}
+                        <div class="empty-state-sm" style="grid-column: span 3;">
+                            <p>Aucune livraison</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Status Breakdown (This Month) -->
+            <div class="card" style="margin-top: var(--space-4);">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-pie mr-2"></i> Statut Paiements (Ce Mois)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-bars">
+                        {% for sb in status_breakdown %}
+                        <div class="status-bar-item">
+                            <div class="status-bar-header">
+                                <span class="badge {% if sb.status == 'paid' %}badge-success{% elif sb.status == 'partial' %}badge-warning{% elif sb.status == 'unpaid' %}badge-error{% elif sb.status == 'draft' %}badge-neutral{% else %}badge-neutral{% endif %}">
+                                    {{ sb.count }}x
+                                    {% if sb.status == 'paid' %}Payee{% elif sb.status == 'partial' %}Partielle{% elif sb.status == 'unpaid' %}Non payee{% elif sb.status == 'draft' %}Brouillon{% elif sb.status == 'cancelled' %}Annulee{% elif sb.status == 'exchanged' %}Echangee{% else %}{{ sb.status }}{% endif %}
+                                </span>
+                                <span class="font-semibold">{{ sb.total|floatformat:2 }} DH</span>
+                            </div>
+                            {% if month_stats.revenue %}
+                            <div class="status-bar-track">
+                                <div class="status-bar-fill {% if sb.status == 'paid' %}fill-success{% elif sb.status == 'partial' %}fill-warning{% elif sb.status == 'unpaid' %}fill-error{% else %}fill-neutral{% endif %}"
+                                     style="width: {% widthratio sb.total month_stats.revenue 100 %}%"></div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ REVENUE CHART (last 30 days) ============ -->
+    <div class="dash-section">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-chart-bar mr-2"></i> CA Journalier (30 derniers jours)</h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" id="revenue-chart">
+                    <div class="chart-bars">
+                        {% for d in daily_revenue %}
+                        <div class="chart-bar-wrapper" title="{{ d.day|date:'d/m/Y' }}: {{ d.revenue|floatformat:2 }} DH ({{ d.count }} factures)">
+                            <div class="chart-bar" data-revenue="{{ d.revenue }}" style="height: 0%;"></div>
+                            <div class="chart-label">{{ d.day|date:"d" }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ TOP INVOICES THIS MONTH ============ -->
+    <div class="dash-section">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-trophy mr-2"></i> Top Factures du Mois</h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                {% if recent_large %}
+                <div class="table-wrapper" style="border: none; border-radius: 0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Reference</th>
+                                <th>Vendeur</th>
+                                <th>Client</th>
+                                <th>Montant</th>
+                                <th>Statut</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inv in recent_large %}
+                            <tr style="cursor: pointer;" onclick="window.location='{% url 'sales:invoice_detail' inv.reference %}'">
+                                <td><span class="font-semibold text-primary">{{ inv.reference }}</span></td>
+                                <td>{{ inv.seller.get_full_name|default:inv.seller.username }}</td>
+                                <td>{% if inv.client %}{{ inv.client.first_name }} {{ inv.client.last_name }}{% else %}<span class="text-muted">Anonyme</span>{% endif %}</td>
+                                <td class="font-bold">{{ inv.total_amount|floatformat:2 }} DH</td>
+                                <td>
+                                    <span class="badge {% if inv.status == 'paid' %}badge-success{% elif inv.status == 'partial' %}badge-warning{% elif inv.status == 'unpaid' %}badge-error{% else %}badge-neutral{% endif %}">
+                                        {{ inv.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="text-muted">{{ inv.date|date:"d/m/Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    <div class="empty-state-sm">
+                        <i class="fas fa-file-invoice"></i>
+                        <p>Aucune facture ce mois</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dashboard-container {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-6);
+    }
+
+    .dash-section-title {
+        font-size: var(--text-lg);
+        font-weight: var(--font-bold);
+        color: var(--neutral-700);
+        margin-bottom: var(--space-4);
+    }
+
+    .dash-section-title i {
+        color: var(--primary-500);
+        margin-right: var(--space-2);
+    }
+
+    /* KPI Cards */
+    .kpi-grid {
+        display: grid;
+        gap: var(--space-4);
+    }
+
+    .kpi-grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .kpi-grid-5 { grid-template-columns: repeat(5, 1fr); }
+
+    .kpi-card {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: var(--space-4) var(--space-5);
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--neutral-100);
+        transition: all 0.2s;
+    }
+
+    .kpi-card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+    }
+
+    .kpi-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--text-xl);
+        flex-shrink: 0;
+    }
+
+    .kpi-primary .kpi-icon { background: var(--primary-100); color: var(--primary-600); }
+    .kpi-success .kpi-icon { background: var(--success-100); color: var(--success-600); }
+    .kpi-warning .kpi-icon { background: var(--warning-100); color: var(--warning-600); }
+    .kpi-error .kpi-icon { background: var(--error-100); color: var(--error-600); }
+    .kpi-info .kpi-icon { background: #dbeafe; color: #2563eb; }
+
+    .kpi-value {
+        font-size: var(--text-xl);
+        font-weight: var(--font-bold);
+        color: var(--neutral-800);
+        line-height: 1.2;
+    }
+
+    .kpi-label {
+        font-size: var(--text-xs);
+        color: var(--neutral-500);
+        margin-top: 2px;
+    }
+
+    /* Two column grid */
+    .dash-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-6);
+        align-items: start;
+    }
+
+    /* AMANA Alert Card */
+    .amana-alert-card {
+        border: 1px solid var(--warning-200);
+    }
+
+    .amana-summary {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+    }
+
+    .amana-item {
+        padding: var(--space-3) var(--space-4);
+        border-bottom: 1px solid var(--neutral-100);
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .amana-item:hover {
+        background: var(--primary-50);
+    }
+
+    .amana-item:last-child {
+        border-bottom: none;
+    }
+
+    .amana-item-main {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+
+    .amana-ref {
+        font-weight: var(--font-semibold);
+        font-size: var(--text-sm);
+        color: var(--primary-600);
+    }
+
+    .amana-amount {
+        font-size: var(--text-sm);
+    }
+
+    .amana-item-sub {
+        display: flex;
+        gap: var(--space-3);
+        font-size: var(--text-xs);
+        color: var(--neutral-500);
+        flex-wrap: wrap;
+    }
+
+    .amana-item-sub i {
+        margin-right: 3px;
+    }
+
+    /* Delivery Status Grid */
+    .delivery-status-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-3);
+    }
+
+    .delivery-stat-card {
+        text-align: center;
+        padding: var(--space-3);
+        border-radius: var(--radius-lg);
+        border: 1px solid;
+    }
+
+    .ds-success { background: var(--success-50); border-color: var(--success-200); }
+    .ds-info { background: #eff6ff; border-color: #bfdbfe; }
+    .ds-warning { background: var(--warning-50); border-color: var(--warning-200); }
+    .ds-error { background: var(--error-50); border-color: var(--error-200); }
+    .ds-neutral { background: var(--neutral-50); border-color: var(--neutral-200); }
+
+    .ds-count {
+        font-size: var(--text-2xl);
+        font-weight: var(--font-bold);
+        line-height: 1;
+    }
+
+    .ds-success .ds-count { color: var(--success-600); }
+    .ds-info .ds-count { color: #2563eb; }
+    .ds-warning .ds-count { color: var(--warning-600); }
+    .ds-error .ds-count { color: var(--error-600); }
+    .ds-neutral .ds-count { color: var(--neutral-600); }
+
+    .ds-label {
+        font-size: var(--text-xs);
+        color: var(--neutral-600);
+        margin-top: 4px;
+    }
+
+    .ds-amount {
+        font-size: var(--text-xs);
+        font-weight: var(--font-semibold);
+        color: var(--neutral-500);
+        margin-top: 2px;
+    }
+
+    /* Status Bars */
+    .status-bars {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .status-bar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+
+    .status-bar-track {
+        height: 8px;
+        background: var(--neutral-100);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .status-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.6s ease-out;
+    }
+
+    .fill-success { background: var(--success-500); }
+    .fill-warning { background: var(--warning-500); }
+    .fill-error { background: var(--error-500); }
+    .fill-neutral { background: var(--neutral-400); }
+
+    /* Chart */
+    .chart-container {
+        height: 200px;
+        overflow-x: auto;
+    }
+
+    .chart-bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 4px;
+        height: 100%;
+        min-width: max-content;
+        padding-bottom: 24px;
+        position: relative;
+    }
+
+    .chart-bar-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        min-width: 22px;
+        height: 100%;
+        justify-content: flex-end;
+    }
+
+    .chart-bar {
+        width: 100%;
+        max-width: 30px;
+        background: var(--primary-400);
+        border-radius: 4px 4px 0 0;
+        transition: height 0.5s ease-out, background 0.2s;
+        cursor: pointer;
+        min-height: 2px;
+    }
+
+    .chart-bar:hover {
+        background: var(--primary-600);
+    }
+
+    .chart-label {
+        font-size: 10px;
+        color: var(--neutral-400);
+        margin-top: 4px;
+        position: absolute;
+        bottom: 0;
+    }
+
+    /* Empty state small */
+    .empty-state-sm {
+        padding: var(--space-6);
+        text-align: center;
+        color: var(--neutral-400);
+    }
+
+    .empty-state-sm i {
+        font-size: 1.5rem;
+        margin-bottom: var(--space-2);
+        display: block;
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+        .kpi-grid-5 { grid-template-columns: repeat(3, 1fr); }
+        .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); }
+        .dash-grid-2 { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 768px) {
+        .kpi-grid-5,
+        .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); }
+        .kpi-card {
+            padding: var(--space-3);
+            gap: var(--space-3);
+        }
+        .kpi-icon {
+            width: 40px;
+            height: 40px;
+            font-size: var(--text-base);
+        }
+        .kpi-value {
+            font-size: var(--text-base);
+        }
+        .delivery-status-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .amana-summary {
+            flex-direction: column;
+            align-items: flex-end;
+            gap: var(--space-1);
+        }
+    }
+</style>
+
+<script>
+    // Animate chart bars on load
+    document.addEventListener('DOMContentLoaded', function() {
+        const bars = document.querySelectorAll('.chart-bar');
+        if (bars.length === 0) return;
+
+        // Find max revenue for scaling
+        let maxRevenue = 0;
+        bars.forEach(bar => {
+            const rev = parseFloat(bar.dataset.revenue) || 0;
+            if (rev > maxRevenue) maxRevenue = rev;
+        });
+
+        // Animate bars with slight delay
+        setTimeout(() => {
+            bars.forEach(bar => {
+                const rev = parseFloat(bar.dataset.revenue) || 0;
+                const pct = maxRevenue > 0 ? (rev / maxRevenue * 85) + 5 : 5;
+                bar.style.height = pct + '%';
+            });
+        }, 100);
+    });
+</script>
+{% endblock %}

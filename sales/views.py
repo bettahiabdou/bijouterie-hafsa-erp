@@ -21,6 +21,173 @@ from settings_app.models import PaymentMethod, BankAccount
 
 
 @login_required(login_url='login')
+def sales_dashboard(request):
+    """Sales dashboard with KPIs, seller performance, and delivery tracking"""
+    from django.db.models import Avg, Min, Max
+    from django.db.models.functions import TruncDate, TruncMonth
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    today = timezone.now().date()
+    current_month_start = today.replace(day=1)
+
+    # Base queryset - exclude deleted and returned
+    base_qs = SaleInvoice.objects.filter(is_deleted=False).exclude(status='returned')
+
+    # ============ GLOBAL KPIs ============
+    # Today
+    today_stats = base_qs.filter(date=today).aggregate(
+        revenue=Sum('total_amount'),
+        paid=Sum('amount_paid'),
+        count=Count('id'),
+        weight=Sum('items__product__gross_weight'),
+    )
+
+    # This month
+    month_stats = base_qs.filter(date__gte=current_month_start).aggregate(
+        revenue=Sum('total_amount'),
+        paid=Sum('amount_paid'),
+        balance=Sum('balance_due'),
+        count=Count('id'),
+        weight=Sum('items__product__gross_weight'),
+    )
+
+    # All time
+    total_stats = base_qs.aggregate(
+        revenue=Sum('total_amount'),
+        paid=Sum('amount_paid'),
+        balance=Sum('balance_due'),
+        count=Count('id'),
+        weight=Sum('items__product__gross_weight'),
+    )
+
+    # ============ PAYMENT STATUS BREAKDOWN ============
+    status_breakdown = list(
+        base_qs.filter(date__gte=current_month_start)
+        .values('status')
+        .annotate(
+            count=Count('id'),
+            total=Sum('total_amount'),
+            paid=Sum('amount_paid'),
+        )
+        .order_by('status')
+    )
+
+    # ============ AMANA / DELIVERY PENDING PAYMENTS ============
+    from .models import Delivery
+    amana_pending = (
+        base_qs.filter(
+            delivery_method_type='amana',
+        )
+        .exclude(delivery__status='delivered')
+        .filter(balance_due__gt=0)
+        .select_related('client', 'seller', 'delivery')
+        .order_by('-date')[:20]
+    )
+
+    amana_pending_stats = base_qs.filter(
+        delivery_method_type='amana',
+    ).exclude(delivery__status='delivered').filter(balance_due__gt=0).aggregate(
+        total_pending=Sum('balance_due'),
+        count=Count('id'),
+    )
+
+    # ============ SELLER PERFORMANCE ============
+    seller_stats = list(
+        base_qs.filter(date__gte=current_month_start)
+        .values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
+        .annotate(
+            count=Count('id'),
+            revenue=Sum('total_amount'),
+            paid=Sum('amount_paid'),
+            balance=Sum('balance_due'),
+            weight=Sum('items__product__gross_weight'),
+        )
+        .order_by('-revenue')
+    )
+
+    # Seller stats today
+    seller_stats_today = list(
+        base_qs.filter(date=today)
+        .values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
+        .annotate(
+            count=Count('id'),
+            revenue=Sum('total_amount'),
+            weight=Sum('items__product__gross_weight'),
+        )
+        .order_by('-revenue')
+    )
+
+    # ============ DAILY REVENUE (last 30 days) ============
+    from datetime import timedelta
+    thirty_days_ago = today - timedelta(days=30)
+    daily_revenue = list(
+        base_qs.filter(date__gte=thirty_days_ago)
+        .annotate(day=TruncDate('date'))
+        .values('day')
+        .annotate(
+            revenue=Sum('total_amount'),
+            count=Count('id'),
+        )
+        .order_by('day')
+    )
+
+    # ============ DELIVERY STATUS OVERVIEW ============
+    delivery_stats = list(
+        Delivery.objects.values('status')
+        .annotate(
+            count=Count('id'),
+            total=Sum('total_amount'),
+        )
+        .order_by('status')
+    )
+
+    # ============ RECENT LARGE INVOICES ============
+    recent_large = (
+        base_qs.filter(date__gte=current_month_start)
+        .select_related('client', 'seller')
+        .order_by('-total_amount')[:10]
+    )
+
+    context = {
+        'today': today,
+        'today_stats': {
+            'revenue': today_stats['revenue'] or Decimal('0'),
+            'paid': today_stats['paid'] or Decimal('0'),
+            'count': today_stats['count'] or 0,
+            'weight': today_stats['weight'] or Decimal('0'),
+        },
+        'month_stats': {
+            'revenue': month_stats['revenue'] or Decimal('0'),
+            'paid': month_stats['paid'] or Decimal('0'),
+            'balance': month_stats['balance'] or Decimal('0'),
+            'count': month_stats['count'] or 0,
+            'weight': month_stats['weight'] or Decimal('0'),
+        },
+        'total_stats': {
+            'revenue': total_stats['revenue'] or Decimal('0'),
+            'paid': total_stats['paid'] or Decimal('0'),
+            'balance': total_stats['balance'] or Decimal('0'),
+            'count': total_stats['count'] or 0,
+            'weight': total_stats['weight'] or Decimal('0'),
+        },
+        'status_breakdown': status_breakdown,
+        'amana_pending': amana_pending,
+        'amana_pending_stats': {
+            'total_pending': amana_pending_stats['total_pending'] or Decimal('0'),
+            'count': amana_pending_stats['count'] or 0,
+        },
+        'seller_stats': seller_stats,
+        'seller_stats_today': seller_stats_today,
+        'daily_revenue': daily_revenue,
+        'delivery_stats': delivery_stats,
+        'recent_large': recent_large,
+    }
+
+    return render(request, 'sales/dashboard.html', context)
+
+
+@login_required(login_url='login')
 def invoice_list(request):
     """List all sales invoices with filtering and search"""
     today = timezone.now().date()
