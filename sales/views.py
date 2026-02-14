@@ -2069,100 +2069,68 @@ def pending_invoice_complete(request, reference):
                 # Calculate totals first
                 invoice.calculate_totals()
 
-                # Handle hybrid payments (payment 1 + payment 2)
+                # Handle dynamic payments (N payments)
                 from payments.models import ClientPayment
+                from datetime import datetime
 
                 total_amount_paid = Decimal('0')
                 payment_details = []
 
-                # Payment 1
-                amount_paid_1_str = request.POST.get('amount_paid', '0')
-                payment_method_id_1 = request.POST.get('payment_method', '')
-                payment_ref_1 = request.POST.get('payment_reference', '').strip()
-                bank_account_id_1 = request.POST.get('bank_account', '')
-                payment_date_1_str = request.POST.get('payment_date', '')
+                # Find all payment sections by scanning POST keys
+                # Payment fields are named: payment_method_1, payment_method_2, etc.
+                payment_indices = set()
+                for key in request.POST:
+                    if key.startswith('payment_method_'):
+                        try:
+                            idx = int(key.split('_')[-1])
+                            payment_indices.add(idx)
+                        except (ValueError, IndexError):
+                            pass
 
-                # Parse payment date 1
-                from datetime import datetime
-                if payment_date_1_str:
+                # Process each payment
+                for idx in sorted(payment_indices):
+                    amount_str = request.POST.get(f'amount_paid_{idx}', '0')
+                    method_id = request.POST.get(f'payment_method_{idx}', '')
+                    pay_ref = request.POST.get(f'payment_reference_{idx}', '').strip()
+                    bank_id = request.POST.get(f'bank_account_{idx}', '')
+                    date_str = request.POST.get(f'payment_date_{idx}', '')
+
+                    # Parse date
+                    if date_str:
+                        try:
+                            pay_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                        except ValueError:
+                            pay_date = timezone.now().date()
+                    else:
+                        pay_date = timezone.now().date()
+
+                    # Parse amount
                     try:
-                        payment_date_1 = datetime.strptime(payment_date_1_str, '%Y-%m-%d').date()
-                    except ValueError:
-                        payment_date_1 = timezone.now().date()
-                else:
-                    payment_date_1 = timezone.now().date()
+                        amount = Decimal(amount_str)
+                    except (InvalidOperation, TypeError):
+                        amount = Decimal('0')
 
-                try:
-                    amount_paid_1 = Decimal(amount_paid_1_str)
-                except (InvalidOperation, TypeError):
-                    amount_paid_1 = Decimal('0')
+                    if amount > 0 and method_id:
+                        total_amount_paid += amount
+                        try:
+                            pm = PaymentMethod.objects.get(id=method_id)
+                            payment_details.append({'method': pm.name, 'amount': amount})
 
-                if amount_paid_1 > 0 and payment_method_id_1:
-                    total_amount_paid += amount_paid_1
-                    try:
-                        pm1 = PaymentMethod.objects.get(id=payment_method_id_1)
-                        payment_details.append({'method': pm1.name, 'amount': amount_paid_1})
-
-                        # Create ClientPayment record (works for both clients and anonymous sales)
-                        if not payment_ref_1:
-                            payment_ref_1 = f"PAY-{invoice.reference}-1"
-                        ClientPayment.objects.create(
-                            reference=payment_ref_1,
-                            date=payment_date_1,
-                            payment_type=ClientPayment.PaymentType.INVOICE,
-                            client=invoice.client,  # Can be None for anonymous sales
-                            amount=amount_paid_1,
-                            payment_method=pm1,
-                            bank_account_id=bank_account_id_1 or None,
-                            sale_invoice=invoice,
-                            created_by=request.user
-                        )
-                    except PaymentMethod.DoesNotExist:
-                        pass
-
-                # Payment 2 (hybrid)
-                amount_paid_2_str = request.POST.get('amount_paid_2', '0')
-                payment_method_id_2 = request.POST.get('payment_method_2', '')
-                payment_ref_2 = request.POST.get('payment_reference_2', '').strip()
-                bank_account_id_2 = request.POST.get('bank_account_2', '')
-                payment_date_2_str = request.POST.get('payment_date_2', '')
-
-                # Parse payment date 2
-                if payment_date_2_str:
-                    try:
-                        payment_date_2 = datetime.strptime(payment_date_2_str, '%Y-%m-%d').date()
-                    except ValueError:
-                        payment_date_2 = timezone.now().date()
-                else:
-                    payment_date_2 = timezone.now().date()
-
-                try:
-                    amount_paid_2 = Decimal(amount_paid_2_str)
-                except (InvalidOperation, TypeError):
-                    amount_paid_2 = Decimal('0')
-
-                if amount_paid_2 > 0 and payment_method_id_2:
-                    total_amount_paid += amount_paid_2
-                    try:
-                        pm2 = PaymentMethod.objects.get(id=payment_method_id_2)
-                        payment_details.append({'method': pm2.name, 'amount': amount_paid_2})
-
-                        # Create ClientPayment record (works for both clients and anonymous sales)
-                        if not payment_ref_2:
-                            payment_ref_2 = f"PAY-{invoice.reference}-2"
-                        ClientPayment.objects.create(
-                            reference=payment_ref_2,
-                            date=payment_date_2,
-                            payment_type=ClientPayment.PaymentType.INVOICE,
-                            client=invoice.client,  # Can be None for anonymous sales
-                            amount=amount_paid_2,
-                            payment_method=pm2,
-                            bank_account_id=bank_account_id_2 or None,
-                            sale_invoice=invoice,
-                            created_by=request.user
-                        )
-                    except PaymentMethod.DoesNotExist:
-                        pass
+                            if not pay_ref:
+                                pay_ref = f"PAY-{invoice.reference}-{idx}"
+                            ClientPayment.objects.create(
+                                reference=pay_ref,
+                                date=pay_date,
+                                payment_type=ClientPayment.PaymentType.INVOICE,
+                                client=invoice.client,
+                                amount=amount,
+                                payment_method=pm,
+                                bank_account_id=bank_id or None,
+                                sale_invoice=invoice,
+                                created_by=request.user
+                            )
+                        except PaymentMethod.DoesNotExist:
+                            pass
 
                 # Set payment amounts and determine status based on total amount paid
                 invoice.amount_paid = total_amount_paid

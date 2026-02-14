@@ -246,98 +246,59 @@
                             </select>
                         </div>
 
-                        <!-- Payment 1 -->
-                        <div class="payment-section" style="border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3);">
-                            <h4 style="font-size: var(--text-sm); color: var(--primary-600); margin-bottom: var(--space-3);">
-                                <i class="fas fa-credit-card"></i> Paiement 1
-                            </h4>
-                            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
-                                <div class="form-group">
-                                    <label class="form-label">Mode de paiement</label>
-                                    <select name="payment_method" id="payment-method-select" class="form-select" onchange="updatePaymentFields()">
-                                        <option value="" data-name="">-- Sélectionner --</option>
-                                        {% for pm in payment_methods %}
-                                            <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                        <!-- Dynamic Payments Container -->
+                        <input type="hidden" name="payment_count" id="payment-count" value="1">
+                        <div id="payments-container">
+                            <!-- Payment 1 (always visible) -->
+                            <div class="payment-section" data-payment-index="1" style="border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3);">
+                                <div class="payment-section-header">
+                                    <h4 style="font-size: var(--text-sm); color: var(--primary-600); margin: 0;">
+                                        <i class="fas fa-credit-card"></i> Paiement 1
+                                    </h4>
+                                </div>
+                                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-3);">
+                                    <div class="form-group">
+                                        <label class="form-label">Mode de paiement</label>
+                                        <select name="payment_method_1" class="form-select payment-method-select" data-index="1" onchange="updatePaymentFieldsFor(1)">
+                                            <option value="" data-name="">-- Sélectionner --</option>
+                                            {% for pm in payment_methods %}
+                                                <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Date</label>
+                                        <input type="date" name="payment_date_1" class="form-input"
+                                               value="{% now 'Y-m-d' %}">
+                                    </div>
+                                </div>
+                                <div class="form-group reference-group" id="reference-group-1" style="display: none;">
+                                    <label class="form-label">Référence</label>
+                                    <input type="text" name="payment_reference_1" class="form-input" placeholder="N° chèque, transaction...">
+                                </div>
+                                <div class="form-group bank-account-group" id="bank-account-group-1" style="display: none;">
+                                    <label class="form-label">Compte bancaire</label>
+                                    <select name="bank_account_1" class="form-select">
+                                        <option value="">-- Sélectionner --</option>
+                                        {% for ba in bank_accounts %}
+                                            <option value="{{ ba.id }}">{{ ba.bank_name }}</option>
                                         {% endfor %}
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Date de paiement</label>
-                                    <input type="date" name="payment_date" id="payment-date" class="form-input"
-                                           value="{% now 'Y-m-d' %}">
+                                    <label class="form-label">Montant (DH)</label>
+                                    <input type="number" name="amount_paid_1" class="form-input payment-amount-input"
+                                           step="0.01" min="0" value="{{ invoice.total_amount|floatformat:2 }}"
+                                           oninput="updatePaymentStatus()">
                                 </div>
-                            </div>
-
-                            <!-- Reference field - hidden for Espèces -->
-                            <div class="form-group" id="reference-group" style="display: none;">
-                                <label class="form-label">Référence de paiement</label>
-                                <input type="text" name="payment_reference" id="payment-reference" class="form-input" placeholder="Numéro de chèque, transaction, etc.">
-                            </div>
-
-                            <!-- Bank account - only for Virement Bancaire -->
-                            <div class="form-group" id="bank-account-group" style="display: none;">
-                                <label class="form-label">Compte bancaire</label>
-                                <select name="bank_account" class="form-select">
-                                    <option value="">-- Sélectionner --</option>
-                                    {% for ba in bank_accounts %}
-                                        <option value="{{ ba.id }}">{{ ba.bank_name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-
-                            <!-- Amount Paid 1 -->
-                            <div class="form-group">
-                                <label class="form-label">Montant (DH)</label>
-                                <input type="number" name="amount_paid" id="amount-paid" class="form-input"
-                                       step="0.01" min="0" value="{{ invoice.total_amount|floatformat:2 }}"
-                                       oninput="updatePaymentStatus()">
                             </div>
                         </div>
 
-                        <!-- Payment 2 (Optional - Hybrid) -->
-                        <div class="payment-section" style="border: 1px dashed var(--neutral-300); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3);">
-                            <h4 style="font-size: var(--text-sm); color: var(--neutral-500); margin-bottom: var(--space-3);">
-                                <i class="fas fa-plus-circle"></i> Paiement 2 (optionnel)
-                            </h4>
-                            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
-                                <div class="form-group">
-                                    <label class="form-label">Mode de paiement 2</label>
-                                    <select name="payment_method_2" id="payment-method-select-2" class="form-select" onchange="updatePaymentFields2()">
-                                        <option value="" data-name="">-- Aucun --</option>
-                                        {% for pm in payment_methods %}
-                                            <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Date de paiement 2</label>
-                                    <input type="date" name="payment_date_2" id="payment-date-2" class="form-input"
-                                           value="{% now 'Y-m-d' %}">
-                                </div>
-                            </div>
-
-                            <div class="form-group" id="reference-group-2" style="display: none;">
-                                <label class="form-label">Référence 2</label>
-                                <input type="text" name="payment_reference_2" id="payment-reference-2" class="form-input" placeholder="Référence...">
-                            </div>
-
-                            <div class="form-group" id="bank-account-group-2" style="display: none;">
-                                <label class="form-label">Compte bancaire 2</label>
-                                <select name="bank_account_2" class="form-select">
-                                    <option value="">-- Sélectionner --</option>
-                                    {% for ba in bank_accounts %}
-                                        <option value="{{ ba.id }}">{{ ba.bank_name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">Montant 2 (DH)</label>
-                                <input type="number" name="amount_paid_2" id="amount-paid-2" class="form-input"
-                                       step="0.01" min="0" placeholder="0.00"
-                                       oninput="updatePaymentStatus()">
-                            </div>
-                        </div>
+                        <!-- Add Payment Button -->
+                        <button type="button" class="btn btn-secondary btn-block" id="add-payment-btn" onclick="addPaymentSection()" style="margin-bottom: var(--space-3);">
+                            <i class="fas fa-plus-circle"></i>
+                            <span>Ajouter un paiement</span>
+                        </button>
 
                         <!-- Payment Summary -->
                         <div class="form-group" style="background: var(--neutral-50); padding: var(--space-3); border-radius: var(--radius-md);">
@@ -965,6 +926,26 @@
             border-color: var(--primary-300);
         }
 
+        /* Payment Section */
+        .payment-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        #add-payment-btn {
+            border: 2px dashed var(--neutral-300);
+            background: transparent;
+            color: var(--neutral-500);
+            transition: all 0.2s;
+        }
+
+        #add-payment-btn:hover {
+            border-color: var(--primary-400);
+            color: var(--primary-600);
+            background: var(--primary-50);
+        }
+
         @media (max-width: 1024px) {
             .completion-layout {
                 grid-template-columns: 1fr;
@@ -997,13 +978,18 @@
             return {{ invoice.total_amount|default:0 }};
         }
 
-        // Payment Status Hint - supports hybrid payments
+        // Dynamic payment counter
+        let paymentCount = 1;
+
+        // Payment Status Hint - supports N payments
         function updatePaymentStatus() {
             const invoiceTotal = getInvoiceTotal();
-            const amountPaid1 = parseFloat(document.getElementById('amount-paid').value) || 0;
-            const amountPaid2El = document.getElementById('amount-paid-2');
-            const amountPaid2 = amountPaid2El ? (parseFloat(amountPaid2El.value) || 0) : 0;
-            const totalPaid = amountPaid1 + amountPaid2;
+            let totalPaid = 0;
+
+            // Sum all payment amounts
+            document.querySelectorAll('.payment-amount-input').forEach(input => {
+                totalPaid += parseFloat(input.value) || 0;
+            });
 
             const hint = document.getElementById('payment-status-hint');
             const totalPaymentsEl = document.getElementById('total-payments');
@@ -1021,6 +1007,75 @@
                 hint.innerHTML = '<span style="color: var(--error-600);"><i class="fas fa-times-circle"></i> Non payée</span>';
             } else {
                 hint.innerHTML = '<span style="color: var(--neutral-500);"><i class="fas fa-info-circle"></i> Ajoutez des articles pour calculer le total</span>';
+            }
+        }
+
+        // Add a new payment section dynamically
+        function addPaymentSection() {
+            paymentCount++;
+            document.getElementById('payment-count').value = paymentCount;
+            const index = paymentCount;
+
+            const paymentMethodOptions = `<option value="" data-name="">-- Sélectionner --</option>{% for pm in payment_methods %}<option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>{% endfor %}`;
+            const bankAccountOptions = `<option value="">-- Sélectionner --</option>{% for ba in bank_accounts %}<option value="{{ ba.id }}">{{ ba.bank_name }}</option>{% endfor %}`;
+
+            const today = new Date().toISOString().split('T')[0];
+
+            const html = `
+                <div class="payment-section" data-payment-index="${index}" style="border: 1px dashed var(--neutral-300); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3); animation: slideDown 0.2s ease-out;">
+                    <div class="payment-section-header">
+                        <h4 style="font-size: var(--text-sm); color: var(--neutral-500); margin: 0;">
+                            <i class="fas fa-plus-circle"></i> Paiement ${index}
+                        </h4>
+                        <button type="button" class="btn btn-ghost btn-sm text-error" onclick="removePaymentSection(${index})" title="Retirer ce paiement">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-3);">
+                        <div class="form-group">
+                            <label class="form-label">Mode de paiement</label>
+                            <select name="payment_method_${index}" class="form-select payment-method-select" data-index="${index}" onchange="updatePaymentFieldsFor(${index})">
+                                ${paymentMethodOptions}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Date</label>
+                            <input type="date" name="payment_date_${index}" class="form-input" value="${today}">
+                        </div>
+                    </div>
+                    <div class="form-group reference-group" id="reference-group-${index}" style="display: none;">
+                        <label class="form-label">Référence</label>
+                        <input type="text" name="payment_reference_${index}" class="form-input" placeholder="N° chèque, transaction...">
+                    </div>
+                    <div class="form-group bank-account-group" id="bank-account-group-${index}" style="display: none;">
+                        <label class="form-label">Compte bancaire</label>
+                        <select name="bank_account_${index}" class="form-select">
+                            ${bankAccountOptions}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Montant (DH)</label>
+                        <input type="number" name="amount_paid_${index}" class="form-input payment-amount-input"
+                               step="0.01" min="0" placeholder="0.00"
+                               oninput="updatePaymentStatus()">
+                    </div>
+                </div>
+            `;
+
+            const container = document.getElementById('payments-container');
+            container.insertAdjacentHTML('beforeend', html);
+            updatePaymentStatus();
+        }
+
+        // Remove a payment section
+        function removePaymentSection(index) {
+            const section = document.querySelector(`.payment-section[data-payment-index="${index}"]`);
+            if (section) {
+                section.remove();
+                // Re-count remaining payments and update hidden field
+                const remaining = document.querySelectorAll('.payment-section[data-payment-index]');
+                document.getElementById('payment-count').value = remaining.length;
+                updatePaymentStatus();
             }
         }
 
@@ -1049,56 +1104,20 @@
             }
         });
 
-        // Payment Method Fields Logic
-        function updatePaymentFields() {
-            const select = document.getElementById('payment-method-select');
-            const selectedOption = select.options[select.selectedIndex];
-            const paymentName = selectedOption.getAttribute('data-name') || '';
-
-            const referenceGroup = document.getElementById('reference-group');
-            const bankAccountGroup = document.getElementById('bank-account-group');
-
-            // Hide all by default
-            referenceGroup.style.display = 'none';
-            bankAccountGroup.style.display = 'none';
-
-            if (!paymentName) {
-                // No payment method selected
-                return;
-            }
-
-            // Check payment type
-            const isEspeces = paymentName.includes('espèce') || paymentName.includes('espece') || paymentName === 'cash';
-            const isVirement = paymentName.includes('virement');
-
-            if (isEspeces) {
-                // Cash - no reference, no bank account
-                referenceGroup.style.display = 'none';
-                bankAccountGroup.style.display = 'none';
-            } else if (isVirement) {
-                // Bank transfer - show reference AND bank account
-                referenceGroup.style.display = 'block';
-                bankAccountGroup.style.display = 'block';
-            } else {
-                // Other (cheque, card, etc.) - show only reference
-                referenceGroup.style.display = 'block';
-                bankAccountGroup.style.display = 'none';
-            }
-        }
-
-        // Payment Method Fields Logic - Payment 2 (Hybrid)
-        function updatePaymentFields2() {
-            const select = document.getElementById('payment-method-select-2');
+        // Generic Payment Method Fields Logic for any payment index
+        function updatePaymentFieldsFor(index) {
+            const select = document.querySelector(`select[name="payment_method_${index}"]`);
             if (!select) return;
 
             const selectedOption = select.options[select.selectedIndex];
             const paymentName = selectedOption.getAttribute('data-name') || '';
 
-            const referenceGroup = document.getElementById('reference-group-2');
-            const bankAccountGroup = document.getElementById('bank-account-group-2');
+            const referenceGroup = document.getElementById(`reference-group-${index}`);
+            const bankAccountGroup = document.getElementById(`bank-account-group-${index}`);
 
             if (!referenceGroup || !bankAccountGroup) return;
 
+            // Hide all by default
             referenceGroup.style.display = 'none';
             bankAccountGroup.style.display = 'none';
 
@@ -1107,11 +1126,13 @@
             const isEspeces = paymentName.includes('espèce') || paymentName.includes('espece') || paymentName === 'cash';
             const isVirement = paymentName.includes('virement');
 
-            if (!isEspeces) {
+            if (isEspeces) {
+                // Cash - no reference, no bank account
+            } else if (isVirement) {
                 referenceGroup.style.display = 'block';
-                if (isVirement) {
-                    bankAccountGroup.style.display = 'block';
-                }
+                bankAccountGroup.style.display = 'block';
+            } else {
+                referenceGroup.style.display = 'block';
             }
         }
 
