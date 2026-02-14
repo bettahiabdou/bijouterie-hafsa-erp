@@ -931,6 +931,65 @@ def product_zpl_api(request, reference):
 
 
 # =============================================================================
+# Product Image Upload API - For direct upload from product detail page
+# =============================================================================
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def product_image_upload_api(request, reference):
+    """API endpoint to upload images directly from the product detail page"""
+    product = get_object_or_404(Product, reference=reference)
+
+    if not request.user.is_staff:
+        return JsonResponse({'success': False, 'message': 'Permission refusée'}, status=403)
+
+    images = request.FILES.getlist('images')
+    if not images:
+        return JsonResponse({'success': False, 'message': 'Aucune image sélectionnée'})
+
+    uploaded = []
+    existing_count = product.images.count()
+
+    for i, image_file in enumerate(images):
+        try:
+            converted_image = convert_image_to_jpeg(image_file)
+            product_image = ProductImage.objects.create(
+                product=product,
+                image=converted_image,
+                is_primary=False,
+                display_order=existing_count + i
+            )
+
+            # Set as main_image if none exists
+            if not product.main_image and not product.images.filter(is_primary=True).exists():
+                product_image.is_primary = True
+                product_image.save()
+
+            uploaded.append({
+                'id': product_image.id,
+                'url': product_image.image.url,
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': f'Erreur: {str(e)}'})
+
+    # Log activity
+    try:
+        ActivityLog.objects.create(
+            user=request.user,
+            action='upload_image',
+            description=f"Ajout de {len(uploaded)} image(s) au produit {product.reference}"
+        )
+    except Exception:
+        pass
+
+    return JsonResponse({
+        'success': True,
+        'message': f'{len(uploaded)} image(s) ajoutée(s)',
+        'images': uploaded
+    })
+
+
+# =============================================================================
 # Product Search API - For barcode scanner
 # =============================================================================
 

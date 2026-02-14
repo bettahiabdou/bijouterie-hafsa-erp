@@ -51,10 +51,30 @@
         <div class="detail-main">
             <!-- Product Images Gallery -->
             <div class="card animate-slide-up">
-                <div class="card-header">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <h3><i class="fas fa-images mr-2"></i> Images du Produit</h3>
+                    {% if request.user.is_staff %}
+                    <div style="display: flex; gap: 8px;">
+                        <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
+                            <i class="fas fa-camera"></i> <span class="desktop-only">Photo</span>
+                            <input type="file" id="cameraInput" accept="image/*" capture="environment" multiple style="display: none;" onchange="uploadImages(this.files)">
+                        </label>
+                        <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin: 0;">
+                            <i class="fas fa-folder-open"></i> <span class="desktop-only">Fichier</span>
+                            <input type="file" id="fileInput" accept="image/*" multiple style="display: none;" onchange="uploadImages(this.files)">
+                        </label>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="card-body">
+                    <!-- Upload progress -->
+                    <div id="uploadProgress" style="display: none; margin-bottom: 16px;">
+                        <div style="background: #e5e7eb; border-radius: 8px; overflow: hidden; height: 6px;">
+                            <div id="uploadBar" style="background: #3b82f6; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        </div>
+                        <p id="uploadText" style="text-align: center; margin-top: 8px; font-size: 14px; color: #6b7280;">Envoi en cours...</p>
+                    </div>
+
                     {% if product.main_image or images %}
                         <!-- Main Image Display -->
                         <div class="product-gallery">
@@ -68,7 +88,7 @@
 
                             <!-- Thumbnails - show ProductImages only to avoid duplicates -->
                             {% if images %}
-                            <div class="gallery-thumbnails">
+                            <div class="gallery-thumbnails" id="galleryThumbnails">
                                 {% for image in images %}
                                     <div class="thumbnail-item {% if forloop.first %}active{% endif %}" onclick="changeMainImage('{{ image.image.url }}', this)">
                                         <img src="{{ image.image.url }}" alt="Image {{ forloop.counter }}">
@@ -76,7 +96,7 @@
                                 {% endfor %}
                             </div>
                             {% elif product.main_image %}
-                            <div class="gallery-thumbnails">
+                            <div class="gallery-thumbnails" id="galleryThumbnails">
                                 <div class="thumbnail-item active" onclick="changeMainImage('{{ product.main_image.url }}', this)">
                                     <img src="{{ product.main_image.url }}" alt="Main">
                                 </div>
@@ -85,12 +105,19 @@
                         </div>
                     {% else %}
                         <!-- No Images Placeholder -->
-                        <div class="no-images-placeholder">
+                        <div class="no-images-placeholder" id="noImagesPlaceholder">
                             <i class="fas fa-image"></i>
                             <p>Aucune image disponible</p>
+                            {% if request.user.is_staff %}
+                            <label class="btn btn-primary btn-sm" style="cursor: pointer;">
+                                <i class="fas fa-camera"></i> Prendre une photo
+                                <input type="file" accept="image/*" capture="environment" multiple style="display: none;" onchange="uploadImages(this.files)">
+                            </label>
+                            {% else %}
                             <a href="{% url 'products:edit' product.reference %}" class="btn btn-secondary btn-sm">
                                 <i class="fas fa-upload"></i> Ajouter des images
                             </a>
+                            {% endif %}
                         </div>
                     {% endif %}
                 </div>
@@ -988,6 +1015,68 @@
             }, 3000);
         }
 
+        // Image Upload Functions
+        async function uploadImages(files) {
+            if (!files || files.length === 0) return;
+
+            const progress = document.getElementById('uploadProgress');
+            const bar = document.getElementById('uploadBar');
+            const text = document.getElementById('uploadText');
+
+            progress.style.display = 'block';
+            bar.style.width = '10%';
+            text.textContent = `Envoi de ${files.length} image(s)...`;
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('images', files[i]);
+            }
+
+            // Get CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            try {
+                bar.style.width = '50%';
+
+                const response = await fetch('/products/api/upload-images/{{ product.reference }}/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+
+                bar.style.width = '90%';
+                const data = await response.json();
+
+                if (data.success) {
+                    bar.style.width = '100%';
+                    bar.style.background = '#22c55e';
+                    text.textContent = data.message;
+                    showNotification('success', data.message);
+
+                    // Reload page to show new images
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 800);
+                } else {
+                    bar.style.background = '#ef4444';
+                    text.textContent = data.message;
+                    showNotification('error', data.message);
+                    setTimeout(() => { progress.style.display = 'none'; }, 3000);
+                }
+            } catch (error) {
+                bar.style.background = '#ef4444';
+                text.textContent = 'Erreur de connexion';
+                showNotification('error', 'Erreur de connexion');
+                setTimeout(() => { progress.style.display = 'none'; }, 3000);
+            }
+
+            // Reset file inputs
+            document.getElementById('cameraInput').value = '';
+            document.getElementById('fileInput').value = '';
+        }
+
         // Gallery functions
         function changeMainImage(src, thumbnail) {
             document.getElementById('mainImage').src = src;
@@ -1024,6 +1113,9 @@
         @keyframes slideOut {
             from { transform: translateX(0); opacity: 1; }
             to { transform: translateX(100%); opacity: 0; }
+        }
+        @media (max-width: 768px) {
+            .desktop-only { display: none; }
         }
     </style>
 {% endblock %}

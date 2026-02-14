@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/print-queue/<int:job_id>/complete/', views.print_queue_complete, name='print_queue_complete'),
     path('api/print-queue/<int:job_id>/fail/', views.print_queue_fail, name='print_queue_fail'),
     path('api/search/', views.product_search_api, name='product_search_api'),
+    path('api/upload-images/<str:reference>/', views.product_image_upload_api, name='product_image_upload_api'),
 
     # Product detail routes (catch-all, must be last)
     path('<str:reference>/', views.product_detail, name='detail'),
