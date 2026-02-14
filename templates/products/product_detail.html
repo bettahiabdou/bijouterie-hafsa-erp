@@ -878,17 +878,18 @@
         <img src="" alt="Full size image" id="lightboxImage" onclick="event.stopPropagation()">
     </div>
 
-    <!-- Hidden iframe for printer communication (works on all devices including iOS) -->
-    <iframe id="printerFrame" name="printerFrame" style="display:none;"></iframe>
-
     <script>
         // Printer configuration
         let PRINTER_IP = null;
         let PRINTER_URL = null;
+        let printerConnected = false;
 
         // Load printer config on page load
         document.addEventListener('DOMContentLoaded', async function() {
             await loadPrinterConfig();
+            if (PRINTER_IP) {
+                printerConnected = true;
+            }
         });
 
         async function loadPrinterConfig() {
@@ -897,7 +898,7 @@
                 const config = await response.json();
                 if (config.ip && config.enabled) {
                     PRINTER_IP = config.ip;
-                    PRINTER_URL = `http://${PRINTER_IP}/pstprnt`;
+                    PRINTER_URL = config.http_url || `http://${PRINTER_IP}/pstprnt`;
                 }
             } catch (e) {
                 console.error('Failed to load printer config:', e);
@@ -905,63 +906,24 @@
         }
 
         /**
-         * Send ZPL to printer using hidden form + iframe.
-         * This works on ALL browsers including iOS Safari.
-         * The form POSTs directly to the printer's HTTP interface,
-         * and the response goes into the hidden iframe (so no page navigation).
+         * Send raw ZPL to printer via fetch (works on laptop/desktop Chrome).
+         * This is the original working method.
          */
-        function sendToPrinterViaForm(zplData) {
+        async function sendToPrinter(zplData) {
             if (!PRINTER_URL) {
-                return false;
+                return { success: false, error: 'Imprimante non configuree' };
             }
             try {
-                // Create a temporary form that POSTs to the printer
-                const tempForm = document.createElement('form');
-                tempForm.method = 'POST';
-                tempForm.action = PRINTER_URL;
-                tempForm.target = 'printerFrame'; // Response goes to hidden iframe
-                tempForm.style.display = 'none';
-
-                // The printer expects raw ZPL in the POST body
-                // Use a textarea to send the data
-                const input = document.createElement('textarea');
-                input.name = 'data';
-                input.value = zplData;
-                tempForm.appendChild(input);
-
-                document.body.appendChild(tempForm);
-                tempForm.submit();
-                document.body.removeChild(tempForm);
-
-                return true;
+                await fetch(PRINTER_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: zplData
+                });
+                // With no-cors we can't read the response, but if no error it likely worked
+                return { success: true };
             } catch (error) {
-                console.error('Form print failed:', error);
-                return false;
+                return { success: false, error: error.message };
             }
-        }
-
-        /**
-         * Send ZPL using XMLHttpRequest (backup method).
-         * Some devices work better with XHR than fetch for local network.
-         */
-        function sendToPrinterViaXHR(zplData) {
-            return new Promise((resolve) => {
-                if (!PRINTER_URL) {
-                    resolve(false);
-                    return;
-                }
-                try {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', PRINTER_URL, true);
-                    xhr.timeout = 5000;
-                    xhr.onload = () => resolve(true);
-                    xhr.onerror = () => resolve(false);
-                    xhr.ontimeout = () => resolve(false);
-                    xhr.send(zplData);
-                } catch (e) {
-                    resolve(false);
-                }
-            });
         }
 
         function printLabel() {
@@ -972,7 +934,7 @@
             document.getElementById('printModal').style.display = 'none';
         }
 
-        // Handle print form submission - ALL devices print via browser to local printer
+        // Handle print form submission
         document.getElementById('printForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
@@ -987,27 +949,17 @@
             const labelType = form.querySelector('select[name="label_type"]').value;
             const quantity = form.querySelector('input[name="quantity"]').value;
 
-            if (PRINTER_URL) {
+            // Try browser-based printing (browser sends directly to local printer)
+            if (printerConnected && PRINTER_URL) {
                 try {
-                    // Get ZPL data from server
+                    // Get ZPL data from server API
                     const zplResponse = await fetch(`/products/api/product-zpl/{{ product.reference }}/?label_type=${labelType}&quantity=${quantity}`);
                     const zplData = await zplResponse.json();
 
                     if (zplData.zpl) {
-                        // Method 1: Try hidden form + iframe (most reliable on iOS)
-                        const formSent = sendToPrinterViaForm(zplData.zpl);
+                        const result = await sendToPrinter(zplData.zpl);
 
-                        if (formSent) {
-                            closePrintModal();
-                            showNotification('success', 'Etiquette envoyee a l\'imprimante!');
-                            submitBtn.innerHTML = originalText;
-                            submitBtn.disabled = false;
-                            return;
-                        }
-
-                        // Method 2: Try XHR
-                        const xhrResult = await sendToPrinterViaXHR(zplData.zpl);
-                        if (xhrResult) {
+                        if (result.success) {
                             closePrintModal();
                             showNotification('success', 'Etiquette envoyee a l\'imprimante!');
                             submitBtn.innerHTML = originalText;
@@ -1016,13 +968,13 @@
                         }
                     }
                 } catch (error) {
-                    console.error('Print failed:', error);
+                    console.error('Browser print failed:', error);
                 }
             }
 
-            // Fallback: show error
+            // Fallback: show error with help
             closePrintModal();
-            showNotification('error', 'Impossible d\'envoyer a l\'imprimante. Verifiez que vous etes sur le meme reseau WiFi.');
+            showNotification('error', 'Erreur d\'impression. Verifiez que vous etes connecte au meme reseau WiFi que l\'imprimante.');
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
         });
