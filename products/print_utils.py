@@ -132,8 +132,8 @@ def string_to_hex(text, max_bytes=12):
 def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
     """
     Generate ZPL for RFID jewelry hang tag with loop
-    Total tag: 68x26mm - print on LEFT side (the visible tag head)
-    Right side has the loop/antenna
+    Total tag: 68x26mm - print on RIGHT side (the visible tag head)
+    Left side has the loop/antenna
 
     Layout:
     - Line 1: Weight + Purity (e.g., "5.2g 18K")
@@ -178,28 +178,31 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
 ^RFW,H,1,12,1^FD{rfid_hex}^FS
 """
 
-    # ZPL for 68x26mm tag - print on LEFT side
+    # ZPL for 68x26mm tag - print on RIGHT side
+    # Tag is 544 dots wide (68mm at 8 dots/mm)
+    # Print area is approximately half the tag (right side)
+    # X offset ~270 to start printing on right half
     if size:
-        # Layout with size - adjust positions
+        # Layout with size - adjust positions for RIGHT side
         zpl = f"""^XA
 ^CI28
 ^PW544
 ^LL208
-{rfid_commands}^FO34,25^A0N,20,18^FD{weight}g {purity}^FS
-^FO34,50^A0N,18,16^FDT: {size}cm^FS
-^FO26,110^BY1^BCN,32,N,N,N^FD{barcode_data}^FS
-^FO34,150^A0N,14,12^FD{short_ref}^FS
+{rfid_commands}^FO349,25^A0N,20,18^FD{weight}g {purity}^FS
+^FO349,50^A0N,18,16^FDT: {size}cm^FS
+^FO339,110^BY1^BCN,32,N,N,N^FD{barcode_data}^FS
+^FO349,150^A0N,14,12^FD{short_ref}^FS
 ^PQ{quantity}
 ^XZ"""
     else:
-        # Layout without size - original spacing
+        # Layout without size - RIGHT side
         zpl = f"""^XA
 ^CI28
 ^PW544
 ^LL208
-{rfid_commands}^FO34,31^A0N,22,20^FD{weight}g {purity}^FS
-^FO26,130^BY1^BCN,35,N,N,N^FD{barcode_data}^FS
-^FO34,175^A0N,16,14^FD{short_ref}^FS
+{rfid_commands}^FO349,31^A0N,22,20^FD{weight}g {purity}^FS
+^FO339,130^BY1^BCN,35,N,N,N^FD{barcode_data}^FS
+^FO349,175^A0N,16,14^FD{short_ref}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -241,7 +244,7 @@ def print_price_tag(product, quantity=1):
 
 
 def print_test_label(encode_rfid=True):
-    """Print a test label for jewelry RFID hang tag - LEFT side with barcode
+    """Print a test label for jewelry RFID hang tag - RIGHT side with barcode
     Also encodes RFID with test reference if encode_rfid=True
     """
     test_reference = "PRD-TEST-20260210-0001"
@@ -258,8 +261,8 @@ def print_test_label(encode_rfid=True):
 ^CI28
 ^PW544
 ^LL208
-{rfid_commands}^FO34,31^A0N,22,20^FD5.2g 18K^FS
-^FO26,130^BY1^BCN,35,N,N,N^FD20260210-0001^FS
-^FO34,175^A0N,16,14^FD20260210-0001^FS
+{rfid_commands}^FO349,31^A0N,22,20^FD5.2g 18K^FS
+^FO339,130^BY1^BCN,35,N,N,N^FD20260210-0001^FS
+^FO349,175^A0N,16,14^FD20260210-0001^FS
 ^XZ"""
     return send_to_printer(zpl)

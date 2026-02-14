@@ -145,3 +145,4 @@ Thumbs.db
 
 # PycharmProjects (if exists)
 PycharmProjects/
+*.tar.gz
