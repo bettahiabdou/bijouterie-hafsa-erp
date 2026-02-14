@@ -186,6 +186,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
         # Layout with size - adjust positions for RIGHT side
         zpl = f"""^XA
 ^CI28
+^LH0,0^LT0
 ^PW544
 ^LL208
 {rfid_commands}^FO349,25^A0N,20,18^FD{weight}g {purity}^FS
@@ -198,6 +199,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
         # Layout without size - RIGHT side
         zpl = f"""^XA
 ^CI28
+^LH0,0^LT0
 ^PW544
 ^LL208
 {rfid_commands}^FO349,31^A0N,22,20^FD{weight}g {purity}^FS
@@ -222,6 +224,7 @@ def generate_price_tag_zpl(product, quantity=1):
     # ZPL for 68x26mm tag - print on RIGHT side
     zpl = f"""^XA
 ^CI28
+^LH0,0^LT0
 ^PW544
 ^LL208
 ^FO350,30^A0N,45,40^FD{purity}^FS
@@ -259,6 +262,7 @@ def print_test_label(encode_rfid=True):
 
     zpl = f"""^XA
 ^CI28
+^LH0,0^LT0
 ^PW544
 ^LL208
 {rfid_commands}^FO349,31^A0N,22,20^FD5.2g 18K^FS
