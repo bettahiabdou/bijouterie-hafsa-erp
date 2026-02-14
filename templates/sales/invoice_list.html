@@ -95,6 +95,19 @@
                         </select>
                     </div>
 
+                    <!-- Delivery Status Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Livraison</label>
+                        <select name="delivery_status" class="form-select">
+                            <option value="">Toutes</option>
+                            <option value="magasin" {% if delivery_status_filter == 'magasin' %}selected{% endif %}>Magasin</option>
+                            <option value="pending" {% if delivery_status_filter == 'pending' %}selected{% endif %}>En attente</option>
+                            <option value="in_transit" {% if delivery_status_filter == 'in_transit' %}selected{% endif %}>En transit</option>
+                            <option value="delivered" {% if delivery_status_filter == 'delivered' %}selected{% endif %}>Livré</option>
+                            <option value="returned" {% if delivery_status_filter == 'returned' %}selected{% endif %}>Retourné</option>
+                        </select>
+                    </div>
+
                     <!-- Date From -->
                     <div class="form-group hide-mobile" style="margin-bottom: 0;">
                         <label class="form-label">Du</label>
@@ -126,12 +139,13 @@
                     <thead>
                         <tr>
                             <th>Reference</th>
-                            <th>Client</th>
+                            <th>Vendeur</th>
                             <th>Montant</th>
                             <th>Paye</th>
                             <th>Solde</th>
                             <th>Date</th>
                             <th>Statut</th>
+                            <th>Livraison</th>
                             <th style="text-align: center;">Actions</th>
                         </tr>
                     </thead>
@@ -144,11 +158,7 @@
                                     </a>
                                 </td>
                                 <td>
-                                    {% if invoice.client %}
-                                        {{ invoice.client.first_name }} {{ invoice.client.last_name }}
-                                    {% else %}
-                                        <span class="text-muted" style="font-style: italic;">Vente anonyme</span>
-                                    {% endif %}
+                                    {{ invoice.seller.get_full_name|default:invoice.seller.username }}
                                 </td>
                                 <td class="font-semibold">{{ invoice.total_amount }} DH</td>
                                 <td>{{ invoice.amount_paid }} DH</td>
@@ -162,6 +172,24 @@
                                     <span class="badge {% if invoice.status == 'unpaid' %}badge-error{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'paid' %}badge-success{% else %}badge-neutral{% endif %}">
                                         {{ invoice.get_status_display }}
                                     </span>
+                                </td>
+                                <td>
+                                    {% if invoice.delivery_method_type == 'magasin' %}
+                                        <span class="badge badge-neutral" style="font-size: 11px;">
+                                            <i class="fas fa-store"></i> Magasin
+                                        </span>
+                                    {% elif invoice.delivery %}
+                                        <span class="badge {% if invoice.delivery.status == 'delivered' %}badge-success{% elif invoice.delivery.status == 'in_transit' %}badge-info{% elif invoice.delivery.status == 'returned' %}badge-error{% elif invoice.delivery.status == 'to_pickup' %}badge-warning{% else %}badge-warning{% endif %}" style="font-size: 11px;">
+                                            <i class="fas fa-{% if invoice.delivery.status == 'delivered' %}check-circle{% elif invoice.delivery.status == 'in_transit' %}shipping-fast{% elif invoice.delivery.status == 'returned' %}undo{% elif invoice.delivery.status == 'to_pickup' %}box-open{% else %}clock{% endif %}"></i>
+                                            {{ invoice.delivery.get_status_display }}
+                                        </span>
+                                    {% elif invoice.delivery_method_type == 'amana' or invoice.delivery_method_type == 'transporteur' %}
+                                        <span class="badge badge-warning" style="font-size: 11px;">
+                                            <i class="fas fa-clock"></i> En attente
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
                                 </td>
                                 <td style="text-align: center;" onclick="event.stopPropagation();">
                                     <div style="display: flex; gap: 4px; justify-content: center;">
@@ -181,7 +209,7 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="8">
+                                <td colspan="9">
                                     <div class="empty-state">
                                         <div class="empty-state-icon">
                                             <i class="fas fa-file-invoice"></i>
@@ -207,16 +235,28 @@
                     <div class="invoice-card" onclick="window.location='{% url 'sales:invoice_detail' invoice.reference %}'">
                         <div class="invoice-card-header">
                             <span class="invoice-card-ref">{{ invoice.reference }}</span>
-                            <span class="badge {% if invoice.status == 'unpaid' %}badge-error{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'paid' %}badge-success{% else %}badge-neutral{% endif %}">
-                                {{ invoice.get_status_display }}
-                            </span>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                {% if invoice.delivery_method_type == 'magasin' %}
+                                    <span class="badge badge-neutral" style="font-size: 10px;">
+                                        <i class="fas fa-store"></i> Magasin
+                                    </span>
+                                {% elif invoice.delivery %}
+                                    <span class="badge {% if invoice.delivery.status == 'delivered' %}badge-success{% elif invoice.delivery.status == 'in_transit' %}badge-info{% elif invoice.delivery.status == 'returned' %}badge-error{% elif invoice.delivery.status == 'to_pickup' %}badge-warning{% else %}badge-warning{% endif %}" style="font-size: 10px;">
+                                        <i class="fas fa-{% if invoice.delivery.status == 'delivered' %}check-circle{% elif invoice.delivery.status == 'in_transit' %}shipping-fast{% elif invoice.delivery.status == 'returned' %}undo{% elif invoice.delivery.status == 'to_pickup' %}box-open{% else %}clock{% endif %}"></i>
+                                        {{ invoice.delivery.get_status_display }}
+                                    </span>
+                                {% elif invoice.delivery_method_type == 'amana' or invoice.delivery_method_type == 'transporteur' %}
+                                    <span class="badge badge-warning" style="font-size: 10px;">
+                                        <i class="fas fa-clock"></i> En attente
+                                    </span>
+                                {% endif %}
+                                <span class="badge {% if invoice.status == 'unpaid' %}badge-error{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'paid' %}badge-success{% else %}badge-neutral{% endif %}">
+                                    {{ invoice.get_status_display }}
+                                </span>
+                            </div>
                         </div>
                         <div class="invoice-card-client">
-                            {% if invoice.client %}
-                                <i class="fas fa-user"></i> {{ invoice.client.first_name }} {{ invoice.client.last_name }}
-                            {% else %}
-                                <i class="fas fa-user-slash"></i> Vente anonyme
-                            {% endif %}
+                            <i class="fas fa-user-tie"></i> {{ invoice.seller.get_full_name|default:invoice.seller.username }}
                         </div>
                         <div class="invoice-card-amounts">
                             <div class="invoice-amount-item">
@@ -269,13 +309,13 @@
                 </div>
                 <div class="pagination-buttons">
                     {% if page_obj.has_previous %}
-                        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-ghost btn-sm">
+                        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if delivery_status_filter %}&delivery_status={{ delivery_status_filter }}{% endif %}" class="btn btn-ghost btn-sm">
                             <i class="fas fa-chevron-left"></i>
                         </a>
                     {% endif %}
 
                     {% if page_obj.has_next %}
-                        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-ghost btn-sm">
+                        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if delivery_status_filter %}&delivery_status={{ delivery_status_filter }}{% endif %}" class="btn btn-ghost btn-sm">
                             <i class="fas fa-chevron-right"></i>
                         </a>
                     {% endif %}
@@ -300,7 +340,7 @@
 
         .filter-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: var(--space-4);
             flex: 1;
         }

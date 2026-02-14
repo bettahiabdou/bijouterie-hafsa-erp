@@ -28,7 +28,7 @@ def invoice_list(request):
     # FIXED: Optimized query with select_related and prefetch_related
     # PHASE 3: Filter out soft-deleted invoices
     invoices = SaleInvoice.objects.filter(is_deleted=False).select_related(
-        'client', 'seller', 'delivery_method', 'payment_method'
+        'client', 'seller', 'delivery_method', 'payment_method', 'delivery'
     ).prefetch_related('items__product')
 
     # Search
@@ -44,6 +44,16 @@ def invoice_list(request):
     status_filter = request.GET.get('status', '')
     if status_filter:
         invoices = invoices.filter(status=status_filter)
+
+    # Filter by delivery status
+    delivery_status_filter = request.GET.get('delivery_status', '')
+    if delivery_status_filter:
+        if delivery_status_filter == 'magasin':
+            invoices = invoices.filter(delivery_method_type='magasin')
+        else:
+            invoices = invoices.filter(
+                delivery__status=delivery_status_filter
+            )
 
     # Filter by date range
     date_from = request.GET.get('date_from', '')
@@ -114,6 +124,7 @@ def invoice_list(request):
         'invoices': page_obj.object_list,
         'search_query': search_query,
         'status_filter': status_filter,
+        'delivery_status_filter': delivery_status_filter,
         'date_from': date_from,
         'date_to': date_to,
         'sort_by': sort_by,
