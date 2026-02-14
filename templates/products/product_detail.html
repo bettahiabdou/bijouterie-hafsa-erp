@@ -906,24 +906,56 @@
         }
 
         /**
-         * Send raw ZPL to printer via fetch (works on laptop/desktop Chrome).
-         * This is the original working method.
+         * Send raw ZPL to printer. Tries multiple methods:
+         * 1. fetch with no-cors (works on Chrome desktop)
+         * 2. sendBeacon (works on iOS Safari)
+         * 3. Image trick (last resort fallback)
          */
         async function sendToPrinter(zplData) {
             if (!PRINTER_URL) {
                 return { success: false, error: 'Imprimante non configuree' };
             }
+
+            // Method 1: fetch with no-cors (works on Chrome/desktop)
             try {
                 await fetch(PRINTER_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: zplData
                 });
-                // With no-cors we can't read the response, but if no error it likely worked
                 return { success: true };
-            } catch (error) {
-                return { success: false, error: error.message };
+            } catch (e) {
+                console.log('fetch failed, trying sendBeacon...', e.message);
             }
+
+            // Method 2: sendBeacon (works on iOS Safari for cross-origin POST)
+            try {
+                const blob = new Blob([zplData], { type: 'text/plain' });
+                const sent = navigator.sendBeacon(PRINTER_URL, blob);
+                if (sent) {
+                    return { success: true };
+                }
+            } catch (e) {
+                console.log('sendBeacon failed, trying XHR...', e.message);
+            }
+
+            // Method 3: XMLHttpRequest (some browsers handle this differently than fetch)
+            try {
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', PRINTER_URL, true);
+                    xhr.timeout = 5000;
+                    xhr.onload = resolve;
+                    xhr.onerror = reject;
+                    xhr.ontimeout = reject;
+                    xhr.send(zplData);
+                });
+                return { success: true };
+            } catch (e) {
+                console.log('XHR also failed:', e);
+            }
+
+            return { success: false, error: 'Tous les modes d\'envoi ont echoue' };
         }
 
         function printLabel() {
