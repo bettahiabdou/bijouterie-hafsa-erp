@@ -842,6 +842,11 @@
 
                 <!-- Action Choice -->
                 <div class="action-choice">
+                    <div class="action-choice-btn remove-btn" onclick="selectAction('remove')">
+                        <i class="fas fa-times-circle"></i>
+                        <strong>Retirer</strong>
+                        <small style="color: var(--neutral-500);">Retirer de la facture</small>
+                    </div>
                     <div class="action-choice-btn return-btn" onclick="selectAction('return')">
                         <i class="fas fa-undo"></i>
                         <strong>Retour</strong>
@@ -898,7 +903,14 @@
         </div>
     </div>
 
-    <!-- Hidden forms for return/exchange -->
+    <!-- Hidden forms for remove/return/exchange -->
+    <form method="post" id="removeForm" style="display: none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="remove_item">
+        <input type="hidden" name="item_id" id="removeItemId" value="">
+        <input type="hidden" name="notes" id="removeNotesField" value="">
+    </form>
+
     <form method="post" id="returnForm" style="display: none;">
         {% csrf_token %}
         <input type="hidden" name="action" value="return_item">
@@ -1075,7 +1087,11 @@
 
             // Update button styles
             document.querySelectorAll('.action-choice-btn').forEach(btn => btn.classList.remove('selected'));
-            if (action === 'return') {
+            if (action === 'remove') {
+                document.querySelector('.remove-btn').classList.add('selected');
+                document.getElementById('exchangeProductSection').classList.remove('visible');
+                document.getElementById('confirmRemoveBtn').disabled = false;
+            } else if (action === 'return') {
                 document.querySelector('.return-btn').classList.add('selected');
                 document.getElementById('exchangeProductSection').classList.remove('visible');
                 document.getElementById('confirmRemoveBtn').disabled = false;
@@ -1120,7 +1136,11 @@
 
             const notes = document.getElementById('removeNotes').value;
 
-            if (currentAction === 'return') {
+            if (currentAction === 'remove') {
+                document.getElementById('removeItemId').value = currentRemoveItemId;
+                document.getElementById('removeNotesField').value = notes;
+                document.getElementById('removeForm').submit();
+            } else if (currentAction === 'return') {
                 document.getElementById('returnItemId').value = currentRemoveItemId;
                 document.getElementById('returnNotes').value = notes;
                 document.getElementById('returnForm').submit();

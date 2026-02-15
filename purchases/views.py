@@ -578,6 +578,38 @@ def purchase_invoice_detail(request, reference):
 
             return redirect('purchases:purchase_invoice_detail', reference=invoice.reference)
 
+        # Handle remove item action (just remove from invoice, product back to available)
+        elif action == 'remove_item':
+            item_id = request.POST.get('item_id')
+            notes = request.POST.get('notes', '')
+            if item_id:
+                try:
+                    item = PurchaseInvoiceItem.objects.get(id=item_id, invoice=invoice)
+                    original_product = item.product
+                    original_ref = original_product.reference if original_product else item.description
+
+                    # Set product back to available
+                    if original_product:
+                        original_product.status = 'available'
+                        original_product.save(update_fields=['status'])
+
+                    # Delete the item from invoice
+                    item.delete()
+                    invoice.calculate_totals()
+                    invoice.save()
+
+                    ActivityLog.objects.create(
+                        user=request.user,
+                        action=ActivityLog.ActionType.DELETE,
+                        model_name='PurchaseInvoiceItem',
+                        object_id=str(item_id),
+                        object_repr=f'Removed item {original_ref} from invoice {invoice.reference}',
+                        ip_address=get_client_ip(request)
+                    )
+                    messages.success(request, f'Produit {original_ref} retiré de la facture.')
+                except PurchaseInvoiceItem.DoesNotExist:
+                    messages.error(request, 'Article non trouvé.')
+
         # Handle return item action (Retour au fournisseur)
         elif action == 'return_item':
             item_id = request.POST.get('item_id')
