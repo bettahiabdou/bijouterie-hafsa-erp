@@ -1253,12 +1253,6 @@
             document.getElementById('bulkCreateForm').submit();
         }
 
-        // Close bulk create modal on outside click
-        document.getElementById('bulkCreateModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeBulkCreateModal();
-            }
-        });
     </script>
 
     <!-- Bulk Create Modal -->
@@ -1459,4 +1453,13 @@
             </td>
         </tr>
     </template>
+
+    <script>
+        // Close bulk create modal on outside click (must be after modal HTML)
+        document.getElementById('bulkCreateModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeBulkCreateModal();
+            }
+        });
+    </script>
 {% endblock %}
