@@ -2687,6 +2687,7 @@ def search_products_api(request):
 def quick_create_client(request):
     """AJAX endpoint to quickly create a client with first name, last name, phone"""
     import json
+    import re
 
     try:
         data = json.loads(request.body)
@@ -2697,21 +2698,38 @@ def quick_create_client(request):
         if not first_name or not last_name or not phone:
             return JsonResponse({'success': False, 'error': 'Prénom, Nom et Téléphone sont requis.'})
 
-        # Check if client with same phone already exists
-        existing = Client.objects.filter(phone=phone).first()
+        # Normalize phone: remove spaces, dashes, dots, parentheses
+        phone_clean = re.sub(r'[\s\-\.\(\)]+', '', phone)
+
+        # Check if client with same phone already exists (try both raw and cleaned)
+        existing = Client.objects.filter(
+            Q(phone=phone) | Q(phone=phone_clean)
+        ).first()
+
+        # Also check by stripping all non-digit chars for broader match
+        if not existing:
+            phone_digits = re.sub(r'\D', '', phone)
+            if len(phone_digits) >= 8:
+                for client in Client.objects.all().only('id', 'phone', 'first_name', 'last_name'):
+                    client_digits = re.sub(r'\D', '', client.phone)
+                    if client_digits == phone_digits:
+                        existing = client
+                        break
+
         if existing:
             return JsonResponse({
                 'success': True,
                 'id': existing.id,
                 'full_name': existing.full_name,
                 'phone': existing.phone,
-                'message': 'Client existant sélectionné.'
+                'existing': True,
+                'message': f'Client existant: {existing.full_name} ({existing.phone})'
             })
 
         client = Client.objects.create(
             first_name=first_name,
             last_name=last_name,
-            phone=phone,
+            phone=phone_clean,
             is_active=True
         )
 
@@ -2719,7 +2737,8 @@ def quick_create_client(request):
             'success': True,
             'id': client.id,
             'full_name': client.full_name,
-            'phone': client.phone
+            'phone': client.phone,
+            'existing': False
         })
 
     except Exception as e:

@@ -1386,10 +1386,28 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Add new client to select and select it
                     const select = document.getElementById('client-select');
-                    const option = new Option(data.full_name + ' — ' + data.phone, data.id, true, true);
-                    select.add(option);
+
+                    if (data.existing) {
+                        // Client already exists — select them in dropdown
+                        let found = false;
+                        for (let opt of select.options) {
+                            if (opt.value == data.id) {
+                                opt.selected = true;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            const option = new Option(data.full_name + ' — ' + data.phone, data.id, true, true);
+                            select.add(option);
+                        }
+                        alert('⚠️ Ce numéro existe déjà: ' + data.full_name + ' (' + data.phone + ')\nClient sélectionné automatiquement.');
+                    } else {
+                        // New client created — add to dropdown
+                        const option = new Option(data.full_name + ' — ' + data.phone, data.id, true, true);
+                        select.add(option);
+                    }
 
                     // Close quick add section and clear fields
                     document.getElementById('quick-client-section').style.display = 'none';
