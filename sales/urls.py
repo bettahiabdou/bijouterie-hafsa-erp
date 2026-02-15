@@ -27,6 +27,7 @@ urlpatterns = [
     # API endpoints
     path('api/payment-methods/', views.get_payment_methods, name='get_payment_methods'),
     path('api/search-products/', views.search_products_api, name='search_products_api'),
+    path('api/quick-create-client/', views.quick_create_client, name='quick_create_client'),
 
     # Quote to Invoice conversion
     path('quotes/<int:quote_id>/to-invoice/', views.quote_to_invoice, name='quote_to_invoice'),

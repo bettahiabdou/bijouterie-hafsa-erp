@@ -238,12 +238,43 @@
 
                         <div class="form-group">
                             <label class="form-label">Client (optionnel)</label>
-                            <select name="client_id" class="form-select">
-                                <option value="">-- Vente anonyme --</option>
-                                {% for client in clients %}
-                                    <option value="{{ client.id }}">{{ client.full_name }}</option>
-                                {% endfor %}
-                            </select>
+                            <div style="display: flex; gap: var(--space-2); align-items: center;">
+                                <select name="client_id" id="client-select" class="form-select" style="flex: 1;">
+                                    <option value="">-- Vente anonyme --</option>
+                                    {% for client in clients %}
+                                        <option value="{{ client.id }}">{{ client.full_name }} — {{ client.phone }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleQuickClient()" title="Ajout rapide">
+                                    <i class="fas fa-user-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Quick Add Client -->
+                        <div id="quick-client-section" style="display: none; border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3); background: var(--primary-50);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                                <h4 style="font-size: var(--text-sm); color: var(--primary-600); margin: 0;">
+                                    <i class="fas fa-user-plus"></i> Ajout Rapide Client
+                                </h4>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="toggleQuickClient()" style="padding: 2px 6px;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2);">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <input type="text" id="quick-client-first-name" class="form-input form-input-sm" placeholder="Prénom *">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <input type="text" id="quick-client-last-name" class="form-input form-input-sm" placeholder="Nom *">
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-top: var(--space-2); margin-bottom: 0;">
+                                <input type="tel" id="quick-client-phone" class="form-input form-input-sm" placeholder="Téléphone *">
+                            </div>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="quickCreateClient()" style="margin-top: var(--space-2); width: 100%;">
+                                <i class="fas fa-check mr-1"></i> Créer & Sélectionner
+                            </button>
                         </div>
 
                         <!-- Dynamic Payments Container -->
@@ -1322,5 +1353,57 @@
                 document.getElementById('carrier-id-hidden').value = carrierSelect.value;
             }
         });
+
+        // ===== Quick Add Client =====
+        function toggleQuickClient() {
+            const section = document.getElementById('quick-client-section');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function quickCreateClient() {
+            const firstName = document.getElementById('quick-client-first-name').value.trim();
+            const lastName = document.getElementById('quick-client-last-name').value.trim();
+            const phone = document.getElementById('quick-client-phone').value.trim();
+
+            if (!firstName || !lastName || !phone) {
+                alert('Prénom, Nom et Téléphone sont requis.');
+                return;
+            }
+
+            // Send AJAX request to create client
+            fetch('{% url "sales:quick_create_client" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    first_name: firstName,
+                    last_name: lastName,
+                    phone: phone
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Add new client to select and select it
+                    const select = document.getElementById('client-select');
+                    const option = new Option(data.full_name + ' — ' + data.phone, data.id, true, true);
+                    select.add(option);
+
+                    // Close quick add section and clear fields
+                    document.getElementById('quick-client-section').style.display = 'none';
+                    document.getElementById('quick-client-first-name').value = '';
+                    document.getElementById('quick-client-last-name').value = '';
+                    document.getElementById('quick-client-phone').value = '';
+                } else {
+                    alert(data.error || 'Erreur lors de la création du client.');
+                }
+            })
+            .catch(err => {
+                alert('Erreur réseau. Veuillez réessayer.');
+                console.error(err);
+            });
+        }
     </script>
 {% endblock %}

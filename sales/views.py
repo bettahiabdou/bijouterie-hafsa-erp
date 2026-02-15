@@ -2682,6 +2682,50 @@ def search_products_api(request):
         })
 
 
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def quick_create_client(request):
+    """AJAX endpoint to quickly create a client with first name, last name, phone"""
+    import json
+
+    try:
+        data = json.loads(request.body)
+        first_name = data.get('first_name', '').strip()
+        last_name = data.get('last_name', '').strip()
+        phone = data.get('phone', '').strip()
+
+        if not first_name or not last_name or not phone:
+            return JsonResponse({'success': False, 'error': 'Prénom, Nom et Téléphone sont requis.'})
+
+        # Check if client with same phone already exists
+        existing = Client.objects.filter(phone=phone).first()
+        if existing:
+            return JsonResponse({
+                'success': True,
+                'id': existing.id,
+                'full_name': existing.full_name,
+                'phone': existing.phone,
+                'message': 'Client existant sélectionné.'
+            })
+
+        client = Client.objects.create(
+            first_name=first_name,
+            last_name=last_name,
+            phone=phone,
+            is_active=True
+        )
+
+        return JsonResponse({
+            'success': True,
+            'id': client.id,
+            'full_name': client.full_name,
+            'phone': client.phone
+        })
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
 # =============================================================================
 # LIVRAISONS (DELIVERY TRACKING) VIEWS
 # =============================================================================
