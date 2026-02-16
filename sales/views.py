@@ -3284,15 +3284,15 @@ def delivery_bulk_check(request):
     from django.conf import settings
     from .models import Delivery
 
-    # Get all AMANA deliveries that are not delivered
+    # Get all AMANA deliveries that are not delivered or returned
     deliveries = Delivery.objects.filter(
         delivery_method_type='amana',
         tracking_number__isnull=False
     ).exclude(
         tracking_number=''
     ).exclude(
-        status='delivered'
-    )[:20]  # Limit to 20
+        status__in=['delivered', 'returned']
+    )
 
     proxy_url = getattr(settings, 'AMANA_PROXY_URL', '')
 
