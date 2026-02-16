@@ -926,8 +926,8 @@ def add_invoice_item(request, reference):
         # Get the invoice
         invoice = get_object_or_404(SaleInvoice, reference=reference)
 
-        # Check if invoice is in draft status
-        if invoice.status != 'draft':
+        # Staff can add items to any invoice, others only draft
+        if invoice.status != 'draft' and not request.user.is_staff:
             return JsonResponse({
                 'success': False,
                 'error': 'Seules les factures en brouillon peuvent avoir des articles ajoutés'
@@ -1061,8 +1061,8 @@ def delete_invoice_item(request):
         item = get_object_or_404(SaleInvoiceItem, id=item_id)
         invoice = item.invoice
 
-        # Check if invoice is in draft status
-        if invoice.status != 'draft':
+        # Staff can delete items from any invoice, others only draft
+        if invoice.status != 'draft' and not request.user.is_staff:
             return JsonResponse({
                 'success': False,
                 'error': 'Seules les factures en brouillon peuvent avoir des articles supprimés'

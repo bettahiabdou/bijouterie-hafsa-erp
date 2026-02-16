@@ -98,6 +98,36 @@
             <div class="card">
                 <div class="card-header">
                     <h3><i class="fas fa-shopping-bag mr-2"></i> Articles ({{ items|length }})</h3>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('addItemSection').style.display = document.getElementById('addItemSection').style.display === 'none' ? 'block' : 'none'">
+                        <i class="fas fa-plus"></i> Ajouter
+                    </button>
+                </div>
+                <!-- Add Item Inline Form -->
+                <div id="addItemSection" style="display: none; padding: var(--space-4); background: var(--primary-50); border-bottom: 1px solid var(--neutral-200);">
+                    <div class="form-grid-3" style="margin-bottom: var(--space-3);">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Produit</label>
+                            <select id="new_product_id" class="form-select">
+                                <option value="">-- Selectionnez --</option>
+                                {% for product in products %}
+                                <option value="{{ product.id }}" data-price="{{ product.selling_price }}">{{ product.reference }} - {{ product.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Prix (DH)</label>
+                            <input type="number" id="new_unit_price" class="form-input" step="0.01" min="0" placeholder="Auto">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Qte</label>
+                            <div style="display: flex; gap: var(--space-2);">
+                                <input type="number" id="new_quantity" class="form-input" step="0.001" min="0.001" value="1" style="flex: 1;">
+                                <button type="button" onclick="addNewItem()" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body" style="padding: 0;">
                     {% if items %}
@@ -153,9 +183,14 @@
                                     </td>
                                     <td style="text-align: center;">
                                         {% if not item.is_returned %}
-                                        <button type="button" onclick="updateItem({{ item.id }})" class="btn btn-ghost btn-sm" title="Sauvegarder">
-                                            <i class="fas fa-check text-success"></i>
-                                        </button>
+                                        <div style="display: flex; gap: 2px; justify-content: center;">
+                                            <button type="button" onclick="updateItem({{ item.id }})" class="btn btn-ghost btn-sm" title="Sauvegarder">
+                                                <i class="fas fa-check text-success"></i>
+                                            </button>
+                                            <button type="button" onclick="deleteItem({{ item.id }})" class="btn btn-ghost btn-sm" title="Supprimer">
+                                                <i class="fas fa-trash text-error"></i>
+                                            </button>
+                                        </div>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -584,6 +619,70 @@
             });
         });
     });
+
+    // Auto-fill price when product selected
+    document.addEventListener('DOMContentLoaded', function() {
+        const prodSelect = document.getElementById('new_product_id');
+        if (prodSelect) {
+            prodSelect.addEventListener('change', function() {
+                const opt = this.options[this.selectedIndex];
+                const price = opt ? opt.dataset.price : '';
+                const priceInput = document.getElementById('new_unit_price');
+                if (priceInput && price) priceInput.value = parseFloat(price).toFixed(2);
+            });
+        }
+    });
+
+    // Add new item via AJAX
+    function addNewItem() {
+        const productId = document.getElementById('new_product_id').value;
+        const unitPrice = document.getElementById('new_unit_price').value;
+        const quantity = document.getElementById('new_quantity').value;
+
+        if (!productId) { alert('Selectionnez un produit'); return; }
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const formData = new FormData();
+        formData.append('product_id', productId);
+        formData.append('quantity', quantity || '1');
+        if (unitPrice) formData.append('unit_price', unitPrice);
+
+        fetch('{% url "sales:add_item" invoice.reference %}', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': csrfToken }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+            }
+        })
+        .catch(err => { console.error(err); alert('Erreur de connexion'); });
+    }
+
+    // Delete item via AJAX
+    function deleteItem(itemId) {
+        if (!confirm('Supprimer cet article ?')) return;
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        fetch('{% url "sales:delete_item" %}?item_id=' + itemId, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+            }
+        })
+        .catch(err => { console.error(err); alert('Erreur de connexion'); });
+    }
 
     // Update individual item via AJAX
     function updateItem(itemId) {

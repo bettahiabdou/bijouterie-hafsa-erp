@@ -120,14 +120,16 @@ class SaleInvoiceForm(forms.ModelForm):
             if field_name in self.fields:
                 self.fields[field_name].required = False
 
+    def clean_payment_reference(self):
+        """Convert empty string to None for unique constraint"""
+        val = self.cleaned_data.get('payment_reference')
+        return val if val else None
+
     def clean(self):
-        """Validate form data"""
+        """Validate form data - lenient for editing existing invoices"""
         cleaned_data = super().clean()
         reference = cleaned_data.get('reference')
-        client = cleaned_data.get('client')
         tax_rate = cleaned_data.get('tax_rate')
-        payment_method = cleaned_data.get('payment_method')
-        payment_reference = cleaned_data.get('payment_reference')
 
         # Validate reference is unique (if changed)
         if reference:
@@ -143,49 +145,6 @@ class SaleInvoiceForm(forms.ModelForm):
         # Validate tax rate
         if tax_rate and (tax_rate < 0 or tax_rate > 100):
             raise ValidationError('Le taux TVA doit être entre 0 et 100%.')
-
-        # Validate client credit limit (is_over_credit_limit is a property, not a method)
-        if client and client.is_over_credit_limit:
-            raise ValidationError(
-                f'Le client {client.full_name} a dépassé sa limite de crédit.'
-            )
-
-        # VALIDATION: Payment reference is required for certain payment methods
-        # Only validate when creating a new invoice OR when payment method is being changed
-        is_new = not self.instance.id
-        payment_method_changed = payment_method and (
-            is_new or
-            (self.instance.payment_method_id != payment_method.id if payment_method else False)
-        )
-
-        if payment_method and (is_new or payment_method_changed):
-            payment_method_name = str(payment_method).lower()
-            # Methods that require a reference
-            REQUIRES_REFERENCE = ['virement', 'transfer', 'chèque', 'cheque', 'check', 'carte', 'card', 'mobile']
-            requires_ref = any(req in payment_method_name for req in REQUIRES_REFERENCE)
-
-            if requires_ref and not payment_reference:
-                # Check if existing payment_reference exists on the invoice
-                existing_ref = self.instance.payment_reference if self.instance.id else None
-                if not existing_ref:
-                    raise ValidationError(
-                        f'Une référence de paiement est obligatoire pour {payment_method} '
-                        '(N° de chèque, référence virement, n° de carte, etc.)'
-                    )
-
-        # Validate payment reference is unique (if provided and changed)
-        if payment_reference:
-            # Check for duplicates (exclude current invoice if editing)
-            from sales.models import SaleInvoice
-            existing = SaleInvoice.objects.filter(
-                payment_reference=payment_reference
-            ).exclude(
-                id=self.instance.id if self.instance.id else None
-            )
-            if existing.exists():
-                raise ValidationError(
-                    f'Cette référence de paiement est déjà utilisée par la facture {existing.first().reference}'
-                )
 
         return cleaned_data
 
