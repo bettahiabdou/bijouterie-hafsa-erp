@@ -2359,15 +2359,24 @@ def invoice_payment(request, reference):
                         created_by=request.user
                     )
 
-                # Update invoice totals and status
-                paid_amount = invoice.amount_paid + total_payment
+                # Recalculate invoice payment totals from actual DB records
+                # (ClientPayment.save() already incremented amount_paid via update_payment(),
+                #  so we recalculate from source of truth to avoid double-counting)
+                invoice.refresh_from_db()
+                actual_paid = ClientPayment.objects.filter(
+                    sale_invoice=invoice
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-                if paid_amount >= invoice.total_amount:
+                invoice.amount_paid = actual_paid
+                invoice.balance_due = invoice.total_amount - actual_paid
+
+                if actual_paid >= invoice.total_amount:
                     invoice.status = SaleInvoice.Status.PAID
-                elif paid_amount > 0:
+                elif actual_paid > 0:
                     invoice.status = SaleInvoice.Status.PARTIAL_PAID
+                else:
+                    invoice.status = SaleInvoice.Status.UNPAID
 
-                invoice.amount_paid = paid_amount
                 invoice.save()
 
                 # Log activity
