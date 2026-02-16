@@ -12,12 +12,12 @@
         <div class="page-header-inner">
             <div>
                 <h1 class="page-title">Livraisons</h1>
-                <p class="page-subtitle">Suivi des expéditions AMANA et transporteurs</p>
+                <p class="page-subtitle">Suivi des expeditions AMANA et transporteurs</p>
             </div>
             <div class="page-actions">
                 <a href="{% url 'sales:delivery_bulk_check' %}" class="btn btn-primary">
                     <i class="fas fa-sync-alt"></i>
-                    <span>Vérifier Tout</span>
+                    <span>Verifier Tout</span>
                 </a>
             </div>
         </div>
@@ -26,41 +26,41 @@
 
 {% block content %}
     <!-- Stats Cards -->
-    <div class="stats-grid mb-6">
-        <div class="stat-card">
-            <div class="stat-icon bg-primary-100 text-primary-600">
+    <div class="dlv-stats mb-6">
+        <div class="dlv-stat-card">
+            <div class="dlv-stat-icon" style="background: var(--primary-100); color: var(--primary-600);">
                 <i class="fas fa-truck"></i>
             </div>
-            <div class="stat-content">
-                <span class="stat-value">{{ stats.total }}</span>
-                <span class="stat-label">Total</span>
+            <div class="dlv-stat-content">
+                <span class="dlv-stat-value">{{ stats.total }}</span>
+                <span class="dlv-stat-label">Total</span>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-gray-100 text-gray-600">
+        <div class="dlv-stat-card">
+            <div class="dlv-stat-icon" style="background: var(--neutral-100); color: var(--neutral-600);">
                 <i class="fas fa-clock"></i>
             </div>
-            <div class="stat-content">
-                <span class="stat-value">{{ stats.pending }}</span>
-                <span class="stat-label">En Attente</span>
+            <div class="dlv-stat-content">
+                <span class="dlv-stat-value">{{ stats.pending }}</span>
+                <span class="dlv-stat-label">En Attente</span>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-warning-100 text-warning-600">
+        <div class="dlv-stat-card">
+            <div class="dlv-stat-icon" style="background: var(--warning-100); color: var(--warning-600);">
                 <i class="fas fa-shipping-fast"></i>
             </div>
-            <div class="stat-content">
-                <span class="stat-value">{{ stats.in_transit }}</span>
-                <span class="stat-label">En Transit</span>
+            <div class="dlv-stat-content">
+                <span class="dlv-stat-value">{{ stats.in_transit }}</span>
+                <span class="dlv-stat-label">En Transit</span>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-success-100 text-success-600">
+        <div class="dlv-stat-card">
+            <div class="dlv-stat-icon" style="background: var(--success-100); color: var(--success-600);">
                 <i class="fas fa-check-circle"></i>
             </div>
-            <div class="stat-content">
-                <span class="stat-value">{{ stats.delivered }}</span>
-                <span class="stat-label">Livrés</span>
+            <div class="dlv-stat-content">
+                <span class="dlv-stat-value">{{ stats.delivered }}</span>
+                <span class="dlv-stat-label">Livres</span>
             </div>
         </div>
     </div>
@@ -68,418 +68,410 @@
     <!-- Filters -->
     <div class="card mb-4">
         <div class="card-body">
-            <form method="get" class="filter-form">
-                <div class="filter-row">
-                    <div class="filter-group">
+            <form method="get" class="dlv-filter-form">
+                <div class="dlv-filter-row">
+                    <div class="dlv-filter-group" style="flex: 2;">
                         <label class="form-label">Recherche</label>
-                        <input type="text" name="search" class="form-input" placeholder="Référence, tracking, client..."
+                        <input type="text" name="search" class="form-input" placeholder="Reference, tracking, client, facture..."
                                value="{{ search_query }}">
                     </div>
-                    <div class="filter-group">
+                    <div class="dlv-filter-group">
                         <label class="form-label">Statut</label>
                         <select name="status" class="form-select">
-                            <option value="">Tous les statuts</option>
+                            <option value="">Tous</option>
                             <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>En Attente</option>
                             <option value="in_transit" {% if status_filter == 'in_transit' %}selected{% endif %}>En Transit</option>
-                            <option value="to_pickup" {% if status_filter == 'to_pickup' %}selected{% endif %}>À Récupérer</option>
-                            <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Livré</option>
-                            <option value="returned" {% if status_filter == 'returned' %}selected{% endif %}>Retourné</option>
+                            <option value="to_pickup" {% if status_filter == 'to_pickup' %}selected{% endif %}>A Recuperer</option>
+                            <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Livre</option>
+                            <option value="returned" {% if status_filter == 'returned' %}selected{% endif %}>Retourne</option>
                         </select>
                     </div>
-                    <div class="filter-group">
+                    <div class="dlv-filter-group">
                         <label class="form-label">Type</label>
                         <select name="method" class="form-select">
-                            <option value="">Tous les types</option>
+                            <option value="">Tous</option>
                             <option value="amana" {% if method_filter == 'amana' %}selected{% endif %}>AMANA</option>
                             <option value="transporteur" {% if method_filter == 'transporteur' %}selected{% endif %}>Transporteur</option>
                         </select>
                     </div>
-                    <div class="filter-actions">
+                    <div class="dlv-filter-actions">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-search"></i>
-                            Filtrer
+                            <i class="fas fa-search"></i> Filtrer
                         </button>
+                        {% if search_query or status_filter or method_filter %}
                         <a href="{% url 'sales:delivery_list' %}" class="btn btn-secondary">
                             <i class="fas fa-times"></i>
                         </a>
+                        {% endif %}
                     </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Deliveries List -->
+    <!-- Deliveries -->
     {% if deliveries %}
-        <!-- Desktop Table (hidden on tablet/mobile) -->
-        <div class="card delivery-table-desktop">
-            <div class="card-header">
-                <h3><i class="fas fa-list mr-2"></i> Liste des Livraisons</h3>
-            </div>
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Référence</th>
-                            <th>Client</th>
-                            <th>Type</th>
-                            <th>N° Suivi</th>
-                            <th>Statut</th>
-                            <th>Position</th>
-                            <th>Dernière Vérif.</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for delivery in deliveries %}
-                            <tr>
-                                <td>
-                                    <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="font-mono font-semibold text-primary">
-                                        {{ delivery.reference|truncatechars:16 }}
-                                    </a>
-                                </td>
-                                <td>
-                                    <div>{{ delivery.client_name|default:'-' }}</div>
-                                    {% if delivery.client_phone %}
-                                        <div class="text-sm text-muted">{{ delivery.client_phone }}</div>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if delivery.delivery_method_type == 'amana' %}
-                                        <span class="badge badge-info">AMANA</span>
-                                    {% else %}
-                                        <span class="badge badge-secondary">{{ delivery.carrier.name|default:'Transporteur' }}</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <span class="font-mono text-sm">{{ delivery.tracking_number|default:'-' }}</span>
-                                </td>
-                                <td>
-                                    {% if delivery.status == 'pending' %}
-                                        <span class="badge badge-secondary">En Attente</span>
-                                    {% elif delivery.status == 'in_transit' %}
-                                        <span class="badge badge-warning">En Transit</span>
-                                    {% elif delivery.status == 'to_pickup' %}
-                                        <span class="badge badge-info">À Récupérer</span>
-                                    {% elif delivery.status == 'delivered' %}
-                                        <span class="badge badge-success">Livré</span>
-                                    {% elif delivery.status == 'returned' %}
-                                        <span class="badge badge-danger">Retourné</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <span class="text-sm">{{ delivery.current_position|default:'-'|truncatechars:25 }}</span>
-                                </td>
-                                <td>
-                                    {% if delivery.last_checked_at %}
-                                        <span class="text-sm text-muted">{{ delivery.last_checked_at|date:"d/m H:i" }}</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-right">
-                                    <div class="btn-group">
-                                        <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="btn btn-ghost btn-sm" title="Détails">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
-                                            <a href="{% url 'sales:delivery_check' delivery.reference %}" class="btn btn-ghost btn-sm" title="Vérifier">
-                                                <i class="fas fa-sync-alt"></i>
-                                            </a>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Mobile/Tablet Cards (hidden on desktop) -->
-        <div class="delivery-cards-mobile">
+        <div class="dlv-list">
             {% for delivery in deliveries %}
-                <div class="delivery-card">
-                    <div class="delivery-card-header">
-                        <div class="delivery-card-badges">
-                            {% if delivery.delivery_method_type == 'amana' %}
-                                <span class="badge badge-info">AMANA</span>
-                            {% else %}
-                                <span class="badge badge-secondary">{{ delivery.carrier.name|default:'Transporteur' }}</span>
-                            {% endif %}
-                            {% if delivery.status == 'pending' %}
-                                <span class="badge badge-secondary">En Attente</span>
-                            {% elif delivery.status == 'in_transit' %}
-                                <span class="badge badge-warning">En Transit</span>
-                            {% elif delivery.status == 'to_pickup' %}
-                                <span class="badge badge-info">À Récupérer</span>
-                            {% elif delivery.status == 'delivered' %}
-                                <span class="badge badge-success">Livré</span>
-                            {% elif delivery.status == 'returned' %}
-                                <span class="badge badge-danger">Retourné</span>
+            <div class="dlv-row {% if delivery.status == 'delivered' %}dlv-row-delivered{% elif delivery.status == 'returned' %}dlv-row-returned{% endif %}">
+                <div class="dlv-row-main">
+                    <!-- Left: Status + Type badges -->
+                    <div class="dlv-row-badges">
+                        {% if delivery.status == 'pending' %}
+                            <span class="badge badge-secondary">En Attente</span>
+                        {% elif delivery.status == 'in_transit' %}
+                            <span class="badge badge-warning">En Transit</span>
+                        {% elif delivery.status == 'to_pickup' %}
+                            <span class="badge badge-info">A Recuperer</span>
+                        {% elif delivery.status == 'delivered' %}
+                            <span class="badge badge-success">Livre</span>
+                        {% elif delivery.status == 'returned' %}
+                            <span class="badge badge-error">Retourne</span>
+                        {% endif %}
+                        {% if delivery.delivery_method_type == 'amana' %}
+                            <span class="badge badge-info">AMANA</span>
+                        {% else %}
+                            <span class="badge badge-neutral">{{ delivery.carrier.name|default:'Transporteur' }}</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Center: Main info -->
+                    <div class="dlv-row-info">
+                        <div class="dlv-row-top">
+                            <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="dlv-ref">{{ delivery.reference }}</a>
+                            {% if delivery.invoice %}
+                            <a href="{% url 'sales:invoice_detail' delivery.invoice.reference %}" class="dlv-invoice-link" title="Facture liee">
+                                <i class="fas fa-file-invoice"></i> {{ delivery.invoice.reference }}
+                            </a>
                             {% endif %}
                         </div>
-                        <div class="delivery-card-actions">
-                            <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="btn btn-ghost btn-sm" title="Détails">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                            {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
-                                <a href="{% url 'sales:delivery_check' delivery.reference %}" class="btn btn-ghost btn-sm" title="Vérifier">
-                                    <i class="fas fa-sync-alt"></i>
-                                </a>
+                        <div class="dlv-row-details">
+                            <span class="dlv-detail">
+                                <i class="fas fa-user"></i> {{ delivery.client_name|default:'—' }}
+                            </span>
+                            {% if delivery.tracking_number %}
+                            <span class="dlv-detail">
+                                <i class="fas fa-barcode"></i> {{ delivery.tracking_number }}
+                            </span>
+                            {% endif %}
+                            {% if delivery.current_position %}
+                            <span class="dlv-detail">
+                                <i class="fas fa-map-marker-alt"></i> {{ delivery.current_position|truncatechars:30 }}
+                            </span>
+                            {% endif %}
+                            {% if delivery.total_amount %}
+                            <span class="dlv-detail">
+                                <i class="fas fa-coins"></i> {{ delivery.total_amount|floatformat:0 }} DH
+                            </span>
                             {% endif %}
                         </div>
                     </div>
-                    <div class="delivery-card-body">
-                        <div class="delivery-card-client">
-                            <i class="fas fa-user"></i>
-                            <strong>{{ delivery.client_name|default:'-' }}</strong>
-                            {% if delivery.client_phone %}
-                                <span class="text-muted">{{ delivery.client_phone }}</span>
-                            {% endif %}
-                        </div>
-                        <div class="delivery-card-info">
-                            <div class="delivery-info-item">
-                                <span class="delivery-info-label">Réf</span>
-                                <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="font-mono text-primary">{{ delivery.reference|truncatechars:20 }}</a>
-                            </div>
-                            <div class="delivery-info-item">
-                                <span class="delivery-info-label">Suivi</span>
-                                <span class="font-mono">{{ delivery.tracking_number|default:'-' }}</span>
-                            </div>
-                            {% if delivery.current_position %}
-                                <div class="delivery-info-item">
-                                    <span class="delivery-info-label">Position</span>
-                                    <span>{{ delivery.current_position|truncatechars:30 }}</span>
-                                </div>
-                            {% endif %}
-                            {% if delivery.last_checked_at %}
-                                <div class="delivery-info-item">
-                                    <span class="delivery-info-label">Vérif.</span>
-                                    <span class="text-muted">{{ delivery.last_checked_at|date:"d/m H:i" }}</span>
-                                </div>
-                            {% endif %}
-                        </div>
+
+                    <!-- Right: Actions -->
+                    <div class="dlv-row-actions">
+                        <a href="{% url 'sales:delivery_detail' delivery.reference %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-eye"></i> Details
+                        </a>
+                        {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
+                        <a href="{% url 'sales:delivery_check' delivery.reference %}" class="btn btn-ghost btn-sm" title="Verifier AMANA">
+                            <i class="fas fa-sync-alt"></i>
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
+            </div>
             {% endfor %}
         </div>
 
         <!-- Pagination -->
         {% if page_obj.has_other_pages %}
-            <div class="card mt-4">
-                <div class="card-body" style="display: flex; justify-content: center; padding: var(--space-3);">
-                    <div class="pagination">
-                        {% if page_obj.has_previous %}
-                            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}" class="pagination-btn">
-                                <i class="fas fa-chevron-left"></i>
-                            </a>
-                        {% endif %}
-                        <span class="pagination-info">
-                            Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
-                        </span>
-                        {% if page_obj.has_next %}
-                            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}" class="pagination-btn">
-                                <i class="fas fa-chevron-right"></i>
-                            </a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+        <div class="dlv-pagination">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-chevron-left"></i> Precedent
+            </a>
+            {% endif %}
+            <span class="dlv-page-info">
+                Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+            </span>
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}" class="btn btn-secondary btn-sm">
+                Suivant <i class="fas fa-chevron-right"></i>
+            </a>
+            {% endif %}
+        </div>
         {% endif %}
     {% else %}
         <div class="card">
-            <div class="card-body text-center" style="padding: var(--space-8);">
+            <div class="card-body" style="text-align: center; padding: var(--space-8);">
                 <i class="fas fa-truck" style="font-size: 3rem; color: var(--neutral-300); margin-bottom: var(--space-4); display: block;"></i>
-                <p style="color: var(--neutral-600); margin-bottom: var(--space-2); font-size: var(--text-lg);">Aucune livraison trouvée</p>
-                <p style="color: var(--neutral-400); font-size: var(--text-sm);">Les livraisons apparaîtront ici lorsque des factures seront créées avec le mode AMANA ou transporteur.</p>
+                <p style="color: var(--neutral-600); font-size: var(--text-lg);">Aucune livraison trouvee</p>
+                <p style="color: var(--neutral-400); font-size: var(--text-sm);">Les livraisons apparaitront ici lorsque des factures seront creees avec le mode AMANA ou transporteur.</p>
             </div>
         </div>
     {% endif %}
 
     <style>
-        .stats-grid {
+        /* Stats */
+        .dlv-stats {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: var(--space-4);
         }
 
-        .stat-card {
+        .dlv-stat-card {
             display: flex;
             align-items: center;
-            gap: var(--space-4);
+            gap: var(--space-3);
             padding: var(--space-4);
             background: white;
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-sm);
         }
 
-        .stat-icon {
+        .dlv-stat-icon {
             width: 48px;
             height: 48px;
             border-radius: var(--radius-md);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: var(--text-xl);
+            font-size: 1.2rem;
+            flex-shrink: 0;
         }
 
-        .stat-content {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .stat-value {
+        .dlv-stat-value {
             font-size: var(--text-2xl);
             font-weight: var(--font-bold);
             color: var(--neutral-800);
+            display: block;
         }
 
-        .stat-label {
+        .dlv-stat-label {
             font-size: var(--text-sm);
             color: var(--neutral-500);
         }
 
-        .filter-form .filter-row {
+        /* Filters */
+        .dlv-filter-row {
             display: flex;
-            gap: var(--space-4);
+            gap: var(--space-3);
             align-items: flex-end;
         }
 
-        .filter-form .filter-group {
+        .dlv-filter-group {
             flex: 1;
         }
 
-        .filter-form .filter-actions {
+        .dlv-filter-actions {
             display: flex;
             gap: var(--space-2);
+            flex-shrink: 0;
         }
 
-        /* Desktop table visible, mobile cards hidden */
-        .delivery-table-desktop { display: block; }
-        .delivery-cards-mobile { display: none; }
+        /* Delivery List */
+        .dlv-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
 
-        /* Mobile/Tablet card styles */
-        .delivery-card {
+        .dlv-row {
             background: white;
             border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--neutral-100);
-            margin-bottom: var(--space-3);
+            border: 1px solid var(--neutral-200);
             overflow: hidden;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
-        .delivery-card-header {
+        .dlv-row:hover {
+            border-color: var(--primary-200);
+            box-shadow: var(--shadow-md);
+        }
+
+        .dlv-row-delivered {
+            border-left: 3px solid var(--success-400);
+        }
+
+        .dlv-row-returned {
+            border-left: 3px solid var(--error-400);
+            opacity: 0.7;
+        }
+
+        .dlv-row-main {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: var(--space-3) var(--space-4);
-            background: var(--neutral-50);
-            border-bottom: 1px solid var(--neutral-100);
-        }
-
-        .delivery-card-badges {
-            display: flex;
-            gap: var(--space-2);
-            flex-wrap: wrap;
-        }
-
-        .delivery-card-actions {
-            display: flex;
-            gap: var(--space-1);
-        }
-
-        .delivery-card-body {
+            gap: var(--space-4);
             padding: var(--space-4);
         }
 
-        .delivery-card-client {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            margin-bottom: var(--space-3);
-            font-size: var(--text-base);
-        }
-
-        .delivery-card-client i {
-            color: var(--neutral-400);
-            font-size: var(--text-sm);
-        }
-
-        .delivery-card-client .text-muted {
-            margin-left: var(--space-2);
-            font-size: var(--text-sm);
-        }
-
-        .delivery-card-info {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--space-2);
-        }
-
-        .delivery-info-item {
+        /* Badges column */
+        .dlv-row-badges {
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: var(--space-1);
+            flex-shrink: 0;
+            min-width: 100px;
+            align-items: flex-start;
         }
 
-        .delivery-info-label {
-            font-size: var(--text-xs);
-            color: var(--neutral-400);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+        /* Info column */
+        .dlv-row-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .dlv-row-top {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            margin-bottom: var(--space-2);
+            flex-wrap: wrap;
+        }
+
+        .dlv-ref {
+            font-family: var(--font-mono);
             font-weight: var(--font-semibold);
-        }
-
-        .delivery-info-item span:not(.delivery-info-label),
-        .delivery-info-item a {
             font-size: var(--text-sm);
-            color: var(--neutral-700);
+            color: var(--primary-700);
+            text-decoration: none;
         }
 
-        @media (max-width: 1399px) {
-            .stats-grid {
+        .dlv-ref:hover {
+            text-decoration: underline;
+        }
+
+        .dlv-invoice-link {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            background: var(--neutral-100);
+            padding: 2px var(--space-2);
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            font-family: var(--font-mono);
+            transition: all 0.2s;
+        }
+
+        .dlv-invoice-link:hover {
+            background: var(--primary-100);
+            color: var(--primary-700);
+        }
+
+        .dlv-invoice-link i {
+            font-size: 0.65rem;
+        }
+
+        .dlv-row-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-2) var(--space-4);
+        }
+
+        .dlv-detail {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
+            font-size: var(--text-sm);
+            color: var(--neutral-600);
+        }
+
+        .dlv-detail i {
+            color: var(--neutral-400);
+            font-size: 0.7rem;
+            width: 14px;
+            text-align: center;
+        }
+
+        /* Actions column */
+        .dlv-row-actions {
+            display: flex;
+            gap: var(--space-2);
+            flex-shrink: 0;
+            align-items: center;
+        }
+
+        /* Pagination */
+        .dlv-pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--space-4);
+            padding: var(--space-4);
+            margin-top: var(--space-4);
+        }
+
+        .dlv-page-info {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+            font-weight: var(--font-medium);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .dlv-stats {
                 grid-template-columns: repeat(2, 1fr);
             }
 
-            .filter-form .filter-row {
+            .dlv-filter-row {
                 flex-wrap: wrap;
             }
 
-            .filter-form .filter-group {
+            .dlv-filter-group {
                 flex: 1 1 45%;
             }
 
-            /* Switch to card layout on tablet */
-            .delivery-table-desktop { display: none; }
-            .delivery-cards-mobile { display: block; }
-        }
-
-        @media (max-width: 640px) {
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
-            .stat-card {
-                padding: var(--space-3);
+            .dlv-row-main {
+                flex-wrap: wrap;
                 gap: var(--space-3);
             }
 
-            .stat-icon {
-                width: 40px;
-                height: 40px;
-                font-size: var(--text-lg);
+            .dlv-row-badges {
+                flex-direction: row;
+                min-width: auto;
             }
 
-            .stat-value {
+            .dlv-row-actions {
+                width: 100%;
+                justify-content: flex-end;
+                padding-top: var(--space-2);
+                border-top: 1px solid var(--neutral-100);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .dlv-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .dlv-stat-card {
+                padding: var(--space-3);
+                gap: var(--space-2);
+            }
+
+            .dlv-stat-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+            }
+
+            .dlv-stat-value {
                 font-size: var(--text-xl);
             }
 
-            .filter-form .filter-group {
+            .dlv-filter-group {
                 flex: 1 1 100%;
             }
 
-            .delivery-card-info {
-                grid-template-columns: 1fr;
+            .dlv-row-main {
+                padding: var(--space-3);
+            }
+
+            .dlv-row-details {
+                flex-direction: column;
+                gap: var(--space-1);
             }
         }
     </style>
