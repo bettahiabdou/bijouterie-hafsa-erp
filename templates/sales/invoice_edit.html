@@ -260,27 +260,83 @@
                 </div>
             </div>
 
-            <!-- Payment -->
+            <!-- Payments (ClientPayment records) -->
             <div class="card">
                 <div class="card-header">
-                    <h3><i class="fas fa-credit-card mr-2"></i> Paiement</h3>
+                    <h3><i class="fas fa-credit-card mr-2"></i> Paiements ({{ invoice_payments|length }})</h3>
                 </div>
-                <div class="card-body">
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label class="form-label">Methode de paiement</label>
-                            {{ form.payment_method }}
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Compte bancaire</label>
-                            {{ form.bank_account }}
-                        </div>
+                <div class="card-body" style="padding: 0;">
+                    {% if invoice_payments %}
+                    <div class="table-wrapper" style="border: none; border-radius: 0;">
+                        <table class="table" id="paymentsTable">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th style="width: 140px;">Montant</th>
+                                    <th style="width: 180px;">Methode</th>
+                                    <th style="width: 160px;">Banque</th>
+                                    <th style="text-align: center; width: 80px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pay in invoice_payments %}
+                                <tr id="payment-row-{{ pay.id }}">
+                                    <td>
+                                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                                            <span style="font-size: var(--text-xs); color: var(--neutral-500);">{{ pay.date|date:"d/m/Y" }}</span>
+                                            <input type="text" class="form-input pay-ref-input"
+                                                   value="{{ pay.reference }}"
+                                                   data-pay-id="{{ pay.id }}"
+                                                   style="padding: var(--space-1) var(--space-2); font-size: var(--text-xs);">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-input pay-amount-input"
+                                               value="{{ pay.amount }}" step="0.01" min="0.01"
+                                               data-pay-id="{{ pay.id }}"
+                                               style="text-align: right; padding: var(--space-1) var(--space-2); font-size: var(--text-sm);">
+                                    </td>
+                                    <td>
+                                        <select class="form-select pay-method-select" data-pay-id="{{ pay.id }}"
+                                                style="padding: var(--space-1) var(--space-2); font-size: var(--text-sm);">
+                                            {% for pm in payment_methods %}
+                                            <option value="{{ pm.id }}" {% if pm.id == pay.payment_method_id %}selected{% endif %}>{{ pm.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select class="form-select pay-bank-select" data-pay-id="{{ pay.id }}"
+                                                style="padding: var(--space-1) var(--space-2); font-size: var(--text-sm);">
+                                            <option value="">--</option>
+                                            {% for ba in bank_accounts %}
+                                            <option value="{{ ba.id }}" {% if pay.bank_account_id == ba.id %}selected{% endif %}>{{ ba.bank_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <div style="display: flex; gap: 2px; justify-content: center;">
+                                            <button type="button" onclick="updatePayment({{ pay.id }})" class="btn btn-ghost btn-sm" title="Sauvegarder">
+                                                <i class="fas fa-check text-success"></i>
+                                            </button>
+                                            <button type="button" onclick="deletePayment({{ pay.id }})" class="btn btn-ghost btn-sm" title="Supprimer">
+                                                <i class="fas fa-trash text-error"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Reference de paiement</label>
-                        {{ form.payment_reference }}
-                        <p class="form-hint">N° de cheque, reference virement, n° de carte...</p>
+                    {% else %}
+                    <div style="text-align: center; padding: var(--space-4); color: var(--neutral-400);">
+                        <i class="fas fa-money-bill" style="font-size: 1.5rem; margin-bottom: var(--space-2); display: block;"></i>
+                        <p style="font-size: var(--text-sm);">Aucun paiement enregistre</p>
+                        <a href="{% url 'sales:invoice_payment' invoice.reference %}" class="btn btn-primary btn-sm" style="margin-top: var(--space-2);">
+                            <i class="fas fa-plus"></i> Enregistrer un paiement
+                        </a>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -671,6 +727,71 @@
 
         fetch('{% url "sales:delete_item" %}?item_id=' + itemId, {
             method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+            }
+        })
+        .catch(err => { console.error(err); alert('Erreur de connexion'); });
+    }
+
+    // ========== PAYMENT EDITING ==========
+    function updatePayment(payId) {
+        const row = document.getElementById('payment-row-' + payId);
+        if (!row) return;
+
+        const amountInput = row.querySelector('.pay-amount-input');
+        const methodSelect = row.querySelector('.pay-method-select');
+        const bankSelect = row.querySelector('.pay-bank-select');
+        const refInput = row.querySelector('.pay-ref-input');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        const formData = new FormData();
+        formData.append('payment_id', payId);
+        if (amountInput) formData.append('amount', amountInput.value);
+        if (methodSelect) formData.append('payment_method_id', methodSelect.value);
+        if (bankSelect) formData.append('bank_account_id', bankSelect.value);
+        if (refInput) formData.append('reference', refInput.value);
+
+        fetch('{% url "sales:update_payment" %}', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': csrfToken }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                // Flash success
+                row.style.transition = 'background 0.3s';
+                row.style.background = 'var(--success-50)';
+                setTimeout(() => { row.style.background = ''; }, 1500);
+                // Update summary sidebar
+                if (data.amount_paid) {
+                    const paidEl = document.querySelector('.summary-paid');
+                    if (paidEl) paidEl.textContent = parseFloat(data.amount_paid).toFixed(2) + ' DH';
+                }
+            } else {
+                alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+            }
+        })
+        .catch(err => { console.error(err); alert('Erreur de connexion'); });
+    }
+
+    function deletePayment(payId) {
+        if (!confirm('Supprimer ce paiement ?')) return;
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const formData = new FormData();
+        formData.append('payment_id', payId);
+
+        fetch('{% url "sales:delete_payment" %}', {
+            method: 'POST',
+            body: formData,
             headers: { 'X-CSRFToken': csrfToken }
         })
         .then(r => r.json())

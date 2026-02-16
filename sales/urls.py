@@ -25,6 +25,10 @@ urlpatterns = [
     path('invoices/delete-item/', views.delete_invoice_item, name='delete_item'),
     path('invoices/update-item/', views.update_invoice_item, name='update_item'),
 
+    # Payment editing
+    path('api/update-payment/', views.update_payment, name='update_payment'),
+    path('api/delete-payment/', views.delete_payment, name='delete_payment'),
+
     # API endpoints
     path('api/payment-methods/', views.get_payment_methods, name='get_payment_methods'),
     path('api/search-products/', views.search_products_api, name='search_products_api'),

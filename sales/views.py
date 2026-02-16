@@ -1185,6 +1185,141 @@ def update_invoice_item(request):
 
 
 @login_required(login_url='login')
+@require_http_methods(["POST"])
+def update_payment(request):
+    """Update an existing ClientPayment (AJAX) - staff only"""
+    from payments.models import ClientPayment
+    try:
+        if not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'Permission refusee'}, status=403)
+
+        payment_id = request.POST.get('payment_id')
+        if not payment_id:
+            return JsonResponse({'success': False, 'error': 'ID paiement requis'}, status=400)
+
+        payment = get_object_or_404(ClientPayment, id=payment_id)
+        invoice = payment.sale_invoice
+
+        # Update amount
+        new_amount = request.POST.get('amount')
+        if new_amount is not None and new_amount != '':
+            try:
+                new_amount = Decimal(new_amount)
+                if new_amount <= 0:
+                    return JsonResponse({'success': False, 'error': 'Montant invalide'}, status=400)
+                old_amount = payment.amount
+                payment.amount = new_amount
+            except (InvalidOperation, TypeError):
+                return JsonResponse({'success': False, 'error': 'Montant invalide'}, status=400)
+
+        # Update payment method
+        new_pm_id = request.POST.get('payment_method_id')
+        if new_pm_id:
+            payment.payment_method_id = int(new_pm_id)
+
+        # Update bank account
+        new_ba_id = request.POST.get('bank_account_id')
+        if new_ba_id == '':
+            payment.bank_account = None
+        elif new_ba_id:
+            payment.bank_account_id = int(new_ba_id)
+
+        # Update reference
+        new_ref = request.POST.get('reference')
+        if new_ref is not None:
+            payment.reference = new_ref or f"PAY-{payment.id}"
+
+        payment.save()
+
+        # Recalculate invoice payment totals
+        if invoice:
+            total_paid = ClientPayment.objects.filter(
+                sale_invoice=invoice
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            invoice.amount_paid = total_paid
+            invoice.balance_due = invoice.total_amount - total_paid
+            if total_paid >= invoice.total_amount:
+                invoice.status = 'paid'
+            elif total_paid > 0:
+                invoice.status = 'partial'
+            else:
+                invoice.status = 'unpaid'
+            invoice.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Paiement mis a jour',
+            'amount_paid': str(invoice.amount_paid) if invoice else '0',
+            'balance_due': str(invoice.balance_due) if invoice else '0',
+            'status': invoice.status if invoice else '',
+        })
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f'Error updating payment: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def delete_payment(request):
+    """Delete a ClientPayment (AJAX) - staff only"""
+    from payments.models import ClientPayment
+    try:
+        if not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'Permission refusee'}, status=403)
+
+        payment_id = request.POST.get('payment_id')
+        if not payment_id:
+            return JsonResponse({'success': False, 'error': 'ID paiement requis'}, status=400)
+
+        payment = get_object_or_404(ClientPayment, id=payment_id)
+        invoice = payment.sale_invoice
+        payment_repr = f"{payment.reference} - {payment.amount} DH"
+
+        payment.delete()
+
+        # Recalculate invoice payment totals
+        if invoice:
+            total_paid = ClientPayment.objects.filter(
+                sale_invoice=invoice
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            invoice.amount_paid = total_paid
+            invoice.balance_due = invoice.total_amount - total_paid
+            if total_paid >= invoice.total_amount:
+                invoice.status = 'paid'
+            elif total_paid > 0:
+                invoice.status = 'partial'
+            else:
+                invoice.status = 'unpaid'
+            invoice.save()
+
+        ActivityLog.objects.create(
+            user=request.user,
+            action=ActivityLog.ActionType.DELETE,
+            model_name='ClientPayment',
+            object_id=payment_id,
+            object_repr=payment_repr,
+            ip_address=get_client_ip(request)
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Paiement supprime',
+            'amount_paid': str(invoice.amount_paid) if invoice else '0',
+            'balance_due': str(invoice.balance_due) if invoice else '0',
+            'status': invoice.status if invoice else '',
+        })
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f'Error deleting payment: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
+
+
+@login_required(login_url='login')
 @require_http_methods(["GET", "POST"])
 def invoice_create(request):
     """Create a new sales invoice"""
@@ -2034,12 +2169,22 @@ def invoice_edit(request, reference):
         form = SaleInvoiceForm(instance=invoice)
 
     from django.contrib.auth import get_user_model
+    from payments.models import ClientPayment
+    from settings_app.models import PaymentMethod, BankAccount
     User = get_user_model()
+
+    # Get payments linked to this invoice
+    invoice_payments = ClientPayment.objects.filter(
+        sale_invoice=invoice
+    ).select_related('payment_method', 'bank_account').order_by('date', 'id')
 
     context = {
         'invoice': invoice,
         'form': form,
         'items': items,
+        'invoice_payments': invoice_payments,
+        'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order', 'name'),
+        'bank_accounts': BankAccount.objects.filter(is_active=True).order_by('bank_name'),
         'sellers': User.objects.filter(is_active=True).order_by('first_name'),
         'carriers': Carrier.objects.filter(is_active=True).order_by('name'),
         'clients': Client.objects.filter(is_active=True).order_by('first_name', 'last_name'),
