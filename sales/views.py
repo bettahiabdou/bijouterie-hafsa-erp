@@ -61,16 +61,19 @@ def sales_dashboard(request):
 
     # ============ CALCULATE REAL "ENCAISSE" ============
     # "Encaissé" = actually received money = all ClientPayments EXCEPT
-    # AMANA payments where delivery is NOT yet "delivered"
-    #
-    # Logic: For each invoice, sum its ClientPayment amounts, but exclude
-    # payments where payment_method name contains 'amana' AND the invoice
-    # delivery status is NOT 'delivered'
+    # AMANA/Transporteur payments where delivery is NOT yet "delivered"
 
-    # Get all AMANA payment method IDs
+    # Get AMANA and Transporteur payment method IDs
     amana_method_ids = list(
         PaymentMethod.objects.filter(name__icontains='amana').values_list('id', flat=True)
     )
+    transporteur_method_ids = list(
+        PaymentMethod.objects.filter(
+            Q(name__icontains='transporteur') | Q(name__icontains='transport')
+        ).exclude(id__in=amana_method_ids).values_list('id', flat=True)
+    )
+    # Combined delivery payment methods (money pending until delivered)
+    delivery_method_ids = amana_method_ids + transporteur_method_ids
 
     # Total revenue from filtered invoices
     filtered_stats = base_qs.aggregate(
@@ -82,7 +85,7 @@ def sales_dashboard(request):
     # Get all ClientPayments linked to our filtered invoices
     filtered_invoice_ids = base_qs.values_list('id', flat=True)
 
-    # Actually collected: all payments minus AMANA payments on undelivered invoices
+    # All payments total
     all_payments_total = ClientPayment.objects.filter(
         sale_invoice_id__in=filtered_invoice_ids
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
@@ -97,7 +100,44 @@ def sales_dashboard(request):
             sale_invoice__delivery__status='delivered'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    real_encaisse = all_payments_total - amana_not_received
+    # Transporteur payments on invoices NOT yet delivered
+    transporteur_not_received = Decimal('0')
+    if transporteur_method_ids:
+        transporteur_not_received = ClientPayment.objects.filter(
+            sale_invoice_id__in=filtered_invoice_ids,
+            payment_method_id__in=transporteur_method_ids,
+        ).exclude(
+            sale_invoice__delivery__status='delivered'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    # Also count invoices with delivery_method_type='transporteur' that aren't delivered
+    # even if their payment method isn't labeled "transporteur"
+    transporteur_delivery_not_received = ClientPayment.objects.filter(
+        sale_invoice_id__in=filtered_invoice_ids,
+        sale_invoice__delivery_method_type='transporteur',
+    ).exclude(
+        sale_invoice__delivery__status='delivered'
+    ).exclude(
+        payment_method_id__in=amana_method_ids  # Don't double count AMANA
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    # Use the larger value (some transporteur invoices may use generic payment methods)
+    transporteur_not_received = max(transporteur_not_received, transporteur_delivery_not_received)
+
+    total_delivery_pending = amana_not_received + transporteur_not_received
+    real_encaisse = all_payments_total - total_delivery_pending
+
+    # ============ PAYMENT METHOD BREAKDOWN (for filtered period) ============
+    payment_method_breakdown = list(
+        ClientPayment.objects.filter(
+            sale_invoice_id__in=filtered_invoice_ids
+        ).values(
+            'payment_method__name'
+        ).annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total')
+    )
 
     # ============ TODAY KPIs (always unfiltered by period) ============
     today_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(status='returned')
@@ -113,6 +153,7 @@ def sales_dashboard(request):
     today_all_payments = ClientPayment.objects.filter(
         sale_invoice_id__in=today_invoice_ids
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
     today_amana_pending = Decimal('0')
     if amana_method_ids:
         today_amana_pending = ClientPayment.objects.filter(
@@ -121,10 +162,23 @@ def sales_dashboard(request):
         ).exclude(
             sale_invoice__delivery__status='delivered'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-    today_encaisse = today_all_payments - today_amana_pending
 
-    # ============ AMANA PENDING PAYMENTS (always global, unfiltered) ============
-    # Invoices that have AMANA payments but delivery NOT delivered
+    today_transporteur_pending = Decimal('0')
+    # Transporteur invoices today not delivered
+    today_transporteur_pending = ClientPayment.objects.filter(
+        sale_invoice_id__in=today_invoice_ids,
+        sale_invoice__delivery_method_type='transporteur',
+    ).exclude(
+        sale_invoice__delivery__status='delivered'
+    ).exclude(
+        payment_method_id__in=amana_method_ids
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    today_delivery_pending = today_amana_pending + today_transporteur_pending
+    today_encaisse = today_all_payments - today_delivery_pending
+
+    # ============ DELIVERY PENDING PAYMENTS (AMANA + Transporteur) ============
+    # AMANA pending invoices
     amana_pending_invoices = SaleInvoice.objects.filter(
         is_deleted=False,
     ).exclude(status='returned').filter(
@@ -133,23 +187,48 @@ def sales_dashboard(request):
         delivery__status='delivered'
     ).select_related('client', 'seller', 'delivery').order_by('-date')
 
-    # Calculate pending AMANA amounts per invoice
     amana_pending_list = []
     amana_pending_total = Decimal('0')
     for inv in amana_pending_invoices[:30]:
-        # Get AMANA payment amount for this invoice
         inv_amana_amount = Decimal('0')
         if amana_method_ids:
             inv_amana_amount = ClientPayment.objects.filter(
                 sale_invoice=inv,
                 payment_method_id__in=amana_method_ids,
             ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        if inv_amana_amount <= 0:
+            # Use total_amount if no specific AMANA payment found
+            inv_amana_amount = inv.total_amount or Decimal('0')
         if inv_amana_amount > 0:
             amana_pending_list.append({
                 'invoice': inv,
                 'amana_amount': inv_amana_amount,
             })
             amana_pending_total += inv_amana_amount
+
+    # Transporteur pending invoices
+    transporteur_pending_invoices = SaleInvoice.objects.filter(
+        is_deleted=False,
+    ).exclude(status='returned').filter(
+        delivery_method_type='transporteur',
+    ).exclude(
+        delivery__status='delivered'
+    ).select_related('client', 'seller', 'delivery', 'carrier').order_by('-date')
+
+    transporteur_pending_list = []
+    transporteur_pending_total = Decimal('0')
+    for inv in transporteur_pending_invoices[:30]:
+        inv_amount = ClientPayment.objects.filter(
+            sale_invoice=inv,
+        ).exclude(
+            payment_method_id__in=amana_method_ids
+        ).aggregate(total=Sum('amount'))['total'] or inv.total_amount or Decimal('0')
+        if inv_amount > 0:
+            transporteur_pending_list.append({
+                'invoice': inv,
+                'pending_amount': inv_amount,
+            })
+            transporteur_pending_total += inv_amount
 
     # ============ PAYMENT STATUS BREAKDOWN ============
     status_breakdown = list(
@@ -244,6 +323,8 @@ def sales_dashboard(request):
             'revenue': today_stats_raw['revenue'] or Decimal('0'),
             'encaisse': today_encaisse,
             'amana_pending': today_amana_pending,
+            'transporteur_pending': today_transporteur_pending,
+            'delivery_pending': today_delivery_pending,
             'count': today_stats_raw['count'] or 0,
             'weight': today_stats_raw['weight'] or Decimal('0'),
         },
@@ -252,13 +333,19 @@ def sales_dashboard(request):
             'revenue': filter_revenue,
             'encaisse': real_encaisse,
             'amana_pending': amana_not_received,
+            'transporteur_pending': transporteur_not_received,
+            'delivery_pending': total_delivery_pending,
             'count': filtered_stats['count'] or 0,
             'weight': filtered_stats['weight'] or Decimal('0'),
         },
+        'payment_method_breakdown': payment_method_breakdown,
         'status_breakdown': status_breakdown,
         'amana_pending_list': amana_pending_list,
         'amana_pending_total': amana_pending_total,
         'amana_pending_count': len(amana_pending_list),
+        'transporteur_pending_list': transporteur_pending_list,
+        'transporteur_pending_total': transporteur_pending_total,
+        'transporteur_pending_count': len(transporteur_pending_list),
         'seller_stats': seller_stats,
         'seller_stats_today': seller_stats_today,
         'daily_revenue': daily_revenue,

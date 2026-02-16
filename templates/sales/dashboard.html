@@ -78,23 +78,32 @@
             <div class="kpi-card kpi-primary">
                 <div class="kpi-icon"><i class="fas fa-coins"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ today_stats.revenue|floatformat:2 }}</div>
+                    <div class="kpi-value">{{ today_stats.revenue|floatformat:0 }}</div>
                     <div class="kpi-label">CA du Jour (DH)</div>
                 </div>
             </div>
             <div class="kpi-card kpi-success">
                 <div class="kpi-icon"><i class="fas fa-hand-holding-usd"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ today_stats.encaisse|floatformat:2 }}</div>
-                    <div class="kpi-label">Encaisse (DH)</div>
+                    <div class="kpi-value">{{ today_stats.encaisse|floatformat:0 }}</div>
+                    <div class="kpi-label">Encaisse Reel (DH)</div>
                 </div>
             </div>
             {% if today_stats.amana_pending > 0 %}
             <div class="kpi-card kpi-warning">
                 <div class="kpi-icon"><i class="fas fa-box"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ today_stats.amana_pending|floatformat:2 }}</div>
+                    <div class="kpi-value">{{ today_stats.amana_pending|floatformat:0 }}</div>
                     <div class="kpi-label">AMANA en attente (DH)</div>
+                </div>
+            </div>
+            {% endif %}
+            {% if today_stats.transporteur_pending > 0 %}
+            <div class="kpi-card kpi-error">
+                <div class="kpi-icon"><i class="fas fa-truck"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ today_stats.transporteur_pending|floatformat:0 }}</div>
+                    <div class="kpi-label">Transporteur en attente (DH)</div>
                 </div>
             </div>
             {% endif %}
@@ -126,28 +135,37 @@
             {% else %}Ce Mois{% endif %}
             {% if seller_filter %}(filtre vendeur){% endif %}
         </h2>
-        <div class="kpi-grid kpi-grid-5">
+        <div class="kpi-grid kpi-grid-6">
             <div class="kpi-card kpi-primary">
                 <div class="kpi-icon"><i class="fas fa-chart-line"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ period_stats.revenue|floatformat:2 }}</div>
+                    <div class="kpi-value">{{ period_stats.revenue|floatformat:0 }}</div>
                     <div class="kpi-label">Chiffre d'Affaires (DH)</div>
                 </div>
             </div>
-            <div class="kpi-card kpi-success">
+            <div class="kpi-card kpi-success" style="cursor: pointer;" onclick="document.getElementById('payment-detail-section').scrollIntoView({behavior:'smooth'})">
                 <div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ period_stats.encaisse|floatformat:2 }}</div>
-                    <div class="kpi-label">Encaisse Reel (DH)</div>
+                    <div class="kpi-value">{{ period_stats.encaisse|floatformat:0 }}</div>
+                    <div class="kpi-label">Encaisse Reel (DH) <i class="fas fa-chevron-down" style="font-size: 9px;"></i></div>
                 </div>
             </div>
             <div class="kpi-card kpi-error">
                 <div class="kpi-icon"><i class="fas fa-box"></i></div>
                 <div class="kpi-content">
-                    <div class="kpi-value">{{ period_stats.amana_pending|floatformat:2 }}</div>
+                    <div class="kpi-value">{{ period_stats.amana_pending|floatformat:0 }}</div>
                     <div class="kpi-label">AMANA Non Livre (DH)</div>
                 </div>
             </div>
+            {% if period_stats.transporteur_pending > 0 %}
+            <div class="kpi-card kpi-error" style="border-left: 3px solid var(--error-400);">
+                <div class="kpi-icon"><i class="fas fa-truck"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ period_stats.transporteur_pending|floatformat:0 }}</div>
+                    <div class="kpi-label">Transporteur Non Livre (DH)</div>
+                </div>
+            </div>
+            {% endif %}
             <div class="kpi-card kpi-info">
                 <div class="kpi-icon"><i class="fas fa-receipt"></i></div>
                 <div class="kpi-content">
@@ -161,6 +179,77 @@
                     <div class="kpi-value">{{ period_stats.weight|floatformat:2 }}</div>
                     <div class="kpi-label">Grammes</div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ PAYMENT METHOD DETAIL (Encaissé breakdown) ============ -->
+    <div class="dash-section" id="payment-detail-section">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-wallet mr-2"></i> Detail Paiements par Mode</h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                {% if payment_method_breakdown %}
+                <div class="table-wrapper" style="border: none; border-radius: 0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Mode de Paiement</th>
+                                <th style="text-align: center;">Nombre</th>
+                                <th style="text-align: right;">Montant (DH)</th>
+                                <th style="text-align: right;">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pm in payment_method_breakdown %}
+                            <tr>
+                                <td>
+                                    <span class="font-semibold">
+                                        {% if 'amana' in pm.payment_method__name|lower %}
+                                            <i class="fas fa-box text-warning" style="margin-right: 4px;"></i>
+                                        {% elif 'transport' in pm.payment_method__name|lower %}
+                                            <i class="fas fa-truck text-error" style="margin-right: 4px;"></i>
+                                        {% elif 'espece' in pm.payment_method__name|lower or 'cash' in pm.payment_method__name|lower %}
+                                            <i class="fas fa-money-bill-wave text-success" style="margin-right: 4px;"></i>
+                                        {% elif 'virement' in pm.payment_method__name|lower %}
+                                            <i class="fas fa-university text-info" style="margin-right: 4px;"></i>
+                                        {% elif 'cheque' in pm.payment_method__name|lower or 'chèque' in pm.payment_method__name|lower %}
+                                            <i class="fas fa-money-check text-primary" style="margin-right: 4px;"></i>
+                                        {% elif 'carte' in pm.payment_method__name|lower or 'card' in pm.payment_method__name|lower %}
+                                            <i class="fas fa-credit-card text-primary" style="margin-right: 4px;"></i>
+                                        {% else %}
+                                            <i class="fas fa-circle text-neutral" style="margin-right: 4px; font-size: 8px;"></i>
+                                        {% endif %}
+                                        {{ pm.payment_method__name }}
+                                    </span>
+                                </td>
+                                <td style="text-align: center;">{{ pm.count }}</td>
+                                <td style="text-align: right;" class="font-bold">{{ pm.total|floatformat:0 }}</td>
+                                <td style="text-align: right; color: var(--neutral-500);">
+                                    {% if period_stats.revenue %}
+                                        {% widthratio pm.total period_stats.revenue 100 %}%
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            <tr style="background: var(--neutral-50); font-weight: bold;">
+                                <td>Total Paiements</td>
+                                <td></td>
+                                <td style="text-align: right;">{{ period_stats.encaisse|floatformat:0 }} <span style="font-size: 11px; color: var(--success-600);">(reel)</span></td>
+                                <td></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    <div class="empty-state-sm">
+                        <i class="fas fa-wallet"></i>
+                        <p>Aucun paiement pour cette periode</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -245,30 +334,30 @@
             {% endif %}
         </div>
 
-        <!-- RIGHT: AMANA Pending + Delivery Stats -->
+        <!-- RIGHT: AMANA + Transporteur Pending + Delivery Stats -->
         <div class="dash-section">
             <!-- AMANA Pending Alert -->
             <div class="card amana-alert-card">
                 <div class="card-header" style="background: var(--warning-50); border-bottom-color: var(--warning-200);">
                     <h3 style="color: var(--warning-700);">
-                        <i class="fas fa-box mr-2"></i> AMANA - Non Livre (Argent en attente)
+                        <i class="fas fa-box mr-2"></i> AMANA - Non Livre
                     </h3>
                     <div class="amana-summary">
                         <span class="badge badge-warning" style="font-size: var(--text-sm);">
                             {{ amana_pending_count }} colis
                         </span>
                         <span class="font-bold" style="color: var(--error-600); font-size: var(--text-lg);">
-                            {{ amana_pending_total|floatformat:2 }} DH
+                            {{ amana_pending_total|floatformat:0 }} DH
                         </span>
                     </div>
                 </div>
-                <div class="card-body" style="padding: 0; max-height: 400px; overflow-y: auto;">
+                <div class="card-body" style="padding: 0; max-height: 300px; overflow-y: auto;">
                     {% if amana_pending_list %}
                         {% for item in amana_pending_list %}
                         <div class="amana-item" onclick="window.location='{% url 'sales:invoice_detail' item.invoice.reference %}'">
                             <div class="amana-item-main">
                                 <span class="amana-ref">{{ item.invoice.reference }}</span>
-                                <span class="amana-amount text-error font-semibold">{{ item.amana_amount|floatformat:2 }} DH</span>
+                                <span class="amana-amount text-error font-semibold">{{ item.amana_amount|floatformat:0 }} DH</span>
                             </div>
                             <div class="amana-item-sub">
                                 <span>
@@ -295,6 +384,61 @@
                         <div class="empty-state-sm">
                             <i class="fas fa-check-circle text-success"></i>
                             <p>Aucun colis AMANA en attente</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Transporteur Pending Alert -->
+            <div class="card" style="margin-top: var(--space-4); border: 1px solid var(--error-200);">
+                <div class="card-header" style="background: var(--error-50); border-bottom-color: var(--error-200);">
+                    <h3 style="color: var(--error-700);">
+                        <i class="fas fa-truck mr-2"></i> Transporteur - Non Livre
+                    </h3>
+                    <div class="amana-summary">
+                        <span class="badge badge-error" style="font-size: var(--text-sm);">
+                            {{ transporteur_pending_count }} envois
+                        </span>
+                        <span class="font-bold" style="color: var(--error-600); font-size: var(--text-lg);">
+                            {{ transporteur_pending_total|floatformat:0 }} DH
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body" style="padding: 0; max-height: 300px; overflow-y: auto;">
+                    {% if transporteur_pending_list %}
+                        {% for item in transporteur_pending_list %}
+                        <div class="amana-item" onclick="window.location='{% url 'sales:invoice_detail' item.invoice.reference %}'">
+                            <div class="amana-item-main">
+                                <span class="amana-ref">{{ item.invoice.reference }}</span>
+                                <span class="amana-amount text-error font-semibold">{{ item.pending_amount|floatformat:0 }} DH</span>
+                            </div>
+                            <div class="amana-item-sub">
+                                <span>
+                                    <i class="fas fa-user"></i>
+                                    {% if item.invoice.client %}{{ item.invoice.client.first_name }} {{ item.invoice.client.last_name }}{% else %}Anonyme{% endif %}
+                                </span>
+                                {% if item.invoice.carrier %}
+                                <span>
+                                    <i class="fas fa-truck"></i>
+                                    {{ item.invoice.carrier.name }}
+                                </span>
+                                {% endif %}
+                                <span>
+                                    <i class="fas fa-calendar"></i>
+                                    {{ item.invoice.date|date:"d/m" }}
+                                </span>
+                                {% if item.invoice.delivery %}
+                                <span class="badge {% if item.invoice.delivery.status == 'in_transit' %}badge-info{% elif item.invoice.delivery.status == 'to_pickup' %}badge-warning{% else %}badge-neutral{% endif %}" style="font-size: 10px;">
+                                    {{ item.invoice.delivery.get_status_display }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state-sm">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <p>Aucun envoi Transporteur en attente</p>
                         </div>
                     {% endif %}
                 </div>
@@ -482,6 +626,7 @@
 
     .kpi-grid-4 { grid-template-columns: repeat(4, 1fr); }
     .kpi-grid-5 { grid-template-columns: repeat(5, 1fr); }
+    .kpi-grid-6 { grid-template-columns: repeat(3, 1fr); }
 
     .kpi-card {
         background: white;
@@ -733,7 +878,7 @@
 
     /* Responsive */
     @media (max-width: 1200px) {
-        .kpi-grid-5 { grid-template-columns: repeat(3, 1fr); }
+        .kpi-grid-5, .kpi-grid-6 { grid-template-columns: repeat(3, 1fr); }
         .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); }
         .dash-grid-2 { grid-template-columns: 1fr; }
         .dash-filter-grid { grid-template-columns: repeat(2, 1fr); }
@@ -741,6 +886,7 @@
 
     @media (max-width: 768px) {
         .kpi-grid-5,
+        .kpi-grid-6,
         .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); }
         .kpi-card {
             padding: var(--space-3);
