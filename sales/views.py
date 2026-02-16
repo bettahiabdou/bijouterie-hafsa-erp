@@ -78,20 +78,32 @@ def sales_dashboard(request):
     transporteur_stats = transporteur_qs.aggregate(revenue=Sum('total_amount'), count=Count('id'))
 
     # ============ CALCULATE REAL "ENCAISSE" ============
-    # Encaissé Réel = payments from Magasin sales (always received)
-    #               + payments from AMANA/Transporteur sales that ARE delivered
-    # i.e. exclude ALL payments on undelivered AMANA/Transporteur invoices
+    # Encaissé Réel = all payments actually received (cash, virement, etc.)
+    # Excludes:
+    #   1) "Dépôt Client" payments (old deposits applied to invoices, not new money)
+    #   2) Payments on undelivered AMANA/Transporteur invoices (COD not yet collected)
 
+    # Base: all payments excluding "Dépôt Client" (already received previously)
     all_payments_total = ClientPayment.objects.filter(
         sale_invoice_id__in=filtered_invoice_ids
+    ).exclude(
+        payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # All payments on AMANA invoices NOT yet delivered
+    # Dépôt Client total (shown separately for reference)
+    deposit_client_total = ClientPayment.objects.filter(
+        sale_invoice_id__in=filtered_invoice_ids,
+        payment_method__name='Dépôt Client',
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    # All payments on AMANA invoices NOT yet delivered (exclude deposits already counted out)
     amana_not_received = ClientPayment.objects.filter(
         sale_invoice_id__in=filtered_invoice_ids,
         sale_invoice__delivery_method_type='amana',
     ).exclude(
         sale_invoice__delivery__status='delivered'
+    ).exclude(
+        payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
     # All payments on Transporteur invoices NOT yet delivered
@@ -100,6 +112,8 @@ def sales_dashboard(request):
         sale_invoice__delivery_method_type='transporteur',
     ).exclude(
         sale_invoice__delivery__status='delivered'
+    ).exclude(
+        payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
     total_delivery_pending = amana_not_received + transporteur_not_received
@@ -144,22 +158,28 @@ def sales_dashboard(request):
     today_invoice_ids = list(today_base.values_list('id', flat=True))
     today_all_payments = ClientPayment.objects.filter(
         sale_invoice_id__in=today_invoice_ids
+    ).exclude(
+        payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # Today: AMANA invoices not delivered
+    # Today: AMANA invoices not delivered (exclude deposits)
     today_amana_pending = ClientPayment.objects.filter(
         sale_invoice_id__in=today_invoice_ids,
         sale_invoice__delivery_method_type='amana',
     ).exclude(
         sale_invoice__delivery__status='delivered'
+    ).exclude(
+        payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # Today: Transporteur invoices not delivered
+    # Today: Transporteur invoices not delivered (exclude deposits)
     today_transporteur_pending = ClientPayment.objects.filter(
         sale_invoice_id__in=today_invoice_ids,
         sale_invoice__delivery_method_type='transporteur',
     ).exclude(
         sale_invoice__delivery__status='delivered'
+    ).exclude(
+        payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
     today_delivery_pending = today_amana_pending + today_transporteur_pending
