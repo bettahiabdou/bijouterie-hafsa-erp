@@ -115,6 +115,7 @@ class SaleInvoiceForm(forms.ModelForm):
             'client', 'seller', 'discount_percent',
             'payment_method', 'bank_account', 'tax_rate', 'notes', 'payment_reference',
             'carrier', 'tracking_number', 'delivery_address', 'delivery_cost',
+            'delivery_method_type',
         ]
         for field_name in optional_fields:
             if field_name in self.fields:

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load l10n %}
 
 {% block title %}Modifier {{ invoice.reference }} - Bijouterie Hafsa ERP{% endblock %}
 
@@ -58,8 +59,29 @@
 </div>
 {% endif %}
 
-<form method="POST" id="editInvoiceForm">
+<form method="POST" id="editInvoiceForm" action="{% url 'sales:invoice_edit' invoice.reference %}">
     {% csrf_token %}
+
+    {% if form.errors %}
+    <div class="card" style="border: 1px solid var(--error-300); background: var(--error-50); margin-bottom: var(--space-4);">
+        <div class="card-body" style="padding: var(--space-3) var(--space-4);">
+            <div style="display: flex; align-items: flex-start; gap: var(--space-3);">
+                <i class="fas fa-exclamation-circle" style="color: var(--error-500); font-size: 1.2rem; margin-top: 2px;"></i>
+                <div>
+                    <strong style="color: var(--error-700);">Erreurs dans le formulaire:</strong>
+                    <ul style="margin: var(--space-2) 0 0; padding-left: var(--space-4); color: var(--error-600); font-size: var(--text-sm);">
+                        {% for field, errors in form.errors.items %}
+                            {% for error in errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="edit-layout">
         <!-- LEFT: Main Form -->
         <div class="edit-main">
@@ -291,7 +313,7 @@
                                 <div class="payment-field payment-field-amount">
                                     <label class="form-label">Montant (DH)</label>
                                     <input type="number" class="form-input pay-amount-input"
-                                           value="{{ pay.amount|floatformat:2 }}" step="0.01" min="0.01"
+                                           value="{{ pay.amount|unlocalize }}" step="0.01" min="0.01"
                                            data-pay-id="{{ pay.id }}"
                                            style="font-size: var(--text-base); font-weight: 600;">
                                 </div>
