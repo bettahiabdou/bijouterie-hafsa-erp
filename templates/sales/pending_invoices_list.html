@@ -30,6 +30,9 @@
 {% endblock %}
 
 {% block content %}
+    <!-- Hidden CSRF token for AJAX -->
+    <form id="csrf-form" style="display:none;">{% csrf_token %}</form>
+
     <!-- Stats Cards -->
     <div class="stats-grid mb-6">
         <div class="stat-card stat-warning">
@@ -122,10 +125,13 @@
 
                         <!-- Actions -->
                         <div class="pending-invoice-actions">
-                            <a href="{% url 'sales:pending_invoice_complete' invoice.reference %}" class="btn btn-primary btn-block">
+                            <a href="{% url 'sales:pending_invoice_complete' invoice.reference %}" class="btn btn-primary" style="flex: 1;">
                                 <i class="fas fa-edit"></i>
-                                <span>Compléter la saisie</span>
+                                <span>Compléter</span>
                             </a>
+                            <button type="button" class="btn btn-danger" onclick="deletePending('{{ invoice.reference }}')" title="Supprimer">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -275,6 +281,19 @@
 
         .pending-invoice-actions {
             margin-top: auto;
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        .btn-danger {
+            background: var(--error-50);
+            color: var(--error-600);
+            border: 1px solid var(--error-200);
+        }
+
+        .btn-danger:hover {
+            background: var(--error-100);
+            color: var(--error-700);
         }
 
         .stats-grid {
@@ -293,4 +312,26 @@
             }
         }
     </style>
+
+    <script>
+    function deletePending(reference) {
+        if (!confirm('Supprimer la facture ' + reference + ' ?\nCette action est irreversible.')) return;
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        fetch('/sales/invoices/' + reference + '/delete/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken },
+            redirect: 'follow',
+        })
+        .then(response => {
+            // Whether redirect or direct success, reload page
+            location.reload();
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Erreur de connexion');
+        });
+    }
+    </script>
 {% endblock %}
