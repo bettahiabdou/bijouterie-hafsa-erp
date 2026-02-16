@@ -1,215 +1,659 @@
-{% extends "base.html" %}
-{% load static %}
+{% extends 'base.html' %}
 
-{% block title %}Éditer Facture {{ invoice.reference }}{% endblock %}
+{% block title %}Modifier {{ invoice.reference }} - Bijouterie Hafsa ERP{% endblock %}
 
-{% block content %}
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">
-                        <i class="fas fa-edit"></i> Éditer Facture {{ invoice.reference }}
-                    </h3>
-                </div>
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_list' %}" class="breadcrumb-item">Factures</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="breadcrumb-item">{{ invoice.reference }}</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Modifier</span>
+{% endblock %}
 
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-
-                <div class="card-body">
-                    {% if invoice.status != 'draft' and not user.is_staff %}
-                        <div class="alert alert-warning" role="alert">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            Seules les factures en brouillon peuvent être éditées.
-                        </div>
-                    {% else %}
-                        {% if invoice.status != 'draft' %}
-                            <div class="alert alert-warning" role="alert">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                Attention: Cette facture n'est pas un brouillon ({{ invoice.get_status_display }}). Modifier une facture finalisee peut affecter la comptabilite.
-                            </div>
-                        {% endif %}
-                        <form method="POST" novalidate>
-                            {% csrf_token %}
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="{{ form.reference.id_for_label }}" class="form-label">Référence</label>
-                                        {{ form.reference }}
-                                        {% if form.reference.errors %}
-                                            <div class="invalid-feedback d-block">
-                                                {{ form.reference.errors.0 }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="{{ form.date.id_for_label }}" class="form-label">Date</label>
-                                        {{ form.date }}
-                                        {% if form.date.errors %}
-                                            <div class="invalid-feedback d-block">
-                                                {{ form.date.errors.0 }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-group mb-3">
-                                <label for="{{ form.client.id_for_label }}" class="form-label">Client <span class="text-muted">(Optionnel)</span></label>
-                                {{ form.client }}
-                                <small class="form-text text-muted">Laissez vide pour une vente sans client</small>
-                                {% if form.client.errors %}
-                                    <div class="invalid-feedback d-block">
-                                        {{ form.client.errors.0 }}
-                                    </div>
-                                {% endif %}
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group mb-3">
-                                        <label for="{{ form.discount_percent.id_for_label }}" class="form-label">Remise (%)</label>
-                                        {{ form.discount_percent }}
-                                        {% if form.discount_percent.errors %}
-                                            <div class="invalid-feedback d-block">
-                                                {{ form.discount_percent.errors.0 }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-group mb-3">
-                                        <label for="{{ form.tax_rate.id_for_label }}" class="form-label">Taux TVA (%)</label>
-                                        {{ form.tax_rate }}
-                                        {% if form.tax_rate.errors %}
-                                            <div class="invalid-feedback d-block">
-                                                {{ form.tax_rate.errors.0 }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group mb-3">
-                                        <label for="{{ form.payment_method.id_for_label }}" class="form-label">Méthode de paiement</label>
-                                        {{ form.payment_method }}
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-group mb-3">
-                                        <label for="{{ form.bank_account.id_for_label }}" class="form-label">Compte bancaire</label>
-                                        {{ form.bank_account }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-group mb-3">
-                                <label for="{{ form.delivery_address.id_for_label }}" class="form-label">Adresse de livraison</label>
-                                {{ form.delivery_address }}
-                            </div>
-
-                            <div class="form-group mb-3">
-                                <label for="{{ form.delivery_cost.id_for_label }}" class="form-label">Coût de livraison</label>
-                                {{ form.delivery_cost }}
-                            </div>
-
-                            <div class="form-group mb-3">
-                                <label for="{{ form.notes.id_for_label }}" class="form-label">Notes</label>
-                                {{ form.notes }}
-                            </div>
-
-                            <div class="form-group">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> Enregistrer les modifications
-                                </button>
-                                <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-secondary">
-                                    <i class="fas fa-arrow-left"></i> Annuler
-                                </a>
-                            </div>
-                        </form>
-                    {% endif %}
-                </div>
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title"><i class="fas fa-edit"></i> Modifier {{ invoice.reference }}</h1>
+                <p class="page-subtitle">
+                    {{ invoice.date|date:"d F Y" }}
+                    <span class="badge {% if invoice.status == 'paid' %}badge-success{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'unpaid' %}badge-error{% else %}badge-neutral{% endif %}" style="margin-left: var(--space-2);">
+                        {{ invoice.get_status_display }}
+                    </span>
+                </p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
             </div>
         </div>
+    </div>
+{% endblock %}
 
-        <div class="col-md-4">
-            <div class="card mb-3">
+{% block content %}
+{% if invoice.status != 'draft' and not user.is_staff %}
+    <div class="card">
+        <div class="card-body" style="text-align: center; padding: var(--space-8);">
+            <i class="fas fa-lock" style="font-size: 3rem; color: var(--warning-500); margin-bottom: var(--space-4); display: block;"></i>
+            <h3 style="color: var(--neutral-700); margin-bottom: var(--space-2);">Modification non autorisee</h3>
+            <p style="color: var(--neutral-500);">Seules les factures en brouillon peuvent etre editees.</p>
+            <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-primary" style="margin-top: var(--space-4);">
+                <i class="fas fa-arrow-left"></i> Retour a la facture
+            </a>
+        </div>
+    </div>
+{% else %}
+
+{% if invoice.status != 'draft' %}
+<div class="card" style="border: 1px solid var(--warning-300); background: var(--warning-50); margin-bottom: var(--space-4);">
+    <div class="card-body" style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4);">
+        <i class="fas fa-exclamation-triangle" style="color: var(--warning-600); font-size: 1.2rem;"></i>
+        <span style="color: var(--warning-700); font-size: var(--text-sm);">
+            <strong>Attention:</strong> Cette facture est <strong>{{ invoice.get_status_display }}</strong>. Les modifications peuvent affecter la comptabilite.
+        </span>
+    </div>
+</div>
+{% endif %}
+
+<form method="POST" id="editInvoiceForm">
+    {% csrf_token %}
+    <div class="edit-layout">
+        <!-- LEFT: Main Form -->
+        <div class="edit-main">
+            <!-- Invoice Info -->
+            <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Informations de la facture</h5>
+                    <h3><i class="fas fa-file-invoice mr-2"></i> Informations Facture</h3>
                 </div>
                 <div class="card-body">
-                    <p>
-                        <strong>Référence:</strong> {{ invoice.reference }}<br>
-                        <strong>Client:</strong>
-                        {% if invoice.client %}
-                            {{ invoice.client.full_name }}
-                        {% else %}
-                            <span class="text-muted">(Pas de client)</span>
-                        {% endif %}<br>
-                        <strong>Statut:</strong>
-                        <span class="badge bg-{% if invoice.status == 'draft' %}warning{% elif invoice.status == 'confirmed' %}info{% elif invoice.status == 'paid' %}success{% else %}secondary{% endif %}">
-                            {{ invoice.get_status_display }}
-                        </span><br>
-                        <strong>Date:</strong> {{ invoice.date|date:'d/m/Y' }}<br>
-                    </p>
-                    <hr>
-                    <p>
-                        <strong>Sous-total:</strong> {{ invoice.subtotal|floatformat:2 }} DH<br>
-                        <strong>Remise:</strong> -{{ invoice.discount_amount|floatformat:2 }} DH<br>
-                        <strong>TVA:</strong> +{{ invoice.tax_amount|floatformat:2 }} DH<br>
-                        <strong>Livraison:</strong> +{{ invoice.delivery_cost|floatformat:2 }} DH<br>
-                    </p>
-                    <hr>
-                    <h6>
-                        <strong>Total:</strong> <span class="text-success">{{ invoice.total_amount|floatformat:2 }} DH</span>
-                    </h6>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Reference <span class="required">*</span></label>
+                            {{ form.reference }}
+                            {% if form.reference.errors %}<div class="form-error">{{ form.reference.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Date <span class="required">*</span></label>
+                            {{ form.date }}
+                            {% if form.date.errors %}<div class="form-error">{{ form.date.errors.0 }}</div>{% endif %}
+                        </div>
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Client</label>
+                            {{ form.client }}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Vendeur</label>
+                            {{ form.seller }}
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            <!-- Articles -->
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Articles ({{ invoice.items.count }})</h5>
+                    <h3><i class="fas fa-shopping-bag mr-2"></i> Articles ({{ items|length }})</h3>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm">
+                <div class="card-body" style="padding: 0;">
+                    {% if items %}
+                    <div class="table-wrapper" style="border: none; border-radius: 0;">
+                        <table class="table" id="itemsTable">
                             <thead>
                                 <tr>
                                     <th>Produit</th>
-                                    <th>Qté</th>
-                                    <th>Total</th>
+                                    <th style="text-align: right; width: 100px;">Qte</th>
+                                    <th style="text-align: right; width: 140px;">Prix Original</th>
+                                    <th style="text-align: right; width: 140px;">Prix Negocie</th>
+                                    <th style="text-align: right; width: 120px;">Total</th>
+                                    <th style="text-align: center; width: 60px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for item in invoice.items.all %}
-                                    <tr>
-                                        <td>{{ item.product.reference }}</td>
-                                        <td>{{ item.quantity }}</td>
-                                        <td>{{ item.total_amount|floatformat:2 }} DH</td>
-                                    </tr>
-                                {% empty %}
-                                    <tr>
-                                        <td colspan="3" class="text-center text-muted">Aucun article</td>
-                                    </tr>
+                                {% for item in items %}
+                                <tr id="item-row-{{ item.id }}" class="{% if item.is_returned %}returned-item{% endif %}">
+                                    <td>
+                                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                                            <span class="font-semibold" style="color: var(--primary-600);">{{ item.product.reference }}</span>
+                                            <span style="font-size: var(--text-xs); color: var(--neutral-500);">{{ item.product.name }}</span>
+                                            {% if item.is_returned %}
+                                                <span class="badge badge-error badge-sm">Retourne</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        {% if not item.is_returned %}
+                                        <input type="number" class="form-input item-qty-input"
+                                               value="{{ item.quantity }}" step="0.001" min="0.001"
+                                               data-item-id="{{ item.id }}" data-field="quantity"
+                                               style="width: 80px; text-align: right; padding: var(--space-1) var(--space-2); font-size: var(--text-sm);">
+                                        {% else %}
+                                            {{ item.quantity }}
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align: right; color: var(--neutral-500); font-size: var(--text-sm);">
+                                        {{ item.original_price|floatformat:2 }} DH
+                                    </td>
+                                    <td style="text-align: right;">
+                                        {% if not item.is_returned %}
+                                        <input type="number" class="form-input item-price-input"
+                                               value="{{ item.unit_price }}" step="0.01" min="0"
+                                               data-item-id="{{ item.id }}" data-field="negotiated_price"
+                                               style="width: 120px; text-align: right; padding: var(--space-1) var(--space-2); font-size: var(--text-sm);">
+                                        {% else %}
+                                            {{ item.unit_price|floatformat:2 }} DH
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align: right; font-weight: 600;" id="item-total-{{ item.id }}">
+                                        {{ item.total_amount|floatformat:2 }} DH
+                                    </td>
+                                    <td style="text-align: center;">
+                                        {% if not item.is_returned %}
+                                        <button type="button" onclick="updateItem({{ item.id }})" class="btn btn-ghost btn-sm" title="Sauvegarder">
+                                            <i class="fas fa-check text-success"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
+                    {% else %}
+                    <div style="text-align: center; padding: var(--space-6); color: var(--neutral-400);">
+                        <i class="fas fa-inbox" style="font-size: 2rem; margin-bottom: var(--space-2); display: block;"></i>
+                        <p>Aucun article</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Pricing -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-calculator mr-2"></i> Tarification</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Remise (%)</label>
+                            {{ form.discount_percent }}
+                            <p class="form-hint">Remise globale sur la facture</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Taux TVA (%)</label>
+                            {{ form.tax_rate }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delivery -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-truck mr-2"></i> Livraison</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Type de livraison</label>
+                            {{ form.delivery_method_type }}
+                        </div>
+                        <div class="form-group" id="carrierField">
+                            <label class="form-label">Transporteur</label>
+                            {{ form.carrier }}
+                        </div>
+                        <div class="form-group" id="trackingField">
+                            <label class="form-label">N° de suivi</label>
+                            {{ form.tracking_number }}
+                        </div>
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Adresse de livraison</label>
+                            {{ form.delivery_address }}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Frais de livraison (DH)</label>
+                            {{ form.delivery_cost }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-credit-card mr-2"></i> Paiement</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Methode de paiement</label>
+                            {{ form.payment_method }}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Compte bancaire</label>
+                            {{ form.bank_account }}
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Reference de paiement</label>
+                        {{ form.payment_reference }}
+                        <p class="form-hint">N° de cheque, reference virement, n° de carte...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-sticky-note mr-2"></i> Notes</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        {{ form.notes }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions-bar">
+                <a href="{% url 'sales:invoice_detail' invoice.reference %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Annuler
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Enregistrer les modifications
+                </button>
+            </div>
+        </div>
+
+        <!-- RIGHT: Sidebar Summary -->
+        <div class="edit-sidebar">
+            <!-- Current Totals -->
+            <div class="card" style="position: sticky; top: var(--space-4);">
+                <div class="card-header">
+                    <h3><i class="fas fa-calculator mr-2"></i> Resume</h3>
+                </div>
+                <div class="card-body">
+                    <div class="summary-list">
+                        <div class="summary-item">
+                            <span class="summary-label">Sous-total</span>
+                            <span class="summary-value" id="summary-subtotal">{{ invoice.subtotal|floatformat:2 }} DH</span>
+                        </div>
+                        {% if invoice.discount_amount > 0 %}
+                        <div class="summary-item" style="color: var(--error-500);">
+                            <span class="summary-label">Remise</span>
+                            <span class="summary-value">-{{ invoice.discount_amount|floatformat:2 }} DH</span>
+                        </div>
+                        {% endif %}
+                        {% if invoice.old_gold_amount > 0 %}
+                        <div class="summary-item" style="color: var(--warning-600);">
+                            <span class="summary-label">Ancien or</span>
+                            <span class="summary-value">-{{ invoice.old_gold_amount|floatformat:2 }} DH</span>
+                        </div>
+                        {% endif %}
+                        {% if invoice.tax_amount > 0 %}
+                        <div class="summary-item">
+                            <span class="summary-label">TVA</span>
+                            <span class="summary-value">+{{ invoice.tax_amount|floatformat:2 }} DH</span>
+                        </div>
+                        {% endif %}
+                        {% if invoice.delivery_cost > 0 %}
+                        <div class="summary-item">
+                            <span class="summary-label">Livraison</span>
+                            <span class="summary-value">+{{ invoice.delivery_cost|floatformat:2 }} DH</span>
+                        </div>
+                        {% endif %}
+                        <div class="summary-total">
+                            <span>Total</span>
+                            <span id="summary-total">{{ invoice.total_amount|floatformat:2 }} DH</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--neutral-200);">
+                        <div class="summary-item">
+                            <span class="summary-label">Paye</span>
+                            <span class="summary-value" style="color: var(--success-600); font-weight: 600;">{{ invoice.amount_paid|floatformat:2 }} DH</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Solde</span>
+                            <span class="summary-value {% if invoice.balance_due > 0 %}text-error{% else %}text-success{% endif %}" style="font-weight: 600;">
+                                {{ invoice.balance_due|floatformat:2 }} DH
+                            </span>
+                        </div>
+                    </div>
+
+                    {% if invoice.delivery_method_type %}
+                    <div style="margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--neutral-200);">
+                        <div class="summary-item">
+                            <span class="summary-label">Livraison</span>
+                            <span class="badge {% if invoice.delivery_method_type == 'magasin' %}badge-success{% elif invoice.delivery_method_type == 'amana' %}badge-warning{% else %}badge-error{% endif %}">
+                                {{ invoice.get_delivery_method_type_display }}
+                            </span>
+                        </div>
+                        {% if invoice.carrier %}
+                        <div class="summary-item">
+                            <span class="summary-label">Transporteur</span>
+                            <span class="summary-value">{{ invoice.carrier.name }}</span>
+                        </div>
+                        {% endif %}
+                        {% if invoice.tracking_number %}
+                        <div class="summary-item">
+                            <span class="summary-label">N° Suivi</span>
+                            <span class="summary-value font-mono" style="font-size: var(--text-xs);">{{ invoice.tracking_number }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="card-body" style="padding-top: 0;">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <i class="fas fa-save"></i> Enregistrer
+                    </button>
                 </div>
             </div>
         </div>
     </div>
-</div>
+</form>
+{% endif %}
+
+<style>
+    .edit-layout {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: var(--space-6);
+        align-items: start;
+    }
+
+    .edit-main {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .edit-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .form-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-4);
+    }
+
+    .form-grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: var(--space-4);
+    }
+
+    .form-group {
+        margin-bottom: var(--space-4);
+    }
+
+    .form-label {
+        display: block;
+        font-size: var(--text-sm);
+        font-weight: var(--font-medium);
+        color: var(--neutral-700);
+        margin-bottom: var(--space-2);
+    }
+
+    .form-label .required {
+        color: var(--error-500);
+    }
+
+    .form-input,
+    .form-select {
+        width: 100%;
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--neutral-300);
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
+        color: var(--neutral-800);
+        background: white;
+        transition: all var(--transition-fast);
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+        outline: none;
+        border-color: var(--primary-400);
+        box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
+    }
+
+    .form-hint {
+        font-size: var(--text-xs);
+        color: var(--neutral-500);
+        margin-top: var(--space-1);
+    }
+
+    .form-error {
+        font-size: var(--text-xs);
+        color: var(--error-500);
+        margin-top: var(--space-1);
+    }
+
+    .form-actions-bar {
+        display: flex;
+        gap: var(--space-3);
+        justify-content: flex-end;
+        padding: var(--space-4);
+        background: white;
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--neutral-100);
+    }
+
+    /* Summary */
+    .summary-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .summary-label {
+        font-size: var(--text-sm);
+        color: var(--neutral-500);
+    }
+
+    .summary-value {
+        font-size: var(--text-sm);
+        font-weight: var(--font-medium);
+        color: var(--neutral-800);
+    }
+
+    .summary-total {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-3);
+        background: var(--success-50);
+        border-radius: var(--radius-md);
+        margin-top: var(--space-2);
+        font-weight: var(--font-bold);
+        color: var(--success-700);
+        font-size: var(--text-lg);
+    }
+
+    /* Returned items */
+    .returned-item td {
+        opacity: 0.5;
+        text-decoration: line-through;
+    }
+
+    .returned-item .badge {
+        text-decoration: none;
+    }
+
+    /* Item inputs */
+    .item-price-input,
+    .item-qty-input {
+        border: 1px solid var(--neutral-200);
+        border-radius: var(--radius-sm);
+        background: var(--neutral-50);
+        transition: all 0.2s;
+    }
+
+    .item-price-input:focus,
+    .item-qty-input:focus {
+        background: white;
+        border-color: var(--primary-400);
+        box-shadow: 0 0 0 2px rgba(183, 110, 121, 0.1);
+    }
+
+    .item-price-input.item-changed,
+    .item-qty-input.item-changed {
+        border-color: var(--warning-400);
+        background: var(--warning-50);
+    }
+
+    /* Responsive */
+    @media (max-width: 1023px) {
+        .edit-layout {
+            grid-template-columns: 1fr;
+        }
+        .edit-sidebar {
+            order: -1;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .form-grid-2,
+        .form-grid-3 {
+            grid-template-columns: 1fr;
+        }
+        .form-actions-bar {
+            flex-direction: column;
+        }
+        .form-actions-bar .btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+
+<script>
+    // Toggle carrier/tracking fields based on delivery type
+    function toggleDeliveryFields() {
+        const deliveryType = document.getElementById('deliveryMethodType');
+        if (!deliveryType) return;
+        const val = deliveryType.value;
+        const carrierField = document.getElementById('carrierField');
+        const trackingField = document.getElementById('trackingField');
+        if (val === 'magasin') {
+            if (carrierField) carrierField.style.display = 'none';
+            if (trackingField) trackingField.style.display = 'none';
+        } else {
+            if (carrierField) carrierField.style.display = 'block';
+            if (trackingField) trackingField.style.display = 'block';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleDeliveryFields();
+        const deliverySelect = document.getElementById('deliveryMethodType');
+        if (deliverySelect) {
+            deliverySelect.addEventListener('change', toggleDeliveryFields);
+        }
+
+        // Mark changed items
+        document.querySelectorAll('.item-price-input, .item-qty-input').forEach(input => {
+            const original = input.value;
+            input.dataset.original = original;
+            input.addEventListener('input', function() {
+                if (this.value !== this.dataset.original) {
+                    this.classList.add('item-changed');
+                } else {
+                    this.classList.remove('item-changed');
+                }
+            });
+        });
+    });
+
+    // Update individual item via AJAX
+    function updateItem(itemId) {
+        const row = document.getElementById('item-row-' + itemId);
+        if (!row) return;
+
+        const priceInput = row.querySelector('.item-price-input');
+        const qtyInput = row.querySelector('.item-qty-input');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        const formData = new FormData();
+        formData.append('item_id', itemId);
+        if (priceInput) formData.append('negotiated_price', priceInput.value);
+        if (qtyInput) formData.append('quantity', qtyInput.value);
+
+        // Disable button
+        const btn = row.querySelector('.btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        fetch('{% url "sales:update_item" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                // Update displayed total
+                const totalCell = document.getElementById('item-total-' + itemId);
+                if (totalCell) totalCell.textContent = parseFloat(data.item_total).toFixed(2) + ' DH';
+
+                // Update summary
+                const subtotalEl = document.getElementById('summary-subtotal');
+                if (subtotalEl) subtotalEl.textContent = parseFloat(data.invoice_subtotal).toFixed(2) + ' DH';
+                const totalEl = document.getElementById('summary-total');
+                if (totalEl) totalEl.textContent = parseFloat(data.invoice_total).toFixed(2) + ' DH';
+
+                // Reset changed state
+                if (priceInput) {
+                    priceInput.classList.remove('item-changed');
+                    priceInput.dataset.original = priceInput.value;
+                }
+                if (qtyInput) {
+                    qtyInput.classList.remove('item-changed');
+                    qtyInput.dataset.original = qtyInput.value;
+                }
+
+                // Flash success
+                row.style.transition = 'background 0.3s';
+                row.style.background = 'var(--success-50)';
+                setTimeout(() => { row.style.background = ''; }, 1500);
+            } else {
+                alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Erreur de connexion');
+        })
+        .finally(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check text-success"></i>';
+            }
+        });
+    }
+</script>
 {% endblock %}

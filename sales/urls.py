@@ -20,9 +20,10 @@ urlpatterns = [
     path('invoices/<str:reference>/payment/', views.invoice_payment, name='invoice_payment'),
     path('invoices/<str:reference>/delivery/', views.invoice_delivery, name='invoice_delivery'),
 
-    # Invoice Items (Add/Delete)
+    # Invoice Items (Add/Delete/Update)
     path('invoices/<str:reference>/add-item/', views.add_invoice_item, name='add_item'),
     path('invoices/delete-item/', views.delete_invoice_item, name='delete_item'),
+    path('invoices/update-item/', views.update_invoice_item, name='update_item'),
 
     # API endpoints
     path('api/payment-methods/', views.get_payment_methods, name='get_payment_methods'),

@@ -20,7 +20,7 @@ class SaleInvoiceForm(forms.ModelForm):
         min_value=0,
         decimal_places=2,
         widget=forms.NumberInput(attrs={
-            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+            'class': 'form-input',
             'step': '0.01',
             'min': '0',
             'placeholder': '0.00'
@@ -31,57 +31,90 @@ class SaleInvoiceForm(forms.ModelForm):
     class Meta:
         model = SaleInvoice
         fields = [
-            'reference', 'date', 'client', 'payment_method', 'bank_account',
-            'tax_rate', 'notes', 'payment_reference'
+            'reference', 'date', 'client', 'seller',
+            'discount_percent', 'tax_rate',
+            'delivery_method_type', 'carrier', 'tracking_number',
+            'delivery_address', 'delivery_cost',
+            'payment_method', 'bank_account', 'payment_reference',
+            'notes',
         ]
         widgets = {
             'reference': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+                'class': 'form-input',
                 'placeholder': 'INV-20260210-0001'
             }),
             'date': forms.DateInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+                'class': 'form-input',
                 'type': 'date'
             }),
             'client': forms.Select(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+                'class': 'form-select',
             }),
-            'payment_method': forms.Select(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+            'seller': forms.Select(attrs={
+                'class': 'form-select',
             }),
-            'bank_account': forms.Select(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
-            }),
-            'tax_rate': forms.NumberInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+            'discount_percent': forms.NumberInput(attrs={
+                'class': 'form-input',
                 'step': '0.01',
                 'min': '0',
                 'max': '100',
-                'value': '0',
                 'placeholder': '0.00'
             }),
+            'tax_rate': forms.NumberInput(attrs={
+                'class': 'form-input',
+                'step': '0.01',
+                'min': '0',
+                'max': '100',
+                'placeholder': '0.00'
+            }),
+            'delivery_method_type': forms.Select(attrs={
+                'class': 'form-select',
+                'id': 'deliveryMethodType',
+            }),
+            'carrier': forms.Select(attrs={
+                'class': 'form-select',
+            }),
+            'tracking_number': forms.TextInput(attrs={
+                'class': 'form-input',
+                'placeholder': 'Numero de suivi...'
+            }),
+            'delivery_address': forms.Textarea(attrs={
+                'class': 'form-input',
+                'rows': '2',
+                'placeholder': 'Adresse de livraison...'
+            }),
+            'delivery_cost': forms.NumberInput(attrs={
+                'class': 'form-input',
+                'step': '0.01',
+                'min': '0',
+                'placeholder': '0.00'
+            }),
+            'payment_method': forms.Select(attrs={
+                'class': 'form-select',
+                'id': 'paymentMethodSelect',
+            }),
+            'bank_account': forms.Select(attrs={
+                'class': 'form-select',
+            }),
             'payment_reference': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
-                'placeholder': 'N° de chèque, référence virement, n° de carte...'
+                'class': 'form-input',
+                'placeholder': 'N° de cheque, reference virement, n° de carte...'
             }),
             'notes': forms.Textarea(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none',
-                'rows': '3'
+                'class': 'form-input',
+                'rows': '3',
+                'placeholder': 'Notes...'
             }),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Add data attributes to payment method options for dynamic visibility
-        if 'payment_method' in self.fields:
-            self.fields['payment_method'].widget.attrs.update({
-                'id': 'paymentMethodSelect',
-            })
-
         # Make optional fields actually optional
         optional_fields = [
-            'payment_method', 'bank_account', 'tax_rate', 'notes', 'payment_reference'
+            'client', 'seller', 'discount_percent',
+            'payment_method', 'bank_account', 'tax_rate', 'notes', 'payment_reference',
+            'carrier', 'tracking_number', 'delivery_address', 'delivery_cost',
         ]
         for field_name in optional_fields:
             if field_name in self.fields:

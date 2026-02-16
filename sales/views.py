@@ -1111,6 +1111,80 @@ def delete_invoice_item(request):
 
 
 @login_required(login_url='login')
+@require_http_methods(["POST"])
+def update_invoice_item(request):
+    """Update price/quantity of an existing invoice item (AJAX)"""
+    import json
+    try:
+        item_id = request.POST.get('item_id')
+        if not item_id:
+            return JsonResponse({'success': False, 'error': 'ID article requis'}, status=400)
+
+        item = get_object_or_404(SaleInvoiceItem, id=item_id)
+        invoice = item.invoice
+
+        # Staff can edit any invoice
+        if not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'Permission refusee'}, status=403)
+
+        # Update negotiated price
+        new_price = request.POST.get('negotiated_price')
+        if new_price is not None and new_price != '':
+            try:
+                new_price = Decimal(new_price)
+                if new_price < 0:
+                    return JsonResponse({'success': False, 'error': 'Le prix ne peut pas etre negatif'}, status=400)
+                item.negotiated_price = new_price
+                item.unit_price = new_price
+                item.total_amount = new_price * item.quantity
+            except (InvalidOperation, TypeError):
+                return JsonResponse({'success': False, 'error': 'Prix invalide'}, status=400)
+
+        # Update quantity
+        new_qty = request.POST.get('quantity')
+        if new_qty is not None and new_qty != '':
+            try:
+                new_qty = Decimal(new_qty)
+                if new_qty <= 0:
+                    return JsonResponse({'success': False, 'error': 'Quantite invalide'}, status=400)
+                item.quantity = new_qty
+                price = item.negotiated_price or item.unit_price
+                item.total_amount = price * new_qty
+            except (InvalidOperation, TypeError):
+                return JsonResponse({'success': False, 'error': 'Quantite invalide'}, status=400)
+
+        item.save()
+
+        # Recalculate invoice totals
+        invoice.calculate_totals()
+        invoice.save()
+
+        ActivityLog.objects.create(
+            user=request.user,
+            action=ActivityLog.ActionType.UPDATE,
+            model_name='SaleInvoiceItem',
+            object_id=str(item.id),
+            object_repr=f"{invoice.reference} - {item.product.name}",
+            ip_address=get_client_ip(request)
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Article mis a jour',
+            'item_total': str(item.total_amount),
+            'invoice_subtotal': str(invoice.subtotal),
+            'invoice_discount': str(invoice.discount_amount),
+            'invoice_total': str(invoice.total_amount),
+        })
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f'Error updating invoice item: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
+
+
+@login_required(login_url='login')
 @require_http_methods(["GET", "POST"])
 def invoice_create(request):
     """Create a new sales invoice"""
@@ -1906,8 +1980,12 @@ def get_client_ip(request):
 def invoice_edit(request, reference):
     """Edit existing invoice - staff can edit any invoice"""
     from .forms import SaleInvoiceForm
+    from settings_app.models import Carrier
 
-    invoice = get_object_or_404(SaleInvoice, reference=reference)
+    invoice = get_object_or_404(
+        SaleInvoice.objects.select_related('client', 'seller', 'carrier', 'payment_method', 'bank_account'),
+        reference=reference
+    )
 
     # Check permissions - staff can edit any, others only their own drafts
     if not request.user.is_staff:
@@ -1918,14 +1996,17 @@ def invoice_edit(request, reference):
             messages.error(request, 'Vous n\'avez pas la permission d\'éditer cette facture.')
             return redirect('sales:invoice_detail', reference=reference)
 
+    items = invoice.items.select_related('product').order_by('id')
     form = None
 
     if request.method == 'POST':
         try:
             form = SaleInvoiceForm(request.POST, instance=invoice)
             if form.is_valid():
-                form.save()
-                invoice.calculate_totals()
+                inv = form.save(commit=False)
+                inv.save()
+                inv.calculate_totals()
+                inv.save()
 
                 ActivityLog.objects.create(
                     user=request.user,
@@ -1937,11 +2018,12 @@ def invoice_edit(request, reference):
                 )
 
                 messages.success(request, 'Facture mise à jour avec succès.')
-                return redirect('sales:invoice_detail', reference=invoice.reference)
+                return redirect('sales:invoice_detail', reference=inv.reference)
             else:
                 for field, errors in form.errors.items():
                     for error in errors:
-                        messages.error(request, f'{field}: {error}')
+                        field_label = form.fields[field].label if field in form.fields else field
+                        messages.error(request, f'{field_label}: {error}')
         except Exception as e:
             messages.error(request, f'Erreur lors de la mise à jour: {str(e)}')
             import logging
@@ -1951,10 +2033,17 @@ def invoice_edit(request, reference):
     if form is None:
         form = SaleInvoiceForm(instance=invoice)
 
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
     context = {
         'invoice': invoice,
         'form': form,
-        'clients': Client.objects.filter(is_active=True),
+        'items': items,
+        'sellers': User.objects.filter(is_active=True).order_by('first_name'),
+        'carriers': Carrier.objects.filter(is_active=True).order_by('name'),
+        'clients': Client.objects.filter(is_active=True).order_by('first_name', 'last_name'),
+        'products': Product.objects.filter(status='available').select_related('category').order_by('reference'),
     }
 
     return render(request, 'sales/invoice_edit.html', context)
