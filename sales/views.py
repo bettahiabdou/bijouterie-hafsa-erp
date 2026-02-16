@@ -3175,6 +3175,81 @@ def delivery_detail(request, reference):
 
 
 @login_required(login_url='login')
+@require_http_methods(["POST"])
+def delivery_update_status(request, reference):
+    """Manually update delivery status (AJAX) - staff only"""
+    from .models import Delivery, DeliveryTimelineEvent
+
+    if not request.user.is_staff:
+        return JsonResponse({'success': False, 'error': 'Permission refusee'}, status=403)
+
+    delivery = get_object_or_404(Delivery, reference=reference)
+    new_status = request.POST.get('status')
+
+    valid_statuses = ['pending', 'in_transit', 'to_pickup', 'delivered', 'returned']
+    if new_status not in valid_statuses:
+        return JsonResponse({'success': False, 'error': 'Statut invalide'}, status=400)
+
+    old_status = delivery.status
+    delivery.status = new_status
+
+    # Set delivery date if marking as delivered
+    if new_status == 'delivered' and not delivery.delivery_date:
+        delivery.delivery_date = timezone.now().strftime('%d/%m/%Y')
+
+    delivery.save()
+
+    # Add timeline event
+    DeliveryTimelineEvent.objects.create(
+        delivery=delivery,
+        event_number='M',
+        event_date=timezone.now().strftime('%d/%m/%Y'),
+        event_time=timezone.now().strftime('%H:%M'),
+        description=f'Statut changé manuellement: {old_status} → {new_status}',
+        location='',
+        source='manual',
+    )
+
+    # Update linked invoice delivery_status
+    if delivery.invoice:
+        invoice = delivery.invoice
+        if new_status == 'delivered':
+            invoice.delivery_status = 'delivered'
+            invoice.delivery_date = timezone.now().date()
+        elif new_status == 'returned':
+            invoice.delivery_status = 'pending'
+        elif new_status == 'in_transit':
+            invoice.delivery_status = 'in_transit'
+        elif new_status == 'pending':
+            invoice.delivery_status = 'pending'
+        invoice.save(update_fields=['delivery_status', 'delivery_date'] if new_status == 'delivered' else ['delivery_status'])
+
+    ActivityLog.objects.create(
+        user=request.user,
+        action=ActivityLog.ActionType.UPDATE,
+        model_name='Delivery',
+        object_id=str(delivery.id),
+        object_repr=f'{delivery.reference}: {old_status} → {new_status}',
+        ip_address=get_client_ip(request),
+    )
+
+    status_labels = {
+        'pending': 'En attente',
+        'in_transit': 'En transit',
+        'to_pickup': 'À récupérer',
+        'delivered': 'Livré',
+        'returned': 'Retourné',
+    }
+
+    return JsonResponse({
+        'success': True,
+        'message': f'Statut mis à jour: {status_labels.get(new_status, new_status)}',
+        'new_status': new_status,
+        'new_status_label': status_labels.get(new_status, new_status),
+    })
+
+
+@login_required(login_url='login')
 def delivery_check(request, reference):
     """Manually trigger AMANA tracking check for a delivery"""
     from .models import Delivery

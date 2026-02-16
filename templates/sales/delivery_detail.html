@@ -141,7 +141,7 @@
 
             <!-- Invoice Link -->
             {% if delivery.invoice %}
-                <div class="card">
+                <div class="card mb-4">
                     <div class="card-header">
                         <h3><i class="fas fa-file-invoice mr-2"></i> Facture Liée</h3>
                     </div>
@@ -167,6 +167,42 @@
                     </div>
                 </div>
             {% endif %}
+
+            <!-- Manual Status Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-exchange-alt mr-2"></i> Changer le Statut</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-actions">
+                        {% if delivery.status != 'delivered' %}
+                        <button type="button" class="status-action-btn status-btn-delivered" onclick="changeStatus('delivered')">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Marquer Livré</span>
+                        </button>
+                        {% endif %}
+                        {% if delivery.status != 'returned' %}
+                        <button type="button" class="status-action-btn status-btn-returned" onclick="changeStatus('returned')">
+                            <i class="fas fa-undo"></i>
+                            <span>Marquer Retourné</span>
+                        </button>
+                        {% endif %}
+                        {% if delivery.status != 'in_transit' and delivery.status != 'pending' %}
+                        <button type="button" class="status-action-btn status-btn-transit" onclick="changeStatus('in_transit')">
+                            <i class="fas fa-shipping-fast"></i>
+                            <span>Remettre En Transit</span>
+                        </button>
+                        {% endif %}
+                        {% if delivery.status != 'pending' and delivery.status != 'in_transit' %}
+                        <button type="button" class="status-action-btn status-btn-pending" onclick="changeStatus('pending')">
+                            <i class="fas fa-clock"></i>
+                            <span>Remettre En Attente</span>
+                        </button>
+                        {% endif %}
+                    </div>
+                    <div id="status-message" style="display:none; margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); font-size: var(--text-sm);"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Right Column: Timeline -->
@@ -382,6 +418,79 @@
             margin-bottom: var(--space-4);
         }
 
+        /* Status Action Buttons */
+        .status-actions {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .status-action-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-3) var(--space-4);
+            border-radius: var(--radius-md);
+            border: 1px solid;
+            cursor: pointer;
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            transition: all 0.2s;
+            width: 100%;
+            text-align: left;
+        }
+
+        .status-action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-action-btn i {
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .status-btn-delivered {
+            background: var(--success-50);
+            color: var(--success-700);
+            border-color: var(--success-200);
+        }
+        .status-btn-delivered:hover:not(:disabled) {
+            background: var(--success-100);
+            border-color: var(--success-300);
+        }
+
+        .status-btn-returned {
+            background: var(--error-50);
+            color: var(--error-700);
+            border-color: var(--error-200);
+        }
+        .status-btn-returned:hover:not(:disabled) {
+            background: var(--error-100);
+            border-color: var(--error-300);
+        }
+
+        .status-btn-transit {
+            background: var(--warning-50);
+            color: var(--warning-700);
+            border-color: var(--warning-200);
+        }
+        .status-btn-transit:hover:not(:disabled) {
+            background: var(--warning-100);
+            border-color: var(--warning-300);
+        }
+
+        .status-btn-pending {
+            background: var(--neutral-50);
+            color: var(--neutral-600);
+            border-color: var(--neutral-200);
+        }
+        .status-btn-pending:hover:not(:disabled) {
+            background: var(--neutral-100);
+            border-color: var(--neutral-300);
+        }
+
         @media (max-width: 1024px) {
             .delivery-layout {
                 grid-template-columns: 1fr;
@@ -485,6 +594,60 @@
             display: none;
         }
     </style>
+
+    <!-- Status Change Script (always available) -->
+    <script>
+    function changeStatus(newStatus) {
+        const labels = {
+            'delivered': 'Livré',
+            'returned': 'Retourné',
+            'in_transit': 'En Transit',
+            'pending': 'En Attente',
+        };
+        if (!confirm('Changer le statut en "' + labels[newStatus] + '" ?')) return;
+
+        // Disable all buttons
+        document.querySelectorAll('.status-action-btn').forEach(b => b.disabled = true);
+
+        const msgDiv = document.getElementById('status-message');
+
+        fetch('{% url "sales:delivery_update_status" delivery.reference %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'status=' + newStatus,
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                msgDiv.style.display = 'block';
+                msgDiv.style.background = 'var(--success-50)';
+                msgDiv.style.color = 'var(--success-700)';
+                msgDiv.style.border = '1px solid var(--success-200)';
+                msgDiv.innerHTML = '<i class="fas fa-check-circle mr-2"></i>' + data.message + ' — Rechargement...';
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                msgDiv.style.display = 'block';
+                msgDiv.style.background = 'var(--error-50)';
+                msgDiv.style.color = 'var(--error-700)';
+                msgDiv.style.border = '1px solid var(--error-200)';
+                msgDiv.innerHTML = '<i class="fas fa-exclamation-circle mr-2"></i>' + (data.error || 'Erreur');
+                document.querySelectorAll('.status-action-btn').forEach(b => b.disabled = false);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            msgDiv.style.display = 'block';
+            msgDiv.style.background = 'var(--error-50)';
+            msgDiv.style.color = 'var(--error-700)';
+            msgDiv.style.border = '1px solid var(--error-200)';
+            msgDiv.innerHTML = '<i class="fas fa-exclamation-circle mr-2"></i>Erreur de connexion';
+            document.querySelectorAll('.status-action-btn').forEach(b => b.disabled = false);
+        });
+    }
+    </script>
 
     {% if delivery.delivery_method_type == 'amana' and delivery.tracking_number %}
     <!-- Import Modal -->
