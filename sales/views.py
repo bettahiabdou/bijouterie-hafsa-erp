@@ -78,14 +78,27 @@ def sales_dashboard(request):
     transporteur_stats = transporteur_qs.aggregate(revenue=Sum('total_amount'), count=Count('id'))
 
     # ============ CALCULATE REAL "ENCAISSE" ============
-    # Encaissé Réel = all payments actually received (cash, virement, etc.)
+    # Encaissé Réel = payments actually received within the selected period
+    # Filtered by PAYMENT DATE (not invoice date) to avoid counting old/future payments
     # Excludes:
     #   1) "Dépôt Client" payments (old deposits applied to invoices, not new money)
     #   2) Payments on undelivered AMANA/Transporteur invoices (COD not yet collected)
 
-    # Base: all payments excluding "Dépôt Client" (already received previously)
+    # Build payment date filter matching the invoice date filter
+    payment_date_filter = {}
+    if date_from:
+        payment_date_filter['date__gte'] = date_from
+    elif period_filter == 'today':
+        payment_date_filter['date'] = today
+    elif period_filter == 'month':
+        payment_date_filter['date__gte'] = current_month_start
+    if date_to:
+        payment_date_filter['date__lte'] = date_to
+
+    # Base: all payments within date range, excluding "Dépôt Client"
     all_payments_total = ClientPayment.objects.filter(
-        sale_invoice_id__in=filtered_invoice_ids
+        sale_invoice_id__in=filtered_invoice_ids,
+        **payment_date_filter,
     ).exclude(
         payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
@@ -100,6 +113,7 @@ def sales_dashboard(request):
     amana_not_received = ClientPayment.objects.filter(
         sale_invoice_id__in=filtered_invoice_ids,
         sale_invoice__delivery_method_type='amana',
+        **payment_date_filter,
     ).exclude(
         sale_invoice__delivery__status='delivered'
     ).exclude(
@@ -110,6 +124,7 @@ def sales_dashboard(request):
     transporteur_not_received = ClientPayment.objects.filter(
         sale_invoice_id__in=filtered_invoice_ids,
         sale_invoice__delivery_method_type='transporteur',
+        **payment_date_filter,
     ).exclude(
         sale_invoice__delivery__status='delivered'
     ).exclude(
@@ -122,7 +137,8 @@ def sales_dashboard(request):
     # ============ PAYMENT METHOD BREAKDOWN (for filtered period) ============
     payment_method_breakdown = list(
         ClientPayment.objects.filter(
-            sale_invoice_id__in=filtered_invoice_ids
+            sale_invoice_id__in=filtered_invoice_ids,
+            **payment_date_filter,
         ).values(
             'payment_method__name'
         ).annotate(
@@ -156,26 +172,30 @@ def sales_dashboard(request):
         weight=Sum('items__product__gross_weight'),
     )
     today_invoice_ids = list(today_base.values_list('id', flat=True))
+    # Filter by payment date = today (not just invoice date)
     today_all_payments = ClientPayment.objects.filter(
-        sale_invoice_id__in=today_invoice_ids
+        sale_invoice_id__in=today_invoice_ids,
+        date=today,
     ).exclude(
         payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # Today: AMANA invoices not delivered (exclude deposits)
+    # Today: AMANA invoices not delivered (exclude deposits, payment date = today)
     today_amana_pending = ClientPayment.objects.filter(
         sale_invoice_id__in=today_invoice_ids,
         sale_invoice__delivery_method_type='amana',
+        date=today,
     ).exclude(
         sale_invoice__delivery__status='delivered'
     ).exclude(
         payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # Today: Transporteur invoices not delivered (exclude deposits)
+    # Today: Transporteur invoices not delivered (exclude deposits, payment date = today)
     today_transporteur_pending = ClientPayment.objects.filter(
         sale_invoice_id__in=today_invoice_ids,
         sale_invoice__delivery_method_type='transporteur',
+        date=today,
     ).exclude(
         sale_invoice__delivery__status='delivered'
     ).exclude(
