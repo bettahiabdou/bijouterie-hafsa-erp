@@ -18,7 +18,7 @@
                 <h1 class="page-title"><i class="fas fa-edit"></i> Modifier {{ invoice.reference }}</h1>
                 <p class="page-subtitle">
                     {{ invoice.date|date:"d F Y" }}
-                    <span class="badge {% if invoice.status == 'paid' %}badge-success{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'unpaid' %}badge-error{% else %}badge-neutral{% endif %}" style="margin-left: var(--space-2);">
+                    <span id="summary-status" class="badge {% if invoice.status == 'paid' %}badge-success{% elif invoice.status == 'partial' %}badge-warning{% elif invoice.status == 'unpaid' %}badge-error{% else %}badge-neutral{% endif %}" style="margin-left: var(--space-2);">
                         {{ invoice.get_status_display }}
                     </span>
                 </p>
@@ -264,75 +264,70 @@
             <div class="card">
                 <div class="card-header">
                     <h3><i class="fas fa-credit-card mr-2"></i> Paiements ({{ invoice_payments|length }})</h3>
+                    <a href="{% url 'sales:invoice_payment' invoice.reference %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Ajouter
+                    </a>
                 </div>
-                <div class="card-body" style="padding: 0;">
+                <div class="card-body">
                     {% if invoice_payments %}
-                    <div class="table-wrapper" style="border: none; border-radius: 0;">
-                        <table class="table" id="paymentsTable">
-                            <thead>
-                                <tr>
-                                    <th>Reference</th>
-                                    <th style="width: 140px;">Montant</th>
-                                    <th style="width: 180px;">Methode</th>
-                                    <th style="width: 160px;">Banque</th>
-                                    <th style="text-align: center; width: 80px;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for pay in invoice_payments %}
-                                <tr id="payment-row-{{ pay.id }}">
-                                    <td>
-                                        <div style="display: flex; flex-direction: column; gap: 2px;">
-                                            <span style="font-size: var(--text-xs); color: var(--neutral-500);">{{ pay.date|date:"d/m/Y" }}</span>
-                                            <input type="text" class="form-input pay-ref-input"
-                                                   value="{{ pay.reference }}"
-                                                   data-pay-id="{{ pay.id }}"
-                                                   style="padding: var(--space-1) var(--space-2); font-size: var(--text-xs);">
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <input type="number" class="form-input pay-amount-input"
-                                               value="{{ pay.amount }}" step="0.01" min="0.01"
-                                               data-pay-id="{{ pay.id }}"
-                                               style="text-align: right; padding: var(--space-1) var(--space-2); font-size: var(--text-sm);">
-                                    </td>
-                                    <td>
-                                        <select class="form-select pay-method-select" data-pay-id="{{ pay.id }}"
-                                                style="padding: var(--space-1) var(--space-2); font-size: var(--text-sm);">
-                                            {% for pm in payment_methods %}
-                                            <option value="{{ pm.id }}" {% if pm.id == pay.payment_method_id %}selected{% endif %}>{{ pm.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select class="form-select pay-bank-select" data-pay-id="{{ pay.id }}"
-                                                style="padding: var(--space-1) var(--space-2); font-size: var(--text-sm);">
-                                            <option value="">--</option>
-                                            {% for ba in bank_accounts %}
-                                            <option value="{{ ba.id }}" {% if pay.bank_account_id == ba.id %}selected{% endif %}>{{ ba.bank_name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </td>
-                                    <td style="text-align: center;">
-                                        <div style="display: flex; gap: 2px; justify-content: center;">
-                                            <button type="button" onclick="updatePayment({{ pay.id }})" class="btn btn-ghost btn-sm" title="Sauvegarder">
-                                                <i class="fas fa-check text-success"></i>
-                                            </button>
-                                            <button type="button" onclick="deletePayment({{ pay.id }})" class="btn btn-ghost btn-sm" title="Supprimer">
-                                                <i class="fas fa-trash text-error"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="payment-cards">
+                        {% for pay in invoice_payments %}
+                        <div class="payment-card" id="payment-row-{{ pay.id }}">
+                            <div class="payment-card-header">
+                                <div class="payment-card-badge">
+                                    <i class="fas fa-receipt"></i>
+                                    <span>{{ pay.date|date:"d/m/Y" }}</span>
+                                </div>
+                                <div class="payment-card-actions">
+                                    <button type="button" onclick="updatePayment({{ pay.id }})" class="btn btn-success btn-sm" title="Sauvegarder">
+                                        <i class="fas fa-check"></i> Sauvegarder
+                                    </button>
+                                    <button type="button" onclick="deletePayment({{ pay.id }})" class="btn btn-danger btn-sm" title="Supprimer">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="payment-card-body">
+                                <div class="payment-field payment-field-amount">
+                                    <label class="form-label">Montant (DH)</label>
+                                    <input type="number" class="form-input pay-amount-input"
+                                           value="{{ pay.amount|floatformat:2 }}" step="0.01" min="0.01"
+                                           data-pay-id="{{ pay.id }}"
+                                           style="font-size: var(--text-base); font-weight: 600;">
+                                </div>
+                                <div class="payment-field">
+                                    <label class="form-label">Methode de paiement</label>
+                                    <select class="form-select pay-method-select" data-pay-id="{{ pay.id }}">
+                                        {% for pm in payment_methods %}
+                                        <option value="{{ pm.id }}" {% if pm.id == pay.payment_method_id %}selected{% endif %}>{{ pm.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="payment-field">
+                                    <label class="form-label">Compte bancaire</label>
+                                    <select class="form-select pay-bank-select" data-pay-id="{{ pay.id }}">
+                                        <option value="">-- Aucun --</option>
+                                        {% for ba in bank_accounts %}
+                                        <option value="{{ ba.id }}" {% if pay.bank_account_id == ba.id %}selected{% endif %}>{{ ba.bank_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="payment-field">
+                                    <label class="form-label">Reference</label>
+                                    <input type="text" class="form-input pay-ref-input"
+                                           value="{{ pay.reference }}"
+                                           data-pay-id="{{ pay.id }}"
+                                           placeholder="N° cheque, ref virement...">
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                     {% else %}
-                    <div style="text-align: center; padding: var(--space-4); color: var(--neutral-400);">
-                        <i class="fas fa-money-bill" style="font-size: 1.5rem; margin-bottom: var(--space-2); display: block;"></i>
+                    <div style="text-align: center; padding: var(--space-6); color: var(--neutral-400);">
+                        <i class="fas fa-money-bill" style="font-size: 2rem; margin-bottom: var(--space-2); display: block;"></i>
                         <p style="font-size: var(--text-sm);">Aucun paiement enregistre</p>
-                        <a href="{% url 'sales:invoice_payment' invoice.reference %}" class="btn btn-primary btn-sm" style="margin-top: var(--space-2);">
+                        <a href="{% url 'sales:invoice_payment' invoice.reference %}" class="btn btn-primary btn-sm" style="margin-top: var(--space-3);">
                             <i class="fas fa-plus"></i> Enregistrer un paiement
                         </a>
                     </div>
@@ -409,11 +404,11 @@
                     <div style="margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--neutral-200);">
                         <div class="summary-item">
                             <span class="summary-label">Paye</span>
-                            <span class="summary-value" style="color: var(--success-600); font-weight: 600;">{{ invoice.amount_paid|floatformat:2 }} DH</span>
+                            <span class="summary-value" id="summary-paid" style="color: var(--success-600); font-weight: 600;">{{ invoice.amount_paid|floatformat:2 }} DH</span>
                         </div>
                         <div class="summary-item">
                             <span class="summary-label">Solde</span>
-                            <span class="summary-value {% if invoice.balance_due > 0 %}text-error{% else %}text-success{% endif %}" style="font-weight: 600;">
+                            <span class="summary-value {% if invoice.balance_due > 0 %}text-error{% else %}text-success{% endif %}" id="summary-balance" style="font-weight: 600;">
                                 {{ invoice.balance_due|floatformat:2 }} DH
                             </span>
                         </div>
@@ -613,6 +608,119 @@
         background: var(--warning-50);
     }
 
+    /* Payment Cards */
+    .payment-cards {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .payment-card {
+        border: 1px solid var(--neutral-200);
+        border-radius: var(--radius-lg);
+        background: var(--neutral-50);
+        overflow: hidden;
+        transition: border-color 0.3s, background-color 0.3s;
+    }
+
+    .payment-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-3) var(--space-4);
+        background: white;
+        border-bottom: 1px solid var(--neutral-200);
+    }
+
+    .payment-card-badge {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-size: var(--text-sm);
+        color: var(--neutral-500);
+        font-weight: var(--font-medium);
+    }
+
+    .payment-card-badge i {
+        color: var(--primary-400);
+    }
+
+    .payment-card-actions {
+        display: flex;
+        gap: var(--space-2);
+    }
+
+    .payment-card-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-3);
+        padding: var(--space-4);
+    }
+
+    .payment-field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+    }
+
+    .payment-field label {
+        font-size: var(--text-xs);
+        color: var(--neutral-500);
+        font-weight: var(--font-medium);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .payment-field-amount {
+        grid-column: 1 / -1;
+    }
+
+    .payment-field-amount .form-input {
+        background: white;
+        border: 2px solid var(--primary-200);
+    }
+
+    .payment-field-amount .form-input:focus {
+        border-color: var(--primary-400);
+    }
+
+    .payment-card.payment-saved {
+        border-color: var(--success-400);
+        background: var(--success-50);
+    }
+
+    .btn-danger {
+        background: var(--error-50);
+        color: var(--error-600);
+        border: 1px solid var(--error-200);
+    }
+
+    .btn-danger:hover {
+        background: var(--error-100);
+        color: var(--error-700);
+    }
+
+    @media (max-width: 640px) {
+        .payment-card-body {
+            grid-template-columns: 1fr;
+        }
+
+        .payment-card-header {
+            flex-direction: column;
+            gap: var(--space-2);
+            align-items: flex-start;
+        }
+
+        .payment-card-actions {
+            width: 100%;
+        }
+
+        .payment-card-actions .btn {
+            flex: 1;
+            justify-content: center;
+        }
+    }
+
     /* Responsive */
     @media (max-width: 1023px) {
         .edit-layout {
@@ -741,15 +849,51 @@
     }
 
     // ========== PAYMENT EDITING ==========
-    function updatePayment(payId) {
-        const row = document.getElementById('payment-row-' + payId);
-        if (!row) return;
+    function updateSidebar(data) {
+        // Update paid amount
+        const paidEl = document.getElementById('summary-paid');
+        if (paidEl && data.amount_paid) {
+            paidEl.textContent = parseFloat(data.amount_paid).toFixed(2) + ' DH';
+        }
+        // Update balance
+        const balanceEl = document.getElementById('summary-balance');
+        if (balanceEl && data.balance_due !== undefined) {
+            const balance = parseFloat(data.balance_due);
+            balanceEl.textContent = balance.toFixed(2) + ' DH';
+            balanceEl.className = 'summary-value ' + (balance > 0 ? 'text-error' : 'text-success');
+            balanceEl.style.fontWeight = '600';
+        }
+        // Update status badge
+        const statusEl = document.getElementById('summary-status');
+        if (statusEl && data.status) {
+            const statusMap = {
+                'paid': { label: 'Payee', cls: 'badge-success' },
+                'partial': { label: 'Partiel', cls: 'badge-warning' },
+                'unpaid': { label: 'Impayee', cls: 'badge-error' },
+                'draft': { label: 'Brouillon', cls: 'badge-neutral' },
+            };
+            const s = statusMap[data.status] || { label: data.status, cls: 'badge-neutral' };
+            statusEl.className = 'badge ' + s.cls;
+            statusEl.textContent = s.label;
+        }
+    }
 
-        const amountInput = row.querySelector('.pay-amount-input');
-        const methodSelect = row.querySelector('.pay-method-select');
-        const bankSelect = row.querySelector('.pay-bank-select');
-        const refInput = row.querySelector('.pay-ref-input');
+    function updatePayment(payId) {
+        const card = document.getElementById('payment-row-' + payId);
+        if (!card) return;
+
+        const amountInput = card.querySelector('.pay-amount-input');
+        const methodSelect = card.querySelector('.pay-method-select');
+        const bankSelect = card.querySelector('.pay-bank-select');
+        const refInput = card.querySelector('.pay-ref-input');
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        // Disable save button
+        const saveBtn = card.querySelector('.btn-success');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ...';
+        }
 
         const formData = new FormData();
         formData.append('payment_id', payId);
@@ -766,20 +910,22 @@
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                // Flash success
-                row.style.transition = 'background 0.3s';
-                row.style.background = 'var(--success-50)';
-                setTimeout(() => { row.style.background = ''; }, 1500);
-                // Update summary sidebar
-                if (data.amount_paid) {
-                    const paidEl = document.querySelector('.summary-paid');
-                    if (paidEl) paidEl.textContent = parseFloat(data.amount_paid).toFixed(2) + ' DH';
-                }
+                // Flash success on the card
+                card.classList.add('payment-saved');
+                setTimeout(() => card.classList.remove('payment-saved'), 2000);
+                // Update sidebar
+                updateSidebar(data);
             } else {
                 alert('Erreur: ' + (data.error || 'Erreur inconnue'));
             }
         })
-        .catch(err => { console.error(err); alert('Erreur de connexion'); });
+        .catch(err => { console.error(err); alert('Erreur de connexion'); })
+        .finally(() => {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-check"></i> Sauvegarder';
+            }
+        });
     }
 
     function deletePayment(payId) {
