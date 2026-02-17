@@ -1,16 +1,19 @@
 """
 Views for Client Deposit Fund management
 """
+import json
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count
+from django.db.models.functions import TruncDate
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation
+from datetime import timedelta
 
 from .models import DepositAccount, DepositTransaction
 from clients.models import Client
@@ -619,3 +622,226 @@ def api_product_info(request, product_id):
         })
     except Product.DoesNotExist:
         return JsonResponse({'error': 'Product not found'}, status=404)
+
+
+@login_required
+def deposit_dashboard(request):
+    """Comprehensive deposit dashboard with full payment analytics"""
+    today = timezone.now().date()
+    current_month_start = today.replace(day=1)
+
+    # ============ FILTERS ============
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    period_filter = request.GET.get('period', 'month')
+
+    # Base: only deposit transactions (money IN), use the date field
+    base_qs = DepositTransaction.objects.filter(
+        transaction_type='deposit',
+    )
+
+    # Date filter using the date field (not created_at)
+    if date_from:
+        base_qs = base_qs.filter(date__gte=date_from)
+    elif period_filter == 'today':
+        base_qs = base_qs.filter(date=today)
+    elif period_filter == 'month':
+        base_qs = base_qs.filter(date__gte=current_month_start)
+
+    if date_to:
+        base_qs = base_qs.filter(date__lte=date_to)
+
+    # ============ MAIN STATS ============
+    total_deposits = base_qs.aggregate(
+        total=Sum('amount'),
+        count=Count('id'),
+    )
+
+    # ============ PAYMENT METHOD BREAKDOWN ============
+    method_breakdown = list(
+        base_qs.values(
+            'payment_method__name'
+        ).annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total')
+    )
+
+    # ============ PAYMENT METHOD + BANK DETAIL ============
+    method_bank_detail = list(
+        base_qs.values(
+            'payment_method__name',
+            'bank_account__bank_name',
+        ).annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('payment_method__name', '-total')
+    )
+
+    # Structure by method
+    payment_detail = {}
+    for row in method_bank_detail:
+        method = row['payment_method__name'] or 'Non défini'
+        bank = row['bank_account__bank_name'] or None
+        if method not in payment_detail:
+            payment_detail[method] = {'total': Decimal('0'), 'count': 0, 'banks': []}
+        payment_detail[method]['total'] += row['total']
+        payment_detail[method]['count'] += row['count']
+        if bank:
+            payment_detail[method]['banks'].append({
+                'bank_name': bank,
+                'total': row['total'],
+                'count': row['count'],
+            })
+    payment_detail_sorted = sorted(payment_detail.items(), key=lambda x: x[1]['total'], reverse=True)
+
+    # ============ PER-TRANSACTION DETAIL (grouped by method) ============
+    all_transactions = list(
+        base_qs.select_related(
+            'account', 'account__client', 'payment_method', 'bank_account'
+        ).order_by('payment_method__name', '-date')
+    )
+
+    transactions_by_method = {}
+    for t in all_transactions:
+        method = t.payment_method.name if t.payment_method else 'Non défini'
+        if method not in transactions_by_method:
+            transactions_by_method[method] = []
+        transactions_by_method[method].append({
+            'client': t.account.client.full_name,
+            'account_id': t.account.pk,
+            'amount': t.amount,
+            'date': t.date,
+            'bank_name': t.bank_account.bank_name if t.bank_account else None,
+            'description': t.description,
+            'reference': t.payment_reference,
+        })
+
+    # Build payment sections
+    payment_sections = []
+    for method_name, detail in payment_detail_sorted:
+        payment_sections.append({
+            'method': method_name,
+            'total': detail['total'],
+            'count': detail['count'],
+            'banks': detail['banks'],
+            'transactions': transactions_by_method.get(method_name, []),
+        })
+
+    # ============ BANK DETAIL ============
+    bank_grouped = {}
+    for t in all_transactions:
+        bank = t.bank_account.bank_name if t.bank_account else None
+        if not bank:
+            bank = 'Sans Banque (Espèces, etc.)'
+        method = t.payment_method.name if t.payment_method else 'Autre'
+        if bank not in bank_grouped:
+            bank_grouped[bank] = {'total': Decimal('0'), 'count': 0, 'methods': {}, 'transactions': []}
+        bank_grouped[bank]['total'] += t.amount
+        bank_grouped[bank]['count'] += 1
+        if method not in bank_grouped[bank]['methods']:
+            bank_grouped[bank]['methods'][method] = {'total': Decimal('0'), 'count': 0}
+        bank_grouped[bank]['methods'][method]['total'] += t.amount
+        bank_grouped[bank]['methods'][method]['count'] += 1
+        bank_grouped[bank]['transactions'].append({
+            'client': t.account.client.full_name,
+            'account_id': t.account.pk,
+            'amount': t.amount,
+            'date': t.date,
+            'method': method,
+            'description': t.description,
+        })
+
+    bank_detail_sorted = []
+    for bank_name, detail in sorted(bank_grouped.items(), key=lambda x: x[1]['total'], reverse=True):
+        methods_list = [{'method': m, 'total': d['total'], 'count': d['count']}
+                        for m, d in sorted(detail['methods'].items(), key=lambda x: x[1]['total'], reverse=True)]
+        bank_detail_sorted.append((bank_name, {
+            'total': detail['total'],
+            'count': detail['count'],
+            'methods': methods_list,
+            'transactions': detail['transactions'],
+        }))
+
+    # ============ PER-CLIENT BREAKDOWN ============
+    client_breakdown = list(
+        base_qs.values(
+            'account__client__first_name',
+            'account__client__last_name',
+            'account__pk',
+        ).annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total')
+    )
+
+    # ============ TODAY STATS ============
+    today_qs = DepositTransaction.objects.filter(
+        transaction_type='deposit',
+        date=today,
+    )
+    today_stats = today_qs.aggregate(total=Sum('amount'), count=Count('id'))
+
+    today_methods = list(
+        today_qs.values('payment_method__name').annotate(
+            total=Sum('amount'), count=Count('id')
+        ).order_by('-total')
+    )
+
+    # ============ DAILY CHART (last 30 days) ============
+    thirty_days_ago = today - timedelta(days=30)
+    daily_deposits = list(
+        DepositTransaction.objects.filter(
+            transaction_type='deposit',
+            date__gte=thirty_days_ago,
+        ).values('date').annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('date')
+    )
+
+    chart_labels = [d['date'].strftime('%d/%m') for d in daily_deposits]
+    chart_values = [float(d['total']) for d in daily_deposits]
+
+    # Payment method chart
+    pm_chart_labels = [m['payment_method__name'] or 'Autre' for m in method_breakdown]
+    pm_chart_values = [float(m['total']) for m in method_breakdown]
+
+    # ============ GLOBAL STATS (all time) ============
+    all_accounts = DepositAccount.objects.all()
+    total_balance = sum(a.balance for a in all_accounts)
+    active_accounts = all_accounts.filter(is_active=True).count()
+
+    context = {
+        'today': today,
+        'date_from': date_from,
+        'date_to': date_to,
+        'period_filter': period_filter,
+        # Today
+        'today_stats': {
+            'total': today_stats['total'] or Decimal('0'),
+            'count': today_stats['count'] or 0,
+        },
+        'today_methods': today_methods,
+        # Period
+        'period_stats': {
+            'total': total_deposits['total'] or Decimal('0'),
+            'count': total_deposits['count'] or 0,
+        },
+        # Global
+        'total_balance': total_balance,
+        'active_accounts': active_accounts,
+        'total_accounts': all_accounts.count(),
+        # Payment detail
+        'payment_sections': payment_sections,
+        'bank_detail_sorted': bank_detail_sorted,
+        'method_breakdown': method_breakdown,
+        'client_breakdown': client_breakdown,
+        # Charts
+        'chart_labels_json': json.dumps(chart_labels),
+        'chart_values_json': json.dumps(chart_values),
+        'pm_chart_labels_json': json.dumps(pm_chart_labels),
+        'pm_chart_values_json': json.dumps(pm_chart_values),
+    }
+
+    return render(request, 'deposits/dashboard.html', context)

@@ -489,6 +489,28 @@ def sales_dashboard(request):
     # ============ SELLERS LIST FOR FILTER ============
     sellers = User.objects.filter(sales__isnull=False).distinct().order_by('first_name', 'last_name')
 
+    # ============ DEPOSIT FUNDS RECEIVED (separate from sales) ============
+    from deposits.models import DepositTransaction
+    deposit_date_filter = {}
+    if date_from:
+        deposit_date_filter['date__gte'] = date_from
+    elif period_filter == 'today':
+        deposit_date_filter['date'] = today
+    elif period_filter == 'month':
+        deposit_date_filter['date__gte'] = current_month_start
+    if date_to:
+        deposit_date_filter['date__lte'] = date_to
+
+    deposit_funds_total = DepositTransaction.objects.filter(
+        transaction_type='deposit',
+        **deposit_date_filter,
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    today_deposit_funds = DepositTransaction.objects.filter(
+        transaction_type='deposit',
+        date=today,
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
     filter_revenue = filtered_stats['revenue'] or Decimal('0')
 
     context = {
@@ -506,12 +528,14 @@ def sales_dashboard(request):
             'transporteur_pending': today_transporteur_pending,
             'count': today_stats_raw['count'] or 0,
             'weight': today_stats_raw['weight'] or Decimal('0'),
+            'deposit_funds': today_deposit_funds,
         },
         'today_payment_methods': today_payment_methods,
         # Period
         'period_stats': {
             'revenue': filter_revenue,
             'encaisse': real_encaisse,
+            'deposit_funds': deposit_funds_total,
             'amana_pending': amana_not_received,
             'transporteur_pending': transporteur_not_received,
             'count': filtered_stats['count'] or 0,

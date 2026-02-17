@@ -9,6 +9,7 @@ app_name = 'deposits'
 urlpatterns = [
     # Main views
     path('', views.deposit_list, name='list'),
+    path('dashboard/', views.deposit_dashboard, name='dashboard'),
     path('create/', views.deposit_create, name='create'),
     path('<int:pk>/', views.deposit_detail, name='detail'),
 

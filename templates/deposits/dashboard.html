@@ -1,0 +1,519 @@
+{% extends 'base.html' %}
+
+{% block title %}Tableau de Bord Depots - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'deposits:list' %}" class="breadcrumb-item">Depots</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Tableau de Bord</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Tableau de Bord Depots</h1>
+                <p class="page-subtitle">{{ today|date:"l d F Y" }}</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'deposits:list' %}" class="btn btn-secondary">
+                    <i class="fas fa-list"></i> <span>Comptes</span>
+                </a>
+                <a href="{% url 'deposits:create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> <span>Nouveau Compte</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="db">
+
+    <!-- ============ FILTERS ============ -->
+    <div class="card db-filter-card">
+        <form method="get" class="db-filter-form">
+            <div class="db-filter-grid">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Periode</label>
+                    <select name="period" class="form-select" onchange="toggleDateFields(this.value)">
+                        <option value="today" {% if period_filter == 'today' %}selected{% endif %}>Aujourd'hui</option>
+                        <option value="month" {% if period_filter == 'month' %}selected{% endif %}>Ce Mois</option>
+                        <option value="all" {% if period_filter == 'all' %}selected{% endif %}>Tout</option>
+                        <option value="custom" {% if date_from or date_to %}selected{% endif %}>Personnalise</option>
+                    </select>
+                </div>
+                <div class="form-group date-field" style="margin-bottom:0; {% if not date_from and not date_to %}display:none;{% endif %}">
+                    <label class="form-label">Du</label>
+                    <input type="date" name="date_from" value="{{ date_from }}" class="form-input">
+                </div>
+                <div class="form-group date-field" style="margin-bottom:0; {% if not date_from and not date_to %}display:none;{% endif %}">
+                    <label class="form-label">Au</label>
+                    <input type="date" name="date_to" value="{{ date_to }}" class="form-input">
+                </div>
+            </div>
+            <div class="db-filter-actions">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filtrer</button>
+                <a href="{% url 'deposits:dashboard' %}" class="btn btn-secondary"><i class="fas fa-times"></i></a>
+            </div>
+        </form>
+    </div>
+
+    <!-- ============ GLOBAL STATS ============ -->
+    <div class="db-section">
+        <h2 class="db-title"><i class="fas fa-piggy-bank"></i> Vue Globale</h2>
+        <div class="db-kpi-row">
+            <div class="db-kpi db-kpi--success">
+                <div class="db-kpi__icon"><i class="fas fa-wallet"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ total_balance|floatformat:0 }}</span>
+                    <span class="db-kpi__label">Solde Total (DH)</span>
+                </div>
+            </div>
+            <div class="db-kpi db-kpi--primary">
+                <div class="db-kpi__icon"><i class="fas fa-users"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ total_accounts }}</span>
+                    <span class="db-kpi__label">Comptes ({{ active_accounts }} actifs)</span>
+                </div>
+            </div>
+            <div class="db-kpi db-kpi--info">
+                <div class="db-kpi__icon"><i class="fas fa-calendar-day"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ today_stats.total|floatformat:0 }}</span>
+                    <span class="db-kpi__label">Recu Aujourd'hui (DH)</span>
+                </div>
+            </div>
+            <div class="db-kpi db-kpi--warning">
+                <div class="db-kpi__icon"><i class="fas fa-exchange-alt"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ today_stats.count }}</span>
+                    <span class="db-kpi__label">Transactions Aujourd'hui</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Today method chips -->
+        {% if today_methods %}
+        <div class="db-today-methods">
+            {% for pm in today_methods %}
+            <div class="db-method-chip">
+                <span class="db-method-chip__name">{{ pm.payment_method__name|default:"Autre" }}</span>
+                <span class="db-method-chip__val">{{ pm.total|floatformat:0 }} DH</span>
+                <span class="db-method-chip__count">({{ pm.count }})</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ============ PERIOD STATS ============ -->
+    <div class="db-section">
+        <h2 class="db-title">
+            <i class="fas fa-chart-line"></i>
+            {% if date_from and date_to %}{{ date_from }} — {{ date_to }}
+            {% elif date_from %}Depuis {{ date_from }}
+            {% elif period_filter == 'today' %}Aujourd'hui
+            {% elif period_filter == 'all' %}Historique Global
+            {% else %}Ce Mois{% endif %}
+            — Fonds Recus
+        </h2>
+        <div class="db-kpi-row db-kpi-row--3">
+            <div class="db-kpi db-kpi--success">
+                <div class="db-kpi__icon"><i class="fas fa-hand-holding-usd"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ period_stats.total|floatformat:0 }}</span>
+                    <span class="db-kpi__label">Total Recu (DH)</span>
+                </div>
+            </div>
+            <div class="db-kpi db-kpi--info">
+                <div class="db-kpi__icon"><i class="fas fa-receipt"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ period_stats.count }}</span>
+                    <span class="db-kpi__label">Transactions</span>
+                </div>
+            </div>
+            <div class="db-kpi db-kpi--primary">
+                <div class="db-kpi__icon"><i class="fas fa-calculator"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{% if period_stats.count > 0 %}{{ period_stats.total|floatformat:0 }}{% else %}0{% endif %}</span>
+                    <span class="db-kpi__label">Moy/Transaction: {% if period_stats.count > 0 %}{{ period_stats.total|floatformat:0 }}{% else %}0{% endif %}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ CHARTS ============ -->
+    <div class="db-section">
+        <div class="db-charts-row">
+            <div class="card db-chart-card" style="flex:2;">
+                <div class="card-header"><h3><i class="fas fa-chart-bar mr-2"></i> Depots (30 jours)</h3></div>
+                <div class="card-body"><canvas id="depositsChart" height="220"></canvas></div>
+            </div>
+            <div class="card db-chart-card" style="flex:1;">
+                <div class="card-header"><h3><i class="fas fa-chart-pie mr-2"></i> Modes de Paiement</h3></div>
+                <div class="card-body" style="display:flex;align-items:center;justify-content:center;">
+                    <canvas id="methodChart" height="220"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ PAYMENT DETAIL ============ -->
+    <div class="db-section">
+        <h2 class="db-title"><i class="fas fa-wallet"></i> Detail par Mode de Paiement</h2>
+
+        {% for section in payment_sections %}
+        <div class="card db-pay-card">
+            <div class="db-pay-card__header" onclick="togglePaySection('dpay-{{ forloop.counter }}')">
+                <div class="db-pay-card__left">
+                    <span class="db-pay-card__icon">
+                        {% if 'espece' in section.method|lower or 'cash' in section.method|lower %}
+                            <i class="fas fa-money-bill-wave" style="color:var(--success-600);"></i>
+                        {% elif 'virement' in section.method|lower %}
+                            <i class="fas fa-university" style="color:#2563eb;"></i>
+                        {% elif 'cheque' in section.method|lower or 'chèque' in section.method|lower %}
+                            <i class="fas fa-money-check" style="color:var(--primary-600);"></i>
+                        {% elif 'carte' in section.method|lower %}
+                            <i class="fas fa-credit-card" style="color:#7c3aed;"></i>
+                        {% else %}
+                            <i class="fas fa-wallet" style="color:var(--neutral-500);"></i>
+                        {% endif %}
+                    </span>
+                    <div>
+                        <strong class="db-pay-card__method">{{ section.method }}</strong>
+                        <span class="db-pay-card__count">{{ section.count }} transaction{{ section.count|pluralize }}</span>
+                    </div>
+                </div>
+                <div class="db-pay-card__right">
+                    <span class="db-pay-card__total">{{ section.total|floatformat:0 }} DH</span>
+                    <i class="fas fa-chevron-down db-pay-card__arrow"></i>
+                </div>
+            </div>
+
+            {% if section.banks %}
+            <div class="db-pay-card__banks">
+                {% for bank in section.banks %}
+                <div class="db-bank-chip">
+                    <i class="fas fa-university"></i>
+                    <span>{{ bank.bank_name }}</span>
+                    <strong>{{ bank.total|floatformat:0 }} DH</strong>
+                    <small>({{ bank.count }})</small>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div id="dpay-{{ forloop.counter }}" class="db-pay-card__body" style="display:none;">
+                {% if section.transactions %}
+                <table class="table db-pay-table">
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Date</th>
+                            {% if section.banks %}<th>Banque</th>{% endif %}
+                            <th>Description</th>
+                            <th style="text-align:right;">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in section.transactions %}
+                        <tr onclick="window.location='{% url 'deposits:detail' t.account_id %}'" style="cursor:pointer;">
+                            <td class="font-semibold">{{ t.client }}</td>
+                            <td>{{ t.date|date:"d/m/Y" }}</td>
+                            {% if section.banks %}<td>{{ t.bank_name|default:"—" }}</td>{% endif %}
+                            <td class="text-muted">{{ t.description|default:"—" }}</td>
+                            <td style="text-align:right;" class="font-bold text-success">+{{ t.amount|floatformat:0 }} DH</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="{% if section.banks %}4{% else %}3{% endif %}"><strong>Total {{ section.method }}</strong></td>
+                            <td style="text-align:right;"><strong>{{ section.total|floatformat:0 }} DH</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% else %}
+                <div class="db-empty">Aucune transaction</div>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="card"><div class="card-body"><div class="db-empty"><i class="fas fa-wallet"></i> Aucun depot pour cette periode</div></div></div>
+        {% endfor %}
+    </div>
+
+    <!-- ============ BANK DETAIL ============ -->
+    {% if bank_detail_sorted %}
+    <div class="db-section">
+        <h2 class="db-title"><i class="fas fa-university"></i> Detail par Banque</h2>
+        {% for bank_name, detail in bank_detail_sorted %}
+        <div class="card db-pay-card" style="margin-bottom:var(--space-4);">
+            <div class="db-pay-card__header" onclick="togglePaySection('dbank-{{ forloop.counter }}')">
+                <div class="db-pay-card__left">
+                    <span class="db-pay-card__icon">
+                        {% if 'sans banque' in bank_name|lower %}
+                            <i class="fas fa-money-bill-wave" style="color:var(--success-600);"></i>
+                        {% else %}
+                            <i class="fas fa-university" style="color:#2563eb;"></i>
+                        {% endif %}
+                    </span>
+                    <div>
+                        <strong class="db-pay-card__method">{{ bank_name }}</strong>
+                        <span class="db-pay-card__count">{{ detail.count }} transaction{{ detail.count|pluralize }}</span>
+                    </div>
+                </div>
+                <div class="db-pay-card__right">
+                    <span class="db-pay-card__total" style="color:#2563eb;">{{ detail.total|floatformat:0 }} DH</span>
+                    <i class="fas fa-chevron-down db-pay-card__arrow"></i>
+                </div>
+            </div>
+
+            <div class="db-pay-card__banks">
+                {% for m in detail.methods %}
+                <div class="db-bank-chip">
+                    <span>{{ m.method }}</span>
+                    <strong>{{ m.total|floatformat:0 }} DH</strong>
+                    <small>({{ m.count }})</small>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div id="dbank-{{ forloop.counter }}" class="db-pay-card__body" style="display:none;">
+                {% if detail.transactions %}
+                <table class="table db-pay-table">
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Mode</th>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th style="text-align:right;">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in detail.transactions %}
+                        <tr onclick="window.location='{% url 'deposits:detail' t.account_id %}'" style="cursor:pointer;">
+                            <td class="font-semibold">{{ t.client }}</td>
+                            <td><span class="badge badge-neutral" style="font-size:var(--text-xs);">{{ t.method }}</span></td>
+                            <td>{{ t.date|date:"d/m/Y" }}</td>
+                            <td class="text-muted">{{ t.description|default:"—" }}</td>
+                            <td style="text-align:right;" class="font-bold text-success">+{{ t.amount|floatformat:0 }} DH</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4"><strong>Total {{ bank_name }}</strong></td>
+                            <td style="text-align:right;"><strong>{{ detail.total|floatformat:0 }} DH</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% else %}
+                <div class="db-empty">Aucune transaction</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ============ CLIENT BREAKDOWN ============ -->
+    {% if client_breakdown %}
+    <div class="db-section">
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-users mr-2"></i> Depots par Client</h3></div>
+            <div class="card-body" style="padding:0;">
+                <table class="table">
+                    <thead><tr><th>Client</th><th>Transactions</th><th style="text-align:right;">Total Depose (DH)</th></tr></thead>
+                    <tbody>
+                        {% for c in client_breakdown %}
+                        <tr onclick="window.location='{% url 'deposits:detail' c.account__pk %}'" style="cursor:pointer;">
+                            <td class="font-semibold">{{ c.account__client__first_name }} {{ c.account__client__last_name }}</td>
+                            <td>{{ c.count }}</td>
+                            <td style="text-align:right;" class="font-bold text-success">{{ c.total|floatformat:0 }} DH</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- ============ STYLES (reuse sales dashboard styles) ============ -->
+<style>
+    .db { display:flex; flex-direction:column; gap:var(--space-6); }
+    .db-section { }
+    .db-title { font-size:var(--text-lg); font-weight:var(--font-bold); color:var(--neutral-700); margin-bottom:var(--space-4); }
+    .db-title i { color:var(--primary-500); margin-right:var(--space-2); }
+    .db-filter-card { padding:var(--space-4) var(--space-5); }
+    .db-filter-form { display:flex; gap:var(--space-4); align-items:flex-end; }
+    .db-filter-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--space-4); flex:1; }
+    .db-filter-actions { display:flex; gap:var(--space-2); }
+    .db-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--space-4); }
+    .db-kpi-row--3 { grid-template-columns:repeat(3,1fr); }
+    .db-kpi {
+        background:white; border-radius:var(--radius-xl); padding:var(--space-4) var(--space-5);
+        display:flex; align-items:center; gap:var(--space-4);
+        box-shadow:var(--shadow-sm); border:1px solid var(--neutral-100); transition:all .2s;
+    }
+    .db-kpi:hover { box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .db-kpi__icon {
+        width:48px; height:48px; border-radius:var(--radius-lg);
+        display:flex; align-items:center; justify-content:center;
+        font-size:var(--text-xl); flex-shrink:0;
+    }
+    .db-kpi__value { font-size:var(--text-xl); font-weight:var(--font-bold); color:var(--neutral-800); display:block; line-height:1.2; }
+    .db-kpi__label { font-size:var(--text-xs); color:var(--neutral-500); margin-top:2px; display:block; }
+    .db-kpi--primary .db-kpi__icon { background:var(--primary-100); color:var(--primary-600); }
+    .db-kpi--success .db-kpi__icon { background:var(--success-100); color:var(--success-600); }
+    .db-kpi--warning .db-kpi__icon { background:var(--warning-100); color:var(--warning-600); }
+    .db-kpi--info .db-kpi__icon { background:#dbeafe; color:#2563eb; }
+    .db-today-methods { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:var(--space-3); }
+    .db-method-chip {
+        display:inline-flex; align-items:center; gap:var(--space-2);
+        background:white; border:1px solid var(--neutral-200); border-radius:var(--radius-full);
+        padding:var(--space-1) var(--space-3); font-size:var(--text-sm);
+    }
+    .db-method-chip__name { color:var(--neutral-600); }
+    .db-method-chip__val { font-weight:var(--font-bold); color:var(--neutral-800); }
+    .db-method-chip__count { color:var(--neutral-400); font-size:var(--text-xs); }
+    .db-charts-row { display:flex; gap:var(--space-4); }
+    .db-chart-card { min-height:280px; }
+    .db-pay-card { margin-bottom:var(--space-3); overflow:hidden; }
+    .db-pay-card__header {
+        display:flex; justify-content:space-between; align-items:center;
+        padding:var(--space-4) var(--space-5); cursor:pointer; transition:background .15s;
+    }
+    .db-pay-card__header:hover { background:var(--neutral-50); }
+    .db-pay-card__left { display:flex; align-items:center; gap:var(--space-3); }
+    .db-pay-card__icon { font-size:1.2rem; width:36px; text-align:center; }
+    .db-pay-card__method { font-size:var(--text-base); display:block; }
+    .db-pay-card__count { font-size:var(--text-xs); color:var(--neutral-500); }
+    .db-pay-card__right { display:flex; align-items:center; gap:var(--space-3); }
+    .db-pay-card__total { font-size:var(--text-lg); font-weight:var(--font-bold); color:var(--neutral-800); }
+    .db-pay-card__arrow { color:var(--neutral-400); font-size:var(--text-sm); transition:transform .2s; }
+    .db-pay-card__banks {
+        display:flex; flex-wrap:wrap; gap:var(--space-2);
+        padding:0 var(--space-5) var(--space-3);
+        border-bottom:1px solid var(--neutral-100);
+    }
+    .db-bank-chip {
+        display:inline-flex; align-items:center; gap:var(--space-2);
+        background:var(--neutral-50); border:1px solid var(--neutral-200);
+        border-radius:var(--radius-md); padding:var(--space-1) var(--space-3); font-size:var(--text-sm);
+    }
+    .db-bank-chip i { color:#2563eb; font-size:.75rem; }
+    .db-bank-chip small { color:var(--neutral-400); }
+    .db-pay-card__body { border-top:1px solid var(--neutral-100); }
+    .db-pay-table { margin:0; }
+    .db-pay-table thead th { font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.05em; color:var(--neutral-500); }
+    .db-pay-table tfoot td { background:var(--neutral-50); }
+    .db-empty { padding:var(--space-6); text-align:center; color:var(--neutral-400); }
+    .db-empty i { font-size:1.5rem; margin-bottom:var(--space-2); display:block; }
+
+    @media (max-width:1200px) {
+        .db-kpi-row { grid-template-columns:repeat(2,1fr); }
+        .db-filter-grid { grid-template-columns:1fr 1fr; }
+        .db-charts-row { flex-direction:column; }
+    }
+    @media (max-width:768px) {
+        .db-kpi-row, .db-kpi-row--3 { grid-template-columns:repeat(2,1fr); }
+        .db-kpi { padding:var(--space-3); gap:var(--space-3); }
+        .db-kpi__icon { width:40px; height:40px; font-size:var(--text-base); }
+        .db-kpi__value { font-size:var(--text-base); }
+        .db-filter-form { flex-direction:column; }
+        .db-filter-grid { grid-template-columns:1fr; width:100%; }
+        .db-filter-actions { width:100%; }
+        .db-pay-card__header { padding:var(--space-3); }
+        .db-pay-card__banks { padding:0 var(--space-3) var(--space-2); }
+    }
+</style>
+
+<!-- ============ SCRIPTS ============ -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    function togglePaySection(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function toggleDateFields(value) {
+        document.querySelectorAll('.date-field').forEach(f => {
+            f.style.display = value === 'custom' ? 'block' : 'none';
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const colors = {
+            primary: '#6366f1', primaryLight: 'rgba(99,102,241,0.15)',
+            success: '#22c55e', successLight: 'rgba(34,197,94,0.15)',
+            blue: '#3b82f6', purple: '#8b5cf6', pink: '#ec4899',
+            teal: '#14b8a6', orange: '#f97316', gray: '#9ca3af',
+            warning: '#f59e0b', error: '#ef4444',
+        };
+        const pieColors = [colors.success, colors.blue, colors.purple, colors.warning, colors.error, colors.pink, colors.teal, colors.orange, colors.gray, colors.primary];
+
+        // Bar chart
+        const labels = {{ chart_labels_json|safe }};
+        const values = {{ chart_values_json|safe }};
+        if (labels.length > 0) {
+            new Chart(document.getElementById('depositsChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Depots',
+                        data: values,
+                        backgroundColor: colors.successLight,
+                        borderColor: colors.success,
+                        borderWidth: 2,
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => new Intl.NumberFormat('fr-MA').format(ctx.parsed.y) + ' DH' } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(0,0,0,0.04)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Pie chart
+        const pmLabels = {{ pm_chart_labels_json|safe }};
+        const pmValues = {{ pm_chart_values_json|safe }};
+        if (pmLabels.length > 0) {
+            new Chart(document.getElementById('methodChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: pmLabels,
+                    datasets: [{ data: pmValues, backgroundColor: pieColors.slice(0, pmLabels.length), borderWidth: 2, borderColor: '#fff' }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '55%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, font: { size: 11 } } },
+                        tooltip: { callbacks: { label: ctx => {
+                            const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+                            const pct = total > 0 ? ((ctx.parsed/total)*100).toFixed(1) : 0;
+                            return ctx.label + ': ' + new Intl.NumberFormat('fr-MA').format(ctx.parsed) + ' DH (' + pct + '%)';
+                        }}}
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

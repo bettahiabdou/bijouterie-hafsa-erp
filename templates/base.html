@@ -578,6 +578,9 @@
                         <i class="fas fa-chevron-right nav-chevron"></i>
                     </a>
                     <div class="nav-submenu">
+                        <a href="{% url 'deposits:dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' and 'deposits' in request.path %}active{% endif %}">
+                            <span class="nav-text">Tableau de Bord</span>
+                        </a>
                         <a href="{% url 'deposits:list' %}" class="nav-link {% if request.resolver_match.url_name == 'list' and 'deposits' in request.path %}active{% endif %}">
                             <span class="nav-text">Tous les Comptes</span>
                         </a>

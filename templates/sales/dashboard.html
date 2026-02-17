@@ -99,6 +99,15 @@
                     <span class="db-kpi__label">Grammes</span>
                 </div>
             </div>
+            {% if today_stats.deposit_funds > 0 %}
+            <div class="db-kpi db-kpi--deposit">
+                <div class="db-kpi__icon"><i class="fas fa-piggy-bank"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ today_stats.deposit_funds|floatformat:0 }}</span>
+                    <span class="db-kpi__label">Depots Recus (DH)</span>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Today: payment method mini breakdown -->
@@ -181,6 +190,15 @@
                 <div class="db-kpi__body">
                     <span class="db-kpi__value">{{ period_stats.old_gold|floatformat:0 }}</span>
                     <span class="db-kpi__label">Ancien Or (DH)</span>
+                </div>
+            </div>
+            {% endif %}
+            {% if period_stats.deposit_funds > 0 %}
+            <div class="db-kpi db-kpi--deposit">
+                <div class="db-kpi__icon"><i class="fas fa-piggy-bank"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ period_stats.deposit_funds|floatformat:0 }}</span>
+                    <span class="db-kpi__label">Depots Recus (DH)</span>
                 </div>
             </div>
             {% endif %}
@@ -327,6 +345,15 @@
                 <div>
                     <strong>{{ deposit_client_total|floatformat:0 }} DH</strong>
                     <small>Depot Client</small>
+                </div>
+            </div>
+            {% endif %}
+            {% if period_stats.deposit_funds > 0 %}
+            <div class="db-pay-summary__item db-pay-summary__item--purple">
+                <i class="fas fa-hand-holding-usd"></i>
+                <div>
+                    <strong>{{ period_stats.deposit_funds|floatformat:0 }} DH</strong>
+                    <small>Fonds Depots Recus</small>
                 </div>
             </div>
             {% endif %}
@@ -704,6 +731,8 @@
     .db-kpi--error .db-kpi__icon { background:var(--error-100); color:var(--error-600); }
     .db-kpi--info .db-kpi__icon { background:#dbeafe; color:#2563eb; }
     .db-kpi--neutral .db-kpi__icon { background:var(--neutral-100); color:var(--neutral-500); }
+    .db-kpi--deposit { border-left:4px solid #8b5cf6; }
+    .db-kpi--deposit .db-kpi__icon { background:#f5f3ff; color:#7c3aed; }
     .db-kpi--store { border-left:4px solid var(--success-500); }
     .db-kpi--store .db-kpi__icon { background:var(--success-100); color:var(--success-600); }
     .db-kpi--amana { border-left:4px solid var(--warning-500); }
@@ -763,6 +792,7 @@
     .db-pay-summary__item--orange { background:var(--warning-50); color:var(--warning-700); border:1px solid var(--warning-200); }
     .db-pay-summary__item--red { background:var(--error-50); color:var(--error-700); border:1px solid var(--error-200); }
     .db-pay-summary__item--blue { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; }
+    .db-pay-summary__item--purple { background:#f5f3ff; color:#5b21b6; border:1px solid #ddd6fe; }
 
     /* Payment accordion cards */
     .db-pay-card { margin-bottom:var(--space-3); overflow:hidden; }
