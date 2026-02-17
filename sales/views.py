@@ -22,13 +22,14 @@ from settings_app.models import PaymentMethod, BankAccount
 
 @login_required(login_url='login')
 def sales_dashboard(request):
-    """Sales dashboard with KPIs, seller performance, and delivery tracking"""
+    """Comprehensive sales dashboard with full payment analytics"""
     from django.db.models import Avg, Min, Max, Subquery, OuterRef, Value, Case, When, DecimalField as DjDecimalField
     from django.db.models.functions import TruncDate, TruncMonth, Coalesce
     from django.contrib.auth import get_user_model
     from payments.models import ClientPayment
     from .models import Delivery
     from datetime import timedelta
+    import json
     User = get_user_model()
 
     today = timezone.now().date()
@@ -50,25 +51,26 @@ def sales_dashboard(request):
         base_qs = base_qs.filter(date=today)
     elif period_filter == 'month':
         base_qs = base_qs.filter(date__gte=current_month_start)
-    # 'all' = no date filter
 
     if date_to:
         base_qs = base_qs.filter(date__lte=date_to)
 
-    # Apply seller filter
     if seller_filter:
         base_qs = base_qs.filter(seller_id=seller_filter)
 
-    # ============ STATS ============
+    # ============ MAIN STATS ============
     filtered_stats = base_qs.aggregate(
         revenue=Sum('total_amount'),
         count=Count('id'),
         weight=Sum('items__product__gross_weight'),
+        paid=Sum('amount_paid'),
+        balance=Sum('balance_due'),
+        discount=Sum('discount_amount'),
+        old_gold=Sum('old_gold_amount'),
     )
     filtered_invoice_ids = list(base_qs.values_list('id', flat=True))
 
     # ============ DELIVERY TYPE BREAKDOWN ============
-    # Split sales by delivery_method_type: magasin, amana, transporteur
     magasin_qs = base_qs.filter(Q(delivery_method_type='magasin') | Q(delivery_method_type__isnull=True) | Q(delivery_method_type=''))
     amana_qs = base_qs.filter(delivery_method_type='amana')
     transporteur_qs = base_qs.filter(delivery_method_type='transporteur')
@@ -77,14 +79,7 @@ def sales_dashboard(request):
     amana_stats = amana_qs.aggregate(revenue=Sum('total_amount'), count=Count('id'))
     transporteur_stats = transporteur_qs.aggregate(revenue=Sum('total_amount'), count=Count('id'))
 
-    # ============ CALCULATE REAL "ENCAISSE" ============
-    # Encaissé Réel = payments actually received within the selected period
-    # Filtered by PAYMENT DATE (not invoice date) to avoid counting old/future payments
-    # Excludes:
-    #   1) "Dépôt Client" payments (old deposits applied to invoices, not new money)
-    #   2) Payments on undelivered AMANA/Transporteur invoices (COD not yet collected)
-
-    # Build payment date filter matching the invoice date filter
+    # ============ PAYMENT DATE FILTER ============
     payment_date_filter = {}
     if date_from:
         payment_date_filter['date__gte'] = date_from
@@ -95,36 +90,32 @@ def sales_dashboard(request):
     if date_to:
         payment_date_filter['date__lte'] = date_to
 
-    # Base: all payments within date range, excluding "Dépôt Client"
-    all_payments_total = ClientPayment.objects.filter(
+    # ============ ALL PAYMENTS FOR PERIOD ============
+    period_payments_qs = ClientPayment.objects.filter(
         sale_invoice_id__in=filtered_invoice_ids,
         **payment_date_filter,
-    ).exclude(
+    )
+
+    all_payments_total = period_payments_qs.exclude(
         payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # Dépôt Client total (shown separately for reference)
-    deposit_client_total = ClientPayment.objects.filter(
-        sale_invoice_id__in=filtered_invoice_ids,
+    deposit_client_total = period_payments_qs.filter(
         payment_method__name='Dépôt Client',
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # All payments on AMANA invoices NOT yet delivered (exclude deposits already counted out)
-    amana_not_received = ClientPayment.objects.filter(
-        sale_invoice_id__in=filtered_invoice_ids,
+    # AMANA not received
+    amana_not_received = period_payments_qs.filter(
         sale_invoice__delivery_method_type='amana',
-        **payment_date_filter,
     ).exclude(
         sale_invoice__delivery__status='delivered'
     ).exclude(
         payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # All payments on Transporteur invoices NOT yet delivered
-    transporteur_not_received = ClientPayment.objects.filter(
-        sale_invoice_id__in=filtered_invoice_ids,
+    # Transporteur not received
+    transporteur_not_received = period_payments_qs.filter(
         sale_invoice__delivery_method_type='transporteur',
-        **payment_date_filter,
     ).exclude(
         sale_invoice__delivery__status='delivered'
     ).exclude(
@@ -134,18 +125,133 @@ def sales_dashboard(request):
     total_delivery_pending = amana_not_received + transporteur_not_received
     real_encaisse = all_payments_total - total_delivery_pending
 
-    # ============ PAYMENT METHOD BREAKDOWN (for filtered period) ============
+    # ============ DETAILED PAYMENT BREAKDOWN: Method + Bank ============
+    # Group by payment_method AND bank_account for full detail
     payment_method_breakdown = list(
-        ClientPayment.objects.filter(
-            sale_invoice_id__in=filtered_invoice_ids,
-            **payment_date_filter,
-        ).values(
+        period_payments_qs.values(
             'payment_method__name'
         ).annotate(
             total=Sum('amount'),
             count=Count('id'),
         ).order_by('-total')
     )
+
+    # Payment by method + bank (for virements, cheques, etc.)
+    payment_by_method_bank = list(
+        period_payments_qs.exclude(
+            payment_method__name='Dépôt Client'
+        ).values(
+            'payment_method__name',
+            'bank_account__bank_name',
+            'bank_account__id',
+        ).annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('payment_method__name', '-total')
+    )
+
+    # Structure: { method_name: { total, count, banks: [{bank_name, total, count}] } }
+    payment_detail = {}
+    for row in payment_by_method_bank:
+        method = row['payment_method__name'] or 'Non défini'
+        bank = row['bank_account__bank_name'] or None
+        if method not in payment_detail:
+            payment_detail[method] = {'total': Decimal('0'), 'count': 0, 'banks': [], 'invoices': []}
+        payment_detail[method]['total'] += row['total']
+        payment_detail[method]['count'] += row['count']
+        if bank:
+            payment_detail[method]['banks'].append({
+                'bank_name': bank,
+                'bank_id': row['bank_account__id'],
+                'total': row['total'],
+                'count': row['count'],
+            })
+
+    # Sort by total descending
+    payment_detail_sorted = sorted(payment_detail.items(), key=lambda x: x[1]['total'], reverse=True)
+
+    # ============ PER-INVOICE DETAIL FOR EACH PAYMENT METHOD ============
+    # Get all individual payments with their invoice info
+    payment_invoices_raw = list(
+        period_payments_qs.exclude(
+            payment_method__name='Dépôt Client'
+        ).select_related(
+            'sale_invoice', 'sale_invoice__client', 'payment_method', 'bank_account'
+        ).order_by('payment_method__name', '-date', '-amount')
+    )
+
+    # Group invoices by payment method
+    payment_invoices_by_method = {}
+    for pay in payment_invoices_raw:
+        method = pay.payment_method.name if pay.payment_method else 'Non défini'
+        if method not in payment_invoices_by_method:
+            payment_invoices_by_method[method] = []
+        payment_invoices_by_method[method].append({
+            'reference': pay.reference,
+            'invoice_ref': pay.sale_invoice.reference if pay.sale_invoice else '—',
+            'invoice_id': pay.sale_invoice_id,
+            'client': (pay.sale_invoice.client.full_name if pay.sale_invoice and pay.sale_invoice.client else 'Anonyme'),
+            'amount': pay.amount,
+            'date': pay.date,
+            'bank_name': pay.bank_account.bank_name if pay.bank_account else None,
+            'check_number': pay.check_number or '',
+        })
+
+    # Combine payment_detail with invoices
+    payment_sections = []
+    for method_name, detail in payment_detail_sorted:
+        section = {
+            'method': method_name,
+            'total': detail['total'],
+            'count': detail['count'],
+            'banks': detail['banks'],
+            'invoices': payment_invoices_by_method.get(method_name, []),
+        }
+        payment_sections.append(section)
+
+    # ============ BANK ACCOUNT SUMMARY ============
+    bank_summary = list(
+        period_payments_qs.exclude(
+            payment_method__name='Dépôt Client'
+        ).filter(
+            bank_account__isnull=False
+        ).values(
+            'bank_account__id', 'bank_account__bank_name', 'bank_account__account_name'
+        ).annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total')
+    )
+
+    # Bank detail: per-bank, per-method breakdown
+    bank_method_detail = list(
+        period_payments_qs.exclude(
+            payment_method__name='Dépôt Client'
+        ).filter(
+            bank_account__isnull=False
+        ).values(
+            'bank_account__bank_name',
+            'payment_method__name',
+        ).annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('bank_account__bank_name', '-total')
+    )
+
+    # Group: { bank_name: { total, methods: [{method, total, count}] } }
+    bank_detail_grouped = {}
+    for row in bank_method_detail:
+        bank = row['bank_account__bank_name']
+        if bank not in bank_detail_grouped:
+            bank_detail_grouped[bank] = {'total': Decimal('0'), 'count': 0, 'methods': []}
+        bank_detail_grouped[bank]['total'] += row['total']
+        bank_detail_grouped[bank]['count'] += row['count']
+        bank_detail_grouped[bank]['methods'].append({
+            'method': row['payment_method__name'],
+            'total': row['total'],
+            'count': row['count'],
+        })
+    bank_detail_sorted = sorted(bank_detail_grouped.items(), key=lambda x: x[1]['total'], reverse=True)
 
     # ============ INVOICE LISTS PER DELIVERY TYPE ============
     magasin_invoices = list(
@@ -161,7 +267,7 @@ def sales_dashboard(request):
         .order_by('-date')[:30]
     )
 
-    # ============ TODAY KPIs (always unfiltered by period) ============
+    # ============ TODAY KPIs ============
     today_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(status='returned')
     if seller_filter:
         today_base = today_base.filter(seller_id=seller_filter)
@@ -172,41 +278,39 @@ def sales_dashboard(request):
         weight=Sum('items__product__gross_weight'),
     )
     today_invoice_ids = list(today_base.values_list('id', flat=True))
-    # Filter by payment date = today (not just invoice date)
+
     today_all_payments = ClientPayment.objects.filter(
-        sale_invoice_id__in=today_invoice_ids,
-        date=today,
-    ).exclude(
-        payment_method__name='Dépôt Client'
-    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        sale_invoice_id__in=today_invoice_ids, date=today,
+    ).exclude(payment_method__name='Dépôt Client').aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # Today: AMANA invoices not delivered (exclude deposits, payment date = today)
     today_amana_pending = ClientPayment.objects.filter(
-        sale_invoice_id__in=today_invoice_ids,
-        sale_invoice__delivery_method_type='amana',
-        date=today,
-    ).exclude(
-        sale_invoice__delivery__status='delivered'
-    ).exclude(
+        sale_invoice_id__in=today_invoice_ids, sale_invoice__delivery_method_type='amana', date=today,
+    ).exclude(sale_invoice__delivery__status='delivered').exclude(
         payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # Today: Transporteur invoices not delivered (exclude deposits, payment date = today)
     today_transporteur_pending = ClientPayment.objects.filter(
-        sale_invoice_id__in=today_invoice_ids,
-        sale_invoice__delivery_method_type='transporteur',
-        date=today,
-    ).exclude(
-        sale_invoice__delivery__status='delivered'
-    ).exclude(
+        sale_invoice_id__in=today_invoice_ids, sale_invoice__delivery_method_type='transporteur', date=today,
+    ).exclude(sale_invoice__delivery__status='delivered').exclude(
         payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
     today_delivery_pending = today_amana_pending + today_transporteur_pending
     today_encaisse = today_all_payments - today_delivery_pending
 
-    # ============ DELIVERY PENDING PAYMENTS (AMANA + Transporteur) — GLOBAL ============
-    # AMANA pending invoices (undelivered, global)
+    # Today payment method breakdown
+    today_payment_methods = list(
+        ClientPayment.objects.filter(
+            sale_invoice_id__in=today_invoice_ids, date=today,
+        ).exclude(payment_method__name='Dépôt Client').values(
+            'payment_method__name',
+        ).annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total')
+    )
+
+    # ============ DELIVERY PENDING (GLOBAL) ============
     amana_pending_invoices = SaleInvoice.objects.filter(
         is_deleted=False, delivery_method_type='amana',
     ).exclude(status='returned').exclude(
@@ -221,7 +325,6 @@ def sales_dashboard(request):
             amana_pending_list.append({'invoice': inv, 'amount': inv_amount})
             amana_pending_total += inv_amount
 
-    # Transporteur pending invoices (undelivered, global)
     transporteur_pending_invoices = SaleInvoice.objects.filter(
         is_deleted=False, delivery_method_type='transporteur',
     ).exclude(status='returned').exclude(
@@ -239,37 +342,25 @@ def sales_dashboard(request):
     # ============ PAYMENT STATUS BREAKDOWN ============
     status_breakdown = list(
         base_qs.values('status')
-        .annotate(
-            count=Count('id'),
-            total=Sum('total_amount'),
-            paid=Sum('amount_paid'),
-        )
+        .annotate(count=Count('id'), total=Sum('total_amount'), paid=Sum('amount_paid'))
         .order_by('status')
     )
 
-    # ============ SELLER PERFORMANCE (for filtered period) ============
+    # ============ SELLER PERFORMANCE ============
     seller_stats = list(
         base_qs.values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
         .annotate(
-            count=Count('id'),
-            revenue=Sum('total_amount'),
-            paid=Sum('amount_paid'),
-            balance=Sum('balance_due'),
+            count=Count('id'), revenue=Sum('total_amount'),
+            paid=Sum('amount_paid'), balance=Sum('balance_due'),
             weight=Sum('items__product__gross_weight'),
-        )
-        .order_by('-revenue')
+        ).order_by('-revenue')
     )
 
-    # Seller stats today (always show today regardless of filter)
     today_seller_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(status='returned')
     seller_stats_today = list(
         today_seller_base
         .values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
-        .annotate(
-            count=Count('id'),
-            revenue=Sum('total_amount'),
-            weight=Sum('items__product__gross_weight'),
-        )
+        .annotate(count=Count('id'), revenue=Sum('total_amount'), weight=Sum('items__product__gross_weight'))
         .order_by('-revenue')
     )
 
@@ -279,52 +370,77 @@ def sales_dashboard(request):
     if seller_filter:
         daily_base = daily_base.filter(seller_id=seller_filter)
     daily_revenue = list(
-        daily_base
-        .annotate(day=TruncDate('date'))
-        .values('day')
-        .annotate(
-            revenue=Sum('total_amount'),
-            count=Count('id'),
-        )
+        daily_base.annotate(day=TruncDate('date')).values('day')
+        .annotate(revenue=Sum('total_amount'), count=Count('id'))
         .order_by('day')
     )
+
+    # ============ DAILY ENCAISSE (last 30 days) for chart ============
+    daily_payments_raw = list(
+        ClientPayment.objects.filter(
+            date__gte=thirty_days_ago,
+            sale_invoice__is_deleted=False,
+        ).exclude(
+            payment_method__name='Dépôt Client'
+        ).exclude(
+            sale_invoice__status='returned'
+        ).annotate(day=TruncDate('date')).values('day')
+        .annotate(total=Sum('amount'))
+        .order_by('day')
+    )
+    daily_payments_map = {str(d['day']): float(d['total']) for d in daily_payments_raw}
+
+    # Build chart data JSON
+    chart_labels = []
+    chart_revenue = []
+    chart_encaisse = []
+    chart_counts = []
+    for d in daily_revenue:
+        day_str = str(d['day'])
+        chart_labels.append(d['day'].strftime('%d/%m'))
+        chart_revenue.append(float(d['revenue'] or 0))
+        chart_encaisse.append(daily_payments_map.get(day_str, 0))
+        chart_counts.append(d['count'])
+
+    # Payment method chart data
+    pm_chart_labels = []
+    pm_chart_values = []
+    for pm in payment_method_breakdown:
+        if pm['payment_method__name'] != 'Dépôt Client':
+            pm_chart_labels.append(pm['payment_method__name'] or 'Autre')
+            pm_chart_values.append(float(pm['total']))
+
+    # Delivery type chart data
+    dt_chart_labels = ['Magasin', 'AMANA', 'Transporteur']
+    dt_chart_values = [
+        float(magasin_stats['revenue'] or 0),
+        float(amana_stats['revenue'] or 0),
+        float(transporteur_stats['revenue'] or 0),
+    ]
 
     # ============ DELIVERY STATUS OVERVIEW ============
     delivery_stats = list(
         Delivery.objects.values('status')
-        .annotate(
-            count=Count('id'),
-            total=Sum('total_amount'),
-        )
+        .annotate(count=Count('id'), total=Sum('total_amount'))
         .order_by('status')
     )
 
     # ============ TOP INVOICES ============
-    recent_large = (
-        base_qs.select_related('client', 'seller')
-        .order_by('-total_amount')[:10]
-    )
+    recent_large = base_qs.select_related('client', 'seller').order_by('-total_amount')[:10]
 
     # ============ SELLERS LIST FOR FILTER ============
-    sellers = User.objects.filter(
-        sales__isnull=False
-    ).distinct().order_by('first_name', 'last_name')
+    sellers = User.objects.filter(sales__isnull=False).distinct().order_by('first_name', 'last_name')
 
-    # Filter display info
     filter_revenue = filtered_stats['revenue'] or Decimal('0')
-    filter_balance = filter_revenue - real_encaisse - amana_not_received
-    if filter_balance < 0:
-        filter_balance = Decimal('0')
 
     context = {
         'today': today,
-        # Filters
         'date_from': date_from,
         'date_to': date_to,
         'seller_filter': seller_filter,
         'period_filter': period_filter,
         'sellers': sellers,
-        # Today stats (always today)
+        # Today
         'today_stats': {
             'revenue': today_stats_raw['revenue'] or Decimal('0'),
             'encaisse': today_encaisse,
@@ -333,7 +449,8 @@ def sales_dashboard(request):
             'count': today_stats_raw['count'] or 0,
             'weight': today_stats_raw['weight'] or Decimal('0'),
         },
-        # Filtered period stats
+        'today_payment_methods': today_payment_methods,
+        # Period
         'period_stats': {
             'revenue': filter_revenue,
             'encaisse': real_encaisse,
@@ -341,37 +458,47 @@ def sales_dashboard(request):
             'transporteur_pending': transporteur_not_received,
             'count': filtered_stats['count'] or 0,
             'weight': filtered_stats['weight'] or Decimal('0'),
+            'paid': filtered_stats['paid'] or Decimal('0'),
+            'balance': filtered_stats['balance'] or Decimal('0'),
+            'discount': filtered_stats['discount'] or Decimal('0'),
+            'old_gold': filtered_stats['old_gold'] or Decimal('0'),
         },
-        # Delivery type breakdown
-        'magasin_stats': {
-            'revenue': magasin_stats['revenue'] or Decimal('0'),
-            'count': magasin_stats['count'] or 0,
-        },
-        'amana_stats': {
-            'revenue': amana_stats['revenue'] or Decimal('0'),
-            'count': amana_stats['count'] or 0,
-        },
-        'transporteur_stats': {
-            'revenue': transporteur_stats['revenue'] or Decimal('0'),
-            'count': transporteur_stats['count'] or 0,
-        },
-        # Invoice lists per delivery type
+        # Delivery type
+        'magasin_stats': {'revenue': magasin_stats['revenue'] or Decimal('0'), 'count': magasin_stats['count'] or 0},
+        'amana_stats': {'revenue': amana_stats['revenue'] or Decimal('0'), 'count': amana_stats['count'] or 0},
+        'transporteur_stats': {'revenue': transporteur_stats['revenue'] or Decimal('0'), 'count': transporteur_stats['count'] or 0},
+        # Invoice lists
         'magasin_invoices': magasin_invoices,
         'amana_invoices_all': amana_invoices_all,
         'transporteur_invoices_all': transporteur_invoices_all,
-        # Payment method breakdown
+        # Payment detail
         'payment_method_breakdown': payment_method_breakdown,
+        'payment_sections': payment_sections,
+        'bank_detail_sorted': bank_detail_sorted,
+        'bank_summary': bank_summary,
+        'deposit_client_total': deposit_client_total,
         'status_breakdown': status_breakdown,
-        # Pending delivery lists (global, undelivered)
+        # Pending
         'amana_pending_list': amana_pending_list,
         'amana_pending_total': amana_pending_total,
         'amana_pending_count': len(amana_pending_list),
         'transporteur_pending_list': transporteur_pending_list,
         'transporteur_pending_total': transporteur_pending_total,
         'transporteur_pending_count': len(transporteur_pending_list),
+        # Sellers
         'seller_stats': seller_stats,
         'seller_stats_today': seller_stats_today,
+        # Charts
         'daily_revenue': daily_revenue,
+        'chart_labels_json': json.dumps(chart_labels),
+        'chart_revenue_json': json.dumps(chart_revenue),
+        'chart_encaisse_json': json.dumps(chart_encaisse),
+        'chart_counts_json': json.dumps(chart_counts),
+        'pm_chart_labels_json': json.dumps(pm_chart_labels),
+        'pm_chart_values_json': json.dumps(pm_chart_values),
+        'dt_chart_labels_json': json.dumps(dt_chart_labels),
+        'dt_chart_values_json': json.dumps(dt_chart_values),
+        # Other
         'delivery_stats': delivery_stats,
         'recent_large': recent_large,
     }
