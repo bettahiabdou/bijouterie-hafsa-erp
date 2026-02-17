@@ -163,7 +163,7 @@
                         <tbody>
                             {% for trans in transactions %}
                                 <tr>
-                                    <td>{{ trans.created_at|date:"d/m/Y H:i" }}</td>
+                                    <td>{% if trans.date %}{{ trans.date|date:"d/m/Y" }}{% else %}{{ trans.created_at|date:"d/m/Y" }}{% endif %}</td>
                                     <td>
                                         <span class="badge {% if trans.transaction_type == 'deposit' %}badge-success{% elif trans.transaction_type == 'purchase' %}badge-primary{% elif trans.transaction_type == 'withdrawal' %}badge-warning{% elif trans.transaction_type == 'refund' %}badge-info{% else %}badge-neutral{% endif %}">
                                             {{ trans.get_transaction_type_display }}
