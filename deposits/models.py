@@ -196,6 +196,14 @@ class DepositTransaction(models.Model):
         default=0
     )
 
+    # Date of the transaction (defaults to today, can be set manually)
+    date = models.DateField(
+        _('Date'),
+        null=True,
+        blank=True,
+        help_text=_('Date de la transaction (par défaut: aujourd\'hui)')
+    )
+
     # Tracking
     created_by = models.ForeignKey(
         'users.User',
@@ -216,6 +224,10 @@ class DepositTransaction(models.Model):
         return f"{self.get_transaction_type_display()} {sign}{self.amount} DH - {self.account.client.full_name}"
 
     def save(self, *args, **kwargs):
+        # Set date to today if not provided
+        if not self.date:
+            from django.utils import timezone
+            self.date = timezone.now().date()
         # Calculate balance after this transaction
         if not self.pk:  # New transaction
             current_balance = self.account.balance

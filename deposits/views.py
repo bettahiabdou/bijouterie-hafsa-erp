@@ -112,6 +112,7 @@ def deposit_detail(request, pk):
         'transaction_types': DepositTransaction.TransactionType.choices,
         'payment_methods': payment_methods,
         'bank_accounts': bank_accounts,
+        'today': timezone.now().date(),
     }
     return render(request, 'deposits/deposit_detail.html', context)
 
@@ -209,6 +210,7 @@ def add_fund(request, pk):
         payment_reference = request.POST.get('payment_reference', '')
         description = request.POST.get('description', '')
         notes = request.POST.get('notes', '')
+        date_str = request.POST.get('date', '')
 
         try:
             amount = Decimal(amount)
@@ -218,6 +220,17 @@ def add_fund(request, pk):
         except InvalidOperation:
             messages.error(request, 'Montant invalide.')
             return redirect('deposits:detail', pk=pk)
+
+        # Parse date or default to today
+        from datetime import datetime
+        trans_date = None
+        if date_str:
+            try:
+                trans_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                trans_date = timezone.now().date()
+        else:
+            trans_date = timezone.now().date()
 
         payment_method = None
         bank_account = None
@@ -238,6 +251,7 @@ def add_fund(request, pk):
             account=account,
             transaction_type=DepositTransaction.TransactionType.DEPOSIT,
             amount=amount,
+            date=trans_date,
             payment_method=payment_method,
             bank_account=bank_account,
             payment_reference=payment_reference,
