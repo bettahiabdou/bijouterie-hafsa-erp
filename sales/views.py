@@ -238,12 +238,12 @@ def sales_dashboard(request):
         ).order_by('bank_account__bank_name', '-total')
     )
 
-    # Group: { bank_name: { total, methods: [{method, total, count}] } }
+    # Group: { bank_name: { total, methods: [{method, total, count}], payments: [...] } }
     bank_detail_grouped = {}
     for row in bank_method_detail:
         bank = row['bank_account__bank_name']
         if bank not in bank_detail_grouped:
-            bank_detail_grouped[bank] = {'total': Decimal('0'), 'count': 0, 'methods': []}
+            bank_detail_grouped[bank] = {'total': Decimal('0'), 'count': 0, 'methods': [], 'payments': []}
         bank_detail_grouped[bank]['total'] += row['total']
         bank_detail_grouped[bank]['count'] += row['count']
         bank_detail_grouped[bank]['methods'].append({
@@ -251,6 +251,64 @@ def sales_dashboard(request):
             'total': row['total'],
             'count': row['count'],
         })
+
+    # Per-bank individual payments
+    bank_payments_raw = list(
+        period_payments_qs.exclude(
+            payment_method__name='Dépôt Client'
+        ).filter(
+            bank_account__isnull=False
+        ).select_related(
+            'sale_invoice', 'sale_invoice__client', 'payment_method', 'bank_account'
+        ).order_by('bank_account__bank_name', 'payment_method__name', '-date')
+    )
+    for pay in bank_payments_raw:
+        bank = pay.bank_account.bank_name
+        if bank in bank_detail_grouped:
+            bank_detail_grouped[bank]['payments'].append({
+                'invoice_ref': pay.sale_invoice.reference if pay.sale_invoice else '—',
+                'client': (pay.sale_invoice.client.full_name if pay.sale_invoice and pay.sale_invoice.client else 'Anonyme'),
+                'amount': pay.amount,
+                'date': pay.date,
+                'method': pay.payment_method.name if pay.payment_method else '—',
+                'check_number': pay.check_number or '',
+            })
+
+    # Also get payments WITHOUT a bank account (e.g. Espèces/cash)
+    no_bank_payments_raw = list(
+        period_payments_qs.exclude(
+            payment_method__name='Dépôt Client'
+        ).filter(
+            bank_account__isnull=True
+        ).select_related(
+            'sale_invoice', 'sale_invoice__client', 'payment_method'
+        ).order_by('payment_method__name', '-date')
+    )
+    if no_bank_payments_raw:
+        no_bank_total = sum(p.amount for p in no_bank_payments_raw)
+        no_bank_methods = {}
+        no_bank_pays = []
+        for pay in no_bank_payments_raw:
+            m = pay.payment_method.name if pay.payment_method else 'Autre'
+            if m not in no_bank_methods:
+                no_bank_methods[m] = {'method': m, 'total': Decimal('0'), 'count': 0}
+            no_bank_methods[m]['total'] += pay.amount
+            no_bank_methods[m]['count'] += 1
+            no_bank_pays.append({
+                'invoice_ref': pay.sale_invoice.reference if pay.sale_invoice else '—',
+                'client': (pay.sale_invoice.client.full_name if pay.sale_invoice and pay.sale_invoice.client else 'Anonyme'),
+                'amount': pay.amount,
+                'date': pay.date,
+                'method': m,
+                'check_number': pay.check_number or '',
+            })
+        bank_detail_grouped['Sans Banque (Especes, etc.)'] = {
+            'total': no_bank_total,
+            'count': len(no_bank_payments_raw),
+            'methods': list(no_bank_methods.values()),
+            'payments': no_bank_pays,
+        }
+
     bank_detail_sorted = sorted(bank_detail_grouped.items(), key=lambda x: x[1]['total'], reverse=True)
 
     # ============ INVOICE LISTS PER DELIVERY TYPE ============

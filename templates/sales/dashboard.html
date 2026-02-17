@@ -424,27 +424,81 @@
     {% if bank_detail_sorted %}
     <div class="db-section">
         <h2 class="db-title"><i class="fas fa-university"></i> Detail par Banque</h2>
-        <div class="db-bank-grid">
-            {% for bank_name, detail in bank_detail_sorted %}
-            <div class="card db-bank-card">
-                <div class="db-bank-card__header">
+        {% for bank_name, detail in bank_detail_sorted %}
+        <div class="card db-pay-card" style="margin-bottom:var(--space-4);">
+            <div class="db-pay-card__header" onclick="togglePaySection('bank-{{ forloop.counter }}')">
+                <div class="db-pay-card__left">
+                    <span class="db-pay-card__icon"><i class="fas fa-university" style="color:#2563eb;"></i></span>
                     <div>
-                        <i class="fas fa-university" style="color:#2563eb; margin-right:8px;"></i>
-                        <strong>{{ bank_name }}</strong>
+                        <strong class="db-pay-card__method">{{ bank_name }}</strong>
+                        <span class="db-pay-card__count">{{ detail.count }} paiement{{ detail.count|pluralize }}</span>
                     </div>
-                    <span class="db-bank-card__total">{{ detail.total|floatformat:0 }} DH</span>
                 </div>
-                <div class="db-bank-card__body">
-                    {% for m in detail.methods %}
-                    <div class="db-bank-method-row">
-                        <span>{{ m.method }}</span>
-                        <span><strong>{{ m.total|floatformat:0 }} DH</strong> <small class="text-muted">({{ m.count }})</small></span>
-                    </div>
-                    {% endfor %}
+                <div class="db-pay-card__right">
+                    <span class="db-pay-card__total" style="color:#2563eb;">{{ detail.total|floatformat:0 }} DH</span>
+                    <i class="fas fa-chevron-down db-pay-card__arrow"></i>
                 </div>
             </div>
-            {% endfor %}
+
+            <!-- Method breakdown chips -->
+            <div class="db-pay-card__banks">
+                {% for m in detail.methods %}
+                <div class="db-bank-chip">
+                    {% if 'espece' in m.method|lower or 'cash' in m.method|lower %}
+                        <i class="fas fa-money-bill-wave" style="color:var(--success-600);"></i>
+                    {% elif 'virement' in m.method|lower %}
+                        <i class="fas fa-exchange-alt" style="color:#2563eb;"></i>
+                    {% elif 'cheque' in m.method|lower or 'chèque' in m.method|lower %}
+                        <i class="fas fa-money-check" style="color:var(--primary-600);"></i>
+                    {% elif 'carte' in m.method|lower %}
+                        <i class="fas fa-credit-card" style="color:#7c3aed;"></i>
+                    {% else %}
+                        <i class="fas fa-wallet" style="color:var(--neutral-500);"></i>
+                    {% endif %}
+                    <span>{{ m.method }}</span>
+                    <strong>{{ m.total|floatformat:0 }} DH</strong>
+                    <small>({{ m.count }})</small>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Individual payments (collapsed) -->
+            <div id="bank-{{ forloop.counter }}" class="db-pay-card__body" style="display:none;">
+                {% if detail.payments %}
+                <table class="table db-pay-table">
+                    <thead>
+                        <tr>
+                            <th>Facture</th>
+                            <th>Client</th>
+                            <th>Mode</th>
+                            <th>Date</th>
+                            <th style="text-align:right;">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in detail.payments %}
+                        <tr onclick="window.location='/sales/invoices/{{ p.invoice_ref }}/'" style="cursor:pointer;">
+                            <td><span class="db-inv-ref">{{ p.invoice_ref }}</span></td>
+                            <td>{{ p.client }}</td>
+                            <td><span class="badge badge-neutral" style="font-size:var(--text-xs);">{{ p.method }}</span></td>
+                            <td>{{ p.date|date:"d/m/Y" }}</td>
+                            <td style="text-align:right;" class="font-bold">{{ p.amount|floatformat:0 }} DH</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4"><strong>Total {{ bank_name }}</strong></td>
+                            <td style="text-align:right;"><strong>{{ detail.total|floatformat:0 }} DH</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% else %}
+                <div class="db-empty">Aucun paiement</div>
+                {% endif %}
+            </div>
         </div>
+        {% endfor %}
     </div>
     {% endif %}
 
