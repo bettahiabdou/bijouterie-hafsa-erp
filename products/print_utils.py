@@ -158,7 +158,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
 
     # Weight - compact
     weight_value = product.net_weight or product.gross_weight
-    weight = f"{weight_value:.1f}" if weight_value else ""
+    weight = f"{weight_value:.2f}" if weight_value else ""
 
     # Purity (e.g., "18K")
     purity = ""
