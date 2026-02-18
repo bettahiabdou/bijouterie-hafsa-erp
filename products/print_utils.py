@@ -135,10 +135,11 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
     Total tag: 68x26mm - print on RIGHT side (the visible tag head)
     Left side has the loop/antenna
 
-    Layout:
-    - Line 1: Weight + Purity (e.g., "5.2g 18K")
+    Layout (top half = product info, bottom half = barcode only):
+    - Line 1: Weight + Purity (large, e.g., "5.2g 18K")
     - Line 2: Size if available (e.g., "T: 45cm")
-    - Bottom: Barcode + Reference
+    - Line 3: Product reference code (large)
+    - Bottom half: Barcode
 
     RFID: Encodes product reference into the RFID chip
     """
@@ -170,7 +171,6 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
     # RFID encoding command - writes product reference to EPC memory
     # ^RS8 = RFID setup (8 = UHF Gen2)
     # ^RFW,E = Write to EPC memory bank, Hex format
-    # ^RFV = Verify after write (optional, adds reliability)
     rfid_commands = ""
     if encode_rfid:
         rfid_hex = string_to_hex(full_reference)
@@ -179,32 +179,33 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
 """
 
     # ZPL for 68x26mm tag - print on RIGHT side
-    # Tag is 544 dots wide (68mm at 8 dots/mm)
-    # Print area is approximately half the tag (right side)
-    # X offset ~270 to start printing on right half
+    # Tag is 544 dots wide (68mm at 8 dots/mm), 208 dots tall (26mm)
+    # Print area is right half: X offset ~339-349
+    # TOP HALF (y 0-104): product code + weight/purity (large text)
+    # BOTTOM HALF (y 104-208): barcode only
     if size:
-        # Layout with size - adjust positions for RIGHT side
+        # Layout with size
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
 ^PW544
 ^LL208
-{rfid_commands}^FO349,25^A0N,20,18^FD{weight}g {purity}^FS
-^FO349,50^A0N,18,16^FDT: {size}cm^FS
-^FO339,142^BY1^BCN,32,N,N,N^FD{barcode_data}^FS
-^FO349,182^A0N,14,12^FD{short_ref}^FS
+{rfid_commands}^FO339,10^A0N,28,26^FD{weight}g {purity}^FS
+^FO339,42^A0N,22,20^FDT: {size}cm^FS
+^FO339,70^A0N,30,26^FD{short_ref}^FS
+^FO339,115^BY1^BCN,50,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     else:
-        # Layout without size - RIGHT side
+        # Layout without size - more room for code
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
 ^PW544
 ^LL208
-{rfid_commands}^FO349,31^A0N,22,20^FD{weight}g {purity}^FS
-^FO339,162^BY1^BCN,35,N,N,N^FD{barcode_data}^FS
-^FO349,207^A0N,16,14^FD{short_ref}^FS
+{rfid_commands}^FO339,12^A0N,30,28^FD{weight}g {purity}^FS
+^FO339,52^A0N,36,30^FD{short_ref}^FS
+^FO339,115^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -265,8 +266,8 @@ def print_test_label(encode_rfid=True):
 ^LH0,0^LT0
 ^PW544
 ^LL208
-{rfid_commands}^FO349,31^A0N,22,20^FD5.2g 18K^FS
-^FO339,162^BY1^BCN,35,N,N,N^FD20260210-0001^FS
-^FO349,207^A0N,16,14^FD20260210-0001^FS
+{rfid_commands}^FO339,12^A0N,30,28^FD5.2g 18K^FS
+^FO339,52^A0N,36,30^FD20260210-0001^FS
+^FO339,115^BY1^BCN,55,N,N,N^FD20260210-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
