@@ -190,9 +190,9 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
 ^LH0,0^LT0
 ^PW544
 ^LL208
-{rfid_commands}^FO339,34^A0N,28,26^FD{weight}g {purity}^FS
-^FO339,66^A0N,22,20^FDT: {size}cm^FS
-^FO339,94^A0N,30,26^FD{short_ref}^FS
+{rfid_commands}^FO339,34^A0N,24,22^FD{weight}g {purity}^FS
+^FO339,62^A0N,18,16^FDT: {size}cm^FS
+^FO339,84^A0N,26,22^FD{short_ref}^FS
 ^FO339,139^BY1^BCN,50,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
@@ -203,8 +203,8 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
 ^LH0,0^LT0
 ^PW544
 ^LL208
-{rfid_commands}^FO339,36^A0N,30,28^FD{weight}g {purity}^FS
-^FO339,76^A0N,36,30^FD{short_ref}^FS
+{rfid_commands}^FO339,36^A0N,26,24^FD{weight}g {purity}^FS
+^FO339,70^A0N,30,26^FD{short_ref}^FS
 ^FO339,139^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
@@ -266,8 +266,8 @@ def print_test_label(encode_rfid=True):
 ^LH0,0^LT0
 ^PW544
 ^LL208
-{rfid_commands}^FO339,36^A0N,30,28^FD5.2g 18K^FS
-^FO339,76^A0N,36,30^FD20260210-0001^FS
+{rfid_commands}^FO339,36^A0N,26,24^FD5.2g 18K^FS
+^FO339,70^A0N,30,26^FD20260210-0001^FS
 ^FO339,139^BY1^BCN,55,N,N,N^FD20260210-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
