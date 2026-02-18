@@ -790,3 +790,35 @@ class ConsignmentItem(models.Model):
 
         # Update consignment totals
         self.consignment.update_totals()
+
+
+class PurchaseInvoicePhoto(models.Model):
+    """
+    Photos/images attached to purchase invoices
+    """
+    invoice = models.ForeignKey(
+        PurchaseInvoice,
+        on_delete=models.CASCADE,
+        related_name='photos',
+        verbose_name=_('Facture')
+    )
+    image = models.ImageField(
+        _('Image'),
+        upload_to='purchase_invoice_photos/%Y/%m/%d/'
+    )
+    caption = models.TextField(_('Légende'), blank=True)
+    uploaded_at = models.DateTimeField(_('Téléchargé le'), auto_now_add=True)
+    uploaded_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name=_('Téléchargé par')
+    )
+
+    class Meta:
+        verbose_name = _('Photo facture achat')
+        verbose_name_plural = _('Photos factures achat')
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"Photo {self.id} - {self.invoice.reference}"

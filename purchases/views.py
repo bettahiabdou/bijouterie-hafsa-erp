@@ -11,7 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from django.db.models import Q, Sum, Count, F, DecimalField, Value
 from django.db.models.functions import Coalesce
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from .models import (
     PurchaseOrder,
@@ -19,6 +19,7 @@ from .models import (
     PurchaseInvoice,
     PurchaseInvoiceItem,
     PurchaseInvoiceAction,
+    PurchaseInvoicePhoto,
     Consignment,
     ConsignmentItem
 )
@@ -723,6 +724,78 @@ def purchase_invoice_detail(request, reference):
                 except Product.DoesNotExist:
                     messages.error(request, 'Produit de remplacement non trouvé.')
 
+        # Handle photo upload
+        elif action == 'upload_photo':
+            photos = request.FILES.getlist('photos')
+            caption = request.POST.get('caption', '')
+            uploaded = 0
+            for photo_file in photos:
+                PurchaseInvoicePhoto.objects.create(
+                    invoice=invoice,
+                    image=photo_file,
+                    caption=caption,
+                    uploaded_by=request.user,
+                )
+                uploaded += 1
+            if uploaded:
+                messages.success(request, f'{uploaded} photo(s) ajoutée(s).')
+
+        # Handle photo delete
+        elif action == 'delete_photo':
+            photo_id = request.POST.get('photo_id')
+            try:
+                photo = PurchaseInvoicePhoto.objects.get(id=photo_id, invoice=invoice)
+                photo.image.delete(save=False)
+                photo.delete()
+                messages.success(request, 'Photo supprimée.')
+            except PurchaseInvoicePhoto.DoesNotExist:
+                messages.error(request, 'Photo non trouvée.')
+
+        # Handle add payment
+        elif action == 'add_payment':
+            from payments.models import SupplierPayment
+            from settings_app.models import PaymentMethod, BankAccount as BA
+
+            amount_str = request.POST.get('payment_amount', '0')
+            method_id = request.POST.get('payment_method', '')
+            bank_id = request.POST.get('payment_bank', '')
+            payment_date = request.POST.get('payment_date', '')
+            check_number = request.POST.get('check_number', '')
+            payment_notes = request.POST.get('payment_notes', '')
+
+            try:
+                amount = Decimal(amount_str)
+                if amount <= 0:
+                    raise ValueError('Amount must be positive')
+
+                payment_method = PaymentMethod.objects.get(id=method_id)
+                bank_account = BA.objects.get(id=bank_id) if bank_id else None
+
+                from datetime import datetime
+                if payment_date:
+                    p_date = datetime.strptime(payment_date, '%Y-%m-%d').date()
+                else:
+                    p_date = now().date()
+
+                SupplierPayment.objects.create(
+                    supplier=invoice.supplier,
+                    amount=amount,
+                    payment_method=payment_method,
+                    from_bank_account=bank_account,
+                    purchase_invoice=invoice,
+                    payment_type='invoice',
+                    date=p_date,
+                    check_number=check_number,
+                    notes=payment_notes,
+                    created_by=request.user,
+                )
+                messages.success(request, f'Paiement de {amount} DH enregistré.')
+
+            except (ValueError, InvalidOperation):
+                messages.error(request, 'Montant invalide.')
+            except PaymentMethod.DoesNotExist:
+                messages.error(request, 'Mode de paiement invalide.')
+
         return redirect('purchases:purchase_invoice_detail', reference=reference)
 
     # Get products that are NOT already linked to ANY purchase invoice
@@ -771,12 +844,22 @@ def purchase_invoice_detail(request, reference):
     ).all()
 
     # Get data for bulk product creation modal
-    from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount
+    from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount, PaymentMethod
     categories = ProductCategory.objects.filter(is_active=True)
     metals = MetalType.objects.all()
     purities = MetalPurity.objects.all()
     bank_accounts = BankAccount.objects.filter(is_active=True)
     product_types = Product.ProductType.choices
+    payment_methods = PaymentMethod.objects.filter(is_active=True)
+
+    # Get photos
+    photos = invoice.photos.all()
+
+    # Get payments for this invoice
+    from payments.models import SupplierPayment
+    invoice_payments = SupplierPayment.objects.filter(
+        purchase_invoice=invoice
+    ).select_related('payment_method', 'from_bank_account').order_by('-date')
 
     context = {
         'invoice': invoice,
@@ -788,6 +871,10 @@ def purchase_invoice_detail(request, reference):
         'total_gross_weight': total_gross_weight,
         'total_net_weight': total_net_weight,
         'invoice_actions': invoice_actions,
+        'photos': photos,
+        'invoice_payments': invoice_payments,
+        'payment_methods': payment_methods,
+        'today': now().date(),
         # For bulk product creation
         'categories': categories,
         'metals': metals,

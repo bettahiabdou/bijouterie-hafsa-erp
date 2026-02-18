@@ -208,6 +208,42 @@
                 </div>
             </div>
 
+            <!-- Photos Section -->
+            <div class="card animate-slide-up" style="animation-delay: 120ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-camera mr-2"></i> Photos</h3>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('photoUploadModal').classList.add('active')">
+                        <i class="fas fa-plus"></i>
+                        <span>Ajouter</span>
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if photos %}
+                    <div class="pi-photo-grid">
+                        {% for photo in photos %}
+                        <div class="pi-photo-item">
+                            <a href="{{ photo.image.url }}" target="_blank">
+                                <img src="{{ photo.image.url }}" alt="Photo {{ forloop.counter }}">
+                            </a>
+                            {% if photo.caption %}<p class="pi-photo-caption">{{ photo.caption }}</p>{% endif %}
+                            <div class="pi-photo-meta">
+                                <small>{{ photo.uploaded_at|date:"d/m/Y H:i" }}</small>
+                                <form method="post" style="display:inline;" onsubmit="return confirm('Supprimer cette photo ?')">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete_photo">
+                                    <input type="hidden" name="photo_id" value="{{ photo.id }}">
+                                    <button type="submit" class="btn btn-ghost btn-sm text-error" style="padding:2px 6px;"><i class="fas fa-trash"></i></button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-center text-muted" style="padding: var(--space-4);">Aucune photo</p>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Actions History (Returns/Exchanges) -->
             {% if invoice_actions %}
             <div class="card animate-slide-up" style="animation-delay: 150ms;">
@@ -335,8 +371,12 @@
                 <div class="card-body">
                     <div class="status-list">
                         <div class="status-item">
+                            <span class="status-label">Total</span>
+                            <span class="status-value font-semibold">{{ dynamic_total|floatformat:2 }} DH</span>
+                        </div>
+                        <div class="status-item">
                             <span class="status-label">Payé</span>
-                            <span class="status-value">{{ invoice.amount_paid }} DH</span>
+                            <span class="status-value font-semibold text-success">{{ invoice.amount_paid|floatformat:2 }} DH</span>
                         </div>
                         <div class="status-item">
                             <span class="status-label">Solde</span>
@@ -345,6 +385,32 @@
                             </span>
                         </div>
                     </div>
+
+                    <!-- Payment History -->
+                    {% if invoice_payments %}
+                    <div style="margin-top: var(--space-4); border-top: 1px solid var(--neutral-200); padding-top: var(--space-3);">
+                        <small class="text-muted" style="display:block; margin-bottom: var(--space-2);">Historique:</small>
+                        {% for pay in invoice_payments %}
+                        <div class="pi-payment-row">
+                            <div>
+                                <strong>{{ pay.amount|floatformat:2 }} DH</strong>
+                                <small class="text-muted">{{ pay.payment_method.name }}</small>
+                                {% if pay.from_bank_account %}<small class="text-muted">- {{ pay.from_bank_account.bank_name }}</small>{% endif %}
+                            </div>
+                            <small class="text-muted">{{ pay.date|date:"d/m/Y" }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Add Payment Button -->
+                    {% if dynamic_balance > 0 %}
+                    <div style="margin-top: var(--space-4);">
+                        <button type="button" class="btn btn-success btn-block btn-sm" onclick="document.getElementById('paymentModal').classList.add('active')">
+                            <i class="fas fa-plus mr-1"></i> Ajouter Paiement
+                        </button>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -794,6 +860,51 @@
         .action-choice-btn.exchange-btn i {
             color: var(--info-600);
         }
+
+        /* Photo Grid */
+        .pi-photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: var(--space-3);
+        }
+        .pi-photo-item {
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: var(--neutral-50);
+        }
+        .pi-photo-item img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            display: block;
+        }
+        .pi-photo-caption {
+            font-size: var(--text-xs);
+            color: var(--neutral-600);
+            padding: var(--space-1) var(--space-2);
+            margin: 0;
+        }
+        .pi-photo-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-1) var(--space-2);
+            border-top: 1px solid var(--neutral-200);
+        }
+        .pi-photo-meta small { color: var(--neutral-500); font-size: 10px; }
+
+        /* Payment history rows */
+        .pi-payment-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-2) 0;
+            border-bottom: 1px solid var(--neutral-100);
+        }
+        .pi-payment-row:last-child { border-bottom: none; }
+        .pi-payment-row strong { font-size: var(--text-sm); }
+        .pi-payment-row small { display: block; }
 
         .exchange-product-section {
             display: none;
@@ -1474,12 +1585,105 @@
         </tr>
     </template>
 
+    <!-- Photo Upload Modal -->
+    <div id="photoUploadModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-camera mr-2"></i> Ajouter des Photos</h3>
+                <button type="button" class="modal-close" onclick="document.getElementById('photoUploadModal').classList.remove('active')">&times;</button>
+            </div>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="upload_photo">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Photos (plusieurs possibles)</label>
+                        <input type="file" name="photos" accept="image/*" multiple required class="form-input" style="padding: var(--space-2);">
+                    </div>
+                    <div class="form-group">
+                        <label>Légende (optionnel)</label>
+                        <input type="text" name="caption" placeholder="Description..." class="form-input">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('photoUploadModal').classList.remove('active')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload mr-1"></i> Télécharger
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-money-bill-wave mr-2"></i> Ajouter un Paiement</h3>
+                <button type="button" class="modal-close" onclick="document.getElementById('paymentModal').classList.remove('active')">&times;</button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_payment">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Montant (DH) *</label>
+                        <input type="number" name="payment_amount" step="0.01" min="0.01" max="{{ dynamic_balance }}" value="{{ dynamic_balance|floatformat:2 }}" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Mode de paiement *</label>
+                        <select name="payment_method" required class="form-select">
+                            <option value="">-- Sélectionner --</option>
+                            {% for pm in payment_methods %}
+                                <option value="{{ pm.id }}">{{ pm.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Compte bancaire</label>
+                        <select name="payment_bank" class="form-select">
+                            <option value="">-- Aucun (Espèces) --</option>
+                            {% for ba in bank_accounts %}
+                                <option value="{{ ba.id }}">{{ ba.bank_name }} - {{ ba.account_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>N° Chèque</label>
+                        <input type="text" name="check_number" placeholder="Si paiement par chèque..." class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea name="payment_notes" rows="2" placeholder="Notes..." class="form-input"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('paymentModal').classList.remove('active')">Annuler</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check mr-1"></i> Enregistrer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         // Close bulk create modal on outside click (must be after modal HTML)
         document.getElementById('bulkCreateModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 closeBulkCreateModal();
             }
+        });
+
+        // Close photo and payment modals on outside click
+        ['photoUploadModal', 'paymentModal'].forEach(function(id) {
+            document.getElementById(id).addEventListener('click', function(e) {
+                if (e.target === this) this.classList.remove('active');
+            });
         });
     </script>
 {% endblock %}
