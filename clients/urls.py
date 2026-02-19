@@ -13,4 +13,5 @@ urlpatterns = [
     path('<int:pk>/edit/', views.client_edit, name='edit'),
     path('<int:pk>/delete/', views.client_delete, name='delete'),
     path('quick-create/', views.quick_create_client, name='quick_create'),
+    path('api/search/', views.api_search_clients, name='api_search'),
 ]

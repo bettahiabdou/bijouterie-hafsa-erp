@@ -285,6 +285,45 @@ def client_delete(request, pk):
 
 
 @login_required(login_url='login')
+def api_search_clients(request):
+    """API endpoint to search clients by name, phone, or code - returns deposit balance info"""
+    query = request.GET.get('q', '').strip()
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+
+    clients = Client.objects.filter(
+        Q(first_name__icontains=query) |
+        Q(last_name__icontains=query) |
+        Q(phone__icontains=query) |
+        Q(code__icontains=query)
+    ).filter(is_active=True)[:10]
+
+    results = []
+    for client in clients:
+        deposit_balance = 0
+        has_deposit = False
+        try:
+            if hasattr(client, 'deposit_account'):
+                dep = client.deposit_account
+                if dep and dep.is_active:
+                    deposit_balance = float(dep.balance)
+                    has_deposit = True
+        except Exception:
+            pass
+
+        results.append({
+            'id': client.id,
+            'name': client.full_name,
+            'phone': client.phone or '',
+            'code': client.code or '',
+            'has_deposit': has_deposit,
+            'deposit_balance': deposit_balance,
+        })
+
+    return JsonResponse({'results': results})
+
+
+@login_required(login_url='login')
 @require_http_methods(["POST"])
 def quick_create_client(request):
     """Quickly create a client from invoice form popup"""

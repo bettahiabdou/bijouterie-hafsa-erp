@@ -2534,6 +2534,10 @@ def invoice_payment(request, reference):
 
             notes = request.POST.get('notes', '').strip()
 
+            # Deposit client IDs (when paying with "Dépôt Client", can be any client)
+            deposit_client_id_1 = request.POST.get('deposit_client_id_1', '')
+            deposit_client_id_2 = request.POST.get('deposit_client_id_2', '')
+
             total_payment = amount_1 + amount_2
 
             if total_payment <= 0:
@@ -2570,31 +2574,51 @@ def invoice_payment(request, reference):
                     return redirect('sales:invoice_payment', reference=reference)
 
                 # Helper: deduct from client deposit if payment method is "Dépôt Client"
-                def handle_deposit_deduction(pm, amount, pay_date):
-                    if pm.name.lower() in ('dépôt client', 'depot client', 'dépôt') and invoice.client:
+                def handle_deposit_deduction(pm, amount, pay_date, dep_client_id=''):
+                    if pm.name.lower() in ('dépôt client', 'depot client', 'dépôt'):
                         from deposits.models import DepositAccount, DepositTransaction
+                        from clients.models import Client as ClientModel
                         try:
-                            dep_account = invoice.client.deposit_account
+                            # Use the selected deposit client, or fallback to invoice client
+                            dep_client = None
+                            if dep_client_id:
+                                try:
+                                    dep_client = ClientModel.objects.get(pk=int(dep_client_id))
+                                except (ClientModel.DoesNotExist, ValueError):
+                                    dep_client = None
+
+                            if not dep_client and invoice.client:
+                                dep_client = invoice.client
+
+                            if not dep_client:
+                                messages.warning(
+                                    request,
+                                    'Aucun client sélectionné pour le dépôt. Le paiement a été enregistré sans déduction.'
+                                )
+                                return
+
+                            dep_account = dep_client.deposit_account
                             if dep_account.balance >= amount:
                                 DepositTransaction.objects.create(
                                     account=dep_account,
                                     transaction_type=DepositTransaction.TransactionType.PURCHASE,
                                     amount=-amount,
                                     invoice=invoice,
-                                    description=f"Paiement facture {invoice.reference}",
+                                    description=f"Paiement facture {invoice.reference} (dépôt {dep_client.full_name})",
                                     date=pay_date,
                                     created_by=request.user,
                                 )
                             else:
                                 messages.warning(
                                     request,
-                                    f'Solde dépôt insuffisant ({dep_account.balance} DH). '
+                                    f'Solde dépôt insuffisant pour {dep_client.full_name} ({dep_account.balance} DH). '
                                     f'Le paiement a été enregistré mais le dépôt n\'a pas été déduit.'
                                 )
                         except DepositAccount.DoesNotExist:
                             messages.warning(
                                 request,
-                                'Ce client n\'a pas de compte dépôt. Le paiement a été enregistré sans déduction.'
+                                f'{dep_client.full_name if dep_client else "Ce client"} n\'a pas de compte dépôt. '
+                                f'Le paiement a été enregistré sans déduction.'
                             )
 
                 # Create Payment 1
@@ -2614,7 +2638,7 @@ def invoice_payment(request, reference):
                     )
 
                     # Deduct from deposit if applicable
-                    handle_deposit_deduction(pm1, amount_1, payment_date_1)
+                    handle_deposit_deduction(pm1, amount_1, payment_date_1, deposit_client_id_1)
 
                     # Update invoice with payment 1 method
                     invoice.payment_method = pm1
@@ -2640,7 +2664,7 @@ def invoice_payment(request, reference):
                     )
 
                     # Deduct from deposit if applicable
-                    handle_deposit_deduction(pm2, amount_2, payment_date_2)
+                    handle_deposit_deduction(pm2, amount_2, payment_date_2, deposit_client_id_2)
 
                 # Recalculate invoice payment totals from actual DB records
                 # (ClientPayment.save() already incremented amount_paid via update_payment(),
