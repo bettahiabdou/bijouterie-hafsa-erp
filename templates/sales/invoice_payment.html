@@ -88,6 +88,21 @@
                             </select>
                         </div>
 
+                        <!-- Deposit Info (shown when Dépôt Client selected) -->
+                        <div class="form-group" id="depositInfo1" style="display: none;">
+                            <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: var(--space-3);">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span><i class="fas fa-piggy-bank mr-2"></i> Solde depot client:</span>
+                                    <strong id="depositBalanceDisplay1" style="font-size: var(--text-lg); color: var(--primary-700);">{{ deposit_balance|floatformat:2 }} DH</strong>
+                                </div>
+                                {% if deposit_balance <= 0 %}
+                                <p style="color: var(--error-600); margin-top: var(--space-2); font-size: var(--text-sm);">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i> Ce client n'a pas de solde depot.
+                                </p>
+                                {% endif %}
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label for="amount" class="form-label">
                                 Montant (DH) <span class="required">*</span>
@@ -136,6 +151,16 @@
                                     <option value="{{ ba.id }}">{{ ba.bank_name }} - {{ ba.account_name }}</option>
                                 {% endfor %}
                             </select>
+                        </div>
+
+                        <!-- Deposit Info for Payment 2 -->
+                        <div class="form-group" id="depositInfo2" style="display: none;">
+                            <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: var(--space-3);">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span><i class="fas fa-piggy-bank mr-2"></i> Solde depot client:</span>
+                                    <strong style="font-size: var(--text-lg); color: var(--primary-700);">{{ deposit_balance|floatformat:2 }} DH</strong>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -246,6 +271,14 @@
                         {% if invoice.client.phone %}
                             <p class="text-sm text-muted"><i class="fas fa-phone mr-2"></i>{{ invoice.client.phone }}</p>
                         {% endif %}
+                        {% if deposit_balance > 0 %}
+                        <div style="margin-top: var(--space-3); padding: var(--space-3); background: var(--primary-50); border-radius: var(--radius-md); border: 1px solid var(--primary-200);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span class="text-sm"><i class="fas fa-piggy-bank mr-1"></i> Depot</span>
+                                <strong style="color: var(--primary-700);">{{ deposit_balance|floatformat:2 }} DH</strong>
+                            </div>
+                        </div>
+                        {% endif %}
                     {% else %}
                         <p class="text-muted"><i class="fas fa-user-slash mr-2"></i>Vente anonyme (walk-in)</p>
                     {% endif %}
@@ -258,6 +291,8 @@
 
 {% block extra_js %}
 <script>
+    const DEPOSIT_BALANCE = parseFloat("{{ deposit_balance }}".replace(',', '.')) || 0;
+
     function updatePaymentFields(paymentNum) {
         const select = document.getElementById(paymentNum === 1 ? 'payment_method' : 'payment_method_2');
         const selectedOption = select.options[select.selectedIndex];
@@ -265,10 +300,13 @@
 
         const referenceGroup = document.getElementById('referenceGroup' + paymentNum);
         const bankAccountGroup = document.getElementById('bankAccountGroup' + paymentNum);
+        const depositInfo = document.getElementById('depositInfo' + paymentNum);
+        const amountInput = document.getElementById(paymentNum === 1 ? 'amount' : 'amount_2');
 
         // Hide all by default
         referenceGroup.style.display = 'none';
         bankAccountGroup.style.display = 'none';
+        if (depositInfo) depositInfo.style.display = 'none';
 
         // No payment method selected
         if (!paymentName || !select.value) return;
@@ -276,20 +314,37 @@
         // Check payment method type
         const isVirement = paymentName.includes('virement') || paymentName.includes('bank');
         const isEspece = paymentName.includes('espece') || paymentName.includes('especes') || paymentName.includes('espèce') || paymentName === 'cash';
+        const isDepot = paymentName.includes('dépôt') || paymentName.includes('depot');
 
-        if (isEspece) {
+        if (isDepot) {
+            // Dépôt Client - show deposit info, cap amount to deposit balance
+            if (depositInfo) depositInfo.style.display = 'block';
+            const maxAmount = Math.min(DEPOSIT_BALANCE, parseFloat("{{ remaining }}".replace(',', '.')) || 0);
+            if (amountInput) {
+                amountInput.max = maxAmount;
+                if (parseFloat(amountInput.value) > maxAmount) {
+                    amountInput.value = maxAmount.toFixed(2);
+                }
+            }
+        } else if (isEspece) {
             // Cash - no reference, no bank account
             referenceGroup.style.display = 'none';
             bankAccountGroup.style.display = 'none';
+            // Reset max to remaining
+            if (amountInput && paymentNum === 1) amountInput.max = "{{ remaining }}";
         } else if (isVirement) {
             // Bank transfer - show reference AND bank account
             referenceGroup.style.display = 'block';
             bankAccountGroup.style.display = 'block';
+            if (amountInput && paymentNum === 1) amountInput.max = "{{ remaining }}";
         } else {
             // Other (cheque, card, etc.) - show only reference
             referenceGroup.style.display = 'block';
             bankAccountGroup.style.display = 'none';
+            if (amountInput && paymentNum === 1) amountInput.max = "{{ remaining }}";
         }
+
+        updatePaymentSummary();
     }
 
     function updatePaymentSummary() {
