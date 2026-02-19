@@ -3035,6 +3035,40 @@ def pending_invoice_complete(request, reference):
                                 sale_invoice=invoice,
                                 created_by=request.user
                             )
+
+                            # Deduct from deposit if payment method is "Dépôt Client"
+                            if pm.name.lower() in ('dépôt client', 'depot client', 'dépôt'):
+                                from deposits.models import DepositAccount, DepositTransaction
+                                dep_client_id = request.POST.get(f'deposit_client_id_{idx}', '')
+                                dep_client = None
+                                if dep_client_id:
+                                    try:
+                                        dep_client = Client.objects.get(pk=int(dep_client_id))
+                                    except (Client.DoesNotExist, ValueError):
+                                        dep_client = None
+                                if not dep_client and invoice.client:
+                                    dep_client = invoice.client
+                                if dep_client:
+                                    try:
+                                        dep_account = dep_client.deposit_account
+                                        if dep_account.balance >= amount:
+                                            DepositTransaction.objects.create(
+                                                account=dep_account,
+                                                transaction_type=DepositTransaction.TransactionType.PURCHASE,
+                                                amount=-amount,
+                                                invoice=invoice,
+                                                description=f"Paiement facture {invoice.reference} (dépôt {dep_client.full_name})",
+                                                date=pay_date,
+                                                created_by=request.user,
+                                            )
+                                        else:
+                                            messages.warning(
+                                                request,
+                                                f'Solde dépôt insuffisant pour {dep_client.full_name} ({dep_account.balance} DH).'
+                                            )
+                                    except DepositAccount.DoesNotExist:
+                                        messages.warning(request, f'{dep_client.full_name} n\'a pas de compte dépôt.')
+
                         except PaymentMethod.DoesNotExist:
                             pass
 

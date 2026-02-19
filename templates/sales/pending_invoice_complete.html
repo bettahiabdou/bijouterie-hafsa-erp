@@ -1,5 +1,26 @@
 {% extends 'base.html' %}
 
+{% block extra_css %}
+<style>
+    .dep-search-results {
+        position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+        background: white; border: 1px solid var(--neutral-300); border-radius: var(--radius-md);
+        max-height: 250px; overflow-y: auto; box-shadow: var(--shadow-lg);
+    }
+    .dep-search-item {
+        padding: var(--space-3); cursor: pointer; border-bottom: 1px solid var(--neutral-100); transition: background 0.15s;
+    }
+    .dep-search-item:hover { background: var(--primary-50); }
+    .dep-search-item:last-child { border-bottom: none; }
+    .dep-search-item .dep-client-name { font-weight: 600; color: var(--neutral-800); }
+    .dep-search-item .dep-client-phone { font-size: var(--text-sm); color: var(--neutral-500); margin-left: var(--space-2); }
+    .dep-search-item .dep-client-balance { font-size: var(--text-sm); margin-top: 2px; }
+    .dep-search-item .dep-client-balance.has-balance { color: var(--success-600); }
+    .dep-search-item .dep-client-balance.no-balance { color: var(--neutral-400); }
+    .dep-search-no-results { padding: var(--space-3); text-align: center; color: var(--neutral-500); font-size: var(--text-sm); }
+</style>
+{% endblock %}
+
 {% block title %}Compléter Facture {{ invoice.reference }} - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
@@ -315,6 +336,34 @@
                                             <option value="{{ ba.id }}">{{ ba.bank_name }}</option>
                                         {% endfor %}
                                     </select>
+                                </div>
+                                <!-- Deposit Client Search -->
+                                <div class="form-group deposit-section" id="deposit-section-1" style="display: none;">
+                                    <input type="hidden" name="deposit_client_id_1" id="deposit-client-id-1" value="">
+                                    <label class="form-label"><i class="fas fa-piggy-bank mr-1"></i> Client Dépôt</label>
+                                    <div style="position: relative;">
+                                        <input type="text" id="deposit-search-1" class="form-input"
+                                               placeholder="Chercher par nom, téléphone..."
+                                               autocomplete="off" oninput="searchDepositClients(1)">
+                                        <div id="deposit-results-1" class="dep-search-results" style="display: none;"></div>
+                                    </div>
+                                    <div id="deposit-selected-1" style="display: none; margin-top: var(--space-2);">
+                                        <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: var(--space-3);">
+                                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                <div>
+                                                    <strong id="deposit-client-name-1" style="color: var(--primary-800);"></strong>
+                                                    <span id="deposit-client-phone-1" class="text-sm text-muted" style="margin-left: var(--space-2);"></span>
+                                                </div>
+                                                <button type="button" class="btn btn-ghost btn-sm text-error" onclick="clearDepositClient(1)" style="padding: 2px 8px;">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--primary-200);">
+                                                <span class="text-sm">Solde dépôt:</span>
+                                                <strong id="deposit-balance-1" style="font-size: var(--text-lg); color: var(--primary-700);">0.00 DH</strong>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Montant (DH)</label>
@@ -1084,6 +1133,33 @@
                             ${bankAccountOptions}
                         </select>
                     </div>
+                    <div class="form-group deposit-section" id="deposit-section-${index}" style="display: none;">
+                        <input type="hidden" name="deposit_client_id_${index}" id="deposit-client-id-${index}" value="">
+                        <label class="form-label"><i class="fas fa-piggy-bank mr-1"></i> Client Dépôt</label>
+                        <div style="position: relative;">
+                            <input type="text" id="deposit-search-${index}" class="form-input"
+                                   placeholder="Chercher par nom, téléphone..."
+                                   autocomplete="off" oninput="searchDepositClients(${index})">
+                            <div id="deposit-results-${index}" class="dep-search-results" style="display: none;"></div>
+                        </div>
+                        <div id="deposit-selected-${index}" style="display: none; margin-top: var(--space-2);">
+                            <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: var(--space-3);">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <strong id="deposit-client-name-${index}" style="color: var(--primary-800);"></strong>
+                                        <span id="deposit-client-phone-${index}" class="text-sm text-muted" style="margin-left: var(--space-2);"></span>
+                                    </div>
+                                    <button type="button" class="btn btn-ghost btn-sm text-error" onclick="clearDepositClient(${index})" style="padding: 2px 8px;">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--primary-200);">
+                                    <span class="text-sm">Solde dépôt:</span>
+                                    <strong id="deposit-balance-${index}" style="font-size: var(--text-lg); color: var(--primary-700);">0.00 DH</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label class="form-label">Montant (DH)</label>
                         <input type="number" name="amount_paid_${index}" class="form-input payment-amount-input"
@@ -1145,19 +1221,25 @@
 
             const referenceGroup = document.getElementById(`reference-group-${index}`);
             const bankAccountGroup = document.getElementById(`bank-account-group-${index}`);
+            const depositSection = document.getElementById(`deposit-section-${index}`);
 
             if (!referenceGroup || !bankAccountGroup) return;
 
             // Hide all by default
             referenceGroup.style.display = 'none';
             bankAccountGroup.style.display = 'none';
+            if (depositSection) depositSection.style.display = 'none';
 
             if (!paymentName) return;
 
             const isEspeces = paymentName.includes('espèce') || paymentName.includes('espece') || paymentName === 'cash';
             const isVirement = paymentName.includes('virement');
+            const isDepot = paymentName.includes('dépôt') || paymentName.includes('depot');
 
-            if (isEspeces) {
+            if (isDepot) {
+                // Deposit Client - show client search
+                if (depositSection) depositSection.style.display = 'block';
+            } else if (isEspeces) {
                 // Cash - no reference, no bank account
             } else if (isVirement) {
                 referenceGroup.style.display = 'block';
@@ -1166,6 +1248,103 @@
                 referenceGroup.style.display = 'block';
             }
         }
+
+        // Deposit client search
+        const depositSearchTimers = {};
+        const depositBalances = {};
+
+        function searchDepositClients(index) {
+            const query = document.getElementById(`deposit-search-${index}`).value.trim();
+            const resultsDiv = document.getElementById(`deposit-results-${index}`);
+
+            if (query.length < 2) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            if (depositSearchTimers[index]) clearTimeout(depositSearchTimers[index]);
+            depositSearchTimers[index] = setTimeout(function() {
+                fetch('{% url "clients:api_search" %}?q=' + encodeURIComponent(query))
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.results && data.results.length > 0) {
+                            let html = '';
+                            data.results.forEach(function(client) {
+                                const balanceClass = client.has_deposit && client.deposit_balance > 0 ? 'has-balance' : 'no-balance';
+                                const balanceText = client.has_deposit
+                                    ? (client.deposit_balance > 0 ? client.deposit_balance.toFixed(2) + ' DH' : '0.00 DH')
+                                    : 'Pas de compte dépôt';
+                                const clientJson = JSON.stringify(client).replace(/'/g, '&#39;');
+                                html += `<div class="dep-search-item" onclick='selectDepositClient(${index}, ${clientJson})'>
+                                    <div><span class="dep-client-name">${escapeHtml(client.name)}</span>
+                                    <span class="dep-client-phone">${escapeHtml(client.phone)}</span></div>
+                                    <div class="dep-client-balance ${balanceClass}">
+                                    <i class="fas fa-piggy-bank mr-1"></i> ${balanceText}</div></div>`;
+                            });
+                            resultsDiv.innerHTML = html;
+                        } else {
+                            resultsDiv.innerHTML = '<div class="dep-search-no-results">Aucun client trouvé</div>';
+                        }
+                        resultsDiv.style.display = 'block';
+                    })
+                    .catch(function() {
+                        resultsDiv.innerHTML = '<div class="dep-search-no-results">Erreur de recherche</div>';
+                        resultsDiv.style.display = 'block';
+                    });
+            }, 300);
+        }
+
+        function selectDepositClient(index, client) {
+            document.getElementById(`deposit-client-id-${index}`).value = client.id;
+            document.getElementById(`deposit-client-name-${index}`).textContent = client.name;
+            document.getElementById(`deposit-client-phone-${index}`).textContent = client.phone || '';
+            document.getElementById(`deposit-balance-${index}`).textContent = (client.deposit_balance || 0).toFixed(2) + ' DH';
+            document.getElementById(`deposit-selected-${index}`).style.display = 'block';
+            document.getElementById(`deposit-search-${index}`).value = '';
+            document.getElementById(`deposit-results-${index}`).style.display = 'none';
+
+            depositBalances[index] = client.deposit_balance || 0;
+
+            // Cap amount to deposit balance
+            const amountInput = document.querySelector(`input[name="amount_paid_${index}"]`);
+            if (amountInput) {
+                const maxAmount = client.deposit_balance || 0;
+                amountInput.max = maxAmount;
+                if (parseFloat(amountInput.value) > maxAmount) {
+                    amountInput.value = maxAmount.toFixed(2);
+                }
+                updatePaymentStatus();
+            }
+        }
+
+        function clearDepositClient(index) {
+            document.getElementById(`deposit-client-id-${index}`).value = '';
+            document.getElementById(`deposit-selected-${index}`).style.display = 'none';
+            document.getElementById(`deposit-search-${index}`).value = '';
+            depositBalances[index] = 0;
+
+            const amountInput = document.querySelector(`input[name="amount_paid_${index}"]`);
+            if (amountInput) {
+                amountInput.removeAttribute('max');
+                updatePaymentStatus();
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // Close deposit search results when clicking outside
+        document.addEventListener('click', function(e) {
+            document.querySelectorAll('.dep-search-results').forEach(function(results) {
+                const searchInput = results.previousElementSibling;
+                if (!results.contains(e.target) && e.target !== searchInput) {
+                    results.style.display = 'none';
+                }
+            });
+        });
 
         // Photo Modal
         function openPhotoModal(url) {
