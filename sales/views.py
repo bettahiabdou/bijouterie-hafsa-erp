@@ -91,10 +91,14 @@ def sales_dashboard(request):
         payment_date_filter['date__lte'] = date_to
 
     # ============ ALL PAYMENTS FOR PERIOD ============
+    # Payments are filtered by PAYMENT DATE only (not invoice date)
+    # so that a sale on date X with payment on date Y shows payment on Y
     period_payments_qs = ClientPayment.objects.filter(
-        sale_invoice_id__in=filtered_invoice_ids,
+        sale_invoice__is_deleted=False,
         **payment_date_filter,
-    )
+    ).exclude(sale_invoice__status='returned')
+    if seller_filter:
+        period_payments_qs = period_payments_qs.filter(sale_invoice__seller_id=seller_filter)
 
     all_payments_total = period_payments_qs.exclude(
         payment_method__name='Dépôt Client'
@@ -337,18 +341,26 @@ def sales_dashboard(request):
     )
     today_invoice_ids = list(today_base.values_list('id', flat=True))
 
-    today_all_payments = ClientPayment.objects.filter(
-        sale_invoice_id__in=today_invoice_ids, date=today,
-    ).exclude(payment_method__name='Dépôt Client').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    # Today payments: filter by PAYMENT DATE only (not invoice date)
+    today_payments_base = ClientPayment.objects.filter(
+        date=today,
+        sale_invoice__is_deleted=False,
+    ).exclude(sale_invoice__status='returned')
+    if seller_filter:
+        today_payments_base = today_payments_base.filter(sale_invoice__seller_id=seller_filter)
 
-    today_amana_pending = ClientPayment.objects.filter(
-        sale_invoice_id__in=today_invoice_ids, sale_invoice__delivery_method_type='amana', date=today,
+    today_all_payments = today_payments_base.exclude(
+        payment_method__name='Dépôt Client'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    today_amana_pending = today_payments_base.filter(
+        sale_invoice__delivery_method_type='amana',
     ).exclude(sale_invoice__delivery__status='delivered').exclude(
         payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    today_transporteur_pending = ClientPayment.objects.filter(
-        sale_invoice_id__in=today_invoice_ids, sale_invoice__delivery_method_type='transporteur', date=today,
+    today_transporteur_pending = today_payments_base.filter(
+        sale_invoice__delivery_method_type='transporteur',
     ).exclude(sale_invoice__delivery__status='delivered').exclude(
         payment_method__name='Dépôt Client'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
@@ -358,9 +370,9 @@ def sales_dashboard(request):
 
     # Today payment method breakdown
     today_payment_methods = list(
-        ClientPayment.objects.filter(
-            sale_invoice_id__in=today_invoice_ids, date=today,
-        ).exclude(payment_method__name='Dépôt Client').values(
+        today_payments_base.exclude(
+            payment_method__name='Dépôt Client'
+        ).values(
             'payment_method__name',
         ).annotate(
             total=Sum('amount'),
