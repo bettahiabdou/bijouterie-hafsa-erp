@@ -216,11 +216,32 @@ def generate_payment_reference(payment_type='PAY'):
     """
     Generate a unique payment reference
     Format: PAY-YYYYMMDD-#### or SUP-PAY-YYYYMMDD-####
+    Uses max existing reference to avoid collisions.
     """
-    from payments.models import ClientPayment
+    from payments.models import ClientPayment, SupplierPayment
+    import re
+
     today = timezone.now().date()
-    count = ClientPayment.objects.filter(date=today).count() + 1
-    return f'{payment_type}-{today.strftime("%Y%m%d")}-{count:04d}'
+    date_str = today.strftime("%Y%m%d")
+    prefix = f'{payment_type}-{date_str}-'
+
+    # Use the correct model based on payment type
+    if payment_type.startswith('SUP'):
+        last = SupplierPayment.objects.filter(
+            reference__startswith=prefix
+        ).order_by('-reference').first()
+    else:
+        last = ClientPayment.objects.filter(
+            reference__startswith=prefix
+        ).order_by('-reference').first()
+
+    if last:
+        match = re.search(r'-(\d{4})$', last.reference)
+        next_num = int(match.group(1)) + 1 if match else 1
+    else:
+        next_num = 1
+
+    return f'{prefix}{next_num:04d}'
 
 
 def generate_old_gold_reference():

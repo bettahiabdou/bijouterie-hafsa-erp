@@ -795,6 +795,8 @@ def purchase_invoice_detail(request, reference):
                 messages.error(request, 'Montant invalide.')
             except PaymentMethod.DoesNotExist:
                 messages.error(request, 'Mode de paiement invalide.')
+            except Exception as e:
+                messages.error(request, f'Erreur lors de l\'enregistrement: {str(e)}')
 
         return redirect('purchases:purchase_invoice_detail', reference=reference)
 
