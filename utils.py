@@ -219,7 +219,7 @@ def generate_payment_reference(payment_type='PAY'):
     """
     from payments.models import ClientPayment
     today = timezone.now().date()
-    count = ClientPayment.objects.filter(payment_date=today).count() + 1
+    count = ClientPayment.objects.filter(date=today).count() + 1
     return f'{payment_type}-{today.strftime("%Y%m%d")}-{count:04d}'
 
 
