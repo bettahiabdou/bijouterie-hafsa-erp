@@ -1617,7 +1617,7 @@
 
     <!-- Payment Modal -->
     <div id="paymentModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content" style="max-width: 500px; max-height: 90vh;">
             <div class="modal-header">
                 <h3><i class="fas fa-money-bill-wave mr-2"></i> Ajouter un Paiement</h3>
                 <button type="button" class="modal-close" onclick="document.getElementById('paymentModal').classList.remove('active')">&times;</button>
@@ -1632,29 +1632,33 @@
                     </div>
                     <div class="form-group">
                         <label>Mode de paiement *</label>
-                        <select name="payment_method" required class="form-select">
-                            <option value="">-- Sélectionner --</option>
+                        <select name="payment_method" id="pi-payment-method" required class="form-select" onchange="updatePurchasePaymentFields()">
+                            <option value="" data-name="">-- Sélectionner --</option>
                             {% for pm in payment_methods %}
-                                <option value="{{ pm.id }}">{{ pm.name }}</option>
+                                <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="pi-bank-group" style="display: none;">
                         <label>Compte bancaire</label>
                         <select name="payment_bank" class="form-select">
-                            <option value="">-- Aucun (Espèces) --</option>
+                            <option value="">-- Sélectionner --</option>
                             {% for ba in bank_accounts %}
                                 <option value="{{ ba.id }}">{{ ba.bank_name }} - {{ ba.account_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="form-group" id="pi-reference-group" style="display: none;">
+                        <label>Référence de paiement</label>
+                        <input type="text" name="payment_reference" placeholder="N° virement, référence..." class="form-input">
+                    </div>
                     <div class="form-group">
                         <label>Date</label>
                         <input type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" class="form-input">
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="pi-check-group" style="display: none;">
                         <label>N° Chèque</label>
-                        <input type="text" name="check_number" placeholder="Si paiement par chèque..." class="form-input">
+                        <input type="text" name="check_number" placeholder="Numéro du chèque..." class="form-input">
                     </div>
                     <div class="form-group">
                         <label>Notes</label>
@@ -1685,5 +1689,37 @@
                 if (e.target === this) this.classList.remove('active');
             });
         });
+
+        // Dynamic payment method fields for purchase payment modal
+        function updatePurchasePaymentFields() {
+            var select = document.getElementById('pi-payment-method');
+            var name = (select.options[select.selectedIndex].getAttribute('data-name') || '').toLowerCase();
+
+            var bankGroup = document.getElementById('pi-bank-group');
+            var refGroup = document.getElementById('pi-reference-group');
+            var checkGroup = document.getElementById('pi-check-group');
+
+            bankGroup.style.display = 'none';
+            refGroup.style.display = 'none';
+            checkGroup.style.display = 'none';
+
+            if (!name) return;
+
+            var isEspece = name.includes('espèce') || name.includes('espece') || name === 'cash';
+            var isVirement = name.includes('virement');
+            var isCheque = name.includes('chèque') || name.includes('cheque');
+
+            if (isEspece) {
+                // Nothing extra for cash
+            } else if (isVirement) {
+                bankGroup.style.display = 'block';
+                refGroup.style.display = 'block';
+            } else if (isCheque) {
+                refGroup.style.display = 'block';
+                checkGroup.style.display = 'block';
+            } else {
+                refGroup.style.display = 'block';
+            }
+        }
     </script>
 {% endblock %}
