@@ -221,6 +221,13 @@
                                     <span>Autre Transporteur</span>
                                 </div>
                             </label>
+                            <label class="delivery-option">
+                                <input type="radio" name="delivery_method_type" value="en_stock" onchange="toggleDeliveryFields()">
+                                <div class="delivery-option-content">
+                                    <i class="fas fa-warehouse"></i>
+                                    <span>En Stock (Garde)</span>
+                                </div>
+                            </label>
                         </div>
                     </div>
 
@@ -1503,8 +1510,8 @@
             // Update hidden fields for form submission
             document.getElementById('delivery-method-type-hidden').value = selectedType;
 
-            if (selectedType === 'magasin') {
-                // Hide all tracking fields for magasin
+            if (selectedType === 'magasin' || selectedType === 'en_stock') {
+                // Hide all tracking fields for magasin and en_stock
                 trackingFields.style.display = 'none';
             } else if (selectedType === 'amana') {
                 // AMANA - show tracking, hide carrier select
@@ -1521,6 +1528,16 @@
         document.getElementById('complete-form').addEventListener('submit', function(e) {
             const selectedType = document.querySelector('input[name="delivery_method_type"]:checked').value;
             document.getElementById('delivery-method-type-hidden').value = selectedType;
+
+            // En Stock requires a client
+            if (selectedType === 'en_stock') {
+                const clientSelect = document.getElementById('client-select');
+                if (!clientSelect || !clientSelect.value) {
+                    e.preventDefault();
+                    alert('Un client est requis pour le mode "En Stock (Garde)".');
+                    return false;
+                }
+            }
 
             const trackingInput = document.getElementById('tracking-number');
             if (trackingInput) {

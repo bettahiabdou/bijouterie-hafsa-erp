@@ -254,6 +254,13 @@
                     <span class="db-kpi__label">Transporteur ({{ transporteur_stats.count }}) <i class="fas fa-chevron-down" style="font-size:9px;"></i></span>
                 </div>
             </div>
+            <div class="db-kpi" style="border-left:3px solid var(--warning-500);">
+                <div class="db-kpi__icon"><i class="fas fa-warehouse"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ en_stock_stats.revenue|floatformat:0 }}</span>
+                    <span class="db-kpi__label">En Stock ({{ en_stock_stats.count }})</span>
+                </div>
+            </div>
         </div>
 
         <div id="magasin-list" class="db-expandable" style="display:none;">

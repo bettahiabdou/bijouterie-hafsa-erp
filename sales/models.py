@@ -199,6 +199,7 @@ class SaleInvoice(models.Model):
         MAGASIN = 'magasin', _('Magasin (Retrait)')
         AMANA = 'amana', _('AMANA')
         TRANSPORTEUR = 'transporteur', _('Autre Transporteur')
+        EN_STOCK = 'en_stock', _('En Stock (Garde)')
 
     delivery_method_type = models.CharField(
         _('Type de livraison'),

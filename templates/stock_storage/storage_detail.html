@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock - {{ account.client.full_name }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'stock_storage:list' %}" class="breadcrumb-item">Stock Client</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ account.client.full_name }}</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">{{ account.client.full_name }}</h1>
+                <p class="page-subtitle">Articles en garde</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'stock_storage:list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Retour</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-3 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">En Attente</div>
+                <div class="stat-value">{{ account.waiting_items }}</div>
+                <div class="stat-meta">Articles non récupérés</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Récupérés</div>
+                <div class="stat-value">{{ account.picked_up_items }}</div>
+                <div class="stat-meta">Articles récupérés</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Valeur en Attente</div>
+                <div class="stat-value">{{ account.total_value_waiting|floatformat:2 }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="detail-layout">
+        <!-- Main Content -->
+        <div class="detail-main">
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-list mr-2"></i> Articles</h3>
+                    <div class="flex gap-2">
+                        <!-- Status Filter Tabs -->
+                        <a href="{% url 'stock_storage:detail' account.pk %}" class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %}">Tous</a>
+                        <a href="{% url 'stock_storage:detail' account.pk %}?status=waiting" class="btn btn-sm {% if status_filter == 'waiting' %}btn-primary{% else %}btn-secondary{% endif %}">En Attente</a>
+                        <a href="{% url 'stock_storage:detail' account.pk %}?status=picked_up" class="btn btn-sm {% if status_filter == 'picked_up' %}btn-primary{% else %}btn-secondary{% endif %}">Récupérés</a>
+                    </div>
+                </div>
+
+                <!-- Bulk Pickup Form -->
+                <form method="post" action="{% url 'stock_storage:bulk_pickup' account.pk %}" id="bulk-pickup-form">
+                    {% csrf_token %}
+
+                    <!-- Bulk Action Bar -->
+                    <div id="bulk-action-bar" style="display: none; padding: var(--space-3) var(--space-4); background: var(--primary-50); border-bottom: 1px solid var(--primary-200);">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span id="selected-count" class="font-semibold text-primary">0 sélectionné(s)</span>
+                            <button type="submit" class="btn btn-success btn-sm">
+                                <i class="fas fa-check-double mr-1"></i> Marquer comme récupéré(s)
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper" style="border: none; border-radius: 0;">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">
+                                        <input type="checkbox" id="select-all" onchange="toggleSelectAll(this)">
+                                    </th>
+                                    <th>Réf. Produit</th>
+                                    <th>Nom</th>
+                                    <th style="text-align: right;">Poids (g)</th>
+                                    <th style="text-align: right;">Prix (DH)</th>
+                                    <th>Facture</th>
+                                    <th>Date Stockage</th>
+                                    <th style="text-align: center;">Statut</th>
+                                    <th style="text-align: center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                    <tr>
+                                        <td>
+                                            {% if item.status == 'waiting' %}
+                                                <input type="checkbox" name="item_ids" value="{{ item.pk }}" class="item-checkbox" onchange="updateBulkBar()">
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'products:detail' item.product.reference %}" class="text-primary font-semibold">
+                                                {{ item.product_reference }}
+                                            </a>
+                                        </td>
+                                        <td>{{ item.product_name }}</td>
+                                        <td style="text-align: right;">{{ item.product_weight|floatformat:3 }}</td>
+                                        <td style="text-align: right;">{{ item.price|floatformat:2 }}</td>
+                                        <td>
+                                            <a href="{% url 'sales:invoice_detail' item.invoice.reference %}" class="text-primary">
+                                                {{ item.invoice.reference }}
+                                            </a>
+                                        </td>
+                                        <td>{{ item.stored_at|date:"d/m/Y H:i" }}</td>
+                                        <td style="text-align: center;">
+                                            {% if item.status == 'waiting' %}
+                                                <span class="badge badge-warning">En attente</span>
+                                            {% else %}
+                                                <span class="badge badge-success">Récupéré</span>
+                                                {% if item.picked_up_at %}
+                                                    <br><small class="text-muted">{{ item.picked_up_at|date:"d/m/Y H:i" }}</small>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td style="text-align: center;">
+                                            {% if item.status == 'waiting' %}
+                                                <form method="post" action="{% url 'stock_storage:pickup_item' account.pk %}" style="display: inline;">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="item_id" value="{{ item.pk }}">
+                                                    <button type="submit" class="btn btn-success btn-sm" title="Marquer récupéré">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                </form>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted" style="padding: var(--space-8);">
+                                            Aucun article
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+
+                <!-- Pagination -->
+                {% if page_obj.has_other_pages %}
+                <div class="card-footer" style="display: flex; justify-content: center; gap: var(--space-2); padding: var(--space-4);">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}" class="btn btn-secondary btn-sm">Précédent</a>
+                    {% endif %}
+                    <span class="btn btn-ghost btn-sm">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}" class="btn btn-secondary btn-sm">Suivant</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="detail-sidebar">
+            <!-- Client Info -->
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-user mr-2"></i> Client</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Nom</span>
+                            <span class="status-value font-semibold">{{ account.client.full_name }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Téléphone</span>
+                            <span class="status-value">{{ account.client.phone|default:"-" }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Code</span>
+                            <span class="status-value">{{ account.client.code|default:"-" }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Compte créé le</span>
+                            <span class="status-value">{{ account.created_at|date:"d/m/Y" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="card animate-slide-up" style="animation-delay: 100ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-pie mr-2"></i> Résumé</h3>
+                </div>
+                <div class="card-body">
+                    <div class="status-list">
+                        <div class="status-item">
+                            <span class="status-label">Total Articles</span>
+                            <span class="status-value font-semibold">{{ account.total_items }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">En Attente</span>
+                            <span class="status-value font-semibold {% if account.waiting_items > 0 %}text-warning{% endif %}">{{ account.waiting_items }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Récupérés</span>
+                            <span class="status-value font-semibold text-success">{{ account.picked_up_items }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Valeur en Attente</span>
+                            <span class="status-value font-semibold">{{ account.total_value_waiting|floatformat:2 }} DH</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .detail-layout {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: var(--space-6);
+        }
+        @media (max-width: 768px) {
+            .detail-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
+    <script>
+        function toggleSelectAll(el) {
+            var checkboxes = document.querySelectorAll('.item-checkbox');
+            checkboxes.forEach(function(cb) { cb.checked = el.checked; });
+            updateBulkBar();
+        }
+
+        function updateBulkBar() {
+            var checked = document.querySelectorAll('.item-checkbox:checked').length;
+            var bar = document.getElementById('bulk-action-bar');
+            var countEl = document.getElementById('selected-count');
+            if (checked > 0) {
+                bar.style.display = 'block';
+                countEl.textContent = checked + ' sélectionné(s)';
+            } else {
+                bar.style.display = 'none';
+            }
+        }
+    </script>
+{% endblock %}

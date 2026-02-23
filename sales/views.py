@@ -74,10 +74,12 @@ def sales_dashboard(request):
     magasin_qs = base_qs.filter(Q(delivery_method_type='magasin') | Q(delivery_method_type__isnull=True) | Q(delivery_method_type=''))
     amana_qs = base_qs.filter(delivery_method_type='amana')
     transporteur_qs = base_qs.filter(delivery_method_type='transporteur')
+    en_stock_qs = base_qs.filter(delivery_method_type='en_stock')
 
     magasin_stats = magasin_qs.aggregate(revenue=Sum('total_amount'), count=Count('id'))
     amana_stats = amana_qs.aggregate(revenue=Sum('total_amount'), count=Count('id'))
     transporteur_stats = transporteur_qs.aggregate(revenue=Sum('total_amount'), count=Count('id'))
+    en_stock_stats = en_stock_qs.aggregate(revenue=Sum('total_amount'), count=Count('id'))
 
     # ============ PAYMENT DATE FILTER ============
     payment_date_filter = {}
@@ -481,11 +483,12 @@ def sales_dashboard(request):
             pm_chart_values.append(float(pm['total']))
 
     # Delivery type chart data
-    dt_chart_labels = ['Magasin', 'AMANA', 'Transporteur']
+    dt_chart_labels = ['Magasin', 'AMANA', 'Transporteur', 'En Stock']
     dt_chart_values = [
         float(magasin_stats['revenue'] or 0),
         float(amana_stats['revenue'] or 0),
         float(transporteur_stats['revenue'] or 0),
+        float(en_stock_stats['revenue'] or 0),
     ]
 
     # ============ DELIVERY STATUS OVERVIEW ============
@@ -561,6 +564,7 @@ def sales_dashboard(request):
         'magasin_stats': {'revenue': magasin_stats['revenue'] or Decimal('0'), 'count': magasin_stats['count'] or 0},
         'amana_stats': {'revenue': amana_stats['revenue'] or Decimal('0'), 'count': amana_stats['count'] or 0},
         'transporteur_stats': {'revenue': transporteur_stats['revenue'] or Decimal('0'), 'count': transporteur_stats['count'] or 0},
+        'en_stock_stats': {'revenue': en_stock_stats['revenue'] or Decimal('0'), 'count': en_stock_stats['count'] or 0},
         # Invoice lists
         'magasin_invoices': magasin_invoices,
         'amana_invoices_all': amana_invoices_all,
@@ -3128,6 +3132,26 @@ def pending_invoice_complete(request, reference):
                         tracking_number=tracking_number,
                         status='pending'
                     )
+
+                # Create stock storage records for en_stock deliveries
+                if delivery_method_type == 'en_stock' and invoice.client:
+                    from stock_storage.models import StockStorageAccount, StockStorageItem
+                    storage_account, _ = StockStorageAccount.objects.get_or_create(
+                        client=invoice.client,
+                        defaults={'created_by': request.user}
+                    )
+                    for inv_item in invoice.items.select_related('product'):
+                        if inv_item.product:
+                            StockStorageItem.objects.create(
+                                account=storage_account,
+                                invoice=invoice,
+                                product=inv_item.product,
+                                product_reference=inv_item.product.reference,
+                                product_name=inv_item.product.name,
+                                product_weight=inv_item.product.gross_weight or 0,
+                                price=inv_item.total_amount or 0,
+                                created_by=request.user,
+                            )
 
                 # Mark all products in the invoice as sold
                 for item in invoice.items.all():

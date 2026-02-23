@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard Stock Client - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'stock_storage:list' %}" class="breadcrumb-item">Stock Client</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Tableau de Bord</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Tableau de Bord - Stock Client</h1>
+                <p class="page-subtitle">Vue d'ensemble des articles en garde</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'stock_storage:list' %}" class="btn btn-secondary">
+                    <i class="fas fa-list"></i>
+                    <span>Tous les Comptes</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-3 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Comptes Actifs</div>
+                <div class="stat-value">{{ total_accounts|default:"0" }}</div>
+                <div class="stat-meta">dont {{ accounts_with_waiting }} avec articles</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <i class="fas fa-boxes"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Articles en Attente</div>
+                <div class="stat-value">{{ total_waiting_items|default:"0" }}</div>
+                <div class="stat-meta">Non récupérés</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Valeur Totale</div>
+                <div class="stat-value">{{ total_value_waiting|floatformat:2|default:"0.00" }}</div>
+                <div class="stat-meta">DH en attente</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- Today Stats -->
+    <div class="grid grid-cols-2 gap-6 mb-8">
+        <div class="card animate-slide-up">
+            <div class="card-header">
+                <h3><i class="fas fa-arrow-down mr-2"></i> Aujourd'hui - Nouveaux</h3>
+            </div>
+            <div class="card-body" style="text-align: center; padding: var(--space-6);">
+                <div style="font-size: 2rem; font-weight: var(--font-bold); color: var(--primary-600);">{{ today_stored }}</div>
+                <div class="text-muted">articles ajoutés</div>
+            </div>
+        </div>
+        <div class="card animate-slide-up" style="animation-delay: 100ms;">
+            <div class="card-header">
+                <h3><i class="fas fa-arrow-up mr-2"></i> Aujourd'hui - Récupérés</h3>
+            </div>
+            <div class="card-body" style="text-align: center; padding: var(--space-6);">
+                <div style="font-size: 2rem; font-weight: var(--font-bold); color: var(--success-600);">{{ today_pickups }}</div>
+                <div class="text-muted">articles récupérés</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Accounts with Waiting Items -->
+    {% if top_accounts %}
+    <div class="card animate-slide-up" style="animation-delay: 200ms;">
+        <div class="card-header">
+            <h3><i class="fas fa-sort-amount-down mr-2"></i> Clients avec le Plus d'Articles en Attente</h3>
+        </div>
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Client</th>
+                        <th>Téléphone</th>
+                        <th style="text-align: center;">En Attente</th>
+                        <th style="text-align: right;">Valeur (DH)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for account in top_accounts %}
+                        <tr>
+                            <td class="font-semibold">{{ account.client.full_name }}</td>
+                            <td>{{ account.client.phone|default:"-" }}</td>
+                            <td style="text-align: center;">
+                                <span class="badge badge-warning">{{ account.waiting_items }}</span>
+                            </td>
+                            <td style="text-align: right;">{{ account.total_value_waiting|floatformat:2 }}</td>
+                            <td>
+                                <a href="{% url 'stock_storage:detail' account.pk %}" class="btn btn-ghost btn-sm">
+                                    <i class="fas fa-eye"></i> Voir
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card animate-slide-up" style="animation-delay: 200ms;">
+        <div class="card-body text-center" style="padding: var(--space-8);">
+            <i class="fas fa-warehouse" style="font-size: 3rem; color: var(--neutral-400); margin-bottom: var(--space-4); display: block;"></i>
+            <p class="text-muted">Aucun article en stock client pour le moment.</p>
+            <p class="text-muted">Les articles apparaitront ici quand des factures avec livraison "En Stock" seront complétées.</p>
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Client - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Stock Client</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Stock Client</h1>
+                <p class="page-subtitle">Articles en garde pour les clients</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'stock_storage:dashboard' %}" class="btn btn-secondary">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Tableau de Bord</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-3 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-warehouse"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Comptes</div>
+                <div class="stat-value">{{ total_accounts|default:"0" }}</div>
+                <div class="stat-meta">Clients avec stock</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Articles en Attente</div>
+                <div class="stat-value">{{ total_waiting|default:"0" }}</div>
+                <div class="stat-meta">Non récupérés</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Valeur en Attente</div>
+                <div class="stat-value">{{ total_value|floatformat:2|default:"0.00" }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="card animate-slide-up">
+        <!-- Filters -->
+        <div class="card-header filter-header">
+            <form method="get" class="filter-form">
+                <div class="filter-grid">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Recherche</label>
+                        <input type="text" name="search" value="{{ search_query }}" placeholder="Nom, tel, code..." class="form-input">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="">Tous</option>
+                            <option value="has_waiting" {% if status_filter == 'has_waiting' %}selected{% endif %}>Avec articles en attente</option>
+                            <option value="all_picked" {% if status_filter == 'all_picked' %}selected{% endif %}>Tout récupéré</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; display: flex; align-items: flex-end;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Filtrer
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Table -->
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Client</th>
+                        <th>Téléphone</th>
+                        <th style="text-align: center;">En Attente</th>
+                        <th style="text-align: center;">Récupérés</th>
+                        <th style="text-align: right;">Valeur</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for account in accounts %}
+                        <tr>
+                            <td class="font-semibold">{{ account.client.full_name }}</td>
+                            <td>{{ account.client.phone|default:"-" }}</td>
+                            <td style="text-align: center;">
+                                {% if account.waiting_items > 0 %}
+                                    <span class="badge badge-warning">{{ account.waiting_items }}</span>
+                                {% else %}
+                                    <span class="badge badge-success">0</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">{{ account.picked_up_items }}</td>
+                            <td style="text-align: right;">{{ account.total_value_waiting|floatformat:2 }} DH</td>
+                            <td>
+                                <a href="{% url 'stock_storage:detail' account.pk %}" class="btn btn-ghost btn-sm">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted" style="padding: var(--space-8);">
+                                <i class="fas fa-warehouse" style="font-size: 2rem; margin-bottom: var(--space-2); display: block;"></i>
+                                Aucun compte stock client
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer" style="display: flex; justify-content: center; gap: var(--space-2); padding: var(--space-4);">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}&search={{ search_query }}&status={{ status_filter }}" class="btn btn-secondary btn-sm">Précédent</a>
+            {% endif %}
+            <span class="btn btn-ghost btn-sm">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}&search={{ search_query }}&status={{ status_filter }}" class="btn btn-secondary btn-sm">Suivant</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}
