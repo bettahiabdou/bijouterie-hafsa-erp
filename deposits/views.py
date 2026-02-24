@@ -845,3 +845,91 @@ def deposit_dashboard(request):
     }
 
     return render(request, 'deposits/dashboard.html', context)
+
+
+# ============ DEPOSIT TRANSACTION EDIT/DELETE (AJAX) ============
+
+@login_required
+def update_deposit_transaction(request):
+    """Update date of an existing DepositTransaction (AJAX) - staff only"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST requis'}, status=405)
+    try:
+        if not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'Permission refusée'}, status=403)
+
+        transaction_id = request.POST.get('transaction_id')
+        if not transaction_id:
+            return JsonResponse({'success': False, 'error': 'ID transaction requis'}, status=400)
+
+        trans = get_object_or_404(DepositTransaction, id=transaction_id)
+
+        # Update date
+        new_date = request.POST.get('date')
+        if new_date:
+            from datetime import datetime
+            trans.date = datetime.strptime(new_date, '%Y-%m-%d').date()
+
+        # Update description
+        new_desc = request.POST.get('description')
+        if new_desc is not None:
+            trans.description = new_desc
+
+        # Update notes
+        new_notes = request.POST.get('notes')
+        if new_notes is not None:
+            trans.notes = new_notes
+
+        # Update payment reference
+        new_ref = request.POST.get('payment_reference')
+        if new_ref is not None:
+            trans.payment_reference = new_ref
+
+        # Save without triggering balance_after recalc (only for new transactions)
+        trans.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Transaction mise à jour',
+        })
+
+    except Exception as e:
+        logger.exception(f'Error updating deposit transaction: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
+
+
+@login_required
+def delete_deposit_transaction(request):
+    """Delete a DepositTransaction (AJAX) - staff only"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST requis'}, status=405)
+    try:
+        if not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'Permission refusée'}, status=403)
+
+        transaction_id = request.POST.get('transaction_id')
+        if not transaction_id:
+            return JsonResponse({'success': False, 'error': 'ID transaction requis'}, status=400)
+
+        trans = get_object_or_404(DepositTransaction, id=transaction_id)
+        account = trans.account
+
+        trans.delete()
+
+        # Recalculate balance_after for all remaining transactions (chronological order)
+        running_balance = Decimal('0')
+        for t in account.transactions.order_by('created_at'):
+            running_balance += t.amount
+            if t.balance_after != running_balance:
+                t.balance_after = running_balance
+                t.save(update_fields=['balance_after'])
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Transaction supprimée',
+            'new_balance': str(account.balance),
+        })
+
+    except Exception as e:
+        logger.exception(f'Error deleting deposit transaction: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)

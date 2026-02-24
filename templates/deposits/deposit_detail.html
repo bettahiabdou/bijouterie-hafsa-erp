@@ -158,11 +158,17 @@
                                 <th>Solde Après</th>
                                 <th>Description</th>
                                 <th>Référence</th>
+                                {% if request.user.is_staff %}<th style="width: 70px;"></th>{% endif %}
                             </tr>
                         </thead>
                         <tbody>
                             {% for trans in transactions %}
-                                <tr>
+                                <tr id="dep-trans-row-{{ trans.id }}"
+                                    data-id="{{ trans.id }}"
+                                    data-date="{% if trans.date %}{{ trans.date|date:'Y-m-d' }}{% else %}{{ trans.created_at|date:'Y-m-d' }}{% endif %}"
+                                    data-description="{{ trans.description }}"
+                                    data-notes="{{ trans.notes }}"
+                                    data-payment-reference="{{ trans.payment_reference }}">
                                     <td>{% if trans.date %}{{ trans.date|date:"d/m/Y" }}{% else %}{{ trans.created_at|date:"d/m/Y" }}{% endif %}</td>
                                     <td>
                                         <span class="badge {% if trans.transaction_type == 'deposit' %}badge-success{% elif trans.transaction_type == 'purchase' %}badge-primary{% elif trans.transaction_type == 'withdrawal' %}badge-warning{% elif trans.transaction_type == 'refund' %}badge-info{% else %}badge-neutral{% endif %}">
@@ -192,10 +198,24 @@
                                             -
                                         {% endif %}
                                     </td>
+                                    {% if request.user.is_staff %}
+                                    <td>
+                                        <div style="display: flex; gap: 4px;">
+                                            <button type="button" class="btn btn-ghost btn-sm" style="padding: 2px 6px; color: var(--primary-500);"
+                                                    onclick="openEditTransModal({{ trans.id }})" title="Modifier">
+                                                <i class="fas fa-edit" style="font-size: 12px;"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-ghost btn-sm" style="padding: 2px 6px; color: var(--error-500);"
+                                                    onclick="deleteDepositTransaction({{ trans.id }})" title="Supprimer">
+                                                <i class="fas fa-trash" style="font-size: 12px;"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    {% endif %}
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="6">
+                                    <td colspan="{% if request.user.is_staff %}7{% else %}6{% endif %}">
                                         <div class="empty-state" style="padding: var(--space-8);">
                                             <div class="empty-state-icon">
                                                 <i class="fas fa-exchange-alt"></i>
@@ -515,6 +535,43 @@
         }
     </style>
 
+    <!-- Edit Transaction Modal -->
+    <div id="editTransModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit mr-2"></i> Modifier la Transaction</h3>
+                <button onclick="document.getElementById('editTransModal').style.display='none'" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-trans-id">
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="edit-trans-date" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" id="edit-trans-description" class="form-input" placeholder="Description...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Référence paiement</label>
+                    <input type="text" id="edit-trans-reference" class="form-input" placeholder="N° chèque, virement...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <textarea id="edit-trans-notes" class="form-input" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="document.getElementById('editTransModal').style.display='none'" class="btn btn-ghost">Annuler</button>
+                <button type="button" class="btn btn-success" id="edit-trans-save-btn" onclick="saveEditTransaction()">
+                    <i class="fas fa-check"></i> Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         function openAddFundModal() {
             document.getElementById('addFundModal').style.display = 'flex';
@@ -557,5 +614,78 @@
                 }
             });
         });
+
+        // ===== EDIT/DELETE DEPOSIT TRANSACTION =====
+
+        function openEditTransModal(transId) {
+            var row = document.getElementById('dep-trans-row-' + transId);
+            if (!row) return;
+
+            document.getElementById('edit-trans-id').value = transId;
+            document.getElementById('edit-trans-date').value = row.getAttribute('data-date') || '';
+            document.getElementById('edit-trans-description').value = row.getAttribute('data-description') || '';
+            document.getElementById('edit-trans-reference').value = row.getAttribute('data-payment-reference') || '';
+            document.getElementById('edit-trans-notes').value = row.getAttribute('data-notes') || '';
+
+            document.getElementById('editTransModal').style.display = 'flex';
+        }
+
+        function saveEditTransaction() {
+            var transId = document.getElementById('edit-trans-id').value;
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            var saveBtn = document.getElementById('edit-trans-save-btn');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ...';
+
+            var formData = new FormData();
+            formData.append('transaction_id', transId);
+            formData.append('date', document.getElementById('edit-trans-date').value);
+            formData.append('description', document.getElementById('edit-trans-description').value);
+            formData.append('payment_reference', document.getElementById('edit-trans-reference').value);
+            formData.append('notes', document.getElementById('edit-trans-notes').value);
+
+            fetch('{% url "deposits:update_transaction" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(function(err) { console.error(err); alert('Erreur de connexion'); })
+            .finally(function() {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-check"></i> Enregistrer';
+            });
+        }
+
+        function deleteDepositTransaction(transId) {
+            if (!confirm('Supprimer cette transaction ? Le solde du compte sera recalculé.')) return;
+
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            var formData = new FormData();
+            formData.append('transaction_id', transId);
+
+            fetch('{% url "deposits:delete_transaction" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(function(err) { console.error(err); alert('Erreur de connexion'); });
+        }
     </script>
 {% endblock %}

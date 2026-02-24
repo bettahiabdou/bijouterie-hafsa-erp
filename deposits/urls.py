@@ -25,4 +25,8 @@ urlpatterns = [
     # API endpoints
     path('api/client/<int:client_id>/balance/', views.api_client_balance, name='api_client_balance'),
     path('api/product/<int:product_id>/', views.api_product_info, name='api_product_info'),
+
+    # Transaction editing (AJAX)
+    path('api/update-transaction/', views.update_deposit_transaction, name='update_transaction'),
+    path('api/delete-transaction/', views.delete_deposit_transaction, name='delete_transaction'),
 ]
