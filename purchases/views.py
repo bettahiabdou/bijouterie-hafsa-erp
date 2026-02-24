@@ -6,6 +6,8 @@ Handles purchase orders, purchase invoices, and consignments
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q, Sum, Count, F, DecimalField, Value
@@ -1021,3 +1023,161 @@ def consignment_detail(request, reference):
         'stats': stats,
     }
     return render(request, 'purchases/consignment_detail.html', context)
+
+
+# ============ SUPPLIER PAYMENT EDIT/DELETE (AJAX) ============
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def update_supplier_payment(request):
+    """Update an existing SupplierPayment (AJAX) - staff only"""
+    from payments.models import SupplierPayment
+    try:
+        if not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'Permission refusée'}, status=403)
+
+        payment_id = request.POST.get('payment_id')
+        if not payment_id:
+            return JsonResponse({'success': False, 'error': 'ID paiement requis'}, status=400)
+
+        payment = get_object_or_404(SupplierPayment, id=payment_id)
+        invoice = payment.purchase_invoice
+
+        # Update amount
+        new_amount = request.POST.get('amount')
+        if new_amount is not None and new_amount != '':
+            try:
+                new_amount = Decimal(new_amount)
+                if new_amount <= 0:
+                    return JsonResponse({'success': False, 'error': 'Montant invalide'}, status=400)
+                payment.amount = new_amount
+            except (InvalidOperation, TypeError):
+                return JsonResponse({'success': False, 'error': 'Montant invalide'}, status=400)
+
+        # Update payment method
+        new_pm_id = request.POST.get('payment_method_id')
+        if new_pm_id:
+            payment.payment_method_id = int(new_pm_id)
+
+        # Update bank account
+        new_ba_id = request.POST.get('bank_account_id')
+        if new_ba_id == '':
+            payment.from_bank_account = None
+        elif new_ba_id:
+            payment.from_bank_account_id = int(new_ba_id)
+
+        # Update date
+        new_date = request.POST.get('date')
+        if new_date:
+            from datetime import datetime
+            payment.date = datetime.strptime(new_date, '%Y-%m-%d').date()
+
+        # Update check number
+        new_check = request.POST.get('check_number')
+        if new_check is not None:
+            payment.check_number = new_check
+
+        # Update notes
+        new_notes = request.POST.get('notes')
+        if new_notes is not None:
+            payment.notes = new_notes
+
+        payment.save()
+
+        # Recalculate invoice payment totals from ALL payments
+        if invoice:
+            total_paid = SupplierPayment.objects.filter(
+                purchase_invoice=invoice
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            invoice.amount_paid = total_paid
+            invoice.balance_due = invoice.total_amount - total_paid
+            if total_paid >= invoice.total_amount and invoice.total_amount > 0:
+                invoice.status = 'paid'
+            elif total_paid > 0:
+                invoice.status = 'partial'
+            else:
+                if invoice.status in ('paid', 'partial'):
+                    invoice.status = 'confirmed'
+            invoice.save(update_fields=['amount_paid', 'balance_due', 'status'])
+
+        ActivityLog.objects.create(
+            user=request.user,
+            action=ActivityLog.ActionType.UPDATE,
+            model_name='SupplierPayment',
+            object_id=str(payment.id),
+            object_repr=f'Updated supplier payment {payment.reference} - {payment.amount} DH',
+            ip_address=get_client_ip(request)
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Paiement mis à jour',
+            'amount_paid': str(invoice.amount_paid) if invoice else '0',
+            'balance_due': str(invoice.balance_due) if invoice else '0',
+            'status': invoice.status if invoice else '',
+        })
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f'Error updating supplier payment: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def delete_supplier_payment(request):
+    """Delete a SupplierPayment (AJAX) - staff only"""
+    from payments.models import SupplierPayment
+    try:
+        if not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'Permission refusée'}, status=403)
+
+        payment_id = request.POST.get('payment_id')
+        if not payment_id:
+            return JsonResponse({'success': False, 'error': 'ID paiement requis'}, status=400)
+
+        payment = get_object_or_404(SupplierPayment, id=payment_id)
+        invoice = payment.purchase_invoice
+        payment_repr = f"{payment.reference} - {payment.amount} DH"
+
+        payment.delete()
+
+        # Recalculate invoice payment totals from ALL remaining payments
+        if invoice:
+            total_paid = SupplierPayment.objects.filter(
+                purchase_invoice=invoice
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            invoice.amount_paid = total_paid
+            invoice.balance_due = invoice.total_amount - total_paid
+            if total_paid >= invoice.total_amount and invoice.total_amount > 0:
+                invoice.status = 'paid'
+            elif total_paid > 0:
+                invoice.status = 'partial'
+            else:
+                if invoice.status in ('paid', 'partial'):
+                    invoice.status = 'confirmed'
+            invoice.save(update_fields=['amount_paid', 'balance_due', 'status'])
+
+        ActivityLog.objects.create(
+            user=request.user,
+            action=ActivityLog.ActionType.DELETE,
+            model_name='SupplierPayment',
+            object_id=payment_id,
+            object_repr=payment_repr,
+            ip_address=get_client_ip(request)
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Paiement supprimé',
+            'amount_paid': str(invoice.amount_paid) if invoice else '0',
+            'balance_due': str(invoice.balance_due) if invoice else '0',
+            'status': invoice.status if invoice else '',
+        })
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f'Error deleting supplier payment: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)

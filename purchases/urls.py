@@ -21,4 +21,8 @@ urlpatterns = [
     path('consignments/', views.consignment_list, name='consignment_list'),
     path('consignments/create/', views.consignment_create, name='consignment_create'),
     path('consignments/<str:reference>/', views.consignment_detail, name='consignment_detail'),
+
+    # Supplier Payment editing (AJAX)
+    path('api/update-supplier-payment/', views.update_supplier_payment, name='update_supplier_payment'),
+    path('api/delete-supplier-payment/', views.delete_supplier_payment, name='delete_supplier_payment'),
 ]

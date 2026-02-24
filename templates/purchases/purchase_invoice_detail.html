@@ -391,13 +391,32 @@
                     <div style="margin-top: var(--space-4); border-top: 1px solid var(--neutral-200); padding-top: var(--space-3);">
                         <small class="text-muted" style="display:block; margin-bottom: var(--space-2);">Historique:</small>
                         {% for pay in invoice_payments %}
-                        <div class="pi-payment-row">
+                        <div class="pi-payment-row" id="pi-pay-row-{{ pay.id }}"
+                             data-id="{{ pay.id }}"
+                             data-amount="{{ pay.amount }}"
+                             data-method-id="{{ pay.payment_method_id }}"
+                             data-bank-id="{{ pay.from_bank_account_id|default:'' }}"
+                             data-date="{{ pay.date|date:'Y-m-d' }}"
+                             data-check="{{ pay.check_number }}"
+                             data-notes="{{ pay.notes }}">
                             <div>
                                 <strong>{{ pay.amount|floatformat:2 }} DH</strong>
                                 <small class="text-muted">{{ pay.payment_method.name }}</small>
                                 {% if pay.from_bank_account %}<small class="text-muted">- {{ pay.from_bank_account.bank_name }}</small>{% endif %}
                             </div>
-                            <small class="text-muted">{{ pay.date|date:"d/m/Y" }}</small>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <small class="text-muted">{{ pay.date|date:"d/m/Y" }}</small>
+                                {% if request.user.is_staff %}
+                                <button type="button" class="btn btn-ghost btn-sm" style="padding: 2px 6px; color: var(--primary-500);"
+                                        onclick="openEditPaymentModal({{ pay.id }})" title="Modifier">
+                                    <i class="fas fa-edit" style="font-size: 12px;"></i>
+                                </button>
+                                <button type="button" class="btn btn-ghost btn-sm" style="padding: 2px 6px; color: var(--error-500);"
+                                        onclick="deleteSupplierPayment({{ pay.id }})" title="Supprimer">
+                                    <i class="fas fa-trash" style="font-size: 12px;"></i>
+                                </button>
+                                {% endif %}
+                            </div>
                         </div>
                         {% endfor %}
                     </div>
@@ -1675,6 +1694,59 @@
         </div>
     </div>
 
+    <!-- Edit Payment Modal -->
+    <div id="editPaymentModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px; max-height: 90vh;">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit mr-2"></i> Modifier le Paiement</h3>
+                <button type="button" class="modal-close" onclick="document.getElementById('editPaymentModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-payment-id">
+                <div class="form-group">
+                    <label>Montant (DH) *</label>
+                    <input type="number" id="edit-payment-amount" step="0.01" min="0.01" required class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Mode de paiement *</label>
+                    <select id="edit-payment-method" required class="form-select" onchange="updateEditPaymentFields()">
+                        <option value="" data-name="">-- Sélectionner --</option>
+                        {% for pm in payment_methods %}
+                            <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" id="edit-bank-group" style="display: none;">
+                    <label>Compte bancaire</label>
+                    <select id="edit-payment-bank" class="form-select">
+                        <option value="">-- Sélectionner --</option>
+                        {% for ba in bank_accounts %}
+                            <option value="{{ ba.id }}">{{ ba.bank_name }} - {{ ba.account_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="edit-payment-date" class="form-input">
+                </div>
+                <div class="form-group" id="edit-check-group" style="display: none;">
+                    <label>N° Chèque</label>
+                    <input type="text" id="edit-payment-check" placeholder="Numéro du chèque..." class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="edit-payment-notes" rows="2" placeholder="Notes..." class="form-input"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('editPaymentModal').classList.remove('active')">Annuler</button>
+                <button type="button" class="btn btn-success" id="edit-payment-save-btn" onclick="saveEditPayment()">
+                    <i class="fas fa-check mr-1"></i> Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Close bulk create modal on outside click (must be after modal HTML)
         document.getElementById('bulkCreateModal').addEventListener('click', function(e) {
@@ -1683,12 +1755,116 @@
             }
         });
 
-        // Close photo and payment modals on outside click
-        ['photoUploadModal', 'paymentModal'].forEach(function(id) {
+        // Close photo, payment and edit payment modals on outside click
+        ['photoUploadModal', 'paymentModal', 'editPaymentModal'].forEach(function(id) {
             document.getElementById(id).addEventListener('click', function(e) {
                 if (e.target === this) this.classList.remove('active');
             });
         });
+
+        // ===== EDIT/DELETE SUPPLIER PAYMENT =====
+
+        // Open Edit Payment Modal - pre-fill from data attributes
+        function openEditPaymentModal(payId) {
+            var row = document.getElementById('pi-pay-row-' + payId);
+            if (!row) return;
+
+            document.getElementById('edit-payment-id').value = payId;
+            document.getElementById('edit-payment-amount').value = row.getAttribute('data-amount');
+            document.getElementById('edit-payment-method').value = row.getAttribute('data-method-id');
+            document.getElementById('edit-payment-bank').value = row.getAttribute('data-bank-id') || '';
+            document.getElementById('edit-payment-date').value = row.getAttribute('data-date');
+            document.getElementById('edit-payment-check').value = row.getAttribute('data-check') || '';
+            document.getElementById('edit-payment-notes').value = row.getAttribute('data-notes') || '';
+
+            updateEditPaymentFields();
+            document.getElementById('editPaymentModal').classList.add('active');
+        }
+
+        // Toggle bank/check fields in edit modal based on payment method
+        function updateEditPaymentFields() {
+            var select = document.getElementById('edit-payment-method');
+            var name = (select.options[select.selectedIndex].getAttribute('data-name') || '').toLowerCase();
+
+            var bankGroup = document.getElementById('edit-bank-group');
+            var checkGroup = document.getElementById('edit-check-group');
+
+            bankGroup.style.display = 'none';
+            checkGroup.style.display = 'none';
+
+            if (!name) return;
+
+            var isVirement = name.includes('virement');
+            var isCheque = name.includes('chèque') || name.includes('cheque');
+
+            if (isVirement) {
+                bankGroup.style.display = 'block';
+            } else if (isCheque) {
+                checkGroup.style.display = 'block';
+            }
+        }
+
+        // Save edited payment via AJAX
+        function saveEditPayment() {
+            var payId = document.getElementById('edit-payment-id').value;
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            var saveBtn = document.getElementById('edit-payment-save-btn');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ...';
+
+            var formData = new FormData();
+            formData.append('payment_id', payId);
+            formData.append('amount', document.getElementById('edit-payment-amount').value);
+            formData.append('payment_method_id', document.getElementById('edit-payment-method').value);
+            formData.append('bank_account_id', document.getElementById('edit-payment-bank').value);
+            formData.append('date', document.getElementById('edit-payment-date').value);
+            formData.append('check_number', document.getElementById('edit-payment-check').value);
+            formData.append('notes', document.getElementById('edit-payment-notes').value);
+
+            fetch('{% url "purchases:update_supplier_payment" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(function(err) { console.error(err); alert('Erreur de connexion'); })
+            .finally(function() {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-check mr-1"></i> Enregistrer';
+            });
+        }
+
+        // Delete supplier payment via AJAX
+        function deleteSupplierPayment(payId) {
+            if (!confirm('Supprimer ce paiement ?')) return;
+
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            var formData = new FormData();
+            formData.append('payment_id', payId);
+
+            fetch('{% url "purchases:delete_supplier_payment" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(function(err) { console.error(err); alert('Erreur de connexion'); });
+        }
 
         // Dynamic payment method fields for purchase payment modal
         function updatePurchasePaymentFields() {
