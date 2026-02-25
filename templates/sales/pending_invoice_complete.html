@@ -1855,7 +1855,7 @@
                 if (cleanNull(d.client_name) && !clientName) clientName = cleanNull(d.client_name);
                 if (cleanNull(d.client_phone) && !clientPhone) clientPhone = cleanNull(d.client_phone);
                 if (cleanNull(d.client_city) && !clientCity) clientCity = cleanNull(d.client_city);
-                if (cleanNull(d.receipt_number) && !receiptNumber) receiptNumber = cleanNull(d.receipt_number);
+                if (cleanNull(d.receipt_number) && !receiptNumber && d.photo_type === 'receipt') receiptNumber = cleanNull(d.receipt_number);
                 if (cleanNull(d.total_amount) && !totalAmount) totalAmount = cleanNull(d.total_amount);
                 if (cleanNull(d.discount_total) && !discountTotal) discountTotal = cleanNull(d.discount_total);
                 if (d.payment_info && cleanNull(d.payment_info.amount_paid) && !paymentInfo) paymentInfo = d.payment_info;

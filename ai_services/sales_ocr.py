@@ -124,19 +124,19 @@ Si une information n'est pas visible, mets null. NE DEVINE PAS."""
 PAYMENT_PROMPT = """Tu extrais les données d'un REÇU DE PAIEMENT / VERSEMENT.
 
 C'est une preuve de paiement (espèces, chèque, virement) pour un achat de bijoux.
+Ce n'est PAS un reçu de bijouterie — NE METS PAS de receipt_number (toujours null).
 
 Cherche:
 - **Montant payé**: somme versée en DH
 - **Mode de paiement**: espèces, chèque, virement, carte
-- **Référence**: numéro de chèque ou référence de virement
+- **Référence du paiement**: tout numéro visible sur le reçu (numéro de bordereau, ref virement, numéro de chèque) → mets-le dans payment_info.reference
 - **Nom du client**: qui a payé
 - **Date**: date du paiement
-- **Numéro de reçu**: si imprimé sur le papier
 
 Retourne ce JSON:
 {
     "photo_type": "payment",
-    "receipt_number": "numéro de reçu (si visible)",
+    "receipt_number": null,
     "client_name": "nom du client (si visible)",
     "client_phone": "téléphone (si visible)",
     "client_city": "ville (si visible)",
@@ -147,11 +147,13 @@ Retourne ce JSON:
     "payment_info": {
         "amount_paid": "montant payé en DH",
         "payment_method": "espèces|chèque|virement|carte",
-        "reference": "numéro de chèque ou ref de virement"
+        "reference": "tout numéro visible sur le reçu de paiement (ref bordereau, chèque, virement)"
     },
     "notes": "autres infos utiles (date, détails du paiement)"
 }
 
+IMPORTANT: receipt_number doit TOUJOURS être null pour un reçu de paiement.
+Les numéros visibles sur ce reçu vont dans payment_info.reference.
 Si une information n'est pas visible, mets null. NE DEVINE PAS."""
 
 NOTE_PROMPT = """Tu extrais les données d'une NOTE MANUSCRITE liée à une vente de bijouterie au Maroc.
