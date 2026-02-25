@@ -262,16 +262,23 @@ def _classify_photo(image_path_or_bytes):
 
 
 def _extract_with_prompt(image_path_or_bytes, prompt):
-    """Pass 2: Extract data using pixtral vision model (dedicated OCR model)."""
+    """Pass 2: Extract data using vision model.
+
+    Uses vision_large (mistral-small-3.2-24b) if available for better OCR,
+    falls back to pixtral-12b.
+    """
     last_error = None
     last_raw = ''
+
+    # Prefer larger model for extraction accuracy (pixtral-12b hallucinates on handwriting)
+    model = scaleway_client.MODELS.get('vision_large', scaleway_client.MODELS['vision'])
 
     for attempt in range(2):
         try:
             response_text = scaleway_client.vision_completion(
                 image_data=image_path_or_bytes,
                 prompt=prompt,
-                model=scaleway_client.MODELS['vision'],
+                model=model,
                 temperature=0.0,
                 max_tokens=2048,
                 response_format={"type": "json_object"},
@@ -420,13 +427,29 @@ def _strip_null(value):
     return value
 
 
+def _clean_receipt_number(value):
+    """Clean receipt number: max 15 chars, reject garbage (all zeros, repeating)."""
+    raw = _strip_null((value or '')).strip()
+    if not raw:
+        return ''
+    # Cap at 15 characters (no receipt number is longer)
+    if len(raw) > 15:
+        logger.warning(f'Receipt number too long ({len(raw)} chars), discarding: {raw[:20]}...')
+        return ''
+    # Reject all-zeros
+    if raw.replace('0', '') == '':
+        logger.warning(f'Receipt number is all zeros, discarding: {raw}')
+        return ''
+    return raw
+
+
 def _clean_sales_data(data):
     """Validate and clean extracted sales data, filtering null strings."""
     delivery = data.get('delivery_info') or {}
 
     cleaned = {
         'photo_type': data.get('photo_type', 'other'),
-        'receipt_number': _strip_null((data.get('receipt_number') or '')).strip(),
+        'receipt_number': _clean_receipt_number(data.get('receipt_number')),
         'client_name': _strip_null(data.get('client_name') or ''),
         'client_phone': _strip_null(data.get('client_phone') or ''),
         'client_city': _strip_null(data.get('client_city') or ''),
