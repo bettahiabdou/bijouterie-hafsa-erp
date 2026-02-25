@@ -22,6 +22,7 @@ SCALEWAY_BASE_URL = os.getenv(
 # Model aliases for convenience
 MODELS = {
     'vision': 'pixtral-12b-2409',
+    'vision_large': 'mistral-small-3.2-24b-instruct-2506',
     'chat': 'gpt-oss-120b',
     'chat_large': 'qwen3-235b-a22b-instruct-2507',
     'embedding': 'bge-multilingual-gemma2',

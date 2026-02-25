@@ -1461,9 +1461,15 @@
             }
         }
 
+        function cleanNull(val) {
+            if (val === null || val === undefined) return '';
+            if (typeof val === 'string' && ['null', 'none', 'n/a', 'nan'].includes(val.toLowerCase().trim())) return '';
+            return val;
+        }
+
         function escapeHtml(text) {
             const div = document.createElement('div');
-            div.textContent = text || '';
+            div.textContent = cleanNull(text) || '';
             return div.innerHTML;
         }
 
@@ -1846,20 +1852,21 @@
                 }
                 const d = r.data;
 
-                if (d.client_name && !clientName) clientName = d.client_name;
-                if (d.client_phone && !clientPhone) clientPhone = d.client_phone;
-                if (d.client_city && !clientCity) clientCity = d.client_city;
-                if (d.receipt_number && !receiptNumber) receiptNumber = d.receipt_number;
-                if (d.total_amount && !totalAmount) totalAmount = d.total_amount;
-                if (d.discount_total && !discountTotal) discountTotal = d.discount_total;
-                if (d.payment_info && d.payment_info.amount_paid && !paymentInfo) paymentInfo = d.payment_info;
+                if (cleanNull(d.client_name) && !clientName) clientName = cleanNull(d.client_name);
+                if (cleanNull(d.client_phone) && !clientPhone) clientPhone = cleanNull(d.client_phone);
+                if (cleanNull(d.client_city) && !clientCity) clientCity = cleanNull(d.client_city);
+                if (cleanNull(d.receipt_number) && !receiptNumber) receiptNumber = cleanNull(d.receipt_number);
+                if (cleanNull(d.total_amount) && !totalAmount) totalAmount = cleanNull(d.total_amount);
+                if (cleanNull(d.discount_total) && !discountTotal) discountTotal = cleanNull(d.discount_total);
+                if (d.payment_info && cleanNull(d.payment_info.amount_paid) && !paymentInfo) paymentInfo = d.payment_info;
 
                 // Delivery info (from AMANA slips)
-                if (d.delivery_info && d.delivery_info.tracking_number && !deliveryInfo) {
+                if (d.delivery_info && cleanNull(d.delivery_info.tracking_number) && !deliveryInfo) {
                     deliveryInfo = d.delivery_info;
                 }
 
-                if (d.notes) notes.push(d.notes);
+                const noteText = cleanNull(d.notes);
+                if (noteText) notes.push(noteText);
 
                 if (d.items && d.items.length > 0) {
                     d.items.forEach(item => allItems.push(item));
@@ -1882,10 +1889,10 @@
                 html += '<div class="ai-result-label" style="color: var(--primary-700);"><i class="fas fa-shipping-fast mr-1"></i> Livraison AMANA</div>';
                 html += '<div class="ai-result-value">';
                 html += `<div style="font-size: var(--text-lg); font-weight: 700; color: var(--primary-700); letter-spacing: 1px;">📦 Suivi: ${escapeHtml(deliveryInfo.tracking_number)}</div>`;
-                if (deliveryInfo.bordereau_number) html += `<div>N° Bordereau: <strong>${escapeHtml(deliveryInfo.bordereau_number)}</strong></div>`;
-                if (deliveryInfo.cod_amount) html += `<div>Contre-remboursement: <strong>${deliveryInfo.cod_amount} DH</strong></div>`;
-                if (deliveryInfo.destination) html += `<div>Destination: ${escapeHtml(deliveryInfo.destination)}</div>`;
-                if (deliveryInfo.weight_package) html += `<div>Poids colis: ${escapeHtml(deliveryInfo.weight_package)}</div>`;
+                if (cleanNull(deliveryInfo.bordereau_number)) html += `<div>N° Bordereau: <strong>${escapeHtml(deliveryInfo.bordereau_number)}</strong></div>`;
+                if (cleanNull(deliveryInfo.cod_amount)) html += `<div>Contre-remboursement: <strong>${escapeHtml(String(deliveryInfo.cod_amount))} DH</strong></div>`;
+                if (cleanNull(deliveryInfo.destination)) html += `<div>Destination: ${escapeHtml(deliveryInfo.destination)}</div>`;
+                if (cleanNull(deliveryInfo.weight_package)) html += `<div>Poids colis: ${escapeHtml(deliveryInfo.weight_package)}</div>`;
                 html += '</div></div>';
 
                 // Auto-fill AMANA tracking number in the delivery form
@@ -1912,14 +1919,17 @@
                 html += '</tr></thead><tbody>';
 
                 allItems.forEach(item => {
-                    const metal = [item.metal_type, item.purity].filter(Boolean).join(' ');
+                    const metal = [cleanNull(item.metal_type), cleanNull(item.purity)].filter(Boolean).join(' ');
+                    const w = cleanNull(item.weight);
+                    const p = cleanNull(item.unit_price);
+                    const d = cleanNull(item.discount);
                     html += '<tr>';
                     html += `<td>${escapeHtml(item.description || '-')}</td>`;
                     html += `<td>${escapeHtml(item.category || '-')}</td>`;
                     html += `<td>${escapeHtml(metal || '-')}</td>`;
-                    html += `<td>${item.weight ? '<strong>' + item.weight + 'g</strong>' : '-'}</td>`;
-                    html += `<td>${item.unit_price ? '<strong>' + item.unit_price + ' DH</strong>' : '-'}</td>`;
-                    html += `<td>${item.discount ? item.discount + ' DH' : '-'}</td>`;
+                    html += `<td>${w ? '<strong>' + escapeHtml(String(w)) + 'g</strong>' : '-'}</td>`;
+                    html += `<td>${p ? '<strong>' + escapeHtml(String(p)) + ' DH</strong>' : '-'}</td>`;
+                    html += `<td>${d ? escapeHtml(String(d)) + ' DH' : '-'}</td>`;
                     html += '</tr>';
                 });
 
@@ -1927,14 +1937,14 @@
             }
 
             // Total & Payment & Discount
-            if (totalAmount || discountTotal || (paymentInfo && paymentInfo.amount_paid)) {
+            if (cleanNull(totalAmount) || cleanNull(discountTotal) || (paymentInfo && cleanNull(paymentInfo.amount_paid))) {
                 html += '<div class="ai-result-item">';
                 html += '<div class="ai-result-label">Paiement</div>';
                 html += '<div class="ai-result-value">';
-                if (totalAmount) html += `Total: <strong>${totalAmount} DH</strong> `;
-                if (discountTotal) html += `| Remise: <span style="color: var(--error-600);">-${discountTotal} DH</span> `;
-                if (paymentInfo && paymentInfo.amount_paid) html += `| Payé: ${paymentInfo.amount_paid} DH `;
-                if (paymentInfo && paymentInfo.payment_method) html += `(${paymentInfo.payment_method})`;
+                if (cleanNull(totalAmount)) html += `Total: <strong>${escapeHtml(String(totalAmount))} DH</strong> `;
+                if (cleanNull(discountTotal)) html += `| Remise: <span style="color: var(--error-600);">-${escapeHtml(String(discountTotal))} DH</span> `;
+                if (paymentInfo && cleanNull(paymentInfo.amount_paid)) html += `| Payé: ${escapeHtml(String(paymentInfo.amount_paid))} DH `;
+                if (paymentInfo && cleanNull(paymentInfo.payment_method)) html += `(${escapeHtml(paymentInfo.payment_method)})`;
                 html += '</div></div>';
             }
 
