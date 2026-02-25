@@ -6,6 +6,7 @@ Supports French, Arabic (MSA), and Moroccan Darija.
 """
 
 import json
+import re
 import logging
 from . import scaleway_client
 
@@ -80,7 +81,7 @@ Extrais les informations au format JSON strict:
         "payment_method": "espèces|chèque|virement|carte|null",
         "reference": "numéro de chèque ou ref"
     },
-    "notes": "autres infos utiles (adresse, patente, dates, etc.)"
+    "notes": "autres infos utiles du CLIENT (adresse client, ville, date de la vente). IGNORE l'en-tête du magasin Bijouterie Hafsa (adresse, patente, téléphones du magasin)"
 }
 
 Règles STRICTES:
@@ -110,31 +111,158 @@ def extract_sales_data(image_path_or_bytes):
     if not scaleway_client.is_configured():
         return {'error': 'Service IA non configuré. Configurez SCALEWAY_AI_API_KEY dans .env'}
 
+    last_error = None
+    last_raw = ''
+
+    # Try up to 2 times (retry on JSON parse failure)
+    for attempt in range(2):
+        try:
+            response_text = scaleway_client.vision_completion(
+                image_data=image_path_or_bytes,
+                prompt=SALES_EXTRACTION_PROMPT,
+                model=scaleway_client.MODELS['vision'],
+                temperature=0.1 if attempt == 0 else 0.2,
+                max_tokens=2048,
+            )
+
+            # Clean response text
+            clean_text = _extract_json_from_response(response_text)
+
+            # Try to parse, with repair if needed
+            data = _parse_json_robust(clean_text)
+            return _clean_sales_data(data)
+
+        except json.JSONDecodeError as e:
+            last_error = e
+            last_raw = response_text
+            logger.warning(f'JSON parse failed (attempt {attempt + 1}): {e}')
+            logger.warning(f'Raw response: {response_text[:500]}')
+            continue
+        except Exception as e:
+            logger.error(f'Sales OCR error: {e}')
+            return {'error': str(e)}
+
+    # All attempts failed
+    logger.error(f'All JSON parse attempts failed: {last_error}')
+    return {'error': f'Impossible de lire la réponse IA après 2 tentatives', 'raw_response': last_raw}
+
+
+def _extract_json_from_response(text):
+    """Extract JSON from AI response, handling markdown code blocks and extra text."""
+    clean = text.strip()
+
+    # Remove markdown code blocks
+    if clean.startswith('```'):
+        lines = clean.split('\n')
+        # Remove first line (```json or ```)
+        lines = lines[1:]
+        # Remove last line if it's ```
+        if lines and lines[-1].strip() == '```':
+            lines = lines[:-1]
+        clean = '\n'.join(lines).strip()
+
+    # If response has text before JSON, find the first {
+    if clean and clean[0] != '{':
+        brace_pos = clean.find('{')
+        if brace_pos >= 0:
+            clean = clean[brace_pos:]
+
+    # If response has text after JSON, find the last }
+    if clean:
+        last_brace = clean.rfind('}')
+        if last_brace >= 0:
+            clean = clean[:last_brace + 1]
+
+    return clean
+
+
+def _parse_json_robust(text):
+    """Parse JSON with automatic repair of common AI-generated issues."""
+    # Try direct parse first
     try:
-        response_text = scaleway_client.vision_completion(
-            image_data=image_path_or_bytes,
-            prompt=SALES_EXTRACTION_PROMPT,
-            model=scaleway_client.MODELS['vision'],
-            temperature=0.1,
-            max_tokens=2048,
-        )
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
 
-        # Try to parse JSON from response
-        clean_text = response_text.strip()
-        if clean_text.startswith('```'):
-            lines = clean_text.split('\n')
-            clean_text = '\n'.join(lines[1:-1] if lines[-1].strip() == '```' else lines[1:])
+    # Repair common issues
+    repaired = text
 
-        data = json.loads(clean_text)
-        return _clean_sales_data(data)
+    # Fix trailing commas before } or ]
+    repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
 
-    except json.JSONDecodeError as e:
-        logger.error(f'Failed to parse AI response as JSON: {e}')
-        logger.error(f'Raw response: {response_text[:500]}')
-        return {'error': f'Impossible de lire la réponse IA: {str(e)}', 'raw_response': response_text}
-    except Exception as e:
-        logger.error(f'Sales OCR error: {e}')
-        return {'error': str(e)}
+    # Fix unescaped newlines in strings (replace actual newlines inside strings with spaces)
+    repaired = _fix_newlines_in_strings(repaired)
+
+    # Try parsing repaired text
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+
+    # Last resort: try to close any unclosed strings/brackets
+    repaired = _close_unclosed_json(repaired)
+
+    return json.loads(repaired)
+
+
+def _fix_newlines_in_strings(text):
+    """Replace actual newlines inside JSON string values with spaces."""
+    result = []
+    in_string = False
+    escape_next = False
+
+    for char in text:
+        if escape_next:
+            result.append(char)
+            escape_next = False
+            continue
+
+        if char == '\\':
+            result.append(char)
+            escape_next = True
+            continue
+
+        if char == '"':
+            in_string = not in_string
+
+        if in_string and char == '\n':
+            result.append(' ')
+        else:
+            result.append(char)
+
+    return ''.join(result)
+
+
+def _close_unclosed_json(text):
+    """Try to close unclosed JSON structures."""
+    # Count open/close braces and brackets
+    open_braces = text.count('{') - text.count('}')
+    open_brackets = text.count('[') - text.count(']')
+
+    # Check if we're in an unclosed string
+    in_string = False
+    escape_next = False
+    for char in text:
+        if escape_next:
+            escape_next = False
+            continue
+        if char == '\\':
+            escape_next = True
+            continue
+        if char == '"':
+            in_string = not in_string
+
+    result = text
+
+    # Close unclosed string
+    if in_string:
+        result += '"'
+
+    # Close brackets and braces
+    result += ']' * max(0, open_brackets)
+    result += '}' * max(0, open_braces)
+
+    return result
 
 
 def _clean_sales_data(data):
@@ -163,7 +291,7 @@ def _clean_sales_data(data):
             'payment_method': (data.get('payment_info') or {}).get('payment_method') or '',
             'reference': (data.get('payment_info') or {}).get('reference') or '',
         },
-        'notes': data.get('notes') or '',
+        'notes': _clean_notes(data.get('notes') or ''),
     }
 
     for item in data.get('items', []):
@@ -180,6 +308,31 @@ def _clean_sales_data(data):
         cleaned['items'].append(cleaned_item)
 
     return cleaned
+
+
+def _clean_notes(notes):
+    """Remove store's own header info from notes (not useful)."""
+    if not notes:
+        return ''
+    # Remove Bijouterie Hafsa store info that the AI sometimes picks up from receipt headers
+    store_patterns = [
+        r'Bijouterie\s+Hafsa',
+        r'181\s*Av\.?\s*Ancien\s*Mellah',
+        r'Patente\s*:\s*\d+',
+        r'Meknes',
+        r'06\s*74\s*35\s*88\s*33',
+        r'06\s*63\s*76\s*38\s*42',
+        r'06\s*56\s*20\s*40\s*70',
+    ]
+    cleaned = notes
+    for pattern in store_patterns:
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+    # Clean up leftover separators and whitespace
+    cleaned = re.sub(r'[,\s]*Tél\s*:\s*[,\s]*$', '', cleaned)
+    cleaned = re.sub(r'\s*,\s*,\s*', ', ', cleaned)
+    cleaned = re.sub(r'^\s*[,\-\s]+', '', cleaned)
+    cleaned = re.sub(r'[,\-\s]+\s*$', '', cleaned)
+    return cleaned.strip()
 
 
 def _to_decimal(value):
