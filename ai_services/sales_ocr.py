@@ -67,45 +67,45 @@ Si une information n'est pas visible, mets null. NE DEVINE PAS."""
 
 RECEIPT_PROMPT = """Tu extrais les données d'un REÇU/FACTURE DE BIJOUTERIE.
 
+RÈGLE ABSOLUE — ANTI-HALLUCINATION:
+- Extrait UNIQUEMENT les lignes de produits RÉELLEMENT ÉCRITES sur le papier
+- Compte le nombre de lignes de produits sur le reçu. Si tu vois 1 produit, retourne 1 item. Si tu vois 2 lignes, retourne 2 items.
+- NE FABRIQUE PAS de données. Inventer des items est INTERDIT.
+- Chaque item DOIT avoir un poids et prix DIFFÉRENT, lus directement sur le reçu
+- Si tous tes items ont le même poids ou le même prix, tu as probablement mal lu — relis le reçu
+
 C'est un papier (souvent JAUNE) avec une liste de produits bijoux vendus.
 
 Cherche:
-- **Numéro de reçu**: nombre imprimé en ROUGE sur le papier (ex: 0020955). C'est le numéro le plus visible, souvent en haut.
-- **Produits bijoux**: chaque ligne avec description, poids, prix
-- **Poids en grammes**: nombre décimal (ex: 3.5g, 4.2gr) — TRES IMPORTANT
-- **Prix**: en DH
+- **Numéro de reçu**: nombre imprimé en ROUGE sur le papier (ex: 0020955). Copie TOUS les chiffres.
+- **Produits bijoux**: UNIQUEMENT les lignes réellement écrites sur le papier
+- **Poids en grammes**: nombre décimal lu sur le reçu (ex: 3.5g, 4.2gr)
+- **Prix**: en DH, lu sur le reçu
 - **Remise/تخفيض**: réduction appliquée
 - **Total**: prix final (الباقي = reste/final)
 - **Client**: nom, téléphone, ville (si mentionné)
 
-TRADUCTIONS OBLIGATOIRES (arabe manuscrit → français):
-خاتم → Bague | سلسلة → Chaîne | حلقات → Boucles d'oreilles
-سوار → Bracelet | قلادة → Collier | دبلة → Alliance
-كورسيج → Corsage/Broche | خلخال → Chevillère | طقم → Ensemble
-ذهب → Or | فضة → Argent | عيار → Carats/Pureté
-
-CRITICAL: Toutes les descriptions DOIVENT être en FRANÇAIS.
-Si le texte est en arabe, TRADUIS-le. Exemple: "خاتم ذهب 18" → "Bague en or 18K"
+Si le texte est en arabe, traduis en français (ex: خاتم=bague, سلسلة=chaîne, سوار=bracelet, حلقات=boucles d'oreilles, قلادة=collier, دبلة=alliance).
 
 ATTENTION aux caractères: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G
 
 Retourne ce JSON:
 {
     "photo_type": "receipt",
-    "receipt_number": "numéro imprimé en ROUGE (ex: 0020955)",
+    "receipt_number": "numéro imprimé en ROUGE — copie TOUS les chiffres",
     "client_name": "nom du client (si visible)",
     "client_phone": "téléphone 10 chiffres (si visible)",
     "client_city": "ville (si visible)",
     "delivery_info": {"tracking_number": null, "bordereau_number": null, "carrier": null, "cod_amount": null, "destination": null, "weight_package": null},
     "items": [
         {
-            "description": "description EN FRANÇAIS (ex: Bague en or 18K)",
-            "category": "bague|collier|bracelet|boucle_oreille|chaine|pendentif|ensemble|montre|corsage|alliance|chevillere|autre",
+            "description": "description en français de CE produit lu sur le reçu",
+            "category": "catégorie du bijou",
             "metal_type": "or|argent|plaqué_or|acier|autre",
             "purity": "18K|21K|24K|14K|9K|925",
-            "weight_grams": "poids en grammes (nombre décimal)",
+            "weight_grams": "poids en grammes lu sur le reçu",
             "quantity": 1,
-            "unit_price": "prix en DH (nombre)",
+            "unit_price": "prix en DH lu sur le reçu",
             "discount": "remise en DH"
         }
     ],
@@ -119,6 +119,7 @@ Retourne ce JSON:
     "notes": "autres infos utiles du CLIENT uniquement. IGNORE l'en-tête du magasin."
 }
 
+RAPPEL: retourne UNIQUEMENT les produits réellement écrits sur le reçu. Pas plus, pas moins.
 Si une information n'est pas visible, mets null. NE DEVINE PAS."""
 
 PAYMENT_PROMPT = """Tu extrais les données d'un REÇU DE PAIEMENT / VERSEMENT.
@@ -158,17 +159,15 @@ Si une information n'est pas visible, mets null. NE DEVINE PAS."""
 
 NOTE_PROMPT = """Tu extrais les données d'une NOTE MANUSCRITE liée à une vente de bijouterie au Maroc.
 
+RÈGLE ABSOLUE: Extrait UNIQUEMENT ce qui est réellement écrit. NE FABRIQUE PAS de données.
+
 Cherche toute information utile:
 - Nom du client, téléphone, ville
-- Produits mentionnés (bijoux: bagues, colliers, bracelets, etc.)
+- Produits mentionnés (UNIQUEMENT ceux écrits sur la note)
 - Montants, poids en grammes
 - Instructions de livraison
 
-TRADUCTIONS OBLIGATOIRES (arabe → français):
-خاتم → Bague | سلسلة → Chaîne | حلقات → Boucles d'oreilles
-سوار → Bracelet | قلادة → Collier | دبلة → Alliance
-
-Toutes les descriptions DOIVENT être en FRANÇAIS.
+Si le texte est en arabe, traduis en français (ex: خاتم=bague, سلسلة=chaîne).
 
 Retourne ce JSON:
 {
@@ -180,8 +179,8 @@ Retourne ce JSON:
     "delivery_info": {"tracking_number": null, "bordereau_number": null, "carrier": null, "cod_amount": null, "destination": null, "weight_package": null},
     "items": [
         {
-            "description": "description EN FRANÇAIS",
-            "category": "bague|collier|bracelet|boucle_oreille|chaine|pendentif|ensemble|autre",
+            "description": "description en français de CE produit lu sur la note",
+            "category": "catégorie du bijou",
             "metal_type": "or|argent|plaqué_or|acier|autre",
             "purity": "18K|21K|24K|14K|9K|925",
             "weight_grams": "poids en grammes",
