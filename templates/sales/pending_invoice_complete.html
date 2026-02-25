@@ -1832,6 +1832,7 @@
             let clientName = '';
             let clientPhone = '';
             let clientCity = '';
+            let receiptNumber = '';
             let totalAmount = null;
             let discountTotal = null;
             let paymentInfo = null;
@@ -1848,6 +1849,7 @@
                 if (d.client_name && !clientName) clientName = d.client_name;
                 if (d.client_phone && !clientPhone) clientPhone = d.client_phone;
                 if (d.client_city && !clientCity) clientCity = d.client_city;
+                if (d.receipt_number && !receiptNumber) receiptNumber = d.receipt_number;
                 if (d.total_amount && !totalAmount) totalAmount = d.total_amount;
                 if (d.discount_total && !discountTotal) discountTotal = d.discount_total;
                 if (d.payment_info && d.payment_info.amount_paid && !paymentInfo) paymentInfo = d.payment_info;
@@ -1866,13 +1868,21 @@
 
             let html = '';
 
-            // AMANA / Delivery info (shown first, most important)
+            // Receipt number (red number on yellow paper)
+            if (receiptNumber) {
+                html += '<div class="ai-result-item">';
+                html += '<div class="ai-result-label"><i class="fas fa-receipt mr-1"></i> N° Reçu</div>';
+                html += `<div class="ai-result-value" style="font-size: var(--text-lg); font-weight: 700; color: var(--error-600);">${escapeHtml(receiptNumber)}</div>`;
+                html += '</div>';
+            }
+
+            // AMANA / Delivery info
             if (deliveryInfo && deliveryInfo.tracking_number) {
                 html += '<div class="ai-result-item" style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-lg); padding: var(--space-3);">';
-                html += '<div class="ai-result-label" style="color: var(--primary-700);"><i class="fas fa-shipping-fast mr-1"></i> Livraison détectée</div>';
+                html += '<div class="ai-result-label" style="color: var(--primary-700);"><i class="fas fa-shipping-fast mr-1"></i> Livraison AMANA</div>';
                 html += '<div class="ai-result-value">';
-                html += `<div style="font-size: var(--text-lg); font-weight: 700; color: var(--primary-700); letter-spacing: 1px;">📦 ${escapeHtml(deliveryInfo.tracking_number)}</div>`;
-                if (deliveryInfo.carrier) html += `<div>Transporteur: <strong>${escapeHtml(deliveryInfo.carrier)}</strong></div>`;
+                html += `<div style="font-size: var(--text-lg); font-weight: 700; color: var(--primary-700); letter-spacing: 1px;">📦 Suivi: ${escapeHtml(deliveryInfo.tracking_number)}</div>`;
+                if (deliveryInfo.bordereau_number) html += `<div>N° Bordereau: <strong>${escapeHtml(deliveryInfo.bordereau_number)}</strong></div>`;
                 if (deliveryInfo.cod_amount) html += `<div>Contre-remboursement: <strong>${deliveryInfo.cod_amount} DH</strong></div>`;
                 if (deliveryInfo.destination) html += `<div>Destination: ${escapeHtml(deliveryInfo.destination)}</div>`;
                 if (deliveryInfo.weight_package) html += `<div>Poids colis: ${escapeHtml(deliveryInfo.weight_package)}</div>`;
