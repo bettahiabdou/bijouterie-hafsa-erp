@@ -1831,8 +1831,11 @@
             let allItems = [];
             let clientName = '';
             let clientPhone = '';
+            let clientCity = '';
             let totalAmount = null;
+            let discountTotal = null;
             let paymentInfo = null;
+            let deliveryInfo = null;
             let notes = [];
 
             aiAllResults.forEach(r => {
@@ -1844,8 +1847,16 @@
 
                 if (d.client_name && !clientName) clientName = d.client_name;
                 if (d.client_phone && !clientPhone) clientPhone = d.client_phone;
+                if (d.client_city && !clientCity) clientCity = d.client_city;
                 if (d.total_amount && !totalAmount) totalAmount = d.total_amount;
+                if (d.discount_total && !discountTotal) discountTotal = d.discount_total;
                 if (d.payment_info && d.payment_info.amount_paid && !paymentInfo) paymentInfo = d.payment_info;
+
+                // Delivery info (from AMANA slips)
+                if (d.delivery_info && d.delivery_info.tracking_number && !deliveryInfo) {
+                    deliveryInfo = d.delivery_info;
+                }
+
                 if (d.notes) notes.push(d.notes);
 
                 if (d.items && d.items.length > 0) {
@@ -1855,13 +1866,30 @@
 
             let html = '';
 
+            // AMANA / Delivery info (shown first, most important)
+            if (deliveryInfo && deliveryInfo.tracking_number) {
+                html += '<div class="ai-result-item" style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-lg); padding: var(--space-3);">';
+                html += '<div class="ai-result-label" style="color: var(--primary-700);"><i class="fas fa-shipping-fast mr-1"></i> Livraison détectée</div>';
+                html += '<div class="ai-result-value">';
+                html += `<div style="font-size: var(--text-lg); font-weight: 700; color: var(--primary-700); letter-spacing: 1px;">📦 ${escapeHtml(deliveryInfo.tracking_number)}</div>`;
+                if (deliveryInfo.carrier) html += `<div>Transporteur: <strong>${escapeHtml(deliveryInfo.carrier)}</strong></div>`;
+                if (deliveryInfo.cod_amount) html += `<div>Contre-remboursement: <strong>${deliveryInfo.cod_amount} DH</strong></div>`;
+                if (deliveryInfo.destination) html += `<div>Destination: ${escapeHtml(deliveryInfo.destination)}</div>`;
+                if (deliveryInfo.weight_package) html += `<div>Poids colis: ${escapeHtml(deliveryInfo.weight_package)}</div>`;
+                html += '</div></div>';
+
+                // Auto-fill AMANA tracking number in the delivery form
+                _autoFillDelivery(deliveryInfo);
+            }
+
             // Client info
-            if (clientName || clientPhone) {
+            if (clientName || clientPhone || clientCity) {
                 html += '<div class="ai-result-item">';
                 html += '<div class="ai-result-label">Client détecté</div>';
                 html += '<div class="ai-result-value">';
                 if (clientName) html += `<i class="fas fa-user mr-1"></i> ${escapeHtml(clientName)}`;
                 if (clientPhone) html += ` <span style="color: var(--neutral-500);">${escapeHtml(clientPhone)}</span>`;
+                if (clientCity) html += ` <span style="color: var(--neutral-500);"><i class="fas fa-map-marker-alt ml-2 mr-1"></i>${escapeHtml(clientCity)}</span>`;
                 html += '</div></div>';
             }
 
@@ -1870,7 +1898,7 @@
                 html += '<div class="ai-result-item">';
                 html += '<div class="ai-result-label">Articles détectés (' + allItems.length + ')</div>';
                 html += '<table class="ai-items-table"><thead><tr>';
-                html += '<th>Description</th><th>Catégorie</th><th>Métal</th><th>Poids</th><th>Prix</th>';
+                html += '<th>Description</th><th>Catégorie</th><th>Métal</th><th>Poids</th><th>Prix</th><th>Remise</th>';
                 html += '</tr></thead><tbody>';
 
                 allItems.forEach(item => {
@@ -1879,20 +1907,22 @@
                     html += `<td>${escapeHtml(item.description || '-')}</td>`;
                     html += `<td>${escapeHtml(item.category || '-')}</td>`;
                     html += `<td>${escapeHtml(metal || '-')}</td>`;
-                    html += `<td>${item.weight ? item.weight + 'g' : '-'}</td>`;
-                    html += `<td>${item.unit_price ? item.unit_price + ' DH' : '-'}</td>`;
+                    html += `<td>${item.weight ? '<strong>' + item.weight + 'g</strong>' : '-'}</td>`;
+                    html += `<td>${item.unit_price ? '<strong>' + item.unit_price + ' DH</strong>' : '-'}</td>`;
+                    html += `<td>${item.discount ? item.discount + ' DH' : '-'}</td>`;
                     html += '</tr>';
                 });
 
                 html += '</tbody></table></div>';
             }
 
-            // Total & Payment
-            if (totalAmount || (paymentInfo && paymentInfo.amount_paid)) {
+            // Total & Payment & Discount
+            if (totalAmount || discountTotal || (paymentInfo && paymentInfo.amount_paid)) {
                 html += '<div class="ai-result-item">';
                 html += '<div class="ai-result-label">Paiement</div>';
                 html += '<div class="ai-result-value">';
                 if (totalAmount) html += `Total: <strong>${totalAmount} DH</strong> `;
+                if (discountTotal) html += `| Remise: <span style="color: var(--error-600);">-${discountTotal} DH</span> `;
                 if (paymentInfo && paymentInfo.amount_paid) html += `| Payé: ${paymentInfo.amount_paid} DH `;
                 if (paymentInfo && paymentInfo.payment_method) html += `(${paymentInfo.payment_method})`;
                 html += '</div></div>';
@@ -1914,6 +1944,24 @@
             content.innerHTML = html;
             panel.style.display = 'block';
             panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function _autoFillDelivery(deliveryInfo) {
+            // Auto-select AMANA delivery type
+            const amanaRadio = document.querySelector('input[name="delivery_method_type"][value="amana"]');
+            if (amanaRadio && deliveryInfo.carrier && deliveryInfo.carrier.toLowerCase().includes('amana')) {
+                amanaRadio.checked = true;
+                toggleDeliveryFields();
+            }
+
+            // Auto-fill tracking number
+            const trackingInput = document.getElementById('tracking-number');
+            if (trackingInput && deliveryInfo.tracking_number) {
+                trackingInput.value = deliveryInfo.tracking_number;
+                // Also update hidden field
+                const hiddenTracking = document.getElementById('tracking-number-hidden');
+                if (hiddenTracking) hiddenTracking.value = deliveryInfo.tracking_number;
+            }
         }
     </script>
 {% endblock %}
