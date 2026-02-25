@@ -3764,3 +3764,35 @@ def delivery_update_from_client(request, reference):
         'status_display': delivery.get_status_display(),
         'message': f'Statut mis à jour: {delivery.get_status_display()}'
     })
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def ai_extract_sales_photo(request):
+    """Extract data from a sales invoice photo using AI vision."""
+    from .models import InvoicePhoto
+
+    try:
+        photo_id = request.POST.get('photo_id')
+        if not photo_id:
+            return JsonResponse({'success': False, 'error': 'Photo ID requis'}, status=400)
+
+        photo = get_object_or_404(InvoicePhoto, id=photo_id)
+
+        # Read the image file
+        if not photo.image or not photo.image.path:
+            return JsonResponse({'success': False, 'error': 'Photo introuvable'}, status=404)
+
+        from ai_services.sales_ocr import extract_sales_data
+        result = extract_sales_data(photo.image.path)
+
+        if 'error' in result:
+            return JsonResponse({'success': False, 'error': result['error']}, status=400)
+
+        return JsonResponse({'success': True, 'data': result})
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f'AI extract sales error: {str(e)}')
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

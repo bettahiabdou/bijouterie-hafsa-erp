@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/payment-methods/', views.get_payment_methods, name='get_payment_methods'),
     path('api/search-products/', views.search_products_api, name='search_products_api'),
     path('api/quick-create-client/', views.quick_create_client, name='quick_create_client'),
+    path('api/ai-extract-sales/', views.ai_extract_sales_photo, name='ai_extract_sales'),
 
     # Quote to Invoice conversion
     path('quotes/<int:quote_id>/to-invoice/', views.quote_to_invoice, name='quote_to_invoice'),

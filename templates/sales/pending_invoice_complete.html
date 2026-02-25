@@ -57,13 +57,31 @@
                 <h3><i class="fas fa-images mr-2"></i> Photos ({{ photos.count }})</h3>
             </div>
             <div class="card-body">
+                {% if photos.count > 0 %}
+                <div style="margin-bottom: var(--space-3);">
+                    <button type="button" class="btn btn-primary btn-block" id="ai-extract-all-btn" onclick="aiExtractAllPhotos()">
+                        <i class="fas fa-robot"></i>
+                        <span>Extraire les données (IA)</span>
+                    </button>
+                    <div id="ai-progress" style="display: none; margin-top: var(--space-2);">
+                        <div style="background: var(--neutral-200); border-radius: var(--radius-md); overflow: hidden; height: 6px;">
+                            <div id="ai-progress-bar" style="background: var(--primary-500); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        </div>
+                        <p id="ai-progress-text" style="font-size: var(--text-sm); color: var(--neutral-500); margin-top: 4px; text-align: center;"></p>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="photos-grid">
                     {% for photo in photos %}
-                        <div class="photo-item" onclick="openPhotoModal('{{ photo.image.url }}')">
-                            <img src="{{ photo.image.url }}" alt="Photo {{ forloop.counter }}">
-                            <div class="photo-overlay">
-                                <i class="fas fa-expand"></i>
+                        <div class="photo-item-wrapper" id="photo-wrapper-{{ photo.id }}">
+                            <div class="photo-item" onclick="openPhotoModal('{{ photo.image.url }}')">
+                                <img src="{{ photo.image.url }}" alt="Photo {{ forloop.counter }}">
+                                <div class="photo-overlay">
+                                    <i class="fas fa-expand"></i>
+                                </div>
                             </div>
+                            <div class="photo-ai-status" id="photo-status-{{ photo.id }}"></div>
                         </div>
                     {% empty %}
                         <div class="no-photos-large">
@@ -71,6 +89,16 @@
                             <p>Aucune photo attachée</p>
                         </div>
                     {% endfor %}
+                </div>
+
+                <!-- AI Results Panel -->
+                <div id="ai-results-panel" style="display: none; margin-top: var(--space-4);">
+                    <div style="border: 2px solid var(--primary-300); border-radius: var(--radius-lg); background: var(--primary-50); padding: var(--space-4);">
+                        <h4 style="color: var(--primary-700); margin: 0 0 var(--space-3) 0;">
+                            <i class="fas fa-robot mr-2"></i> Résultats IA
+                        </h4>
+                        <div id="ai-results-content"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1033,6 +1061,102 @@
             background: var(--primary-50);
         }
 
+        /* AI Extract Styles */
+        .photo-item-wrapper {
+            position: relative;
+        }
+
+        .photo-ai-status {
+            position: absolute;
+            top: var(--space-2);
+            right: var(--space-2);
+            z-index: 10;
+        }
+
+        .photo-ai-status .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: var(--radius-md);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .photo-ai-status .ai-badge.processing {
+            background: rgba(255, 165, 0, 0.9);
+            color: white;
+        }
+
+        .photo-ai-status .ai-badge.done {
+            background: rgba(34, 197, 94, 0.9);
+            color: white;
+        }
+
+        .photo-ai-status .ai-badge.error {
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+        }
+
+        .ai-result-item {
+            background: white;
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            padding: var(--space-3);
+            margin-bottom: var(--space-2);
+        }
+
+        .ai-result-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .ai-result-label {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+
+        .ai-result-value {
+            font-weight: var(--font-semibold);
+            color: var(--neutral-800);
+        }
+
+        .ai-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--text-sm);
+        }
+
+        .ai-items-table th {
+            background: var(--neutral-100);
+            padding: var(--space-2) var(--space-3);
+            text-align: left;
+            font-weight: var(--font-semibold);
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            color: var(--neutral-600);
+        }
+
+        .ai-items-table td {
+            padding: var(--space-2) var(--space-3);
+            border-bottom: 1px solid var(--neutral-100);
+        }
+
+        .ai-items-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        @keyframes pulse-ai {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .ai-processing {
+            animation: pulse-ai 1.5s infinite;
+        }
+
         @media (max-width: 1024px) {
             .completion-layout {
                 grid-template-columns: 1fr;
@@ -1618,6 +1742,178 @@
                 alert('Erreur réseau. Veuillez réessayer.');
                 console.error(err);
             });
+        }
+
+        // ===== AI Photo Extraction =====
+        const photoIds = [{% for photo in photos %}{{ photo.id }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+        let aiAllResults = [];
+
+        async function aiExtractAllPhotos() {
+            if (photoIds.length === 0) return;
+
+            const btn = document.getElementById('ai-extract-all-btn');
+            const progress = document.getElementById('ai-progress');
+            const progressBar = document.getElementById('ai-progress-bar');
+            const progressText = document.getElementById('ai-progress-text');
+
+            // Disable button and show progress
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Analyse en cours...</span>';
+            btn.classList.add('ai-processing');
+            progress.style.display = 'block';
+            aiAllResults = [];
+
+            for (let i = 0; i < photoIds.length; i++) {
+                const photoId = photoIds[i];
+                const pct = Math.round(((i) / photoIds.length) * 100);
+                progressBar.style.width = pct + '%';
+                progressText.textContent = `Photo ${i + 1} / ${photoIds.length} en cours...`;
+
+                // Show processing badge on photo
+                const statusEl = document.getElementById(`photo-status-${photoId}`);
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="ai-badge processing"><i class="fas fa-spinner fa-spin"></i> IA...</span>';
+                }
+
+                try {
+                    const formData = new FormData();
+                    formData.append('photo_id', photoId);
+
+                    const response = await fetch('{% url "sales:ai_extract_sales" %}', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        aiAllResults.push({ photoId: photoId, data: result.data });
+                        if (statusEl) {
+                            statusEl.innerHTML = '<span class="ai-badge done"><i class="fas fa-check"></i> OK</span>';
+                        }
+                    } else {
+                        aiAllResults.push({ photoId: photoId, error: result.error });
+                        if (statusEl) {
+                            statusEl.innerHTML = '<span class="ai-badge error"><i class="fas fa-times"></i> Erreur</span>';
+                        }
+                    }
+                } catch (err) {
+                    console.error('AI extract error for photo', photoId, err);
+                    aiAllResults.push({ photoId: photoId, error: err.message });
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span class="ai-badge error"><i class="fas fa-times"></i> Erreur</span>';
+                    }
+                }
+            }
+
+            // Complete
+            progressBar.style.width = '100%';
+            progressText.textContent = 'Extraction terminée!';
+            btn.disabled = false;
+            btn.classList.remove('ai-processing');
+            btn.innerHTML = '<i class="fas fa-robot"></i> <span>Relancer l\'extraction (IA)</span>';
+
+            // Show combined results
+            showAiResults();
+        }
+
+        function showAiResults() {
+            const panel = document.getElementById('ai-results-panel');
+            const content = document.getElementById('ai-results-content');
+
+            if (aiAllResults.length === 0) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            // Collect all items and info from all photos
+            let allItems = [];
+            let clientName = '';
+            let clientPhone = '';
+            let totalAmount = null;
+            let paymentInfo = null;
+            let notes = [];
+
+            aiAllResults.forEach(r => {
+                if (r.error) {
+                    notes.push(`Photo ${r.photoId}: Erreur - ${r.error}`);
+                    return;
+                }
+                const d = r.data;
+
+                if (d.client_name && !clientName) clientName = d.client_name;
+                if (d.client_phone && !clientPhone) clientPhone = d.client_phone;
+                if (d.total_amount && !totalAmount) totalAmount = d.total_amount;
+                if (d.payment_info && d.payment_info.amount_paid && !paymentInfo) paymentInfo = d.payment_info;
+                if (d.notes) notes.push(d.notes);
+
+                if (d.items && d.items.length > 0) {
+                    d.items.forEach(item => allItems.push(item));
+                }
+            });
+
+            let html = '';
+
+            // Client info
+            if (clientName || clientPhone) {
+                html += '<div class="ai-result-item">';
+                html += '<div class="ai-result-label">Client détecté</div>';
+                html += '<div class="ai-result-value">';
+                if (clientName) html += `<i class="fas fa-user mr-1"></i> ${escapeHtml(clientName)}`;
+                if (clientPhone) html += ` <span style="color: var(--neutral-500);">${escapeHtml(clientPhone)}</span>`;
+                html += '</div></div>';
+            }
+
+            // Items table
+            if (allItems.length > 0) {
+                html += '<div class="ai-result-item">';
+                html += '<div class="ai-result-label">Articles détectés (' + allItems.length + ')</div>';
+                html += '<table class="ai-items-table"><thead><tr>';
+                html += '<th>Description</th><th>Catégorie</th><th>Métal</th><th>Poids</th><th>Prix</th>';
+                html += '</tr></thead><tbody>';
+
+                allItems.forEach(item => {
+                    const metal = [item.metal_type, item.purity].filter(Boolean).join(' ');
+                    html += '<tr>';
+                    html += `<td>${escapeHtml(item.description || '-')}</td>`;
+                    html += `<td>${escapeHtml(item.category || '-')}</td>`;
+                    html += `<td>${escapeHtml(metal || '-')}</td>`;
+                    html += `<td>${item.weight ? item.weight + 'g' : '-'}</td>`;
+                    html += `<td>${item.unit_price ? item.unit_price + ' DH' : '-'}</td>`;
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table></div>';
+            }
+
+            // Total & Payment
+            if (totalAmount || (paymentInfo && paymentInfo.amount_paid)) {
+                html += '<div class="ai-result-item">';
+                html += '<div class="ai-result-label">Paiement</div>';
+                html += '<div class="ai-result-value">';
+                if (totalAmount) html += `Total: <strong>${totalAmount} DH</strong> `;
+                if (paymentInfo && paymentInfo.amount_paid) html += `| Payé: ${paymentInfo.amount_paid} DH `;
+                if (paymentInfo && paymentInfo.payment_method) html += `(${paymentInfo.payment_method})`;
+                html += '</div></div>';
+            }
+
+            // Notes
+            if (notes.length > 0) {
+                html += '<div class="ai-result-item">';
+                html += '<div class="ai-result-label">Notes</div>';
+                html += '<div class="ai-result-value" style="font-size: var(--text-sm); color: var(--neutral-600);">';
+                notes.forEach(n => { html += `<p style="margin: 2px 0;">${escapeHtml(n)}</p>`; });
+                html += '</div></div>';
+            }
+
+            if (!html) {
+                html = '<p style="color: var(--neutral-500); text-align: center;">Aucune donnée extraite des photos.</p>';
+            }
+
+            content.innerHTML = html;
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     </script>
 {% endblock %}
