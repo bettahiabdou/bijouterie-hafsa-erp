@@ -228,6 +228,10 @@
                             {% if photo.caption %}<p class="pi-photo-caption">{{ photo.caption }}</p>{% endif %}
                             <div class="pi-photo-meta">
                                 <small>{{ photo.uploaded_at|date:"d/m/Y H:i" }}</small>
+                                <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px; color: var(--primary-500);"
+                                        onclick="aiExtractInvoice({{ photo.id }})" title="Extraire avec IA">
+                                    <i class="fas fa-robot"></i>
+                                </button>
                                 <form method="post" style="display:inline;" onsubmit="return confirm('Supprimer cette photo ?')">
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="delete_photo">
@@ -1896,6 +1900,59 @@
             } else {
                 refGroup.style.display = 'block';
             }
+        }
+
+        // ===== AI INVOICE OCR =====
+        function aiExtractInvoice(photoId) {
+            var btn = event.target.closest('button');
+            var origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            var formData = new FormData();
+            formData.append('photo_id', photoId);
+
+            fetch('{% url "purchases:ai_extract_invoice" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                if (resp.success) {
+                    showAiResults(resp.data);
+                } else {
+                    alert('Erreur IA: ' + (resp.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(function(err) { console.error(err); alert('Erreur de connexion'); })
+            .finally(function() {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            });
+        }
+
+        function showAiResults(data) {
+            var msg = '🤖 Données extraites par IA:\n\n';
+            if (data.supplier_name) msg += 'Fournisseur: ' + data.supplier_name + '\n';
+            if (data.date) msg += 'Date: ' + data.date + '\n';
+            if (data.invoice_number) msg += 'N° Facture: ' + data.invoice_number + '\n';
+            if (data.total_amount) msg += 'Total: ' + data.total_amount + ' DH\n';
+
+            if (data.items && data.items.length > 0) {
+                msg += '\nArticles:\n';
+                data.items.forEach(function(item, i) {
+                    msg += (i+1) + '. ' + item.description;
+                    if (item.weight) msg += ' | ' + item.weight + 'g';
+                    if (item.total_price) msg += ' | ' + item.total_price + ' DH';
+                    msg += '\n';
+                });
+            }
+
+            if (data.notes) msg += '\nNotes: ' + data.notes;
+
+            alert(msg);
         }
     </script>
 {% endblock %}

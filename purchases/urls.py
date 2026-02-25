@@ -25,4 +25,7 @@ urlpatterns = [
     # Supplier Payment editing (AJAX)
     path('api/update-supplier-payment/', views.update_supplier_payment, name='update_supplier_payment'),
     path('api/delete-supplier-payment/', views.delete_supplier_payment, name='delete_supplier_payment'),
+
+    # AI Invoice OCR
+    path('api/ai-extract-invoice/', views.ai_extract_invoice, name='ai_extract_invoice'),
 ]

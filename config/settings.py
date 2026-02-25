@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'telegram_bot.apps.TelegramBotConfig',
     'deposits.apps.DepositsConfig',
     'stock_storage.apps.StockStorageConfig',
+    'ai_services.apps.AiServicesConfig',
 ]
 
 MIDDLEWARE = [

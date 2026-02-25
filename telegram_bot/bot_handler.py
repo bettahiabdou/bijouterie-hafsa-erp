@@ -981,6 +981,83 @@ class TelegramBotHandler:
             "(produit, facture manuscrite, paiement...)"
         )
 
+    # ===== AI HANDLERS =====
+
+    async def handle_ai_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle non-command text messages with AI"""
+        chat_id = str(update.effective_chat.id)
+        user = await get_verified_user(chat_id)
+
+        if not user:
+            await update.message.reply_text("Vous n'êtes pas enregistré. Utilisez /start.")
+            return
+
+        # Skip if user has an active photo session
+        session = await get_active_session(user)
+        if session:
+            # Don't intercept — user might be sending captions during photo collection
+            return
+
+        text = update.message.text.strip()
+        if not text:
+            return
+
+        # Send "typing" indicator
+        await update.message.chat.send_action('typing')
+
+        # Process with AI
+        try:
+            ai_response = await sync_to_async(_process_ai_query)(text)
+            await update.message.reply_text(ai_response)
+        except Exception as e:
+            logger.error(f"AI text handler error: {e}")
+            await update.message.reply_text(
+                "⚠️ Service IA temporairement indisponible. "
+                "Utilisez les commandes: /vente /mes_ventes /aide"
+            )
+
+    async def handle_ai_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle voice messages: Whisper transcription → AI query"""
+        chat_id = str(update.effective_chat.id)
+        user = await get_verified_user(chat_id)
+
+        if not user:
+            await update.message.reply_text("Vous n'êtes pas enregistré. Utilisez /start.")
+            return
+
+        # Send "typing" indicator
+        await update.message.chat.send_action('typing')
+
+        try:
+            # Download voice file
+            voice = update.message.voice or update.message.audio
+            if not voice:
+                return
+
+            file = await context.bot.get_file(voice.file_id)
+            voice_bytes = await file.download_as_bytearray()
+
+            # Transcribe with Whisper
+            transcribed_text = await sync_to_async(_transcribe_audio)(bytes(voice_bytes))
+
+            if not transcribed_text or not transcribed_text.strip():
+                await update.message.reply_text("🎤 Je n'ai pas pu comprendre l'audio. Réessayez.")
+                return
+
+            # Show what was transcribed
+            await update.message.reply_text(f"🎤 \"{transcribed_text}\"")
+
+            # Process with AI
+            await update.message.chat.send_action('typing')
+            ai_response = await sync_to_async(_process_ai_query)(transcribed_text)
+            await update.message.reply_text(ai_response)
+
+        except Exception as e:
+            logger.error(f"AI voice handler error: {e}")
+            await update.message.reply_text(
+                "⚠️ Service vocal IA temporairement indisponible."
+            )
+
     def setup_handlers(self, application):
         """Set up all command handlers"""
         application.add_handler(CommandHandler("start", self.start_command))
@@ -991,6 +1068,9 @@ class TelegramBotHandler:
         application.add_handler(CommandHandler("aide", self.aide_command))
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
         application.add_handler(CallbackQueryHandler(self.callback_handler))
+        # AI handlers — must be AFTER command/photo handlers (lower priority)
+        application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, self.handle_ai_voice))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_ai_text))
 
     async def error_handler(self, update, context):
         """Handle errors in the bot"""
@@ -1016,6 +1096,32 @@ class TelegramBotHandler:
 
         logger.info("Starting Telegram bot...")
         self.application.run_polling(drop_pending_updates=True)
+
+
+# ===== AI HELPER FUNCTIONS (called via sync_to_async from handlers) =====
+
+def _process_ai_query(text):
+    """Process a text query with AI (runs in sync context)."""
+    try:
+        from ai_services.telegram_ai import process_ai_query
+        return process_ai_query(text)
+    except ImportError:
+        return "Service IA non installé."
+    except Exception as e:
+        logger.error(f"AI query processing error: {e}")
+        return f"Erreur IA: {str(e)}"
+
+
+def _transcribe_audio(audio_bytes):
+    """Transcribe audio bytes with Whisper (runs in sync context)."""
+    try:
+        from ai_services.scaleway_client import transcribe_audio
+        return transcribe_audio(audio_bytes, filename='voice.ogg')
+    except ImportError:
+        return ""
+    except Exception as e:
+        logger.error(f"Whisper transcription error: {e}")
+        return ""
 
 
 def run_bot():

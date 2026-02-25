@@ -1058,6 +1058,66 @@ def product_search_api(request):
     return JsonResponse({'products': results})
 
 
+@login_required(login_url='login')
+def smart_search_api(request):
+    """AI-powered semantic product search - falls back to keyword if AI unavailable."""
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse({'products': []})
+
+    # First try keyword search
+    keyword_results = Product.objects.filter(
+        Q(reference__icontains=query) |
+        Q(name__icontains=query) |
+        Q(name_ar__icontains=query) |
+        Q(barcode__icontains=query) |
+        Q(description__icontains=query) |
+        Q(category__name__icontains=query)
+    ).select_related('category', 'metal_type', 'metal_purity')[:10]
+
+    # If keyword search found results, use those
+    if keyword_results.exists():
+        results = _format_product_results(keyword_results)
+        return JsonResponse({'products': results, 'search_type': 'keyword'})
+
+    # Fall back to semantic search
+    try:
+        from ai_services.embeddings import search_products as semantic_search
+        semantic_results = semantic_search(query, top_k=10, min_score=0.3)
+
+        if semantic_results:
+            product_ids = [r['product_id'] for r in semantic_results]
+            products = Product.objects.filter(
+                id__in=product_ids
+            ).select_related('category', 'metal_type', 'metal_purity')
+
+            # Maintain score ordering
+            products_dict = {p.id: p for p in products}
+            ordered = [products_dict[pid] for pid in product_ids if pid in products_dict]
+
+            results = _format_product_results(ordered)
+            return JsonResponse({'products': results, 'search_type': 'semantic'})
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f'Semantic search error: {e}')
+
+    return JsonResponse({'products': [], 'search_type': 'none'})
+
+
+def _format_product_results(products):
+    """Format products for JSON response."""
+    return [{
+        'id': p.id,
+        'reference': p.reference,
+        'name': p.name,
+        'category': p.category.name if p.category else '',
+        'metal': f"{p.metal_type.name if p.metal_type else ''} {p.metal_purity.name if p.metal_purity else ''}".strip(),
+        'weight': str(p.gross_weight or 0),
+        'selling_price': str(p.selling_price) if p.selling_price else None,
+        'status': p.status,
+    } for p in products]
+
+
 # =============================================================================
 # Print Queue API - For local print agent
 # =============================================================================
