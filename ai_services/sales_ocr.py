@@ -19,16 +19,19 @@ from . import scaleway_client
 logger = logging.getLogger(__name__)
 
 # --- Pass 1: Classification ---
-CLASSIFY_PROMPT = """Regarde cette photo et identifie le type de document.
+CLASSIFY_PROMPT = """Identifie le type de document sur cette photo.
 
 Types possibles:
-- "amana_slip": Bordereau AMANA / Bon de livraison Poste Maroc (formulaire imprimé avec cases, code-barres)
-- "receipt": Reçu ou facture de bijouterie (papier souvent JAUNE avec liste de produits, prix, poids)
-- "payment": Reçu de paiement / versement (preuve de paiement, montant payé)
-- "note": Note manuscrite (informations client, commande écrite à la main)
-- "other": Autre type de document
+- "amana_slip": Bordereau AMANA Poste Maroc — formulaire ROUGE/ORANGE avec logo étoile ★, en-tête "Amana Nationale" ou "أمانة الوطنية", code suivi format QB...MA
+- "receipt": Facture de bijouterie — papier JAUNE avec numéro ROUGE en haut, tableau de produits (bijoux), poids en grammes, prix en DH
+- "payment": Reçu BANCAIRE ou de transfert — logo de banque (Attijariwafa, CIH, BMCE, Banque Populaire, Barid Bank), ou service transfert (Cash Plus, Wafacash), mots-clés: "versement", "virement", "opération", numéro de compte
+- "note": Note manuscrite — écriture à la main sur papier blanc/simple
+- "other": Autre document
 
-Retourne UNIQUEMENT un JSON: {"photo_type": "amana_slip|receipt|payment|note|other"}"""
+ATTENTION: Un reçu de banque avec "versement" ou "opération" est un "payment", PAS un "amana_slip".
+Seuls les formulaires Poste Maroc avec "Amana" sont des "amana_slip".
+
+Retourne UNIQUEMENT: {"photo_type": "amana_slip|receipt|payment|note|other"}"""
 
 # --- Pass 2: Description prompts (PLAIN TEXT, no JSON) ---
 DESCRIBE_AMANA = """Décris EXACTEMENT ce que tu vois sur ce bordereau AMANA (Poste Maroc).
@@ -409,6 +412,38 @@ def _clean_receipt_number(value):
     return raw
 
 
+def _clean_tracking_number(value):
+    """Validate AMANA tracking number format: 2 letters + digits + 2 letters (e.g. QB230428717MA).
+    Reject all-digit strings (bank references), too-long values, etc."""
+    raw = _strip_null((value or '')).strip()
+    if not raw:
+        return ''
+    # Valid AMANA format: letters + digits + letters (e.g. QB230428717MA, EE123456789MA)
+    if re.match(r'^[A-Za-z]{2}\d{6,15}[A-Za-z]{2}$', raw):
+        return raw.upper()
+    # All digits = likely a bank reference number, not AMANA tracking
+    if raw.isdigit():
+        logger.warning(f'Tracking number "{raw}" is all-digits (bank ref?), discarding')
+        return ''
+    # If it contains some letters, keep it but warn
+    if len(raw) > 20:
+        logger.warning(f'Tracking number too long ({len(raw)} chars), discarding')
+        return ''
+    return raw
+
+
+def _clean_bordereau_number(value):
+    """Validate bordereau number: short number (≤6 digits), not a 10-digit bank reference."""
+    raw = _strip_null((value or '')).strip()
+    if not raw:
+        return ''
+    # Bordereau numbers are typically short (1-6 digits)
+    if raw.isdigit() and len(raw) > 6:
+        logger.warning(f'Bordereau number "{raw}" too long ({len(raw)} digits), likely bank ref, discarding')
+        return ''
+    return raw
+
+
 def _clean_sales_data(data):
     """Validate and clean extracted sales data."""
     delivery = data.get('delivery_info') or {}
@@ -420,8 +455,8 @@ def _clean_sales_data(data):
         'client_phone': _strip_null(data.get('client_phone') or ''),
         'client_city': _strip_null(data.get('client_city') or ''),
         'delivery_info': {
-            'tracking_number': _strip_null((delivery.get('tracking_number') or '')).strip(),
-            'bordereau_number': _strip_null((delivery.get('bordereau_number') or '')).strip(),
+            'tracking_number': _clean_tracking_number(delivery.get('tracking_number')),
+            'bordereau_number': _clean_bordereau_number(delivery.get('bordereau_number')),
             'carrier': _strip_null(delivery.get('carrier') or ''),
             'cod_amount': _to_decimal(delivery.get('cod_amount')),
             'destination': _strip_null(delivery.get('destination') or ''),

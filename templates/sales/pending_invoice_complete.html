@@ -1867,9 +1867,15 @@
                 if (cleanNull(d.discount_total) && !discountTotal) discountTotal = cleanNull(d.discount_total);
                 if (d.payment_info && cleanNull(d.payment_info.amount_paid) && !paymentInfo) paymentInfo = d.payment_info;
 
-                // Delivery info (from AMANA slips)
-                if (d.delivery_info && cleanNull(d.delivery_info.tracking_number) && !deliveryInfo) {
-                    deliveryInfo = d.delivery_info;
+                // Delivery info (from AMANA slips) — prefer valid AMANA tracking format
+                if (d.delivery_info && cleanNull(d.delivery_info.tracking_number)) {
+                    const tn = d.delivery_info.tracking_number;
+                    const isValidAmana = /^[A-Z]{2}\d+[A-Z]{2}$/.test(tn);
+                    const currentIsValid = deliveryInfo && /^[A-Z]{2}\d+[A-Z]{2}$/.test(deliveryInfo.tracking_number || '');
+                    // Take this delivery_info if: no existing one, OR this one has valid format and existing doesn't
+                    if (!deliveryInfo || (isValidAmana && !currentIsValid)) {
+                        deliveryInfo = d.delivery_info;
+                    }
                 }
 
                 const noteText = cleanNull(d.notes);
