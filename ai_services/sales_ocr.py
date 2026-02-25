@@ -1,9 +1,14 @@
 """
 Sales photo OCR using Scaleway Vision AI.
 Extracts product data from photos sent by salespeople via Telegram.
-Two-pass architecture: classify photo type first, then extract with focused prompt.
-Handles: AMANA delivery slips, sales receipts, handwritten notes.
-Supports French, Arabic (MSA), and Moroccan Darija.
+
+Architecture: Describe → Structure (3 passes)
+  Pass 1: Vision model classifies photo type (pixtral-12b, fast)
+  Pass 2: Vision model describes what it sees in PLAIN TEXT (no JSON)
+  Pass 3: Chat model (gpt-oss-120b) structures the description into JSON
+
+This separates "reading the image" from "structuring data" — small vision
+models hallucinate when asked to output JSON directly from images.
 """
 
 import json
@@ -13,7 +18,7 @@ from . import scaleway_client
 
 logger = logging.getLogger(__name__)
 
-# --- Pass 1: Classification prompt (short, fast) ---
+# --- Pass 1: Classification ---
 CLASSIFY_PROMPT = """Regarde cette photo et identifie le type de document.
 
 Types possibles:
@@ -25,205 +30,146 @@ Types possibles:
 
 Retourne UNIQUEMENT un JSON: {"photo_type": "amana_slip|receipt|payment|note|other"}"""
 
-# --- Pass 2: Type-specific extraction prompts ---
-AMANA_PROMPT = """Tu extrais les données d'un BORDEREAU AMANA (Poste Maroc / Barid Al Maghrib).
+# --- Pass 2: Description prompts (PLAIN TEXT, no JSON) ---
+DESCRIBE_AMANA = """Décris EXACTEMENT ce que tu vois sur ce bordereau AMANA (Poste Maroc).
 
-Lis UNIQUEMENT ce qui est écrit sur CE document. NE COPIE PAS d'exemples.
+Lis et transcris chaque information visible:
+- Le code de suivi (code-barres avec lettres et chiffres)
+- Le numéro de bordereau (nombre en haut)
+- Le nom du destinataire
+- Le numéro de téléphone
+- Le montant contre-remboursement (COD)
+- La ville de destination
+- Le poids du colis
 
-Cherche sur ce formulaire:
-- **Code de suivi AMANA**: code-barres avec lettres+chiffres (format: 2 lettres + chiffres + 2-3 lettres)
-- **Numéro de bordereau**: nombre imprimé en haut du formulaire
-- **Nom du destinataire**: champ "Destinataire" ou "المرسل إليه"
-- **Téléphone**: numéro à 10 chiffres commençant par 06 ou 07
-- **Montant COD**: contre-remboursement (الثمن/المبلغ), dans une case encadrée
-- **Ville destination**: champ "Destination" ou "Ville"
-- **Poids colis**: en kg ou g
+Transcris les chiffres exactement: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G.
+Écris UNIQUEMENT ce que tu LIS. Si tu ne peux pas lire quelque chose, dis "illisible"."""
 
-ATTENTION: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G
+DESCRIBE_RECEIPT = """Décris EXACTEMENT ce que tu vois sur ce reçu/facture de bijouterie.
 
-Retourne ce JSON avec les valeurs LUES sur le document:
-{
-    "photo_type": "amana_slip",
-    "receipt_number": null,
-    "client_name": "valeur lue",
-    "client_phone": "valeur lue",
-    "client_city": "valeur lue",
-    "delivery_info": {
-        "tracking_number": "valeur lue",
-        "bordereau_number": "valeur lue",
-        "carrier": "amana",
-        "cod_amount": "valeur lue (nombre)",
-        "destination": "valeur lue",
-        "weight_package": "valeur lue"
-    },
-    "items": [],
-    "total_amount": null,
-    "discount_total": null,
-    "payment_info": {"amount_paid": null, "payment_method": null, "reference": null},
-    "notes": "autres infos utiles lues sur le document"
+Ce papier est souvent JAUNE avec un numéro imprimé en ROUGE en haut.
+
+Lis et transcris TOUT ce qui est écrit, ligne par ligne:
+- Le numéro en rouge en haut (tous les chiffres)
+- Chaque ligne de produit: description, poids en grammes, prix en DH
+- Le total
+- Le nom du client, téléphone, ville (si mentionné)
+- Toute remise ou réduction
+
+Si le texte est en arabe, traduis en français.
+Transcris les chiffres exactement: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G.
+Écris UNIQUEMENT ce que tu LIS. Si tu ne peux pas lire quelque chose, dis "illisible".
+N'INVENTE rien — décris seulement ce qui est réellement écrit sur le papier."""
+
+DESCRIBE_PAYMENT = """Décris EXACTEMENT ce que tu vois sur ce reçu de paiement/versement.
+
+Lis et transcris chaque information visible:
+- Le montant payé
+- Le mode de paiement (espèces, chèque, virement, carte)
+- Tout numéro de référence visible
+- Le nom du client/bénéficiaire
+- La date
+- Tout autre détail visible
+
+Écris UNIQUEMENT ce que tu LIS. Si tu ne peux pas lire quelque chose, dis "illisible"."""
+
+DESCRIBE_NOTE = """Décris EXACTEMENT ce que tu vois sur cette note manuscrite.
+
+Lis et transcris tout ce qui est écrit:
+- Noms, téléphones, villes
+- Produits mentionnés avec poids et prix
+- Montants
+- Instructions
+
+Si le texte est en arabe, traduis en français.
+Écris UNIQUEMENT ce que tu LIS. N'INVENTE rien."""
+
+DESCRIBE_PROMPTS = {
+    'amana_slip': DESCRIBE_AMANA,
+    'receipt': DESCRIBE_RECEIPT,
+    'payment': DESCRIBE_PAYMENT,
+    'note': DESCRIBE_NOTE,
 }
 
-Si une information n'est pas visible, mets null. NE DEVINE PAS. NE COPIE PAS les descriptions ci-dessus comme valeurs."""
+# --- Pass 3: Structure prompt (chat model, text → JSON) ---
+STRUCTURE_PROMPT = """Tu es un assistant qui structure des descriptions de documents de bijouterie en JSON.
 
-RECEIPT_PROMPT = """Tu extrais les données d'un REÇU/FACTURE DE BIJOUTERIE.
+On t'a donné une description textuelle d'un document. Le type du document est: {photo_type}
 
-RÈGLES ABSOLUES:
-- Lis UNIQUEMENT ce qui est écrit sur CE papier. NE COPIE PAS les descriptions du JSON ci-dessous comme valeurs.
-- Retourne EXACTEMENT le nombre de produits écrits sur le reçu. Pas plus, pas moins.
-- NE FABRIQUE PAS de données. Chaque valeur doit être lue sur le papier.
+Voici la description du document:
+---
+{description}
+---
 
-C'est un papier (souvent JAUNE) avec une liste de produits bijoux.
-
-Cherche sur CE papier:
-- **Numéro de reçu**: nombre imprimé en ROUGE sur le papier, souvent en haut. Copie TOUS les chiffres visibles.
-- **Produits**: chaque ligne de produit avec sa description, poids, prix
-- **Poids en grammes**: nombre décimal visible sur le reçu
-- **Prix**: montant en DH visible sur le reçu
-- **Remise**: réduction appliquée (si visible)
-- **Total**: prix final (الباقي = reste/final)
-- **Client**: nom, téléphone, ville (si mentionné)
-
-Si le texte est en arabe, traduis en français. ATTENTION: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G
-
-Retourne ce JSON en remplaçant chaque "LIRE_SUR_PAPIER" par la valeur réelle lue:
-{
-    "photo_type": "receipt",
-    "receipt_number": "LIRE_SUR_PAPIER",
-    "client_name": "LIRE_SUR_PAPIER",
-    "client_phone": "LIRE_SUR_PAPIER",
-    "client_city": "LIRE_SUR_PAPIER",
-    "delivery_info": {"tracking_number": null, "bordereau_number": null, "carrier": null, "cod_amount": null, "destination": null, "weight_package": null},
+Extrais les informations de cette description et retourne ce JSON:
+{{
+    "photo_type": "{photo_type}",
+    "receipt_number": "numéro de reçu/facture (si mentionné)",
+    "client_name": "nom du client (si mentionné)",
+    "client_phone": "téléphone (si mentionné)",
+    "client_city": "ville (si mentionné)",
+    "delivery_info": {{
+        "tracking_number": "code de suivi AMANA (si mentionné)",
+        "bordereau_number": "numéro de bordereau (si mentionné)",
+        "carrier": "amana ou null",
+        "cod_amount": "montant COD en nombre (si mentionné)",
+        "destination": "ville destination (si mentionné)",
+        "weight_package": "poids colis (si mentionné)"
+    }},
     "items": [
-        {
-            "description": "LIRE_SUR_PAPIER",
-            "category": "LIRE_SUR_PAPIER",
-            "metal_type": "LIRE_SUR_PAPIER",
-            "purity": "LIRE_SUR_PAPIER",
-            "weight_grams": "LIRE_SUR_PAPIER",
-            "quantity": 1,
-            "unit_price": "LIRE_SUR_PAPIER",
-            "discount": "LIRE_SUR_PAPIER"
-        }
-    ],
-    "total_amount": "LIRE_SUR_PAPIER",
-    "discount_total": "LIRE_SUR_PAPIER",
-    "payment_info": {
-        "amount_paid": "LIRE_SUR_PAPIER",
-        "payment_method": "LIRE_SUR_PAPIER",
-        "reference": "LIRE_SUR_PAPIER"
-    },
-    "notes": "LIRE_SUR_PAPIER — infos CLIENT uniquement, pas l'en-tête magasin"
-}
-
-Si une information n'est pas visible sur le papier, mets null.
-NE COPIE PAS "LIRE_SUR_PAPIER" comme valeur — remplace par ce que tu LIS."""
-
-PAYMENT_PROMPT = """Tu extrais les données d'un REÇU DE PAIEMENT / VERSEMENT.
-
-Lis UNIQUEMENT ce qui est écrit sur CE document. NE COPIE PAS d'exemples.
-Ce n'est PAS un reçu de bijouterie — receipt_number doit être null.
-
-Cherche:
-- **Montant payé**: somme versée en DH
-- **Mode de paiement**: espèces, chèque, virement, carte
-- **Référence du paiement**: tout numéro visible → mets dans payment_info.reference
-- **Nom du client**: qui a payé
-- **Date**: date du paiement
-
-Retourne ce JSON en remplaçant "LIRE_SUR_PAPIER" par les valeurs lues:
-{
-    "photo_type": "payment",
-    "receipt_number": null,
-    "client_name": "LIRE_SUR_PAPIER",
-    "client_phone": "LIRE_SUR_PAPIER",
-    "client_city": "LIRE_SUR_PAPIER",
-    "delivery_info": {"tracking_number": null, "bordereau_number": null, "carrier": null, "cod_amount": null, "destination": null, "weight_package": null},
-    "items": [],
-    "total_amount": null,
-    "discount_total": null,
-    "payment_info": {
-        "amount_paid": "LIRE_SUR_PAPIER",
-        "payment_method": "LIRE_SUR_PAPIER",
-        "reference": "LIRE_SUR_PAPIER"
-    },
-    "notes": "LIRE_SUR_PAPIER — date et détails du paiement"
-}
-
-Si une information n'est pas visible, mets null. NE COPIE PAS "LIRE_SUR_PAPIER" comme valeur."""
-
-NOTE_PROMPT = """Tu extrais les données d'une NOTE MANUSCRITE liée à une vente de bijouterie au Maroc.
-
-RÈGLE ABSOLUE: Extrait UNIQUEMENT ce qui est réellement écrit. NE FABRIQUE PAS de données.
-
-Cherche toute information utile:
-- Nom du client, téléphone, ville
-- Produits mentionnés (UNIQUEMENT ceux écrits sur la note)
-- Montants, poids en grammes
-- Instructions de livraison
-
-Si le texte est en arabe, traduis en français (ex: خاتم=bague, سلسلة=chaîne).
-
-Retourne ce JSON:
-{
-    "photo_type": "note",
-    "receipt_number": null,
-    "client_name": "nom du client (si visible)",
-    "client_phone": "téléphone (si visible)",
-    "client_city": "ville (si visible)",
-    "delivery_info": {"tracking_number": null, "bordereau_number": null, "carrier": null, "cod_amount": null, "destination": null, "weight_package": null},
-    "items": [
-        {
-            "description": "description en français de CE produit lu sur la note",
+        {{
+            "description": "description du produit en français",
             "category": "catégorie du bijou",
-            "metal_type": "or|argent|plaqué_or|acier|autre",
-            "purity": "18K|21K|24K|14K|9K|925",
-            "weight_grams": "poids en grammes",
+            "metal_type": "type de métal",
+            "purity": "pureté (18K, 21K, 925, etc.)",
+            "weight_grams": "poids en grammes (nombre)",
             "quantity": 1,
-            "unit_price": "prix en DH",
-            "discount": null
-        }
+            "unit_price": "prix en DH (nombre)",
+            "discount": "remise en DH (nombre ou null)"
+        }}
     ],
-    "total_amount": "total en DH",
-    "discount_total": null,
-    "payment_info": {"amount_paid": null, "payment_method": null, "reference": null},
-    "notes": "autres infos utiles"
-}
+    "total_amount": "total en DH (nombre ou null)",
+    "discount_total": "remise totale (nombre ou null)",
+    "payment_info": {{
+        "amount_paid": "montant payé (nombre ou null)",
+        "payment_method": "mode de paiement ou null",
+        "reference": "référence de paiement ou null"
+    }},
+    "notes": "autres informations utiles"
+}}
 
-Si une information n'est pas visible, mets null. NE DEVINE PAS."""
-
-# Map photo types to their extraction prompts
-EXTRACTION_PROMPTS = {
-    'amana_slip': AMANA_PROMPT,
-    'receipt': RECEIPT_PROMPT,
-    'payment': PAYMENT_PROMPT,
-    'note': NOTE_PROMPT,
-}
+Règles:
+- Si le type est "payment", receipt_number doit être null (les numéros vont dans payment_info.reference)
+- Si le type est "amana_slip", items doit être vide []
+- Si une info est marquée "illisible" ou absente, mets null
+- Retourne UNIQUEMENT le JSON"""
 
 
 def extract_sales_data(image_path_or_bytes):
     """
-    Extract structured data from a sales photo using two-pass OCR.
+    Extract structured data from a sales photo using describe-then-structure.
 
-    Pass 1: Classify the document type (amana_slip, receipt, payment, note)
-    Pass 2: Extract data using a type-specific focused prompt
-
-    Args:
-        image_path_or_bytes: File path string or image bytes
-
-    Returns:
-        dict: Extracted sales data or error dict
+    Pass 1: Classify document type (pixtral-12b)
+    Pass 2: Describe what's visible in plain text (vision_large)
+    Pass 3: Structure description into JSON (chat model)
     """
     if not scaleway_client.is_configured():
         return {'error': 'Service IA non configuré. Configurez SCALEWAY_AI_API_KEY dans .env'}
 
     try:
-        # --- Pass 1: Classify document type ---
+        # --- Pass 1: Classify ---
         photo_type = _classify_photo(image_path_or_bytes)
         logger.info(f'Photo classified as: {photo_type}')
 
-        # --- Pass 2: Extract with type-specific prompt ---
-        extraction_prompt = EXTRACTION_PROMPTS.get(photo_type, RECEIPT_PROMPT)
-        return _extract_with_prompt(image_path_or_bytes, extraction_prompt)
+        # --- Pass 2: Describe (vision model → plain text) ---
+        description = _describe_photo(image_path_or_bytes, photo_type)
+        logger.info(f'Photo description ({len(description)} chars): {description[:200]}...')
+
+        if not description or description.strip() == '':
+            return {'error': 'Le modèle n\'a pas pu lire la photo'}
+
+        # --- Pass 3: Structure (chat model → JSON) ---
+        return _structure_description(description, photo_type)
 
     except Exception as e:
         logger.error(f'Sales OCR error: {e}')
@@ -231,7 +177,7 @@ def extract_sales_data(image_path_or_bytes):
 
 
 def _classify_photo(image_path_or_bytes):
-    """Pass 1: Classify the photo type with a short prompt."""
+    """Pass 1: Classify photo type (quick, pixtral-12b)."""
     try:
         response_text = scaleway_client.vision_completion(
             image_data=image_path_or_bytes,
@@ -246,39 +192,51 @@ def _classify_photo(image_path_or_bytes):
         data = json.loads(clean_text)
         photo_type = data.get('photo_type', 'other')
 
-        # Normalize to known types
-        if photo_type in EXTRACTION_PROMPTS:
+        if photo_type in DESCRIBE_PROMPTS:
             return photo_type
-        # Map common variants
         if photo_type in ('invoice', 'facture'):
             return 'receipt'
         if photo_type in ('delivery', 'bon_livraison'):
             return 'amana_slip'
-        return 'receipt'  # Default to receipt (most common)
+        return 'receipt'
 
     except Exception as e:
         logger.warning(f'Photo classification failed, defaulting to receipt: {e}')
         return 'receipt'
 
 
-def _extract_with_prompt(image_path_or_bytes, prompt):
-    """Pass 2: Extract data using vision model.
+def _describe_photo(image_path_or_bytes, photo_type):
+    """Pass 2: Vision model describes what it sees in PLAIN TEXT (no JSON)."""
+    describe_prompt = DESCRIBE_PROMPTS.get(photo_type, DESCRIBE_RECEIPT)
 
-    Uses vision_large (mistral-small-3.2-24b) if available for better OCR,
-    falls back to pixtral-12b.
-    """
-    last_error = None
-    last_raw = ''
-
-    # Prefer larger model for extraction accuracy (pixtral-12b hallucinates on handwriting)
+    # Use best available vision model
     model = scaleway_client.MODELS.get('vision_large', scaleway_client.MODELS['vision'])
 
+    response_text = scaleway_client.vision_completion(
+        image_data=image_path_or_bytes,
+        prompt=describe_prompt,
+        model=model,
+        temperature=0.0,
+        max_tokens=1024,
+        # NO response_format — we want plain text, not JSON
+    )
+
+    return response_text.strip()
+
+
+def _structure_description(description, photo_type):
+    """Pass 3: Chat model structures plain text into JSON."""
+    prompt = STRUCTURE_PROMPT.format(
+        photo_type=photo_type,
+        description=description,
+    )
+
+    last_error = None
     for attempt in range(2):
         try:
-            response_text = scaleway_client.vision_completion(
-                image_data=image_path_or_bytes,
-                prompt=prompt,
-                model=model,
+            response_text = scaleway_client.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                model=scaleway_client.MODELS['chat'],
                 temperature=0.0,
                 max_tokens=2048,
                 response_format={"type": "json_object"},
@@ -290,23 +248,22 @@ def _extract_with_prompt(image_path_or_bytes, prompt):
 
         except json.JSONDecodeError as e:
             last_error = e
-            last_raw = response_text
-            logger.warning(f'JSON parse failed (attempt {attempt + 1}): {e}')
-            logger.warning(f'Raw response: {response_text[:500]}')
+            logger.warning(f'Structure JSON parse failed (attempt {attempt + 1}): {e}')
             continue
         except Exception as e:
-            logger.error(f'Sales OCR extraction error: {e}')
+            logger.error(f'Structure error: {e}')
             return {'error': str(e)}
 
-    logger.error(f'All JSON parse attempts failed: {last_error}')
-    return {'error': 'Impossible de lire la réponse IA après 2 tentatives', 'raw_response': last_raw}
+    logger.error(f'All structure attempts failed: {last_error}')
+    return {'error': 'Impossible de structurer les données', 'raw_description': description}
 
+
+# --- Helper functions ---
 
 def _extract_json_from_response(text):
     """Extract JSON from AI response, handling markdown code blocks and extra text."""
     clean = text.strip()
 
-    # Remove markdown code blocks
     if clean.startswith('```'):
         lines = clean.split('\n')
         lines = lines[1:]
@@ -314,13 +271,11 @@ def _extract_json_from_response(text):
             lines = lines[:-1]
         clean = '\n'.join(lines).strip()
 
-    # If response has text before JSON, find the first {
     if clean and clean[0] != '{':
         brace_pos = clean.find('{')
         if brace_pos >= 0:
             clean = clean[brace_pos:]
 
-    # If response has text after JSON, find the last }
     if clean:
         last_brace = clean.rfind('}')
         if last_brace >= 0:
@@ -331,19 +286,13 @@ def _extract_json_from_response(text):
 
 def _parse_json_robust(text):
     """Parse JSON with automatic repair of common AI-generated issues."""
-    # Try direct parse first
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
 
-    # Repair common issues
     repaired = text
-
-    # Fix trailing commas before } or ]
     repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
-
-    # Fix unescaped newlines in strings
     repaired = _fix_newlines_in_strings(repaired)
 
     try:
@@ -351,9 +300,7 @@ def _parse_json_robust(text):
     except json.JSONDecodeError:
         pass
 
-    # Last resort: close unclosed structures
     repaired = _close_unclosed_json(repaired)
-
     return json.loads(repaired)
 
 
@@ -368,15 +315,12 @@ def _fix_newlines_in_strings(text):
             result.append(char)
             escape_next = False
             continue
-
         if char == '\\':
             result.append(char)
             escape_next = True
             continue
-
         if char == '"':
             in_string = not in_string
-
         if in_string and char == '\n':
             result.append(' ')
         else:
@@ -403,10 +347,8 @@ def _close_unclosed_json(text):
             in_string = not in_string
 
     result = text
-
     if in_string:
         result += '"'
-
     result += ']' * max(0, open_brackets)
     result += '}' * max(0, open_braces)
 
@@ -419,32 +361,28 @@ def _strip_null(value):
         return ''
     if isinstance(value, str):
         v = value.strip().lower()
-        if v in ('null', 'none', 'n/a', 'n\\a', 'nan', 'lire_sur_papier'):
+        if v in ('null', 'none', 'n/a', 'n\\a', 'nan', 'lire_sur_papier', 'illisible'):
             return ''
-        # Also catch if model copied the placeholder with variations
-        if 'lire_sur_papier' in v or 'lire sur papier' in v:
+        if 'lire_sur_papier' in v or 'lire sur papier' in v or 'illisible' in v:
             return ''
     return value
 
 
 def _clean_receipt_number(value):
-    """Clean receipt number: max 15 chars, reject garbage (all zeros, repeating)."""
+    """Clean receipt number: max 15 chars, reject garbage."""
     raw = _strip_null((value or '')).strip()
     if not raw:
         return ''
-    # Cap at 15 characters (no receipt number is longer)
     if len(raw) > 15:
-        logger.warning(f'Receipt number too long ({len(raw)} chars), discarding: {raw[:20]}...')
+        logger.warning(f'Receipt number too long ({len(raw)} chars), discarding')
         return ''
-    # Reject all-zeros
     if raw.replace('0', '') == '':
-        logger.warning(f'Receipt number is all zeros, discarding: {raw}')
         return ''
     return raw
 
 
 def _clean_sales_data(data):
-    """Validate and clean extracted sales data, filtering null strings."""
+    """Validate and clean extracted sales data."""
     delivery = data.get('delivery_info') or {}
 
     cleaned = {
@@ -483,27 +421,21 @@ def _clean_sales_data(data):
             'unit_price': _to_decimal(item.get('unit_price')),
             'discount': _to_decimal(item.get('discount')),
         }
-        cleaned['items'].append(cleaned_item)
+        # Skip items with no useful data
+        if cleaned_item['description'] or cleaned_item['weight'] or cleaned_item['unit_price']:
+            cleaned['items'].append(cleaned_item)
 
-    # Detect hallucinated items (sequential weights/prices = fabricated data)
+    # Detect hallucinated items
     cleaned['items'] = _filter_hallucinated_items(cleaned['items'])
 
     return cleaned
 
 
 def _filter_hallucinated_items(items):
-    """Detect and remove hallucinated items with sequential/fabricated patterns.
-
-    Signs of hallucination:
-    - Too many items (receipts rarely have more than 6-8 items)
-    - Sequential weights (e.g. 2.53, 2.46, 2.44, 2.43... decreasing by ~0.01)
-    - Sequential prices (e.g. 2460, 2340, 2320... decreasing by ~20)
-    - All items have nearly identical descriptions
-    """
+    """Detect and remove hallucinated items with sequential/fabricated patterns."""
     if len(items) <= 2:
-        return items  # Can't detect patterns with 1-2 items
+        return items
 
-    # Check for sequential weights
     weights = []
     for item in items:
         try:
@@ -514,34 +446,25 @@ def _filter_hallucinated_items(items):
             pass
 
     if len(weights) >= 4:
-        # Check if weights form a near-arithmetic sequence
         diffs = [weights[i] - weights[i + 1] for i in range(len(weights) - 1)]
         if diffs:
             avg_diff = sum(abs(d) for d in diffs) / len(diffs)
-            # If all differences are similar (within 0.05g) → sequential pattern
             if avg_diff > 0 and all(abs(abs(d) - avg_diff) < 0.05 for d in diffs):
-                logger.warning(
-                    f'Hallucination detected: {len(items)} items with sequential weights '
-                    f'{weights[:5]}... (avg diff: {avg_diff:.3f}g). Clearing items.'
-                )
+                logger.warning(f'Hallucination: sequential weights {weights[:5]}. Clearing.')
                 return []
 
-    # Check for too many items with same description
     if len(items) >= 5:
         descriptions = [item.get('description', '') for item in items]
         most_common = max(set(descriptions), key=descriptions.count)
         if descriptions.count(most_common) >= len(items) * 0.7:
-            logger.warning(
-                f'Hallucination detected: {descriptions.count(most_common)}/{len(items)} '
-                f'items have same description "{most_common}". Clearing items.'
-            )
+            logger.warning(f'Hallucination: {descriptions.count(most_common)}/{len(items)} same desc. Clearing.')
             return []
 
     return items
 
 
 def _clean_notes(notes):
-    """Remove store's own header info from notes (not useful)."""
+    """Remove store's own header info from notes."""
     if not notes:
         return ''
     store_patterns = [
@@ -564,12 +487,12 @@ def _clean_notes(notes):
 
 
 def _to_decimal(value):
-    """Convert a value to a decimal string, or None. Filters placeholder strings."""
+    """Convert a value to a decimal string, or None."""
     if value is None:
         return None
     if isinstance(value, str):
         v = value.strip().lower()
-        if v in ('null', 'none', 'n/a', 'nan', '') or 'lire_sur_papier' in v or 'lire sur papier' in v:
+        if v in ('null', 'none', 'n/a', 'nan', '', 'illisible') or 'lire_sur_papier' in v:
             return None
     try:
         return str(round(float(value), 2))
