@@ -237,12 +237,12 @@ def extract_sales_data(image_path_or_bytes):
 
 
 def _classify_photo(image_path_or_bytes):
-    """Pass 1: Classify the photo type with a short prompt (uses small fast model)."""
+    """Pass 1: Classify the photo type with a short prompt."""
     try:
         response_text = scaleway_client.vision_completion(
             image_data=image_path_or_bytes,
             prompt=CLASSIFY_PROMPT,
-            model=scaleway_client.MODELS.get('vision_large', scaleway_client.MODELS['vision']),
+            model=scaleway_client.MODELS['vision'],
             temperature=0.0,
             max_tokens=64,
             response_format={"type": "json_object"},
@@ -268,20 +268,17 @@ def _classify_photo(image_path_or_bytes):
 
 
 def _extract_with_prompt(image_path_or_bytes, prompt):
-    """Pass 2: Extract data using a specific prompt with larger model for better accuracy."""
+    """Pass 2: Extract data using pixtral vision model (dedicated OCR model)."""
     last_error = None
     last_raw = ''
-
-    # Use larger vision model for extraction (better OCR, especially handwriting)
-    model = scaleway_client.MODELS.get('vision_large', scaleway_client.MODELS['vision'])
 
     for attempt in range(2):
         try:
             response_text = scaleway_client.vision_completion(
                 image_data=image_path_or_bytes,
                 prompt=prompt,
-                model=model,
-                temperature=0.1 if attempt == 0 else 0.2,
+                model=scaleway_client.MODELS['vision'],
+                temperature=0.0,
                 max_tokens=2048,
                 response_format={"type": "json_object"},
             )
@@ -466,7 +463,59 @@ def _clean_sales_data(data):
         }
         cleaned['items'].append(cleaned_item)
 
+    # Detect hallucinated items (sequential weights/prices = fabricated data)
+    cleaned['items'] = _filter_hallucinated_items(cleaned['items'])
+
     return cleaned
+
+
+def _filter_hallucinated_items(items):
+    """Detect and remove hallucinated items with sequential/fabricated patterns.
+
+    Signs of hallucination:
+    - Too many items (receipts rarely have more than 6-8 items)
+    - Sequential weights (e.g. 2.53, 2.46, 2.44, 2.43... decreasing by ~0.01)
+    - Sequential prices (e.g. 2460, 2340, 2320... decreasing by ~20)
+    - All items have nearly identical descriptions
+    """
+    if len(items) <= 2:
+        return items  # Can't detect patterns with 1-2 items
+
+    # Check for sequential weights
+    weights = []
+    for item in items:
+        try:
+            w = float(item.get('weight') or 0)
+            if w > 0:
+                weights.append(w)
+        except (ValueError, TypeError):
+            pass
+
+    if len(weights) >= 4:
+        # Check if weights form a near-arithmetic sequence
+        diffs = [weights[i] - weights[i + 1] for i in range(len(weights) - 1)]
+        if diffs:
+            avg_diff = sum(abs(d) for d in diffs) / len(diffs)
+            # If all differences are similar (within 0.05g) → sequential pattern
+            if avg_diff > 0 and all(abs(abs(d) - avg_diff) < 0.05 for d in diffs):
+                logger.warning(
+                    f'Hallucination detected: {len(items)} items with sequential weights '
+                    f'{weights[:5]}... (avg diff: {avg_diff:.3f}g). Clearing items.'
+                )
+                return []
+
+    # Check for too many items with same description
+    if len(items) >= 5:
+        descriptions = [item.get('description', '') for item in items]
+        most_common = max(set(descriptions), key=descriptions.count)
+        if descriptions.count(most_common) >= len(items) * 0.7:
+            logger.warning(
+                f'Hallucination detected: {descriptions.count(most_common)}/{len(items)} '
+                f'items have same description "{most_common}". Clearing items.'
+            )
+            return []
+
+    return items
 
 
 def _clean_notes(notes):
