@@ -984,12 +984,17 @@ class TelegramBotHandler:
     # ===== AI HANDLERS =====
 
     async def handle_ai_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle non-command text messages with AI"""
+        """Handle non-command text messages with AI (Telegram admins only)"""
         chat_id = str(update.effective_chat.id)
         user = await get_verified_user(chat_id)
 
         if not user:
             await update.message.reply_text("Vous n'êtes pas enregistré. Utilisez /start.")
+            return
+
+        # AI features only for Telegram admins (from TELEGRAM_ADMIN_CHAT_ID env)
+        if not _is_telegram_admin(chat_id):
+            # Non-admin users don't get AI — silently ignore non-command text
             return
 
         # Skip if user has an active photo session
@@ -1017,12 +1022,19 @@ class TelegramBotHandler:
             )
 
     async def handle_ai_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle voice messages: Whisper transcription → AI query"""
+        """Handle voice messages: Whisper transcription → AI query (Telegram admins only)"""
         chat_id = str(update.effective_chat.id)
         user = await get_verified_user(chat_id)
 
         if not user:
             await update.message.reply_text("Vous n'êtes pas enregistré. Utilisez /start.")
+            return
+
+        # AI features only for Telegram admins (from TELEGRAM_ADMIN_CHAT_ID env)
+        if not _is_telegram_admin(chat_id):
+            await update.message.reply_text(
+                "🎤 La fonctionnalité vocale IA est réservée aux administrateurs."
+            )
             return
 
         # Send "typing" indicator
@@ -1099,6 +1111,15 @@ class TelegramBotHandler:
 
 
 # ===== AI HELPER FUNCTIONS (called via sync_to_async from handlers) =====
+
+def _is_telegram_admin(chat_id):
+    """Check if a chat_id is in the TELEGRAM_ADMIN_CHAT_ID env variable."""
+    admin_ids_str = getattr(settings, 'TELEGRAM_ADMIN_CHAT_ID', '')
+    if not admin_ids_str:
+        return False
+    admin_ids = [cid.strip() for cid in admin_ids_str.split(',') if cid.strip()]
+    return str(chat_id) in admin_ids
+
 
 def _process_ai_query(text):
     """Process a text query with AI (runs in sync context)."""
