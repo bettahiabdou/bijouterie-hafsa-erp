@@ -74,7 +74,8 @@ def chat_completion(messages, model=None, temperature=0.3, max_tokens=1024,
         )
         response.raise_for_status()
         data = response.json()
-        return data['choices'][0]['message']['content']
+        content = data['choices'][0]['message']['content']
+        return content or ''  # Never return None
     except requests.exceptions.RequestException as e:
         logger.error(f'Scaleway chat API error: {e}')
         if hasattr(e, 'response') and e.response is not None:
@@ -147,7 +148,8 @@ def vision_completion(image_data, prompt, model=None, temperature=0.2,
         )
         response.raise_for_status()
         data = response.json()
-        return data['choices'][0]['message']['content']
+        content = data['choices'][0]['message']['content']
+        return content or ''  # Never return None
     except requests.exceptions.RequestException as e:
         logger.error(f'Scaleway vision API error: {e}')
         if hasattr(e, 'response') and e.response is not None:

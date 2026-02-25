@@ -213,22 +213,43 @@ def _classify_photo(image_path_or_bytes):
 
 
 def _describe_photo(image_path_or_bytes, photo_type):
-    """Pass 2: Vision model describes what it sees in PLAIN TEXT (no JSON)."""
+    """Pass 2: Vision model describes what it sees in PLAIN TEXT (no JSON).
+    Falls back to pixtral-12b if vision_large returns empty or fails."""
     describe_prompt = DESCRIBE_PROMPTS.get(photo_type, DESCRIBE_RECEIPT)
 
-    # Use best available vision model
-    model = scaleway_client.MODELS.get('vision_large', scaleway_client.MODELS['vision'])
+    # Try vision_large first (holo2-30b-a3b)
+    model_large = scaleway_client.MODELS.get('vision_large', scaleway_client.MODELS['vision'])
+    model_fallback = scaleway_client.MODELS['vision']
 
-    response_text = scaleway_client.vision_completion(
-        image_data=image_path_or_bytes,
-        prompt=describe_prompt,
-        model=model,
-        temperature=0.0,
-        max_tokens=1024,
-        # NO response_format — we want plain text, not JSON
-    )
+    try:
+        response_text = scaleway_client.vision_completion(
+            image_data=image_path_or_bytes,
+            prompt=describe_prompt,
+            model=model_large,
+            temperature=0.0,
+            max_tokens=1024,
+        )
+        if response_text and response_text.strip():
+            logger.info(f'vision_large ({model_large}) succeeded')
+            return response_text.strip()
+        logger.warning(f'vision_large ({model_large}) returned empty, falling back')
+    except Exception as e:
+        logger.warning(f'vision_large ({model_large}) failed: {e}, falling back')
 
-    return response_text.strip()
+    # Fallback to pixtral-12b
+    try:
+        response_text = scaleway_client.vision_completion(
+            image_data=image_path_or_bytes,
+            prompt=describe_prompt,
+            model=model_fallback,
+            temperature=0.0,
+            max_tokens=1024,
+        )
+        logger.info(f'Fallback to {model_fallback} succeeded')
+        return (response_text or '').strip()
+    except Exception as e:
+        logger.error(f'Fallback vision ({model_fallback}) also failed: {e}')
+        return ''
 
 
 def _structure_description(description, photo_type):
