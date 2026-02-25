@@ -1,0 +1,446 @@
+{% extends 'base.html' %}
+
+{% block title %}Assistant IA - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'admin_dashboard:home' %}" class="breadcrumb-item">Administration</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Assistant IA</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title"><i class="fas fa-robot mr-2"></i> Assistant IA</h1>
+                <p class="page-subtitle">Posez vos questions en francais, arabe ou darija</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="chat-container">
+        <!-- Chat Messages Area -->
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-welcome">
+                <div class="chat-welcome-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h3>Bonjour! Je suis l'assistant IA de Bijouterie Hafsa</h3>
+                <p>Je peux vous aider avec:</p>
+                <div class="chat-suggestions">
+                    <button class="suggestion-chip" onclick="sendSuggestion('Résumé du tableau de bord aujourd\'hui')">
+                        <i class="fas fa-chart-bar"></i> Résumé du jour
+                    </button>
+                    <button class="suggestion-chip" onclick="sendSuggestion('Combien on a encaissé ce mois?')">
+                        <i class="fas fa-money-bill-wave"></i> Encaissé ce mois
+                    </button>
+                    <button class="suggestion-chip" onclick="sendSuggestion('Performance des vendeurs ce mois')">
+                        <i class="fas fa-users"></i> Performance vendeurs
+                    </button>
+                    <button class="suggestion-chip" onclick="sendSuggestion('Détail des paiements aujourd\'hui')">
+                        <i class="fas fa-credit-card"></i> Paiements du jour
+                    </button>
+                    <button class="suggestion-chip" onclick="sendSuggestion('Livraisons en attente')">
+                        <i class="fas fa-truck"></i> Livraisons en attente
+                    </button>
+                    <button class="suggestion-chip" onclick="sendSuggestion('Statistiques livraisons ce mois')">
+                        <i class="fas fa-shipping-fast"></i> Stats livraisons
+                    </button>
+                    <button class="suggestion-chip" onclick="sendSuggestion('Combien de bagues en or 18K?')">
+                        <i class="fas fa-ring"></i> Stock produits
+                    </button>
+                    <button class="suggestion-chip" onclick="sendSuggestion('Achats fournisseurs ce mois')">
+                        <i class="fas fa-shopping-cart"></i> Achats fournisseurs
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Input -->
+        <div class="chat-input-area">
+            <form id="chat-form" onsubmit="sendMessage(event)">
+                <div class="chat-input-wrapper">
+                    <input type="text" id="chat-input" class="chat-input"
+                        placeholder="Posez votre question... (ex: chhal dkhel lyoum?)"
+                        autocomplete="off" autofocus>
+                    <button type="submit" class="chat-send-btn" id="send-btn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 200px);
+            min-height: 500px;
+            background: var(--neutral-50);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--neutral-200);
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-6);
+            scroll-behavior: smooth;
+        }
+
+        /* Welcome */
+        .chat-welcome {
+            text-align: center;
+            padding: var(--space-8) var(--space-4);
+        }
+
+        .chat-welcome-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-4);
+            color: white;
+            font-size: 36px;
+        }
+
+        .chat-welcome h3 {
+            font-size: var(--text-xl);
+            color: var(--neutral-800);
+            margin: 0 0 var(--space-2);
+        }
+
+        .chat-welcome p {
+            color: var(--neutral-500);
+            margin: 0 0 var(--space-6);
+        }
+
+        .chat-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-2);
+            justify-content: center;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .suggestion-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: var(--space-2) var(--space-3);
+            background: white;
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-full);
+            color: var(--neutral-700);
+            font-size: var(--text-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .suggestion-chip:hover {
+            background: var(--primary-50);
+            border-color: var(--primary-300);
+            color: var(--primary-700);
+        }
+
+        .suggestion-chip i {
+            font-size: 12px;
+            color: var(--primary-500);
+        }
+
+        /* Messages */
+        .chat-message {
+            display: flex;
+            gap: var(--space-3);
+            margin-bottom: var(--space-4);
+            animation: fadeInUp 0.3s ease;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chat-message.user {
+            flex-direction: row-reverse;
+        }
+
+        .chat-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 16px;
+        }
+
+        .chat-message.user .chat-avatar {
+            background: var(--primary-100);
+            color: var(--primary-700);
+        }
+
+        .chat-message.ai .chat-avatar {
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+            color: white;
+        }
+
+        .chat-bubble {
+            max-width: 80%;
+            padding: var(--space-3) var(--space-4);
+            border-radius: var(--radius-lg);
+            font-size: var(--text-sm);
+            line-height: 1.6;
+        }
+
+        .chat-message.user .chat-bubble {
+            background: var(--primary-500);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-message.ai .chat-bubble {
+            background: white;
+            color: var(--neutral-800);
+            border: 1px solid var(--neutral-200);
+            border-bottom-left-radius: 4px;
+            white-space: pre-line;
+            font-family: inherit;
+        }
+
+        .chat-message.ai .chat-bubble .ai-loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--neutral-500);
+        }
+
+        .chat-message.ai .chat-bubble .ai-loading .dots {
+            display: inline-flex;
+            gap: 4px;
+        }
+
+        .chat-message.ai .chat-bubble .ai-loading .dots span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--neutral-400);
+            animation: dotPulse 1.4s infinite;
+        }
+
+        .chat-message.ai .chat-bubble .ai-loading .dots span:nth-child(2) { animation-delay: 0.2s; }
+        .chat-message.ai .chat-bubble .ai-loading .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes dotPulse {
+            0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+            40% { opacity: 1; transform: scale(1); }
+        }
+
+        .chat-message.ai .chat-bubble .ai-error {
+            color: var(--error-600);
+        }
+
+        /* Input Area */
+        .chat-input-area {
+            padding: var(--space-4) var(--space-6);
+            background: white;
+            border-top: 1px solid var(--neutral-200);
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: var(--space-2);
+            align-items: center;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: var(--space-3) var(--space-4);
+            border: 1px solid var(--neutral-300);
+            border-radius: var(--radius-full);
+            font-size: var(--text-base);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input:focus {
+            border-color: var(--primary-400);
+            box-shadow: 0 0 0 3px var(--primary-100);
+        }
+
+        .chat-send-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--primary-500);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .chat-send-btn:hover {
+            background: var(--primary-600);
+        }
+
+        .chat-send-btn:disabled {
+            background: var(--neutral-300);
+            cursor: not-allowed;
+        }
+
+        /* Timestamp */
+        .chat-timestamp {
+            text-align: center;
+            color: var(--neutral-400);
+            font-size: var(--text-xs);
+            margin: var(--space-4) 0;
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                height: calc(100vh - 160px);
+                border-radius: 0;
+            }
+
+            .chat-messages {
+                padding: var(--space-4);
+            }
+
+            .chat-input-area {
+                padding: var(--space-3);
+            }
+
+            .chat-bubble {
+                max-width: 90%;
+            }
+
+            .chat-suggestions {
+                gap: var(--space-1);
+            }
+
+            .suggestion-chip {
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+        }
+    </style>
+
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        let isProcessing = false;
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function addMessage(text, type) {
+            // Hide welcome on first message
+            const welcome = document.querySelector('.chat-welcome');
+            if (welcome) welcome.style.display = 'none';
+
+            const msg = document.createElement('div');
+            msg.className = `chat-message ${type}`;
+
+            const avatar = type === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+
+            msg.innerHTML = `
+                <div class="chat-avatar">${avatar}</div>
+                <div class="chat-bubble">${type === 'user' ? escapeHtml(text) : text}</div>
+            `;
+
+            chatMessages.appendChild(msg);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return msg;
+        }
+
+        function addLoadingMessage() {
+            const msg = addMessage('', 'ai');
+            msg.querySelector('.chat-bubble').innerHTML = `
+                <div class="ai-loading">
+                    <span>Analyse en cours</span>
+                    <div class="dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            msg.id = 'loading-msg';
+            return msg;
+        }
+
+        function sendSuggestion(text) {
+            chatInput.value = text;
+            sendMessage(new Event('submit'));
+        }
+
+        async function sendMessage(e) {
+            e.preventDefault();
+
+            const text = chatInput.value.trim();
+            if (!text || isProcessing) return;
+
+            isProcessing = true;
+            sendBtn.disabled = true;
+            chatInput.value = '';
+
+            // Add user message
+            addMessage(text, 'user');
+
+            // Add loading indicator
+            const loadingMsg = addLoadingMessage();
+
+            try {
+                const formData = new FormData();
+                formData.append('message', text);
+
+                const response = await fetch('{% url "admin_dashboard:ai_chat_api" %}', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                // Remove loading message
+                loadingMsg.remove();
+
+                if (result.success) {
+                    addMessage(escapeHtml(result.response), 'ai');
+                } else {
+                    const errorMsg = addMessage('', 'ai');
+                    errorMsg.querySelector('.chat-bubble').innerHTML =
+                        `<div class="ai-error"><i class="fas fa-exclamation-triangle mr-1"></i> ${escapeHtml(result.error)}</div>`;
+                }
+            } catch (err) {
+                loadingMsg.remove();
+                const errorMsg = addMessage('', 'ai');
+                errorMsg.querySelector('.chat-bubble').innerHTML =
+                    '<div class="ai-error"><i class="fas fa-exclamation-triangle mr-1"></i> Erreur de connexion. Réessayez.</div>';
+            }
+
+            isProcessing = false;
+            sendBtn.disabled = false;
+            chatInput.focus();
+        }
+
+        // Focus input on load
+        chatInput.focus();
+    </script>
+{% endblock %}

@@ -1043,3 +1043,38 @@ def system_config_edit(request):
     }
 
     return render(request, 'admin_dashboard/system_config.html', context)
+
+
+# ============ AI CHAT ============
+
+@login_required(login_url='login')
+@staff_required
+def ai_chat(request):
+    """AI Chat interface for admins — query all ERP data using natural language."""
+    context = {
+        'page_title': 'Assistant IA',
+        'section': 'ai_chat',
+    }
+    return render(request, 'admin_dashboard/ai_chat.html', context)
+
+
+@login_required(login_url='login')
+@staff_required
+@require_http_methods(["POST"])
+def ai_chat_api(request):
+    """AJAX endpoint for AI chat queries."""
+    from django.http import JsonResponse
+
+    message = request.POST.get('message', '').strip()
+    if not message:
+        return JsonResponse({'success': False, 'error': 'Message vide'}, status=400)
+
+    try:
+        from ai_services.telegram_ai import process_ai_query
+        response = process_ai_query(message)
+        return JsonResponse({'success': True, 'response': response})
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f'AI chat error: {e}')
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

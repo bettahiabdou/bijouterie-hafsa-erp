@@ -54,4 +54,8 @@ urlpatterns = [
 
     # System Status
     path('status/', views.system_status, name='status'),
+
+    # AI Chat
+    path('ai-chat/', views.ai_chat, name='ai_chat'),
+    path('api/ai-chat/', views.ai_chat_api, name='ai_chat_api'),
 ]

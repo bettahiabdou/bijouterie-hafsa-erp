@@ -661,6 +661,13 @@
                         <span class="nav-text">Utilisateurs</span>
                     </a>
                 </div>
+
+                <div class="nav-item">
+                    <a href="{% url 'admin_dashboard:ai_chat' %}" class="nav-link {% if 'ai-chat' in request.path %}active{% endif %}">
+                        <i class="fas fa-robot nav-icon"></i>
+                        <span class="nav-text">Assistant IA</span>
+                    </a>
+                </div>
             </div>
             {% endif %}
         </nav>
