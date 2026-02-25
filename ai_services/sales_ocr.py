@@ -37,48 +37,59 @@ Retourne UNIQUEMENT: {"photo_type": "amana_slip|receipt|payment|note|other"}"""
 DESCRIBE_AMANA = """Décris EXACTEMENT ce que tu vois sur ce bordereau AMANA (Poste Maroc).
 
 Lis et transcris chaque information visible:
-- Le code de suivi (code-barres avec lettres et chiffres)
-- Le numéro de bordereau (nombre en haut)
-- Le nom du destinataire
-- Le numéro de téléphone
-- Le montant contre-remboursement (COD)
+- Le code de suivi (code-barres, format lettres+chiffres+lettres, ex: QB...MA)
+- Le numéro de bordereau (nombre court en haut)
+- Le nom de l'EXPÉDITEUR (celui qui envoie)
+- Le nom du DESTINATAIRE (celui qui reçoit)
+- Les numéros de téléphone
+- Le montant CONTRE-REMBOURSEMENT (COD) — ATTENTION: lis TOUS les chiffres, y compris les milliers. 1200 ≠ 200, 3500 ≠ 500
+- La valeur déclarée
 - La ville de destination
 - Le poids du colis
 
-Transcris les chiffres exactement: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G.
-Écris UNIQUEMENT ce que tu LIS. Si tu ne peux pas lire quelque chose, dis "illisible"."""
+MONTANTS: Lis le montant COMPLET. Les montants de bijouterie sont souvent entre 500 et 10000 DH.
+Chiffres: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G.
+Écris UNIQUEMENT ce que tu LIS. Si illisible, dis "illisible"."""
 
 DESCRIBE_RECEIPT = """RÈGLE ABSOLUE: Décris UNIQUEMENT ce qui est PHYSIQUEMENT ÉCRIT sur ce papier.
 Si tu ne vois pas un produit écrit, NE LE MENTIONNE PAS.
-Si tu inventes un seul produit, ta réponse est FAUSSE.
 
-Ce document est un reçu/facture de bijouterie (papier souvent JAUNE, numéro en ROUGE en haut).
+Ce document est un reçu de bijouterie (papier JAUNE ou blanc, numéro en ROUGE en haut).
+Le reçu a un TABLEAU avec des colonnes en arabe:
+- نوع السلعة = Type/Description du produit
+- العدد = Quantité
+- العيار = Pureté (18K, 21K, 9K)
+- الميزان = Poids en grammes
+- السوم = Prix unitaire au gramme
+- الواجب بالدرهم = Montant total en DH
 
-Lis ligne par ligne et transcris:
-1. Le numéro imprimé en rouge en haut du papier (tous les chiffres)
-2. Chaque ligne de produit RÉELLEMENT ÉCRITE — description, poids (g), prix (DH)
-3. Le total
-4. Nom du client, téléphone, ville (si écrit)
-5. Remises
+Lis et transcris:
+1. Le numéro en ROUGE en haut (tous les chiffres)
+2. Le nom du client (en haut du tableau, souvent en arabe)
+3. Chaque LIGNE du tableau — décris le produit, la quantité, le poids, le prix
+4. Le TOTAL en bas
+5. Téléphone, ville si écrits
 
-COMBIEN de lignes de produits vois-tu écrites ? Indique le nombre EXACT avant de les lister.
-Si tu vois 1 seule ligne, transcris 1 seul produit. Si 2 lignes, 2 produits. Pas plus.
-
-Si le texte est en arabe, traduis en français.
-Chiffres: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G.
-Si illisible, dis "illisible". N'INVENTE JAMAIS."""
+MONTANTS: Les totaux de bijouterie sont entre 500 et 50000 DH. Lis TOUS les chiffres: 4700 ≠ 700, 1200 ≠ 200.
+Si le texte est en arabe, traduis: سلسلة=chaîne, خاتم=bague, حلق/كريول=boucles d'oreilles, سوار=bracelet, دبلة=alliance.
+Si illisible, dis "illisible". N'INVENTE JAMAIS de produit."""
 
 DESCRIBE_PAYMENT = """Décris EXACTEMENT ce que tu vois sur ce reçu de paiement/versement.
 
+Ce document prouve qu'un paiement a été reçu (versement bancaire, transfert Cash Plus/Wafacash, ou reçu manuscrit).
+
 Lis et transcris chaque information visible:
-- Le montant payé
-- Le mode de paiement (espèces, chèque, virement, carte)
-- Tout numéro de référence visible
-- Le nom du client/bénéficiaire
+- Le MONTANT payé — lis TOUS les chiffres y compris les milliers. ATTENTION: 3,500 = trois mille cinq cents, 3500 ≠ 500
+- Le mode de paiement (espèces, chèque, virement, carte, transfert)
+- Le numéro de référence / numéro de transaction
+- Le nom de l'envoyeur/payeur
+- Le nom du bénéficiaire/destinataire
 - La date
+- Le nom de la banque ou agence
 - Tout autre détail visible
 
-Écris UNIQUEMENT ce que tu LIS. Si tu ne peux pas lire quelque chose, dis "illisible"."""
+MONTANTS: Les paiements bijouterie sont entre 500 et 50000 DH. Vérifie que tu as lu le montant COMPLET.
+Écris UNIQUEMENT ce que tu LIS. Si illisible, dis "illisible"."""
 
 DESCRIBE_NOTE = """Décris EXACTEMENT ce que tu vois sur cette note manuscrite.
 
@@ -147,8 +158,9 @@ Extrais les informations de cette description et retourne ce JSON:
 
 Règles:
 - Si le type est "payment", receipt_number doit être null (les numéros vont dans payment_info.reference)
-- Si le type est "amana_slip", items doit être vide []
+- Si le type est "amana_slip", items doit être vide [], client_name = nom du DESTINATAIRE (pas l'expéditeur)
 - Si une info est marquée "illisible" ou absente, mets null
+- MONTANTS: Extrais le montant EXACT tel que décrit. "3,500" ou "3500" = 3500 (pas 500). "1200" = 1200 (pas 200).
 - Retourne UNIQUEMENT le JSON"""
 
 
