@@ -456,6 +456,47 @@ def _clean_bordereau_number(value):
     return raw
 
 
+# Store's own phone numbers — must never appear as client phone
+STORE_PHONES = {
+    '0674358833', '0663763842', '0656204070',
+    '06 74 35 88 33', '06 63 76 38 42', '06 56 20 40 70',
+}
+
+
+def _clean_client_phone(value):
+    """Clean client phone: remove store's own numbers, strip CIN/ID patterns."""
+    raw = _strip_null((value or '')).strip()
+    if not raw:
+        return ''
+    # Remove store phone numbers
+    cleaned = raw
+    for store_phone in STORE_PHONES:
+        cleaned = cleaned.replace(store_phone, '')
+    # Also match with various spacing: 06XX XX XX XX
+    cleaned = re.sub(r'0\s*6\s*7\s*4\s*3\s*5\s*8\s*8\s*3\s*3', '', cleaned)
+    cleaned = re.sub(r'0\s*6\s*6\s*3\s*7\s*6\s*3\s*8\s*4\s*2', '', cleaned)
+    cleaned = re.sub(r'0\s*6\s*5\s*6\s*2\s*0\s*4\s*0\s*7\s*0', '', cleaned)
+    # Clean up separators left over
+    cleaned = re.sub(r'^[\s,;/\-]+|[\s,;/\-]+$', '', cleaned)
+    cleaned = re.sub(r'[\s,;/\-]{2,}', ', ', cleaned)
+    return cleaned.strip()
+
+
+def _clean_client_name(value):
+    """Clean client name: remove CIN/ID patterns, bank references."""
+    raw = _strip_null((value or '')).strip()
+    if not raw:
+        return ''
+    # Remove CIN patterns (e.g., "CIN E74739", "CIN ET74789")
+    cleaned = re.sub(r'\bCIN\s*[A-Z]*\d+\b', '', raw, flags=re.IGNORECASE)
+    # Remove store name if it leaked in
+    cleaned = re.sub(r'Bijouterie\s+Hafsa', '', cleaned, flags=re.IGNORECASE)
+    # Clean up
+    cleaned = re.sub(r'^[\s,;/\-]+|[\s,;/\-]+$', '', cleaned)
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned)
+    return cleaned.strip()
+
+
 def _clean_sales_data(data):
     """Validate and clean extracted sales data."""
     delivery = data.get('delivery_info') or {}
@@ -463,8 +504,8 @@ def _clean_sales_data(data):
     cleaned = {
         'photo_type': data.get('photo_type', 'other'),
         'receipt_number': _clean_receipt_number(data.get('receipt_number')),
-        'client_name': _strip_null(data.get('client_name') or ''),
-        'client_phone': _strip_null(data.get('client_phone') or ''),
+        'client_name': _clean_client_name(data.get('client_name') or ''),
+        'client_phone': _clean_client_phone(data.get('client_phone') or ''),
         'client_city': _strip_null(data.get('client_city') or ''),
         'delivery_info': {
             'tracking_number': _clean_tracking_number(delivery.get('tracking_number')),
