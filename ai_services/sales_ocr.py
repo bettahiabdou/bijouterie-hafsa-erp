@@ -45,21 +45,25 @@ Lis et transcris chaque information visible:
 Transcris les chiffres exactement: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G.
 Écris UNIQUEMENT ce que tu LIS. Si tu ne peux pas lire quelque chose, dis "illisible"."""
 
-DESCRIBE_RECEIPT = """Décris EXACTEMENT ce que tu vois sur ce reçu/facture de bijouterie.
+DESCRIBE_RECEIPT = """RÈGLE ABSOLUE: Décris UNIQUEMENT ce qui est PHYSIQUEMENT ÉCRIT sur ce papier.
+Si tu ne vois pas un produit écrit, NE LE MENTIONNE PAS.
+Si tu inventes un seul produit, ta réponse est FAUSSE.
 
-Ce papier est souvent JAUNE avec un numéro imprimé en ROUGE en haut.
+Ce document est un reçu/facture de bijouterie (papier souvent JAUNE, numéro en ROUGE en haut).
 
-Lis et transcris TOUT ce qui est écrit, ligne par ligne:
-- Le numéro en rouge en haut (tous les chiffres)
-- Chaque ligne de produit: description, poids en grammes, prix en DH
-- Le total
-- Le nom du client, téléphone, ville (si mentionné)
-- Toute remise ou réduction
+Lis ligne par ligne et transcris:
+1. Le numéro imprimé en rouge en haut du papier (tous les chiffres)
+2. Chaque ligne de produit RÉELLEMENT ÉCRITE — description, poids (g), prix (DH)
+3. Le total
+4. Nom du client, téléphone, ville (si écrit)
+5. Remises
+
+COMBIEN de lignes de produits vois-tu écrites ? Indique le nombre EXACT avant de les lister.
+Si tu vois 1 seule ligne, transcris 1 seul produit. Si 2 lignes, 2 produits. Pas plus.
 
 Si le texte est en arabe, traduis en français.
-Transcris les chiffres exactement: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G.
-Écris UNIQUEMENT ce que tu LIS. Si tu ne peux pas lire quelque chose, dis "illisible".
-N'INVENTE rien — décris seulement ce qui est réellement écrit sur le papier."""
+Chiffres: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G.
+Si illisible, dis "illisible". N'INVENTE JAMAIS."""
 
 DESCRIBE_PAYMENT = """Décris EXACTEMENT ce que tu vois sur ce reçu de paiement/versement.
 
@@ -169,7 +173,10 @@ def extract_sales_data(image_path_or_bytes):
             return {'error': 'Le modèle n\'a pas pu lire la photo'}
 
         # --- Pass 3: Structure (chat model → JSON) ---
-        return _structure_description(description, photo_type)
+        result = _structure_description(description, photo_type)
+        # Include raw description for debugging
+        result['_raw_description'] = description[:500]
+        return result
 
     except Exception as e:
         logger.error(f'Sales OCR error: {e}')
@@ -433,7 +440,7 @@ def _clean_sales_data(data):
 
 def _filter_hallucinated_items(items):
     """Detect and remove hallucinated items with sequential/fabricated patterns."""
-    if len(items) <= 2:
+    if len(items) <= 1:
         return items
 
     weights = []
@@ -445,6 +452,7 @@ def _filter_hallucinated_items(items):
         except (ValueError, TypeError):
             pass
 
+    # Check sequential weights (arithmetic sequence)
     if len(weights) >= 4:
         diffs = [weights[i] - weights[i + 1] for i in range(len(weights) - 1)]
         if diffs:
@@ -453,6 +461,40 @@ def _filter_hallucinated_items(items):
                 logger.warning(f'Hallucination: sequential weights {weights[:5]}. Clearing.')
                 return []
 
+    # Check uniform price-per-gram ratio (model applying a formula)
+    if len(items) >= 3:
+        ratios = []
+        for item in items:
+            try:
+                w = float(item.get('weight') or 0)
+                p = float(item.get('unit_price') or 0)
+                if w > 0 and p > 0:
+                    ratios.append(p / w)
+            except (ValueError, TypeError):
+                pass
+        if len(ratios) >= 3:
+            avg_ratio = sum(ratios) / len(ratios)
+            if avg_ratio > 0 and all(abs(r - avg_ratio) / avg_ratio < 0.05 for r in ratios):
+                logger.warning(f'Hallucination: uniform price/gram {avg_ratio:.1f} DH/g across {len(ratios)} items. Clearing.')
+                return []
+
+    # Check generic category-only descriptions (no specific details)
+    if len(items) >= 3:
+        generic_names = {'bague', 'chaîne', 'chaine', 'bracelet', 'collier', 'pendentif',
+                         'boucles', "boucles d'oreilles", 'alliance', 'chevillère', 'ensemble',
+                         'corsage', 'broche', 'gourmette', 'médaille', 'medaille'}
+        generic_count = 0
+        for item in items:
+            desc = (item.get('description') or '').strip().lower()
+            # Strip metal info to check base description
+            desc_base = re.sub(r'\s*(or\s*(blanc|jaune|rose)|argent|plaqué).*', '', desc).strip()
+            if desc_base in generic_names:
+                generic_count += 1
+        if generic_count >= len(items) * 0.75:
+            logger.warning(f'Hallucination: {generic_count}/{len(items)} items are bare category names. Clearing.')
+            return []
+
+    # Check repeated descriptions
     if len(items) >= 5:
         descriptions = [item.get('description', '') for item in items]
         most_common = max(set(descriptions), key=descriptions.count)
