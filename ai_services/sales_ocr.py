@@ -28,134 +28,128 @@ Retourne UNIQUEMENT un JSON: {"photo_type": "amana_slip|receipt|payment|note|oth
 # --- Pass 2: Type-specific extraction prompts ---
 AMANA_PROMPT = """Tu extrais les données d'un BORDEREAU AMANA (Poste Maroc / Barid Al Maghrib).
 
-Cherche sur ce formulaire imprimé:
-- **Code de suivi AMANA**: code-barres avec lettres+chiffres (format: 2 lettres + 8 chiffres + 2-3 lettres, ex: QB22606611SMA)
-- **Numéro de bordereau**: nombre imprimé (souvent en haut ou en ROUGE, ex: 0020955)
+Lis UNIQUEMENT ce qui est écrit sur CE document. NE COPIE PAS d'exemples.
+
+Cherche sur ce formulaire:
+- **Code de suivi AMANA**: code-barres avec lettres+chiffres (format: 2 lettres + chiffres + 2-3 lettres)
+- **Numéro de bordereau**: nombre imprimé en haut du formulaire
 - **Nom du destinataire**: champ "Destinataire" ou "المرسل إليه"
-- **Téléphone**: champ "Tél" ou numéro à 10 chiffres (06XX ou 07XX)
+- **Téléphone**: numéro à 10 chiffres commençant par 06 ou 07
 - **Montant COD**: contre-remboursement (الثمن/المبلغ), dans une case encadrée
 - **Ville destination**: champ "Destination" ou "Ville"
 - **Poids colis**: en kg ou g
 
-ATTENTION aux caractères: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G
-- Numéros de téléphone marocains: TOUJOURS 10 chiffres commençant par 06 ou 07
-- Code de suivi AMANA: EXACTEMENT 8 chiffres entre les lettres (ex: QB22606611SMA)
+ATTENTION: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G
 
-Retourne ce JSON:
+Retourne ce JSON avec les valeurs LUES sur le document:
 {
     "photo_type": "amana_slip",
     "receipt_number": null,
-    "client_name": "nom du destinataire (si visible)",
-    "client_phone": "téléphone 10 chiffres (si visible)",
-    "client_city": "ville (si visible)",
+    "client_name": "valeur lue",
+    "client_phone": "valeur lue",
+    "client_city": "valeur lue",
     "delivery_info": {
-        "tracking_number": "code de suivi AMANA complet",
-        "bordereau_number": "numéro de bordereau",
+        "tracking_number": "valeur lue",
+        "bordereau_number": "valeur lue",
         "carrier": "amana",
-        "cod_amount": "montant COD en DH (nombre)",
-        "destination": "ville de destination",
-        "weight_package": "poids colis"
+        "cod_amount": "valeur lue (nombre)",
+        "destination": "valeur lue",
+        "weight_package": "valeur lue"
     },
     "items": [],
     "total_amount": null,
     "discount_total": null,
     "payment_info": {"amount_paid": null, "payment_method": null, "reference": null},
-    "notes": "autres infos utiles (si visible)"
+    "notes": "autres infos utiles lues sur le document"
 }
 
-Si une information n'est pas visible, mets null. NE DEVINE PAS."""
+Si une information n'est pas visible, mets null. NE DEVINE PAS. NE COPIE PAS les descriptions ci-dessus comme valeurs."""
 
 RECEIPT_PROMPT = """Tu extrais les données d'un REÇU/FACTURE DE BIJOUTERIE.
 
-RÈGLE ABSOLUE — ANTI-HALLUCINATION:
-- Extrait UNIQUEMENT les lignes de produits RÉELLEMENT ÉCRITES sur le papier
-- Compte le nombre de lignes de produits sur le reçu. Si tu vois 1 produit, retourne 1 item. Si tu vois 2 lignes, retourne 2 items.
-- NE FABRIQUE PAS de données. Inventer des items est INTERDIT.
-- Chaque item DOIT avoir un poids et prix DIFFÉRENT, lus directement sur le reçu
-- Si tous tes items ont le même poids ou le même prix, tu as probablement mal lu — relis le reçu
+RÈGLES ABSOLUES:
+- Lis UNIQUEMENT ce qui est écrit sur CE papier. NE COPIE PAS les descriptions du JSON ci-dessous comme valeurs.
+- Retourne EXACTEMENT le nombre de produits écrits sur le reçu. Pas plus, pas moins.
+- NE FABRIQUE PAS de données. Chaque valeur doit être lue sur le papier.
 
-C'est un papier (souvent JAUNE) avec une liste de produits bijoux vendus.
+C'est un papier (souvent JAUNE) avec une liste de produits bijoux.
 
-Cherche:
-- **Numéro de reçu**: nombre imprimé en ROUGE sur le papier (ex: 0020955). Copie TOUS les chiffres.
-- **Produits bijoux**: UNIQUEMENT les lignes réellement écrites sur le papier
-- **Poids en grammes**: nombre décimal lu sur le reçu (ex: 3.5g, 4.2gr)
-- **Prix**: en DH, lu sur le reçu
-- **Remise/تخفيض**: réduction appliquée
+Cherche sur CE papier:
+- **Numéro de reçu**: nombre imprimé en ROUGE sur le papier, souvent en haut. Copie TOUS les chiffres visibles.
+- **Produits**: chaque ligne de produit avec sa description, poids, prix
+- **Poids en grammes**: nombre décimal visible sur le reçu
+- **Prix**: montant en DH visible sur le reçu
+- **Remise**: réduction appliquée (si visible)
 - **Total**: prix final (الباقي = reste/final)
 - **Client**: nom, téléphone, ville (si mentionné)
 
-Si le texte est en arabe, traduis en français (ex: خاتم=bague, سلسلة=chaîne, سوار=bracelet, حلقات=boucles d'oreilles, قلادة=collier, دبلة=alliance).
+Si le texte est en arabe, traduis en français. ATTENTION: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G
 
-ATTENTION aux caractères: 5 ≠ S, 0 ≠ O, 1 ≠ I, 6 ≠ G
-
-Retourne ce JSON:
+Retourne ce JSON en remplaçant chaque "LIRE_SUR_PAPIER" par la valeur réelle lue:
 {
     "photo_type": "receipt",
-    "receipt_number": "numéro imprimé en ROUGE — copie TOUS les chiffres",
-    "client_name": "nom du client (si visible)",
-    "client_phone": "téléphone 10 chiffres (si visible)",
-    "client_city": "ville (si visible)",
+    "receipt_number": "LIRE_SUR_PAPIER",
+    "client_name": "LIRE_SUR_PAPIER",
+    "client_phone": "LIRE_SUR_PAPIER",
+    "client_city": "LIRE_SUR_PAPIER",
     "delivery_info": {"tracking_number": null, "bordereau_number": null, "carrier": null, "cod_amount": null, "destination": null, "weight_package": null},
     "items": [
         {
-            "description": "description en français de CE produit lu sur le reçu",
-            "category": "catégorie du bijou",
-            "metal_type": "or|argent|plaqué_or|acier|autre",
-            "purity": "18K|21K|24K|14K|9K|925",
-            "weight_grams": "poids en grammes lu sur le reçu",
+            "description": "LIRE_SUR_PAPIER",
+            "category": "LIRE_SUR_PAPIER",
+            "metal_type": "LIRE_SUR_PAPIER",
+            "purity": "LIRE_SUR_PAPIER",
+            "weight_grams": "LIRE_SUR_PAPIER",
             "quantity": 1,
-            "unit_price": "prix en DH lu sur le reçu",
-            "discount": "remise en DH"
+            "unit_price": "LIRE_SUR_PAPIER",
+            "discount": "LIRE_SUR_PAPIER"
         }
     ],
-    "total_amount": "total final en DH",
-    "discount_total": "remise totale en DH",
+    "total_amount": "LIRE_SUR_PAPIER",
+    "discount_total": "LIRE_SUR_PAPIER",
     "payment_info": {
-        "amount_paid": "montant payé",
-        "payment_method": "espèces|chèque|virement|carte",
-        "reference": "numéro de chèque ou ref"
+        "amount_paid": "LIRE_SUR_PAPIER",
+        "payment_method": "LIRE_SUR_PAPIER",
+        "reference": "LIRE_SUR_PAPIER"
     },
-    "notes": "autres infos utiles du CLIENT uniquement. IGNORE l'en-tête du magasin."
+    "notes": "LIRE_SUR_PAPIER — infos CLIENT uniquement, pas l'en-tête magasin"
 }
 
-RAPPEL: retourne UNIQUEMENT les produits réellement écrits sur le reçu. Pas plus, pas moins.
-Si une information n'est pas visible, mets null. NE DEVINE PAS."""
+Si une information n'est pas visible sur le papier, mets null.
+NE COPIE PAS "LIRE_SUR_PAPIER" comme valeur — remplace par ce que tu LIS."""
 
 PAYMENT_PROMPT = """Tu extrais les données d'un REÇU DE PAIEMENT / VERSEMENT.
 
-C'est une preuve de paiement (espèces, chèque, virement) pour un achat de bijoux.
-Ce n'est PAS un reçu de bijouterie — NE METS PAS de receipt_number (toujours null).
+Lis UNIQUEMENT ce qui est écrit sur CE document. NE COPIE PAS d'exemples.
+Ce n'est PAS un reçu de bijouterie — receipt_number doit être null.
 
 Cherche:
 - **Montant payé**: somme versée en DH
 - **Mode de paiement**: espèces, chèque, virement, carte
-- **Référence du paiement**: tout numéro visible sur le reçu (numéro de bordereau, ref virement, numéro de chèque) → mets-le dans payment_info.reference
+- **Référence du paiement**: tout numéro visible → mets dans payment_info.reference
 - **Nom du client**: qui a payé
 - **Date**: date du paiement
 
-Retourne ce JSON:
+Retourne ce JSON en remplaçant "LIRE_SUR_PAPIER" par les valeurs lues:
 {
     "photo_type": "payment",
     "receipt_number": null,
-    "client_name": "nom du client (si visible)",
-    "client_phone": "téléphone (si visible)",
-    "client_city": "ville (si visible)",
+    "client_name": "LIRE_SUR_PAPIER",
+    "client_phone": "LIRE_SUR_PAPIER",
+    "client_city": "LIRE_SUR_PAPIER",
     "delivery_info": {"tracking_number": null, "bordereau_number": null, "carrier": null, "cod_amount": null, "destination": null, "weight_package": null},
     "items": [],
     "total_amount": null,
     "discount_total": null,
     "payment_info": {
-        "amount_paid": "montant payé en DH",
-        "payment_method": "espèces|chèque|virement|carte",
-        "reference": "tout numéro visible sur le reçu de paiement (ref bordereau, chèque, virement)"
+        "amount_paid": "LIRE_SUR_PAPIER",
+        "payment_method": "LIRE_SUR_PAPIER",
+        "reference": "LIRE_SUR_PAPIER"
     },
-    "notes": "autres infos utiles (date, détails du paiement)"
+    "notes": "LIRE_SUR_PAPIER — date et détails du paiement"
 }
 
-IMPORTANT: receipt_number doit TOUJOURS être null pour un reçu de paiement.
-Les numéros visibles sur ce reçu vont dans payment_info.reference.
-Si une information n'est pas visible, mets null. NE DEVINE PAS."""
+Si une information n'est pas visible, mets null. NE COPIE PAS "LIRE_SUR_PAPIER" comme valeur."""
 
 NOTE_PROMPT = """Tu extrais les données d'une NOTE MANUSCRITE liée à une vente de bijouterie au Maroc.
 
@@ -413,11 +407,16 @@ def _close_unclosed_json(text):
 
 
 def _strip_null(value):
-    """Convert literal string 'null'/'None'/'N/A' to empty string."""
+    """Convert literal string 'null'/'None'/'N/A'/placeholder to empty string."""
     if value is None:
         return ''
-    if isinstance(value, str) and value.strip().lower() in ('null', 'none', 'n/a', 'n\\a', 'nan'):
-        return ''
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in ('null', 'none', 'n/a', 'n\\a', 'nan', 'lire_sur_papier'):
+            return ''
+        # Also catch if model copied the placeholder with variations
+        if 'lire_sur_papier' in v or 'lire sur papier' in v:
+            return ''
     return value
 
 
@@ -542,11 +541,13 @@ def _clean_notes(notes):
 
 
 def _to_decimal(value):
-    """Convert a value to a decimal string, or None. Filters 'null' strings."""
+    """Convert a value to a decimal string, or None. Filters placeholder strings."""
     if value is None:
         return None
-    if isinstance(value, str) and value.strip().lower() in ('null', 'none', 'n/a', 'nan', ''):
-        return None
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in ('null', 'none', 'n/a', 'nan', '') or 'lire_sur_papier' in v or 'lire sur papier' in v:
+            return None
     try:
         return str(round(float(value), 2))
     except (ValueError, TypeError):
