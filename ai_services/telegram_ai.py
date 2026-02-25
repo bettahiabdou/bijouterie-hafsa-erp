@@ -18,21 +18,34 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """Tu es l'assistant IA de Bijouterie Hafsa, une bijouterie au Maroc. Tu aides le personnel du magasin à trouver des informations rapidement.
 
 Tu comprends le français, l'arabe standard, et le darija marocain. Exemples en darija:
-- "chhal dkhel lyoum?" = "combien on a encaissé aujourd'hui?"
-- "chhal dkhel lbareh?" = "combien on a encaissé hier?"
-- "chhal men khtem d dehab?" = "combien de bagues en or?"
-- "3tini solde dyal client Ahmed" = "donne-moi le solde du client Ahmed"
-- "wach kayn chi bracelet d 18K?" = "est-ce qu'il y a des bracelets en 18K?"
-- "chno les ventes dyal lyoum?" = "quelles sont les ventes d'aujourd'hui?"
-- "chkoun li ba3 kter had chher?" = "qui a le plus vendu ce mois?"
-- "wach waslet la livraison dyal LIV-XXX?" = "est-ce que la livraison LIV-XXX est arrivée?"
-- "feen waslet la commande dyal Fatima?" = "où en est la commande de Fatima?"
-
-Tu dois répondre de manière concise et utile. Réponds en français sauf si l'utilisateur parle en darija ou arabe.
+- "chhal dkhel lyoum?" = "combien on a encaissé aujourd'hui?" → get_dashboard_summary(today)
+- "chhal dkhel lbareh?" = "combien on a encaissé hier?" → get_dashboard_summary(yesterday)
+- "chhal men khtem d dehab?" = "combien de bagues en or?" → count_products
+- "3tini solde dyal client Ahmed" = "donne-moi le solde du client Ahmed" → get_client_info
+- "wach kayn chi bracelet d 18K?" = "est-ce qu'il y a des bracelets en 18K?" → search_products
+- "chno les ventes dyal lyoum?" = "quelles sont les ventes d'aujourd'hui?" → get_sales_stats(today)
+- "chkoun li ba3 kter had chher?" = "qui a le plus vendu ce mois?" → get_seller_performance(month)
+- "wach waslet la livraison dyal LIV-XXX?" → get_delivery_status
+- "feen waslet la commande dyal Fatima?" → search_delivery
+- "chkoun huma top client dyalna?" = "qui sont nos meilleurs clients?" → get_top_clients(month)
+- "chno li tba3 kter?" = "qu'est-ce qui se vend le plus?" → get_top_products(month)
 
 IMPORTANT: Tu as accès à TOUTES les données du système. Tu dois TOUJOURS appeler une fonction pour répondre — ne dis JAMAIS "je n'ai pas accès" ou "je ne peux pas". Si la question concerne des données, appelle la fonction la plus proche.
 
-Pour répondre aux questions, retourne UNIQUEMENT un JSON avec la fonction à appeler:
+GUIDE DE ROUTAGE:
+- "dkhel/encaissé/résumé/tableau de bord" → get_dashboard_summary (PAS get_sales_stats)
+- "ventes/CA/chiffre d'affaires" → get_sales_stats
+- "top/meilleur/fidèle clients" → get_top_clients
+- "top/meilleur produits/best seller" → get_top_products
+- "vendeur/performance/qui a vendu" → get_seller_performance
+- "livraison/LIV-/suivi/tracking" → get_delivery_status
+- "en attente/pending" → get_pending_deliveries
+- "paiement/espèces/virement/chèque" → get_payment_breakdown
+- "stock/inventaire" → get_inventory_summary
+- "achat/fournisseur" → get_purchase_stats
+- "réparation" → get_repair_stats
+
+Pour répondre, retourne UNIQUEMENT un JSON avec la fonction à appeler:
 
 FONCTIONS DISPONIBLES:
 
@@ -60,7 +73,7 @@ FONCTIONS DISPONIBLES:
 8. get_delivery_status: Statut d'une livraison par référence ou numéro de suivi
    {"function": "get_delivery_status", "params": {"reference": "LIV-XXXXXXXX-XXXX"}}
 
-9. get_dashboard_summary: Résumé complet (CA, encaissé réel, livraisons, paiements, dépôts)
+9. get_dashboard_summary: Résumé complet (CA, encaissé réel, livraisons, paiements, dépôts). Utilise cette fonction pour "chhal dkhel" et toute question sur l'encaissement.
    {"function": "get_dashboard_summary", "params": {"period": "today/yesterday/week/last_week/month/last_month/year"}}
 
 10. get_payment_breakdown: Détail paiements par méthode (espèces, virement, chèque) et par banque
@@ -87,7 +100,13 @@ FONCTIONS DISPONIBLES:
 17. get_repair_stats: Statistiques des réparations
     {"function": "get_repair_stats", "params": {"period": "today/month"}}
 
-18. general_answer: UNIQUEMENT pour les salutations et questions sans rapport avec les données
+18. get_top_clients: Meilleurs clients par CA, nombre d'achats et poids
+    {"function": "get_top_clients", "params": {"period": "month", "limit": 10}}
+
+19. get_top_products: Produits les plus vendus par quantité et CA
+    {"function": "get_top_products", "params": {"period": "month", "limit": 10}}
+
+20. general_answer: UNIQUEMENT pour les salutations et questions sans rapport avec les données
     {"function": "general_answer", "params": {"answer": "ta réponse ici"}}
 
 PERIODES SUPPORTEES: today (aujourd'hui), yesterday (hier), week (cette semaine), last_week (semaine dernière), month (ce mois), last_month (mois dernier), year (cette année)
@@ -136,7 +155,8 @@ def process_ai_query(text):
         if func_name == 'general_answer':
             return params.get('answer', result)
 
-        return _format_result(func_name, params, result, text)
+        # 2nd AI pass: format data into natural response
+        return _ai_format_response(func_name, result, text)
 
     except json.JSONDecodeError:
         return response if response else "Désolé, je n'ai pas compris. Essayez de reformuler."
@@ -165,6 +185,8 @@ def _execute_function(func_name, params):
         'get_inventory_summary': _fn_get_inventory_summary,
         'search_delivery': _fn_search_delivery,
         'get_repair_stats': _fn_get_repair_stats,
+        'get_top_clients': _fn_get_top_clients,
+        'get_top_products': _fn_get_top_products,
         'general_answer': lambda p: p.get('answer', ''),
     }
 
@@ -376,6 +398,73 @@ def _fn_get_client_sales(params):
             } for inv in invoices],
         })
     return results
+
+
+# ============ TOP CLIENTS / TOP PRODUCTS ============
+
+def _fn_get_top_clients(params):
+    from sales.models import SaleInvoice
+    period = params.get('period', 'month')
+    limit = params.get('limit', 10)
+    start_date, end_date, label = _get_date_range(period)
+
+    base = SaleInvoice.objects.filter(
+        is_deleted=False, date__gte=start_date, date__lte=end_date,
+        client__isnull=False,
+    ).exclude(status='returned')
+
+    clients = list(base.values(
+        'client__first_name', 'client__last_name', 'client__phone',
+    ).annotate(
+        count=Count('id'), revenue=Sum('total_amount'),
+        paid=Sum('amount_paid'), weight=Sum('items__product__gross_weight'),
+    ).order_by('-revenue')[:limit])
+
+    return {
+        'period': label,
+        'clients': [{
+            'name': f"{c['client__first_name'] or ''} {c['client__last_name'] or ''}".strip() or 'Anonyme',
+            'phone': c['client__phone'] or '-',
+            'invoices': c['count'],
+            'revenue': f"{c['revenue'] or 0} DH",
+            'paid': f"{c['paid'] or 0} DH",
+            'weight': f"{c['weight'] or 0}g",
+        } for c in clients],
+    }
+
+
+def _fn_get_top_products(params):
+    from sales.models import SaleInvoiceItem
+    period = params.get('period', 'month')
+    limit = params.get('limit', 10)
+    start_date, end_date, label = _get_date_range(period)
+
+    base = SaleInvoiceItem.objects.filter(
+        invoice__is_deleted=False, invoice__date__gte=start_date,
+        invoice__date__lte=end_date, product__isnull=False,
+    ).exclude(invoice__status='returned')
+
+    # Top by quantity sold
+    products = list(base.values(
+        'product__name', 'product__reference',
+        'product__category__name', 'product__metal_type__name',
+    ).annotate(
+        qty=Sum('quantity'), revenue=Sum('total_amount'),
+        count=Count('invoice', distinct=True),
+    ).order_by('-qty')[:limit])
+
+    return {
+        'period': label,
+        'products': [{
+            'name': p['product__name'],
+            'reference': p['product__reference'],
+            'category': p['product__category__name'] or '-',
+            'metal': p['product__metal_type__name'] or '-',
+            'qty_sold': p['qty'] or 0,
+            'revenue': f"{p['revenue'] or 0} DH",
+            'invoices': p['count'],
+        } for p in products],
+    }
 
 
 # ============ SALES / DASHBOARD FUNCTIONS ============
@@ -746,220 +835,64 @@ def _fn_get_repair_stats(params):
     }
 
 
-# ============ FORMATTERS ============
+# ============ AI RESPONSE FORMATTER (2nd pass) ============
 
-def _format_result(func_name, params, result, original_query):
-    """Format function results into user-friendly text."""
+FORMAT_PROMPT = """Tu es l'assistant IA de Bijouterie Hafsa. Tu reçois une question utilisateur et les données brutes du système.
+
+Formule une réponse NATURELLE et CONVERSATIONNELLE en utilisant les données. Règles:
+- Réponds dans la même langue que la question (darija, français, ou arabe)
+- Si la question est en darija, réponds en darija/français mélangé naturellement
+- Utilise des emojis pour structurer (📊💰👤📦🏆 etc.)
+- Sois concis mais complet — montre les chiffres importants
+- Pour les listes (top clients, produits, vendeurs), utilise un classement numéroté (1. 2. 3.)
+- Pour les montants, garde le format "X DH"
+- Ne dis JAMAIS que tu n'as pas accès aux données
+- Si les données contiennent une erreur, explique-la simplement
+- Maximum 2000 caractères pour la réponse
+"""
+
+
+def _ai_format_response(func_name, result, original_query):
+    """Use AI to format function results into natural conversational response."""
+    # Quick check for errors
     if isinstance(result, dict) and 'error' in result:
         return f"❌ {result['error']}"
 
-    if func_name == 'search_products':
-        if not result:
-            return "Aucun produit trouvé."
-        lines = [f"🔍 {len(result)} produit(s) trouvé(s):\n"]
-        for p in result:
-            lines.append(f"• {p['reference']} - {p['name']}")
-            lines.append(f"  {p['metal']} | {p['weight']} | {p['price']}")
-        return '\n'.join(lines)
+    # Empty results
+    if isinstance(result, list) and not result:
+        return "Aucun résultat trouvé."
 
-    elif func_name == 'count_products':
-        return f"📊 {result['count']} produit(s)\n   Poids: {result['total_weight']}\n   Valeur: {result['total_value']}"
+    # Prepare data summary for AI (truncate if too large)
+    data_str = json.dumps(result, ensure_ascii=False, default=str)
+    if len(data_str) > 3000:
+        data_str = data_str[:3000] + '... (tronqué)'
 
-    elif func_name == 'get_client_info':
-        if not result:
-            return "Client introuvable."
+    try:
+        messages = [
+            {'role': 'system', 'content': FORMAT_PROMPT},
+            {'role': 'user', 'content': f"Question: {original_query}\n\nFonction appelée: {func_name}\n\nDonnées:\n{data_str}"},
+        ]
+
+        response = scaleway_client.chat_completion(
+            messages=messages,
+            model=scaleway_client.MODELS['chat'],
+            temperature=0.3,
+            max_tokens=1024,
+        )
+        return response.strip()
+    except Exception as e:
+        logger.error(f'AI format error: {e}')
+        # Fallback to basic JSON dump
+        return _fallback_format(func_name, result)
+
+
+def _fallback_format(func_name, result):
+    """Simple fallback formatter if the AI format pass fails."""
+    if isinstance(result, dict):
         lines = []
-        for c in result:
-            lines.append(f"👤 {c['name']} ({c['code']})")
-            lines.append(f"   📱 {c['phone']}")
-            lines.append(f"   💰 Dépôt: {c['deposit_balance']}")
-        return '\n'.join(lines)
-
-    elif func_name == 'get_client_sales':
-        if not result:
-            return "Client introuvable."
-        lines = []
-        for c in result:
-            lines.append(f"👤 {c['client']} - {c['total_invoices']} factures")
-            lines.append(f"   Total: {c['total_amount']} | Payé: {c['total_paid']}\n")
-            for inv in c.get('invoices', [])[:5]:
-                lines.append(f"   • {inv['ref']} ({inv['date']}) - {inv['amount']} [{inv['status']}]")
-        return '\n'.join(lines)
-
-    elif func_name == 'get_sales_stats':
-        r = result
-        return (
-            f"📈 Ventes - {r['period']}:\n"
-            f"   Factures: {r['invoices']}\n"
-            f"   CA: {r['revenue']}\n"
-            f"   Poids: {r['weight']}\n"
-            f"   Encaissé: {r['paid']}\n"
-            f"   Reste: {r['balance_due']}\n"
-            f"   Remise: {r['discount']}"
-        )
-
-    elif func_name == 'get_product_by_ref':
-        p = result
-        return (
-            f"📦 {p['reference']} - {p['name']}\n"
-            f"   {p['metal']} | {p['weight']}\n"
-            f"   Prix: {p['selling_price']} | Coût: {p['cost']}\n"
-            f"   Statut: {p['status']}\n"
-            f"   Fournisseur: {p['supplier']}\n"
-            f"   Emplacement: {p['location']}"
-        )
-
-    elif func_name == 'get_invoice_detail':
-        inv = result
-        lines = [
-            f"🧾 Facture {inv['reference']}",
-            f"   Date: {inv['date']} | Statut: {inv['status']}",
-            f"   Client: {inv['client']}",
-            f"   Vendeur: {inv['seller']}",
-            f"   Total: {inv['total']} | Payé: {inv['paid']} | Reste: {inv['balance']}",
-            f"   Livraison: {inv['delivery_type']} - {inv['delivery_status']}",
-        ]
-        if inv.get('items'):
-            lines.append(f"\n   Articles ({len(inv['items'])}):")
-            for item in inv['items'][:8]:
-                lines.append(f"   • {item['ref']} - {item['product']} × {item['qty']} = {item['price']}")
-        if inv.get('payments'):
-            lines.append(f"\n   Paiements ({len(inv['payments'])}):")
-            for p in inv['payments']:
-                lines.append(f"   • {p['amount']} ({p['method']}) - {p['date']}")
-        return '\n'.join(lines)
-
-    elif func_name == 'get_delivery_status':
-        if isinstance(result, list):
-            lines = [f"📦 {len(result)} livraisons trouvées:\n"]
-            for d in result:
-                lines.append(f"• {d['reference']} - {d['client']} - {d['status']} (Suivi: {d['tracking']})")
-            return '\n'.join(lines)
-        d = result
-        lines = [
-            f"📦 Livraison {d['reference']}",
-            f"   Facture: {d['invoice']}",
-            f"   Client: {d['client']} | 📱 {d['phone']}",
-            f"   Statut: {d['status']}",
-            f"   Type: {d['type']}",
-        ]
-        if d.get('carrier') and d['carrier'] != '-':
-            lines.append(f"   Transporteur: {d['carrier']}")
-        if d.get('tracking') and d['tracking'] != '-':
-            lines.append(f"   Suivi: {d['tracking']}")
-        lines.append(f"   Montant: {d['amount']}")
-        if d.get('current_position') and d['current_position'] != '-':
-            lines.append(f"   Position: {d['current_position']}")
-        if d.get('destination') and d['destination'] != '-':
-            lines.append(f"   Destination: {d['destination']}")
-        return '\n'.join(lines)
-
-    elif func_name == 'search_delivery':
-        if not result:
-            return "Aucune livraison trouvée."
-        lines = [f"📦 {len(result)} livraison(s) trouvée(s):\n"]
-        for d in result:
-            lines.append(f"• {d['reference']} - {d['client']}")
-            lines.append(f"  {d['status']} | {d['type']} | {d['amount']}")
-            if d.get('tracking') and d['tracking'] != '-':
-                lines.append(f"  Suivi: {d['tracking']}")
-        return '\n'.join(lines)
-
-    elif func_name == 'get_dashboard_summary':
-        r = result
-        return (
-            f"📊 Tableau de bord - {r['period']}:\n\n"
-            f"💰 CA: {r['revenue']} ({r['invoices']} factures)\n"
-            f"⚖️ Poids: {r['weight']}\n"
-            f"✅ Encaissé réel: {r['encaisse']}\n"
-            f"💳 Paiements: {r['payments_total']}\n"
-            f"🏦 Dépôt Client: {r['deposit_client']}\n"
-            f"📦 AMANA en attente: {r['amana_pending']}\n"
-            f"🚚 Transporteur en attente: {r['transporteur_pending']}\n"
-            f"⏳ Reste à payer: {r['balance_due']}\n"
-            f"🏷️ Remises: {r['discount']}\n"
-            f"🪙 Or ancien: {r['old_gold']}\n"
-            f"💵 Fonds dépôt reçus: {r['deposit_funds']}"
-        )
-
-    elif func_name == 'get_payment_breakdown':
-        lines = [f"💳 Paiements - {result['period']}:\n", f"Total: {result['total']}\n"]
-        for m in result.get('methods', []):
-            lines.append(f"• {m['method']}: {m['total']} ({m['count']} paiements)")
-        if result.get('banks'):
-            lines.append(f"\n🏦 Par banque:")
-            for b in result['banks']:
-                lines.append(f"• {b['bank']}: {b['total']} ({b['count']})")
-        return '\n'.join(lines)
-
-    elif func_name == 'get_delivery_stats':
-        r = result
-        return (
-            f"🚚 Livraisons - {r['period']}:\n\n"
-            f"🏪 Magasin: {r['magasin']['count']} factures - {r['magasin']['revenue']}\n"
-            f"📦 AMANA: {r['amana']['count']} factures - {r['amana']['revenue']}\n"
-            f"🚛 Transporteur: {r['transporteur']['count']} factures - {r['transporteur']['revenue']}\n"
-            f"🏢 En Stock: {r['en_stock']['count']} factures - {r['en_stock']['revenue']}"
-        )
-
-    elif func_name == 'get_seller_performance':
-        lines = [f"👥 Performance vendeurs - {result['period']}:\n"]
-        for i, s in enumerate(result.get('sellers', []), 1):
-            lines.append(f"{i}. {s['name']}")
-            lines.append(f"   {s['invoices']} factures | {s['revenue']} | {s['weight']}")
-        if not result.get('sellers'):
-            lines.append("Aucune vente pour cette période.")
-        return '\n'.join(lines)
-
-    elif func_name == 'get_pending_deliveries':
-        a = result.get('amana', {})
-        t = result.get('transporteur', {})
-        lines = [f"📦 Livraisons en attente:\n"]
-        lines.append(f"AMANA: {a.get('count', 0)} en attente - {a.get('total', '0 DH')}")
-        for inv in a.get('invoices', [])[:5]:
-            lines.append(f"  • {inv['ref']} - {inv['client']} - {inv['amount']} ({inv['date']})")
-        lines.append(f"\nTransporteur: {t.get('count', 0)} en attente - {t.get('total', '0 DH')}")
-        for inv in t.get('invoices', [])[:5]:
-            lines.append(f"  • {inv['ref']} - {inv['client']} - {inv['amount']} ({inv['date']})")
-        lines.append(f"\n💰 Total en attente: {result.get('total_pending', '0 DH')}")
-        return '\n'.join(lines)
-
-    elif func_name == 'get_purchase_stats':
-        lines = [f"🛒 Achats - {result['period']}:\n"]
-        lines.append(f"Factures: {result['invoices']} | Total: {result['total']}")
-        lines.append(f"Payé: {result['paid']} | Reste: {result['balance']}")
-        if result.get('suppliers'):
-            lines.append(f"\nPar fournisseur:")
-            for s in result['suppliers']:
-                lines.append(f"• {s['name']}: {s['total']} ({s['invoices']} factures)")
-        return '\n'.join(lines)
-
-    elif func_name == 'get_inventory_summary':
-        r = result
-        lines = [
-            f"📦 Stock disponible:\n",
-            f"Total: {r['total_products']} produits",
-            f"Poids: {r['total_weight']}",
-            f"Valeur vente: {r['total_value']}",
-            f"Coût: {r['total_cost']}",
-        ]
-        if r.get('by_category'):
-            lines.append(f"\nPar catégorie:")
-            for c in r['by_category'][:7]:
-                lines.append(f"• {c['name']}: {c['count']} pcs - {c['weight']} - {c['value']}")
-        if r.get('by_metal'):
-            lines.append(f"\nPar métal:")
-            for m in r['by_metal'][:5]:
-                lines.append(f"• {m['name']}: {m['count']} pcs - {m['weight']} - {m['value']}")
-        return '\n'.join(lines)
-
-    elif func_name == 'get_repair_stats':
-        lines = [f"🔧 Réparations - {result['period']}:\n"]
-        lines.append(f"Total: {result['total']} | CA: {result['revenue']}")
-        if result.get('by_status'):
-            lines.append(f"\nPar statut:")
-            for s in result['by_status']:
-                lines.append(f"• {s['status']}: {s['count']}")
-        return '\n'.join(lines)
-
+        for k, v in result.items():
+            if isinstance(v, (list, dict)):
+                continue
+            lines.append(f"• {k}: {v}")
+        return '\n'.join(lines) if lines else json.dumps(result, ensure_ascii=False, indent=2)
     return json.dumps(result, ensure_ascii=False, indent=2)
