@@ -1841,7 +1841,7 @@
             let receiptNumber = '';
             let totalAmount = null;
             let discountTotal = null;
-            let paymentInfo = null;
+            let allPayments = [];
             let deliveryInfo = null;
             let notes = [];
 
@@ -1865,7 +1865,13 @@
                 if (cleanNull(d.receipt_number) && !receiptNumber && d.photo_type === 'receipt') receiptNumber = cleanNull(d.receipt_number);
                 if (cleanNull(d.total_amount) && !totalAmount) totalAmount = cleanNull(d.total_amount);
                 if (cleanNull(d.discount_total) && !discountTotal) discountTotal = cleanNull(d.discount_total);
-                if (d.payment_info && cleanNull(d.payment_info.amount_paid) && !paymentInfo) paymentInfo = d.payment_info;
+                if (d.payment_info && cleanNull(d.payment_info.amount_paid)) {
+                    allPayments.push({
+                        amount_paid: parseFloat(d.payment_info.amount_paid) || 0,
+                        payment_method: cleanNull(d.payment_info.payment_method) || '',
+                        reference: cleanNull(d.payment_info.reference) || '',
+                    });
+                }
 
                 // Delivery info (from AMANA slips) — prefer valid AMANA tracking format
                 if (d.delivery_info && cleanNull(d.delivery_info.tracking_number)) {
@@ -1885,6 +1891,17 @@
                     d.items.forEach(item => allItems.push(item));
                 }
             });
+
+            // Deduplicate payments by reference number
+            let uniquePayments = [];
+            let seenRefs = new Set();
+            allPayments.forEach(p => {
+                const ref = (p.reference || '').trim().replace(/\s+/g, '');
+                if (ref && seenRefs.has(ref)) return; // duplicate — same receipt photographed twice
+                if (ref) seenRefs.add(ref);
+                uniquePayments.push(p);
+            });
+            const totalPaid = uniquePayments.reduce((s, p) => s + p.amount_paid, 0);
 
             let html = '';
 
@@ -1950,14 +1967,41 @@
             }
 
             // Total & Payment & Discount
-            if (cleanNull(totalAmount) || cleanNull(discountTotal) || (paymentInfo && cleanNull(paymentInfo.amount_paid))) {
+            if (cleanNull(totalAmount) || cleanNull(discountTotal) || uniquePayments.length > 0) {
                 html += '<div class="ai-result-item">';
-                html += '<div class="ai-result-label">Paiement</div>';
+                html += '<div class="ai-result-label"><i class="fas fa-money-bill-wave mr-1"></i> Paiement</div>';
                 html += '<div class="ai-result-value">';
-                if (cleanNull(totalAmount)) html += `Total: <strong>${escapeHtml(String(totalAmount))} DH</strong> `;
-                if (cleanNull(discountTotal)) html += `| Remise: <span style="color: var(--error-600);">-${escapeHtml(String(discountTotal))} DH</span> `;
-                if (paymentInfo && cleanNull(paymentInfo.amount_paid)) html += `| Payé: ${escapeHtml(String(paymentInfo.amount_paid))} DH `;
-                if (paymentInfo && cleanNull(paymentInfo.payment_method)) html += `(${escapeHtml(paymentInfo.payment_method)})`;
+                if (cleanNull(totalAmount)) html += `Total facture: <strong>${escapeHtml(String(totalAmount))} DH</strong><br>`;
+                if (cleanNull(discountTotal)) html += `Remise: <span style="color: var(--error-600);">-${escapeHtml(String(discountTotal))} DH</span><br>`;
+
+                if (uniquePayments.length > 0) {
+                    html += `<div style="margin-top: var(--space-2); padding: var(--space-2); background: var(--success-50); border: 1px solid var(--success-200); border-radius: var(--radius-md);">`;
+                    html += `<strong style="color: var(--success-700);">Total payé: ${totalPaid.toFixed(2)} DH</strong>`;
+                    html += ` <span style="color: var(--neutral-500);">(${uniquePayments.length} paiement${uniquePayments.length > 1 ? 's' : ''})</span>`;
+                    html += `</div>`;
+
+                    if (uniquePayments.length > 1) {
+                        html += '<div style="margin-top: var(--space-2); font-size: var(--text-sm);">';
+                        html += '<div style="color: var(--neutral-500); margin-bottom: 4px;">Détail:</div>';
+                        uniquePayments.forEach((p, i) => {
+                            html += `<div style="display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid var(--neutral-100);">`;
+                            html += `<span>${escapeHtml(p.payment_method || 'Paiement ' + (i+1))}`;
+                            if (p.reference) html += ` <span style="color: var(--neutral-400); font-size: var(--text-xs);">#${escapeHtml(p.reference.substring(0, 12))}</span>`;
+                            html += `</span>`;
+                            html += `<strong>${p.amount_paid.toFixed(2)} DH</strong>`;
+                            html += `</div>`;
+                        });
+                        html += '</div>';
+                    } else {
+                        const p = uniquePayments[0];
+                        if (p.payment_method) {
+                            html += `<div style="margin-top: 2px; font-size: var(--text-sm); color: var(--neutral-500);">`;
+                            html += escapeHtml(p.payment_method);
+                            if (p.reference) html += ` - Réf: ${escapeHtml(p.reference)}`;
+                            html += '</div>';
+                        }
+                    }
+                }
                 html += '</div></div>';
             }
 
@@ -1986,6 +2030,11 @@
             content.innerHTML = html;
             panel.style.display = 'block';
             panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Auto-fill payment sections in the form
+            if (uniquePayments.length > 0) {
+                _autoFillPayments(uniquePayments);
+            }
         }
 
         function _autoFillDelivery(deliveryInfo) {
@@ -2003,6 +2052,79 @@
                 // Also update hidden field
                 const hiddenTracking = document.getElementById('tracking-number-hidden');
                 if (hiddenTracking) hiddenTracking.value = deliveryInfo.tracking_number;
+            }
+        }
+
+        function _autoFillPayments(payments) {
+            if (payments.length === 0) return;
+
+            // Remove dynamically added payment sections (keep section 1)
+            document.querySelectorAll('.payment-section[data-payment-index]').forEach(section => {
+                const idx = parseInt(section.getAttribute('data-payment-index'));
+                if (idx > 1) section.remove();
+            });
+            paymentCount = 1;
+            document.getElementById('payment-count').value = 1;
+
+            payments.forEach((payment, i) => {
+                let sectionIndex;
+                if (i === 0) {
+                    sectionIndex = 1; // Use existing section 1
+                } else {
+                    addPaymentSection(); // Creates new section, increments paymentCount
+                    sectionIndex = paymentCount;
+                }
+
+                // Set amount
+                const amountInput = document.querySelector(`input[name="amount_paid_${sectionIndex}"]`);
+                if (amountInput) amountInput.value = payment.amount_paid.toFixed(2);
+
+                // Match payment method in select dropdown
+                const methodSelect = document.querySelector(`select[name="payment_method_${sectionIndex}"]`);
+                if (methodSelect && payment.payment_method) {
+                    _selectPaymentMethod(methodSelect, payment.payment_method);
+                    updatePaymentFieldsFor(sectionIndex);
+                }
+
+                // Set reference if available
+                if (payment.reference) {
+                    const refInput = document.querySelector(`input[name="payment_reference_${sectionIndex}"]`);
+                    if (refInput) refInput.value = payment.reference;
+                    const refGroup = document.getElementById(`reference-group-${sectionIndex}`);
+                    if (refGroup) refGroup.style.display = 'block';
+                }
+            });
+
+            updatePaymentStatus();
+        }
+
+        function _selectPaymentMethod(selectEl, ocrMethod) {
+            const normalized = ocrMethod.toLowerCase().trim();
+            const mappings = [
+                { terms: ['cash plus', 'cashplus', 'cash+'], match: 'cash' },
+                { terms: ['wafacash', 'wafa cash'], match: 'wafa' },
+                { terms: ['virement', 'transfert', 'transfer'], match: 'virement' },
+                { terms: ['espèce', 'espece', 'cash', 'liquide', 'versement espèces'], match: 'esp' },
+                { terms: ['chèque', 'cheque'], match: 'chèque' },
+                { terms: ['carte', 'card', 'cb'], match: 'carte' },
+                { terms: ['mobile', 'paiement mobile'], match: 'mobile' },
+            ];
+
+            // Try direct match on option data-name
+            for (let opt of selectEl.options) {
+                const name = (opt.getAttribute('data-name') || '').toLowerCase();
+                if (name && normalized.includes(name)) { selectEl.value = opt.value; return; }
+                if (name && name.includes(normalized)) { selectEl.value = opt.value; return; }
+            }
+
+            // Try keyword mappings
+            for (let mapping of mappings) {
+                if (mapping.terms.some(t => normalized.includes(t))) {
+                    for (let opt of selectEl.options) {
+                        const name = (opt.getAttribute('data-name') || '').toLowerCase();
+                        if (name && name.includes(mapping.match)) { selectEl.value = opt.value; return; }
+                    }
+                }
             }
         }
     </script>
