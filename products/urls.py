@@ -3,6 +3,7 @@ URL routing for Products app
 """
 from django.urls import path
 from . import views
+from . import api_views
 
 app_name = 'products'
 
@@ -26,6 +27,15 @@ urlpatterns = [
     path('api/print-queue/<int:job_id>/complete/', views.print_queue_complete, name='print_queue_complete'),
     path('api/print-queue/<int:job_id>/fail/', views.print_queue_fail, name='print_queue_fail'),
     path('api/print-direct/', views.print_direct_api, name='print_direct_api'),
+    # RFID API (for Chainway C72 Android app)
+    path('api/rfid/login/', api_views.rfid_login, name='rfid_login'),
+    path('api/rfid/lookup/', api_views.rfid_lookup, name='rfid_lookup'),
+    path('api/rfid/batch-check/', api_views.rfid_batch_check, name='rfid_batch_check'),
+    path('api/rfid/session/', api_views.rfid_session_create, name='rfid_session_create'),
+    path('api/rfid/session/<int:session_id>/save/', api_views.rfid_session_save, name='rfid_session_save'),
+    path('api/rfid/session/<int:session_id>/', api_views.rfid_session_detail, name='rfid_session_detail'),
+    path('api/rfid/sessions/', api_views.rfid_session_list, name='rfid_session_list'),
+
     path('api/search/', views.product_search_api, name='product_search_api'),
     path('api/smart-search/', views.smart_search_api, name='smart_search_api'),
     path('api/upload-images/<str:reference>/', views.product_image_upload_api, name='product_image_upload_api'),

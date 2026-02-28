@@ -825,3 +825,76 @@ class PrintQueue(models.Model):
     def get_pending_jobs(cls):
         """Return all pending print jobs ordered by creation"""
         return cls.objects.filter(status=cls.Status.PENDING).order_by('created_at')
+
+
+class RFIDInventorySession(models.Model):
+    """
+    RFID inventory scan session.
+    Created when a user starts scanning with the Chainway C72 reader.
+    Tracks which products were found and which are missing.
+    """
+
+    class Status(models.TextChoices):
+        IN_PROGRESS = 'in_progress', _('En cours')
+        COMPLETED = 'completed', _('Terminé')
+        CANCELLED = 'cancelled', _('Annulé')
+
+    started_at = models.DateTimeField(_('Début'), auto_now_add=True)
+    completed_at = models.DateTimeField(_('Fin'), null=True, blank=True)
+    started_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='rfid_sessions',
+        verbose_name=_('Par')
+    )
+    location = models.ForeignKey(
+        'settings_app.StockLocation',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_('Emplacement')
+    )
+    status = models.CharField(
+        _('Statut'),
+        max_length=20,
+        choices=Status.choices,
+        default=Status.IN_PROGRESS
+    )
+
+    # Counts
+    expected_count = models.IntegerField(_('Attendus'), default=0)
+    found_count = models.IntegerField(_('Trouvés'), default=0)
+    missing_count = models.IntegerField(_('Manquants'), default=0)
+
+    # Raw scan data
+    scanned_tags = models.JSONField(
+        _('Tags scannés'),
+        default=list,
+        blank=True,
+        help_text=_('Liste des EPCs scannés: [{epc, found_at}]')
+    )
+
+    # Product relations
+    found_products = models.ManyToManyField(
+        Product,
+        blank=True,
+        related_name='rfid_found_in',
+        verbose_name=_('Produits trouvés')
+    )
+    missing_products = models.ManyToManyField(
+        Product,
+        blank=True,
+        related_name='rfid_missing_in',
+        verbose_name=_('Produits manquants')
+    )
+
+    notes = models.TextField(_('Notes'), blank=True)
+
+    class Meta:
+        verbose_name = _('Session inventaire RFID')
+        verbose_name_plural = _('Sessions inventaire RFID')
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f"RFID #{self.pk} - {self.started_at:%Y-%m-%d %H:%M} ({self.get_status_display()})"
