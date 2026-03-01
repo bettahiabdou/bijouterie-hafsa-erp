@@ -23,9 +23,8 @@ class Command(BaseCommand):
         dry_run = options['dry_run']
 
         products_missing = Product.objects.filter(
-            Q(rfid_tag__isnull=True) | Q(rfid_tag='')
-        ).exclude(
-            Q(reference__isnull=True) | Q(reference='')
+            Q(rfid_tag__isnull=True) | Q(rfid_tag=''),
+            reference__startswith='PRD-FIN-',
         ).order_by('created_at')
 
         total = products_missing.count()
