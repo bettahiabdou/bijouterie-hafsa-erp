@@ -130,7 +130,7 @@ def rfid_lookup(request):
 @permission_classes([IsAuthenticated])
 def rfid_batch_check(request):
     """
-    Batch lookup: given a list of EPCs, return found products and unknown EPCs.
+    Batch lookup: given a list of EPCs, return found/missing products and unknown EPCs.
     POST {epcs: ["AAA", "BBB", ...]}
     """
     epcs = request.data.get('epcs', [])
@@ -154,16 +154,33 @@ def rfid_batch_check(request):
         else:
             unknown.append(epc)
 
-    serializer = ProductRFIDSerializer(
+    found_serializer = ProductRFIDSerializer(
         [found_map[e] for e in found],
         many=True,
         context={'request': request},
     )
 
+    # Missing = available products with RFID tags that were NOT scanned
+    found_ids = [p.id for p in found_map.values()]
+    expected_qs = Product.objects.filter(
+        status='available',
+        rfid_tag__isnull=False,
+    ).exclude(rfid_tag='').select_related('category', 'metal_purity')
+    missing_qs = expected_qs.exclude(id__in=found_ids)
+
+    missing_serializer = ProductRFIDSerializer(
+        missing_qs,
+        many=True,
+        context={'request': request},
+    )
+
     return Response({
-        'found': serializer.data,
+        'found': found_serializer.data,
+        'missing': missing_serializer.data,
         'unknown_epcs': unknown,
+        'expected_count': expected_qs.count(),
         'found_count': len(found),
+        'missing_count': missing_qs.count(),
         'unknown_count': len(unknown),
     })
 
