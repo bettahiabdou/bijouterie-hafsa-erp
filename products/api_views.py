@@ -19,6 +19,58 @@ from .api_serializers import (
 )
 
 
+def _find_product_by_epc(epc):
+    """
+    Find a product by scanned EPC, handling the ZPL PC-word offset.
+    The ZPL ^RFW,H,1,12,1 writes 12 bytes starting at word 1 (PC word),
+    so the first 2 bytes of our hex become the PC, shifting the actual EPC.
+    Relationship: scanned_epc[0:20] == db_rfid_tag[4:24]
+    """
+    qs = Product.objects.select_related('category', 'metal_purity')
+    # Try exact match first (for future correctly-encoded tags)
+    product = qs.filter(rfid_tag__iexact=epc).first()
+    if product:
+        return product
+    # Handle PC offset: match db_rfid_tag that ends with epc[:20]
+    if len(epc) >= 20:
+        epc_core = epc[:20]
+        product = qs.filter(rfid_tag__iendswith=epc_core).first()
+    return product
+
+
+def _batch_find_products(epcs_upper):
+    """
+    Batch find products by scanned EPCs, handling the ZPL PC-word offset.
+    Returns dict: {scanned_epc: Product}
+    """
+    qs = Product.objects.select_related('category', 'metal_purity')
+
+    # Try exact matches first
+    exact = qs.filter(rfid_tag__in=epcs_upper)
+    result = {p.rfid_tag.upper(): p for p in exact}
+
+    # For unmatched EPCs, try the PC-offset match
+    unmatched = [e for e in epcs_upper if e not in result]
+    if unmatched:
+        # Build a map of rfid_tag_suffix -> product for offset matching
+        all_products = qs.filter(
+            rfid_tag__isnull=False,
+        ).exclude(rfid_tag='')
+        suffix_map = {}
+        for p in all_products:
+            if p.rfid_tag and len(p.rfid_tag) >= 24:
+                suffix = p.rfid_tag[4:].upper()
+                suffix_map[suffix] = p
+
+        for epc in unmatched:
+            if len(epc) >= 20:
+                epc_core = epc[:20].upper()
+                if epc_core in suffix_map:
+                    result[epc] = suffix_map[epc_core]
+
+    return result
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def rfid_login(request):
@@ -67,14 +119,11 @@ def rfid_lookup(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    try:
-        product = Product.objects.select_related(
-            'category', 'metal_purity'
-        ).get(rfid_tag__iexact=epc)
+    product = _find_product_by_epc(epc)
+    if product:
         serializer = ProductRFIDSerializer(product, context={'request': request})
         return Response({'found': True, 'product': serializer.data})
-    except Product.DoesNotExist:
-        return Response({'found': False, 'epc': epc})
+    return Response({'found': False, 'epc': epc})
 
 
 @api_view(['POST'])
@@ -94,12 +143,8 @@ def rfid_batch_check(request):
     # Normalize to uppercase
     epcs_upper = [e.strip().upper() for e in epcs if isinstance(e, str)]
 
-    # Find all matching products
-    products = Product.objects.filter(
-        rfid_tag__in=epcs_upper
-    ).select_related('category', 'metal_purity')
-
-    found_map = {p.rfid_tag.upper(): p for p in products}
+    # Find all matching products (handles PC-word offset)
+    found_map = _batch_find_products(epcs_upper)
 
     found = []
     unknown = []
@@ -176,10 +221,9 @@ def rfid_session_save(request, session_id):
         if isinstance(t, dict) and t.get('epc')
     })
 
-    # Find matching products
-    found_products = Product.objects.filter(
-        rfid_tag__in=scanned_epcs
-    )
+    # Find matching products (handles PC-word offset)
+    found_map = _batch_find_products(scanned_epcs)
+    found_products = Product.objects.filter(id__in=[p.id for p in found_map.values()])
     found_ids = set(found_products.values_list('id', flat=True))
 
     # Missing = expected available products not found
