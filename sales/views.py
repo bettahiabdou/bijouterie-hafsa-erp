@@ -517,6 +517,40 @@ def sales_dashboard(request):
         c['pct_revenue'] = (rev / total_items_revenue * 100).quantize(Decimal('0.1'))
         category_breakdown.append(c)
 
+    # ============ PER-METAL PRIX/G KPI CARDS ============
+    # For period section - compact list of {name, weight, revenue, prix_g}
+    metal_prix_g = []
+    for m in metal_breakdown:
+        gw = m['gross_weight'] or Decimal('0')
+        rev = m['revenue'] or Decimal('0')
+        metal_prix_g.append({
+            'name': m['product__metal_type__name'],
+            'weight': gw,
+            'revenue': rev,
+            'prix_g': (rev / gw).quantize(Decimal('0.01')) if gw > 0 else Decimal('0'),
+        })
+
+    # For today section - same but from today's items
+    today_items_qs = SaleInvoiceItem.objects.filter(
+        invoice__in=today_base, is_returned=False
+    )
+    today_metal_raw = list(today_items_qs.filter(
+        product__metal_type__isnull=False
+    ).values('product__metal_type__name').annotate(
+        gross_weight=Sum('product__gross_weight'),
+        revenue=Sum('total_amount'),
+    ).order_by('-revenue'))
+    today_metal_prix_g = []
+    for m in today_metal_raw:
+        gw = m['gross_weight'] or Decimal('0')
+        rev = m['revenue'] or Decimal('0')
+        today_metal_prix_g.append({
+            'name': m['product__metal_type__name'],
+            'weight': gw,
+            'revenue': rev,
+            'prix_g': (rev / gw).quantize(Decimal('0.01')) if gw > 0 else Decimal('0'),
+        })
+
     # ============ DAILY REVENUE (last 30 days) ============
     thirty_days_ago = today - timedelta(days=30)
     daily_base = SaleInvoice.objects.filter(is_deleted=False, date__gte=thirty_days_ago).exclude(
@@ -611,7 +645,6 @@ def sales_dashboard(request):
 
     filter_revenue = filtered_stats['revenue'] or Decimal('0')
     filter_weight = filtered_stats['weight'] or Decimal('0')
-    prix_per_gram = (filter_revenue / filter_weight).quantize(Decimal('0.01')) if filter_weight > 0 else Decimal('0')
 
     context = {
         'today': today,
@@ -629,11 +662,8 @@ def sales_dashboard(request):
             'count': today_stats_raw['count'] or 0,
             'weight': today_stats_raw['weight'] or Decimal('0'),
             'deposit_funds': today_deposit_funds,
-            'prix_per_gram': (
-                (today_stats_raw['revenue'] or Decimal('0')) /
-                (today_stats_raw['weight'] or Decimal('1'))
-            ).quantize(Decimal('0.01')) if (today_stats_raw['weight'] or Decimal('0')) > 0 else Decimal('0'),
         },
+        'today_metal_prix_g': today_metal_prix_g,
         'today_payment_methods': today_payment_methods,
         # Period
         'period_stats': {
@@ -644,7 +674,6 @@ def sales_dashboard(request):
             'transporteur_pending': transporteur_not_received,
             'count': filtered_stats['count'] or 0,
             'weight': filtered_stats['weight'] or Decimal('0'),
-            'prix_per_gram': prix_per_gram,
             'paid': filtered_stats['paid'] or Decimal('0'),
             'balance': filtered_stats['balance'] or Decimal('0'),
             'discount': filtered_stats['discount'] or Decimal('0'),
@@ -679,6 +708,7 @@ def sales_dashboard(request):
         # Breakdowns
         'metal_breakdown': metal_breakdown,
         'category_breakdown': category_breakdown,
+        'metal_prix_g': metal_prix_g,
         # Charts
         'daily_revenue': daily_revenue,
         'chart_labels_json': json.dumps(chart_labels),
