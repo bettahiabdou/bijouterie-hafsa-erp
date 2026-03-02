@@ -590,7 +590,7 @@
                 <div class="card-body" style="padding:0; overflow-x:auto;">
                     {% if category_breakdown %}
                     <table class="table">
-                        <thead><tr><th>Categorie</th><th>Articles</th><th>Poids</th><th>CA (DH)</th><th>Prix/g</th><th>%CA</th></tr></thead>
+                        <thead><tr><th>Categorie</th><th>Articles</th><th>Poids</th><th>CA (DH)</th><th>%CA</th><th>Detail Metal</th></tr></thead>
                         <tbody>
                             {% for c in category_breakdown %}
                             <tr>
@@ -598,8 +598,8 @@
                                 <td>{{ c.item_count }}</td>
                                 <td>{{ c.gross_weight|floatformat:2 }}g</td>
                                 <td class="font-semibold">{{ c.revenue|floatformat:0 }}</td>
-                                <td class="font-bold">{{ c.prix_g|floatformat:0 }}</td>
                                 <td>{{ c.pct_revenue }}%</td>
+                                <td>{% for m in c.metals %}<span style="display:inline-block; margin:2px 4px; padding:2px 8px; border-radius:12px; font-size:var(--text-xs); background:var(--neutral-100);">{{ m.name }} {{ m.weight|floatformat:1 }}g <strong>{{ m.prix_g|floatformat:0 }} DH/g</strong></span>{% endfor %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

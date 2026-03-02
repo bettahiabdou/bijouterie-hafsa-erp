@@ -542,12 +542,34 @@ def sales_dashboard(request):
         gross_weight=Sum('product__gross_weight'),
         revenue=Sum('total_amount'),
     ).order_by('-revenue'))
+    # Per-category per-metal stats
+    cat_metal_raw = list(items_qs.filter(
+        product__category__isnull=False,
+        product__metal_type__isnull=False,
+    ).values(
+        'product__category__name',
+        'product__metal_type__name',
+    ).annotate(
+        weight=Sum('product__gross_weight'),
+        revenue=Sum('total_amount'),
+    ).order_by('product__category__name', '-revenue'))
+    cat_metal_map = defaultdict(list)
+    for cm in cat_metal_raw:
+        w = cm['weight'] or Decimal('0')
+        rev = cm['revenue'] or Decimal('0')
+        cat_metal_map[cm['product__category__name']].append({
+            'name': cm['product__metal_type__name'],
+            'weight': w,
+            'revenue': rev,
+            'prix_g': (rev / w).quantize(Decimal('0.01')) if w > 0 else Decimal('0'),
+        })
     category_breakdown = []
     for c in category_breakdown_raw:
         gw = c['gross_weight'] or Decimal('0')
         rev = c['revenue'] or Decimal('0')
         c['prix_g'] = (rev / gw).quantize(Decimal('0.01')) if gw > 0 else Decimal('0')
         c['pct_revenue'] = (rev / total_items_revenue * 100).quantize(Decimal('0.1'))
+        c['metals'] = cat_metal_map.get(c['product__category__name'], [])
         category_breakdown.append(c)
 
     # ============ PER-METAL PRIX/G KPI CARDS ============
