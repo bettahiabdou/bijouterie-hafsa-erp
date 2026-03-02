@@ -29,11 +29,11 @@ class SaleInvoice(models.Model):
         LAYAWAY = 'layaway', _('Mise de côté (acompte)')
         CONSIGNMENT = 'consignment', _('Vente consignation')
 
-    # Reference
+    # Reference – uniqueness enforced via Meta constraint (active records only)
     reference = models.CharField(
         _('Référence'),
         max_length=50,
-        unique=True
+        db_index=True,
     )
     date = models.DateField(_('Date'))
     sale_type = models.CharField(
@@ -296,6 +296,13 @@ class SaleInvoice(models.Model):
         ordering = ['-date', '-created_at']
         indexes = [
             models.Index(fields=['is_deleted', '-date']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['reference'],
+                condition=models.Q(is_deleted=False),
+                name='unique_active_invoice_reference',
+            ),
         ]
 
     def __str__(self):

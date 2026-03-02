@@ -132,10 +132,12 @@ class SaleInvoiceForm(forms.ModelForm):
         reference = cleaned_data.get('reference')
         tax_rate = cleaned_data.get('tax_rate')
 
-        # Validate reference is unique (if changed)
+        # Validate reference is unique among active (non-deleted) invoices
         if reference:
             from sales.models import SaleInvoice
-            existing = SaleInvoice.objects.filter(reference=reference).exclude(
+            existing = SaleInvoice.objects.filter(
+                reference=reference, is_deleted=False
+            ).exclude(
                 id=self.instance.id if self.instance.id else None
             )
             if existing.exists():
