@@ -527,6 +527,8 @@ def sales_dashboard(request):
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
     filter_revenue = filtered_stats['revenue'] or Decimal('0')
+    filter_weight = filtered_stats['weight'] or Decimal('0')
+    prix_per_gram = (filter_revenue / filter_weight).quantize(Decimal('0.01')) if filter_weight > 0 else Decimal('0')
 
     context = {
         'today': today,
@@ -544,6 +546,7 @@ def sales_dashboard(request):
             'count': today_stats_raw['count'] or 0,
             'weight': today_stats_raw['weight'] or Decimal('0'),
             'deposit_funds': today_deposit_funds,
+            'prix_per_gram': ((today_stats_raw['revenue'] or Decimal('0')) / today_stats_raw['weight']).quantize(Decimal('0.01')) if (today_stats_raw['weight'] or Decimal('0')) > 0 else Decimal('0'),
         },
         'today_payment_methods': today_payment_methods,
         # Period
@@ -555,6 +558,7 @@ def sales_dashboard(request):
             'transporteur_pending': transporteur_not_received,
             'count': filtered_stats['count'] or 0,
             'weight': filtered_stats['weight'] or Decimal('0'),
+            'prix_per_gram': prix_per_gram,
             'paid': filtered_stats['paid'] or Decimal('0'),
             'balance': filtered_stats['balance'] or Decimal('0'),
             'discount': filtered_stats['discount'] or Decimal('0'),

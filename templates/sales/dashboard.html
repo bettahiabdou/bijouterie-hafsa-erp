@@ -99,6 +99,15 @@
                     <span class="db-kpi__label">Grammes</span>
                 </div>
             </div>
+            {% if today_stats.prix_per_gram > 0 %}
+            <div class="db-kpi db-kpi--neutral">
+                <div class="db-kpi__icon"><i class="fas fa-gem"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ today_stats.prix_per_gram|floatformat:2 }}</span>
+                    <span class="db-kpi__label">Prix/Gramme (DH)</span>
+                </div>
+            </div>
+            {% endif %}
             {% if today_stats.deposit_funds > 0 %}
             <div class="db-kpi db-kpi--deposit">
                 <div class="db-kpi__icon"><i class="fas fa-piggy-bank"></i></div>
@@ -175,6 +184,15 @@
                     <span class="db-kpi__label">Grammes</span>
                 </div>
             </div>
+            {% if period_stats.prix_per_gram > 0 %}
+            <div class="db-kpi db-kpi--neutral">
+                <div class="db-kpi__icon"><i class="fas fa-gem"></i></div>
+                <div class="db-kpi__body">
+                    <span class="db-kpi__value">{{ period_stats.prix_per_gram|floatformat:2 }}</span>
+                    <span class="db-kpi__label">Prix/Gramme (DH)</span>
+                </div>
+            </div>
+            {% endif %}
             {% if period_stats.discount > 0 %}
             <div class="db-kpi db-kpi--neutral">
                 <div class="db-kpi__icon"><i class="fas fa-percent"></i></div>
