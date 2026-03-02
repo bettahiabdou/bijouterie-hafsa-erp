@@ -555,23 +555,81 @@
     {% endif %}
 
     <!-- ============ TWO COLUMN: SELLERS + PENDING ============ -->
+    <!-- ============ METAL & CATEGORY BREAKDOWN ============ -->
+    <div class="db-grid-2">
+        <!-- Metal Type Breakdown -->
+        <div class="db-section">
+            <div class="card">
+                <div class="card-header"><h3><i class="fas fa-ring mr-2"></i> Par Type de Metal</h3></div>
+                <div class="card-body" style="padding:0; overflow-x:auto;">
+                    {% if metal_breakdown %}
+                    <table class="table">
+                        <thead><tr><th>Metal</th><th>Articles</th><th>Poids Brut</th><th>Poids Net</th><th>CA (DH)</th><th>Prix/g Net</th><th>%CA</th></tr></thead>
+                        <tbody>
+                            {% for m in metal_breakdown %}
+                            <tr>
+                                <td class="font-semibold">{{ m.product__metal_type__name }}</td>
+                                <td>{{ m.item_count }}</td>
+                                <td>{{ m.gross_weight|floatformat:2 }}g</td>
+                                <td>{{ m.net_weight|floatformat:2 }}g</td>
+                                <td class="font-semibold">{{ m.revenue|floatformat:0 }}</td>
+                                <td class="font-bold">{{ m.prix_g_net|floatformat:0 }}</td>
+                                <td>{{ m.pct_revenue }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}<div class="db-empty">Aucune donnee</div>{% endif %}
+                </div>
+            </div>
+        </div>
+        <!-- Category Breakdown -->
+        <div class="db-section">
+            <div class="card">
+                <div class="card-header"><h3><i class="fas fa-th-large mr-2"></i> Par Categorie</h3></div>
+                <div class="card-body" style="padding:0; overflow-x:auto;">
+                    {% if category_breakdown %}
+                    <table class="table">
+                        <thead><tr><th>Categorie</th><th>Articles</th><th>Poids</th><th>CA (DH)</th><th>Prix/g</th><th>%CA</th></tr></thead>
+                        <tbody>
+                            {% for c in category_breakdown %}
+                            <tr>
+                                <td class="font-semibold">{{ c.product__category__name }}</td>
+                                <td>{{ c.item_count }}</td>
+                                <td>{{ c.gross_weight|floatformat:2 }}g</td>
+                                <td class="font-semibold">{{ c.revenue|floatformat:0 }}</td>
+                                <td class="font-bold">{{ c.prix_g|floatformat:0 }}</td>
+                                <td>{{ c.pct_revenue }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}<div class="db-empty">Aucune donnee</div>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="db-grid-2">
 
         <!-- LEFT: Sellers -->
         <div class="db-section">
             <div class="card">
                 <div class="card-header"><h3><i class="fas fa-user-tie mr-2"></i> Performance Vendeurs</h3></div>
-                <div class="card-body" style="padding:0;">
+                <div class="card-body" style="padding:0; overflow-x:auto;">
                     {% if seller_stats %}
                     <table class="table">
-                        <thead><tr><th>Vendeur</th><th>Ventes</th><th>CA (DH)</th><th>Grammes</th></tr></thead>
+                        <thead><tr><th>Vendeur</th><th>Ventes</th><th>CA (DH)</th><th>Remise</th><th>%Rem</th><th>Grammes</th><th>Prix/g</th></tr></thead>
                         <tbody>
                             {% for s in seller_stats %}
-                            <tr>
+                            <tr{% if s.discount_pct > 10 %} style="background:var(--error-50);"{% endif %}>
                                 <td class="font-semibold">{% if s.seller__first_name %}{{ s.seller__first_name }} {{ s.seller__last_name }}{% else %}{{ s.seller__username }}{% endif %}</td>
                                 <td>{{ s.count }}</td>
                                 <td class="font-semibold text-primary">{{ s.revenue|floatformat:0 }}</td>
+                                <td class="text-error">{{ s.discount|floatformat:0 }}</td>
+                                <td>{{ s.discount_pct }}%</td>
                                 <td>{{ s.weight|floatformat:2|default:"0.00" }}</td>
+                                <td class="font-bold">{{ s.prix_per_gram|floatformat:0 }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -583,9 +641,9 @@
             {% if seller_stats_today %}
             <div class="card" style="margin-top:var(--space-4);">
                 <div class="card-header"><h3><i class="fas fa-star mr-2"></i> Vendeurs Aujourd'hui</h3></div>
-                <div class="card-body" style="padding:0;">
+                <div class="card-body" style="padding:0; overflow-x:auto;">
                     <table class="table">
-                        <thead><tr><th>Vendeur</th><th>Ventes</th><th>CA (DH)</th><th>Grammes</th></tr></thead>
+                        <thead><tr><th>Vendeur</th><th>Ventes</th><th>CA (DH)</th><th>Grammes</th><th>Prix/g</th></tr></thead>
                         <tbody>
                             {% for s in seller_stats_today %}
                             <tr>
@@ -593,6 +651,7 @@
                                 <td>{{ s.count }}</td>
                                 <td class="font-semibold text-primary">{{ s.revenue|floatformat:0 }}</td>
                                 <td>{{ s.weight|floatformat:2|default:"0.00" }}</td>
+                                <td class="font-bold">{{ s.prix_per_gram|floatformat:0 }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

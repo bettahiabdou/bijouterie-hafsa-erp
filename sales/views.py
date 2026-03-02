@@ -41,8 +41,10 @@ def sales_dashboard(request):
     seller_filter = request.GET.get('seller', '')
     period_filter = request.GET.get('period', 'month')  # today, month, all
 
-    # Base queryset - exclude deleted and returned
-    base_qs = SaleInvoice.objects.filter(is_deleted=False).exclude(status='returned')
+    # Base queryset - exclude deleted, returned, cancelled, and drafts
+    base_qs = SaleInvoice.objects.filter(is_deleted=False).exclude(
+        status__in=['returned', 'cancelled', 'draft']
+    )
 
     # Apply date filters
     if date_from:
@@ -335,7 +337,9 @@ def sales_dashboard(request):
     )
 
     # ============ TODAY KPIs ============
-    today_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(status='returned')
+    today_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(
+        status__in=['returned', 'cancelled', 'draft']
+    )
     if seller_filter:
         today_base = today_base.filter(seller_id=seller_filter)
 
@@ -423,27 +427,101 @@ def sales_dashboard(request):
         .order_by('status')
     )
 
-    # ============ SELLER PERFORMANCE ============
-    seller_stats = list(
+    # ============ SELLER PERFORMANCE (enhanced with prix/g and discount %) ============
+    # Revenue/count without JOIN inflation
+    seller_invoice_stats = list(
         base_qs.values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
         .annotate(
             count=Count('id'), revenue=Sum('total_amount'),
             paid=Sum('amount_paid'), balance=Sum('balance_due'),
-            weight=Sum('items__product__gross_weight'),
+            discount=Sum('discount_amount'),
+            subtotal=Sum('subtotal'),
         ).order_by('-revenue')
     )
+    # Weight per seller (separate query to avoid inflation)
+    seller_weight_map = {}
+    for sw in base_qs.values('seller__id').annotate(w=Sum('items__product__gross_weight')):
+        seller_weight_map[sw['seller__id']] = sw['w'] or Decimal('0')
+    # Merge and compute prix/g + discount %
+    seller_stats = []
+    for s in seller_invoice_stats:
+        sid = s['seller__id']
+        w = seller_weight_map.get(sid, Decimal('0'))
+        rev = s['revenue'] or Decimal('0')
+        sub = s['subtotal'] or Decimal('0')
+        disc = s['discount'] or Decimal('0')
+        s['weight'] = w
+        s['prix_per_gram'] = (rev / w).quantize(Decimal('0.01')) if w > 0 else Decimal('0')
+        s['discount_pct'] = (disc / sub * 100).quantize(Decimal('0.1')) if sub > 0 else Decimal('0')
+        seller_stats.append(s)
 
-    today_seller_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(status='returned')
-    seller_stats_today = list(
+    today_seller_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(
+        status__in=['returned', 'cancelled', 'draft']
+    )
+    # Today seller stats - same pattern
+    today_seller_invoice = list(
         today_seller_base
         .values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
-        .annotate(count=Count('id'), revenue=Sum('total_amount'), weight=Sum('items__product__gross_weight'))
+        .annotate(count=Count('id'), revenue=Sum('total_amount'))
         .order_by('-revenue')
     )
+    today_seller_weight_map = {}
+    for sw in today_seller_base.values('seller__id').annotate(w=Sum('items__product__gross_weight')):
+        today_seller_weight_map[sw['seller__id']] = sw['w'] or Decimal('0')
+    seller_stats_today = []
+    for s in today_seller_invoice:
+        sid = s['seller__id']
+        w = today_seller_weight_map.get(sid, Decimal('0'))
+        rev = s['revenue'] or Decimal('0')
+        s['weight'] = w
+        s['prix_per_gram'] = (rev / w).quantize(Decimal('0.01')) if w > 0 else Decimal('0')
+        seller_stats_today.append(s)
+
+    # ============ METAL TYPE BREAKDOWN ============
+    from settings_app.models import MetalType
+    items_qs = SaleInvoiceItem.objects.filter(
+        invoice__in=base_qs, is_returned=False
+    )
+    metal_breakdown_raw = list(items_qs.filter(
+        product__metal_type__isnull=False
+    ).values('product__metal_type__name').annotate(
+        item_count=Count('id'),
+        gross_weight=Sum('product__gross_weight'),
+        net_weight=Sum('product__net_weight'),
+        revenue=Sum('total_amount'),
+    ).order_by('-revenue'))
+    total_items_revenue = sum(m['revenue'] or Decimal('0') for m in metal_breakdown_raw) or Decimal('1')
+    metal_breakdown = []
+    for m in metal_breakdown_raw:
+        gw = m['gross_weight'] or Decimal('0')
+        nw = m['net_weight'] or Decimal('0')
+        rev = m['revenue'] or Decimal('0')
+        m['prix_g_gross'] = (rev / gw).quantize(Decimal('0.01')) if gw > 0 else Decimal('0')
+        m['prix_g_net'] = (rev / nw).quantize(Decimal('0.01')) if nw > 0 else Decimal('0')
+        m['pct_revenue'] = (rev / total_items_revenue * 100).quantize(Decimal('0.1'))
+        metal_breakdown.append(m)
+
+    # ============ CATEGORY BREAKDOWN ============
+    category_breakdown_raw = list(items_qs.filter(
+        product__category__isnull=False
+    ).values('product__category__name').annotate(
+        item_count=Count('id'),
+        gross_weight=Sum('product__gross_weight'),
+        revenue=Sum('total_amount'),
+    ).order_by('-revenue'))
+    category_breakdown = []
+    for c in category_breakdown_raw:
+        gw = c['gross_weight'] or Decimal('0')
+        rev = c['revenue'] or Decimal('0')
+        c['prix_g'] = (rev / gw).quantize(Decimal('0.01')) if gw > 0 else Decimal('0')
+        c['pct_revenue'] = (rev / total_items_revenue * 100).quantize(Decimal('0.1'))
+        category_breakdown.append(c)
 
     # ============ DAILY REVENUE (last 30 days) ============
     thirty_days_ago = today - timedelta(days=30)
-    daily_base = SaleInvoice.objects.filter(is_deleted=False, date__gte=thirty_days_ago).exclude(status='returned')
+    daily_base = SaleInvoice.objects.filter(is_deleted=False, date__gte=thirty_days_ago).exclude(
+        status__in=['returned', 'cancelled', 'draft']
+    )
     if seller_filter:
         daily_base = daily_base.filter(seller_id=seller_filter)
     daily_revenue = list(
@@ -598,6 +676,9 @@ def sales_dashboard(request):
         # Sellers
         'seller_stats': seller_stats,
         'seller_stats_today': seller_stats_today,
+        # Breakdowns
+        'metal_breakdown': metal_breakdown,
+        'category_breakdown': category_breakdown,
         # Charts
         'daily_revenue': daily_revenue,
         'chart_labels_json': json.dumps(chart_labels),
