@@ -1212,6 +1212,9 @@ def invoice_detail(request, reference):
                             )
                         except PaymentMethod.DoesNotExist:
                             pass
+                        except ValueError as e:
+                            messages.error(request, str(e))
+                            return redirect('sales:invoice_detail', reference=reference)
 
                     if amount_paid_2 > 0 and payment_method_id_2:
                         try:
@@ -1232,6 +1235,9 @@ def invoice_detail(request, reference):
                             )
                         except PaymentMethod.DoesNotExist:
                             pass
+                        except ValueError as e:
+                            messages.error(request, str(e))
+                            return redirect('sales:invoice_detail', reference=reference)
 
                     # Calculate the difference to pay
                     # Old invoice total was already paid, so transfer that amount
@@ -1916,9 +1922,12 @@ def invoice_create(request):
                                     'amount': payment_amount
                                 })
 
-                        except (json.JSONDecodeError, ValueError, PaymentMethod.DoesNotExist) as e:
+                        except (json.JSONDecodeError, PaymentMethod.DoesNotExist) as e:
                             print(f'Error processing payment: {e}')
                             continue
+                        except ValueError as e:
+                            messages.error(request, str(e))
+                            return redirect('sales:invoice_create')
 
                 # Fallback: Check for simple amount_paid field (backward compatibility)
                 if total_amount_paid == 0:
@@ -2283,6 +2292,8 @@ def bulk_invoice_create(request):
                                         )
                                     except PaymentMethod.DoesNotExist:
                                         pass
+                                    except ValueError as e:
+                                        messages.error(request, f'Ligne {i+1}: {e}')
                         except (InvalidOperation, ValueError):
                             pass
 
@@ -2315,6 +2326,8 @@ def bulk_invoice_create(request):
                                         )
                                     except PaymentMethod.DoesNotExist:
                                         pass
+                                    except ValueError as e:
+                                        messages.error(request, f'Ligne {i+1}: {e}')
                         except (InvalidOperation, ValueError):
                             pass
 
@@ -3268,6 +3281,9 @@ def pending_invoice_complete(request, reference):
 
                         except PaymentMethod.DoesNotExist:
                             pass
+                        except ValueError as e:
+                            messages.error(request, str(e))
+                            return redirect('sales:pending_invoice_complete', reference=reference)
 
                 # Set payment amounts and determine status based on total amount paid
                 invoice.amount_paid = total_amount_paid

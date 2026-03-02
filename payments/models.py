@@ -158,6 +158,16 @@ class ClientPayment(models.Model):
             from utils import generate_payment_reference
             self.reference = generate_payment_reference('PAY')
 
+        # Check for duplicate payment reference (new payments only)
+        if self.pk is None and self.reference:
+            existing = ClientPayment.objects.filter(reference=self.reference).select_related('sale_invoice').first()
+            if existing:
+                inv_ref = existing.sale_invoice.reference if existing.sale_invoice else 'N/A'
+                raise ValueError(
+                    f'La référence de paiement "{self.reference}" existe déjà '
+                    f'(Facture: {inv_ref}, Montant: {existing.amount} DH, Date: {existing.date}).'
+                )
+
         is_new = self.pk is None
         super().save(*args, **kwargs)
 
