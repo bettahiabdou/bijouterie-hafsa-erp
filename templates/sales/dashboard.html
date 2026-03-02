@@ -619,7 +619,7 @@
                 <div class="card-body" style="padding:0; overflow-x:auto;">
                     {% if seller_stats %}
                     <table class="table">
-                        <thead><tr><th>Vendeur</th><th>Ventes</th><th>CA (DH)</th><th>Remise</th><th>%Rem</th><th>Grammes</th><th>Prix/g</th></tr></thead>
+                        <thead><tr><th>Vendeur</th><th>Ventes</th><th>CA (DH)</th><th>Remise</th><th>%Rem</th><th>Detail Metal</th></tr></thead>
                         <tbody>
                             {% for s in seller_stats %}
                             <tr{% if s.discount_pct > 10 %} style="background:var(--error-50);"{% endif %}>
@@ -628,8 +628,7 @@
                                 <td class="font-semibold text-primary">{{ s.revenue|floatformat:0 }}</td>
                                 <td class="text-error">{{ s.discount|floatformat:0 }}</td>
                                 <td>{{ s.discount_pct }}%</td>
-                                <td>{{ s.weight|floatformat:2|default:"0.00" }}</td>
-                                <td class="font-bold">{{ s.prix_per_gram|floatformat:0 }}</td>
+                                <td>{% for m in s.metals %}<span style="display:inline-block; margin:2px 4px; padding:2px 8px; border-radius:12px; font-size:var(--text-xs); background:var(--neutral-100);">{{ m.name }} {{ m.weight|floatformat:1 }}g <strong>{{ m.prix_g|floatformat:0 }} DH/g</strong></span>{% endfor %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -643,15 +642,14 @@
                 <div class="card-header"><h3><i class="fas fa-star mr-2"></i> Vendeurs Aujourd'hui</h3></div>
                 <div class="card-body" style="padding:0; overflow-x:auto;">
                     <table class="table">
-                        <thead><tr><th>Vendeur</th><th>Ventes</th><th>CA (DH)</th><th>Grammes</th><th>Prix/g</th></tr></thead>
+                        <thead><tr><th>Vendeur</th><th>Ventes</th><th>CA (DH)</th><th>Detail Metal</th></tr></thead>
                         <tbody>
                             {% for s in seller_stats_today %}
                             <tr>
                                 <td class="font-semibold">{% if s.seller__first_name %}{{ s.seller__first_name }} {{ s.seller__last_name }}{% else %}{{ s.seller__username }}{% endif %}</td>
                                 <td>{{ s.count }}</td>
                                 <td class="font-semibold text-primary">{{ s.revenue|floatformat:0 }}</td>
-                                <td>{{ s.weight|floatformat:2|default:"0.00" }}</td>
-                                <td class="font-bold">{{ s.prix_per_gram|floatformat:0 }}</td>
+                                <td>{% for m in s.metals %}<span style="display:inline-block; margin:2px 4px; padding:2px 8px; border-radius:12px; font-size:var(--text-xs); background:var(--neutral-100);">{{ m.name }} {{ m.weight|floatformat:1 }}g <strong>{{ m.prix_g|floatformat:0 }} DH/g</strong></span>{% endfor %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

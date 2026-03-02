@@ -427,7 +427,7 @@ def sales_dashboard(request):
         .order_by('status')
     )
 
-    # ============ SELLER PERFORMANCE (enhanced with prix/g and discount %) ============
+    # ============ SELLER PERFORMANCE (enhanced with per-metal prix/g) ============
     # Revenue/count without JOIN inflation
     seller_invoice_stats = list(
         base_qs.values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
@@ -438,43 +438,74 @@ def sales_dashboard(request):
             subtotal=Sum('subtotal'),
         ).order_by('-revenue')
     )
-    # Weight per seller (separate query to avoid inflation)
-    seller_weight_map = {}
-    for sw in base_qs.values('seller__id').annotate(w=Sum('items__product__gross_weight')):
-        seller_weight_map[sw['seller__id']] = sw['w'] or Decimal('0')
-    # Merge and compute prix/g + discount %
+    # Per-seller per-metal stats from items
+    seller_metal_raw = list(items_qs.filter(
+        product__metal_type__isnull=False
+    ).values(
+        'invoice__seller__id',
+        'product__metal_type__name',
+    ).annotate(
+        weight=Sum('product__gross_weight'),
+        revenue=Sum('total_amount'),
+    ).order_by('invoice__seller__id', '-revenue'))
+    # Build map: seller_id -> [{name, weight, revenue, prix_g}]
+    from collections import defaultdict
+    seller_metal_map = defaultdict(list)
+    for sm in seller_metal_raw:
+        w = sm['weight'] or Decimal('0')
+        rev = sm['revenue'] or Decimal('0')
+        seller_metal_map[sm['invoice__seller__id']].append({
+            'name': sm['product__metal_type__name'],
+            'weight': w,
+            'revenue': rev,
+            'prix_g': (rev / w).quantize(Decimal('0.01')) if w > 0 else Decimal('0'),
+        })
+    # Merge
     seller_stats = []
     for s in seller_invoice_stats:
         sid = s['seller__id']
-        w = seller_weight_map.get(sid, Decimal('0'))
-        rev = s['revenue'] or Decimal('0')
         sub = s['subtotal'] or Decimal('0')
         disc = s['discount'] or Decimal('0')
-        s['weight'] = w
-        s['prix_per_gram'] = (rev / w).quantize(Decimal('0.01')) if w > 0 else Decimal('0')
         s['discount_pct'] = (disc / sub * 100).quantize(Decimal('0.1')) if sub > 0 else Decimal('0')
+        s['metals'] = seller_metal_map.get(sid, [])
         seller_stats.append(s)
 
     today_seller_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(
         status__in=['returned', 'cancelled', 'draft']
     )
-    # Today seller stats - same pattern
+    # Today seller stats
     today_seller_invoice = list(
         today_seller_base
         .values('seller__id', 'seller__first_name', 'seller__last_name', 'seller__username')
         .annotate(count=Count('id'), revenue=Sum('total_amount'))
         .order_by('-revenue')
     )
-    today_seller_weight_map = {}
-    for sw in today_seller_base.values('seller__id').annotate(w=Sum('items__product__gross_weight')):
-        today_seller_weight_map[sw['seller__id']] = sw['w'] or Decimal('0')
+    today_items_for_sellers = SaleInvoiceItem.objects.filter(
+        invoice__in=today_seller_base, is_returned=False
+    )
+    today_seller_metal_raw = list(today_items_for_sellers.filter(
+        product__metal_type__isnull=False
+    ).values(
+        'invoice__seller__id',
+        'product__metal_type__name',
+    ).annotate(
+        weight=Sum('product__gross_weight'),
+        revenue=Sum('total_amount'),
+    ).order_by('invoice__seller__id', '-revenue'))
+    today_seller_metal_map = defaultdict(list)
+    for sm in today_seller_metal_raw:
+        w = sm['weight'] or Decimal('0')
+        rev = sm['revenue'] or Decimal('0')
+        today_seller_metal_map[sm['invoice__seller__id']].append({
+            'name': sm['product__metal_type__name'],
+            'weight': w,
+            'revenue': rev,
+            'prix_g': (rev / w).quantize(Decimal('0.01')) if w > 0 else Decimal('0'),
+        })
     seller_stats_today = []
     for s in today_seller_invoice:
         sid = s['seller__id']
-        w = today_seller_weight_map.get(sid, Decimal('0'))
-        rev = s['revenue'] or Decimal('0')
-        s['weight'] = w
-        s['prix_per_gram'] = (rev / w).quantize(Decimal('0.01')) if w > 0 else Decimal('0')
+        s['metals'] = today_seller_metal_map.get(sid, [])
         seller_stats_today.append(s)
 
     # ============ METAL TYPE BREAKDOWN ============
