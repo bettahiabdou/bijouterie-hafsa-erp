@@ -59,15 +59,18 @@ def sales_dashboard(request):
         base_qs = base_qs.filter(seller_id=seller_filter)
 
     # ============ MAIN STATS ============
+    # Weight computed separately to avoid JOIN inflation on other fields
     filtered_stats = base_qs.aggregate(
         revenue=Sum('total_amount'),
         count=Count('id'),
-        weight=Sum('items__product__gross_weight'),
         paid=Sum('amount_paid'),
         balance=Sum('balance_due'),
         discount=Sum('discount_amount'),
         old_gold=Sum('old_gold_amount'),
     )
+    filtered_stats['weight'] = base_qs.aggregate(
+        weight=Sum('items__product__gross_weight')
+    )['weight']
     filtered_invoice_ids = list(base_qs.values_list('id', flat=True))
 
     # ============ DELIVERY TYPE BREAKDOWN ============
@@ -339,8 +342,10 @@ def sales_dashboard(request):
     today_stats_raw = today_base.aggregate(
         revenue=Sum('total_amount'),
         count=Count('id'),
-        weight=Sum('items__product__gross_weight'),
     )
+    today_stats_raw['weight'] = today_base.aggregate(
+        weight=Sum('items__product__gross_weight')
+    )['weight']
     today_invoice_ids = list(today_base.values_list('id', flat=True))
 
     # Today payments: filter by PAYMENT DATE only (not invoice date)
@@ -527,11 +532,8 @@ def sales_dashboard(request):
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
     filter_revenue = filtered_stats['revenue'] or Decimal('0')
-    # Compute weight separately to avoid JOIN inflation of revenue
-    # (combined aggregate with items__ relation inflates Sum('total_amount'))
-    correct_revenue = base_qs.aggregate(rev=Sum('total_amount'))['rev'] or Decimal('0')
-    correct_weight = base_qs.aggregate(w=Sum('items__product__gross_weight'))['w'] or Decimal('0')
-    prix_per_gram = (correct_revenue / correct_weight).quantize(Decimal('0.01')) if correct_weight > 0 else Decimal('0')
+    filter_weight = filtered_stats['weight'] or Decimal('0')
+    prix_per_gram = (filter_revenue / filter_weight).quantize(Decimal('0.01')) if filter_weight > 0 else Decimal('0')
 
     context = {
         'today': today,
@@ -550,8 +552,8 @@ def sales_dashboard(request):
             'weight': today_stats_raw['weight'] or Decimal('0'),
             'deposit_funds': today_deposit_funds,
             'prix_per_gram': (
-                (today_base.aggregate(rev=Sum('total_amount'))['rev'] or Decimal('0')) /
-                (today_base.aggregate(w=Sum('items__product__gross_weight'))['w'] or Decimal('1'))
+                (today_stats_raw['revenue'] or Decimal('0')) /
+                (today_stats_raw['weight'] or Decimal('1'))
             ).quantize(Decimal('0.01')) if (today_stats_raw['weight'] or Decimal('0')) > 0 else Decimal('0'),
         },
         'today_payment_methods': today_payment_methods,
