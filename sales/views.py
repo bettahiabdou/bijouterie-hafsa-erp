@@ -904,7 +904,8 @@ def invoice_detail(request, reference):
         SaleInvoice.objects.select_related(
             'client', 'seller', 'delivery_method'
         ).prefetch_related('items', 'items__product'),
-        reference=reference
+        reference=reference,
+        is_deleted=False
     )
 
     # Log view activity
@@ -1367,7 +1368,7 @@ def add_invoice_item(request, reference):
     """Add an item to an existing invoice"""
     try:
         # Get the invoice
-        invoice = get_object_or_404(SaleInvoice, reference=reference)
+        invoice = get_object_or_404(SaleInvoice, reference=reference, is_deleted=False)
 
         # Staff can add items to any invoice, others only draft
         if invoice.status != 'draft' and not request.user.is_staff:
@@ -2412,7 +2413,8 @@ def invoice_detail_view(request, reference):
         SaleInvoice.objects.select_related(
             'client', 'seller', 'delivery_method'
         ).prefetch_related('items'),
-        reference=reference
+        reference=reference,
+        is_deleted=False
     )
 
     if request.method == 'POST' and request.user.can_view_reports:
@@ -2562,7 +2564,8 @@ def invoice_edit(request, reference):
 
     invoice = get_object_or_404(
         SaleInvoice.objects.select_related('client', 'seller', 'carrier', 'payment_method', 'bank_account'),
-        reference=reference
+        reference=reference,
+        is_deleted=False
     )
 
     # Check permissions - staff can edit any, others only their own drafts
@@ -2641,7 +2644,7 @@ def invoice_edit(request, reference):
 @require_http_methods(["GET", "POST"])
 def invoice_delete(request, reference):
     """Delete (soft delete) invoice - staff can delete any invoice"""
-    invoice = get_object_or_404(SaleInvoice, reference=reference)
+    invoice = get_object_or_404(SaleInvoice, reference=reference, is_deleted=False)
 
     # Check permissions - staff can delete any, others only their own drafts
     if not request.user.is_staff:
@@ -2693,7 +2696,7 @@ def invoice_payment(request, reference):
     from decimal import Decimal
     from payments.models import ClientPayment
 
-    invoice = get_object_or_404(SaleInvoice, reference=reference)
+    invoice = get_object_or_404(SaleInvoice, reference=reference, is_deleted=False)
 
     # Check permissions
     if not request.user.is_staff:
@@ -2927,7 +2930,7 @@ def invoice_delivery(request, reference):
     """Update delivery information"""
     from .forms import DeliveryForm
 
-    invoice = get_object_or_404(SaleInvoice, reference=reference)
+    invoice = get_object_or_404(SaleInvoice, reference=reference, is_deleted=False)
 
     # Check permissions
     if not request.user.is_staff:
