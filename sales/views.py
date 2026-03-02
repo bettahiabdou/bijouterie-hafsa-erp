@@ -427,6 +427,11 @@ def sales_dashboard(request):
         .order_by('status')
     )
 
+    # ============ ITEMS QUERYSET (used by seller, metal, category breakdowns) ============
+    items_qs = SaleInvoiceItem.objects.filter(
+        invoice__in=base_qs, is_returned=False
+    )
+
     # ============ SELLER PERFORMANCE (enhanced with per-metal prix/g) ============
     # Revenue/count without JOIN inflation
     seller_invoice_stats = list(
@@ -510,9 +515,6 @@ def sales_dashboard(request):
 
     # ============ METAL TYPE BREAKDOWN ============
     from settings_app.models import MetalType
-    items_qs = SaleInvoiceItem.objects.filter(
-        invoice__in=base_qs, is_returned=False
-    )
     metal_breakdown_raw = list(items_qs.filter(
         product__metal_type__isnull=False
     ).values('product__metal_type__name').annotate(
