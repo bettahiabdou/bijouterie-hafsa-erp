@@ -41,9 +41,9 @@ def sales_dashboard(request):
     seller_filter = request.GET.get('seller', '')
     period_filter = request.GET.get('period', 'month')  # today, month, all
 
-    # Base queryset - exclude deleted, returned, cancelled, and drafts
+    # Base queryset - exclude deleted, returned, cancelled, exchanged, and drafts
     base_qs = SaleInvoice.objects.filter(is_deleted=False).exclude(
-        status__in=['returned', 'cancelled', 'draft']
+        status__in=['returned', 'cancelled', 'draft', 'exchanged']
     )
 
     # Apply date filters
@@ -338,7 +338,7 @@ def sales_dashboard(request):
 
     # ============ TODAY KPIs ============
     today_base = SaleInvoice.objects.filter(is_deleted=False, date=today).exclude(
-        status__in=['returned', 'cancelled', 'draft']
+        status__in=['returned', 'cancelled', 'draft', 'exchanged']
     )
     if seller_filter:
         today_base = today_base.filter(seller_id=seller_filter)
@@ -609,7 +609,7 @@ def sales_dashboard(request):
     # ============ DAILY REVENUE (last 30 days) ============
     thirty_days_ago = today - timedelta(days=30)
     daily_base = SaleInvoice.objects.filter(is_deleted=False, date__gte=thirty_days_ago).exclude(
-        status__in=['returned', 'cancelled', 'draft']
+        status__in=['returned', 'cancelled', 'draft', 'exchanged']
     )
     if seller_filter:
         daily_base = daily_base.filter(seller_id=seller_filter)
@@ -627,7 +627,7 @@ def sales_dashboard(request):
         ).exclude(
             payment_method__name='Dépôt Client'
         ).exclude(
-            sale_invoice__status='returned'
+            sale_invoice__status__in=['returned', 'exchanged']
         ).annotate(day=TruncDate('date')).values('day')
         .annotate(total=Sum('amount'))
         .order_by('day')
@@ -852,11 +852,12 @@ def invoice_list(request):
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
-    # FIXED: Exclude soft-deleted and returned invoices from statistics
+    # FIXED: Exclude soft-deleted, returned, cancelled, exchanged, draft invoices from statistics
+    excluded_statuses = ['returned', 'cancelled', 'draft', 'exchanged']
     today_stats = SaleInvoice.objects.filter(
         date=today,
         is_deleted=False
-    ).exclude(status='returned').aggregate(
+    ).exclude(status__in=excluded_statuses).aggregate(
         today_total=Sum('total_amount'),
         today_count=Count('id')
     )
@@ -865,14 +866,14 @@ def invoice_list(request):
         date__year=today.year,
         date__month=today.month,
         is_deleted=False
-    ).exclude(status='returned').aggregate(
+    ).exclude(status__in=excluded_statuses).aggregate(
         month_total=Sum('total_amount'),
         month_count=Count('id')
     )
 
     total_stats = SaleInvoice.objects.filter(
         is_deleted=False
-    ).exclude(status='returned').aggregate(
+    ).exclude(status__in=excluded_statuses).aggregate(
         total_invoices=Count('id'),
         total_revenue=Sum('total_amount')
     )
