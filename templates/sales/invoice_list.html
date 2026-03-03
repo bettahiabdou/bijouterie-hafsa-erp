@@ -99,8 +99,19 @@
                         </select>
                     </div>
 
-                    <!-- Delivery Status Filter -->
+                    <!-- Seller Filter -->
                     <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Vendeur</label>
+                        <select name="seller" class="form-select">
+                            <option value="">Tous</option>
+                            {% for s in sellers %}
+                                <option value="{{ s.id }}" {% if seller_filter == s.id|stringformat:"d" %}selected{% endif %}>{{ s.get_full_name|default:s.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Delivery Status Filter -->
+                    <div class="form-group hide-mobile" style="margin-bottom: 0;">
                         <label class="form-label">Livraison</label>
                         <select name="delivery_status" class="form-select">
                             <option value="">Toutes</option>
@@ -313,13 +324,13 @@
                 </div>
                 <div class="pagination-buttons">
                     {% if page_obj.has_previous %}
-                        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if delivery_status_filter %}&delivery_status={{ delivery_status_filter }}{% endif %}" class="btn btn-ghost btn-sm">
+                        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if seller_filter %}&seller={{ seller_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if delivery_status_filter %}&delivery_status={{ delivery_status_filter }}{% endif %}" class="btn btn-ghost btn-sm">
                             <i class="fas fa-chevron-left"></i>
                         </a>
                     {% endif %}
 
                     {% if page_obj.has_next %}
-                        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if delivery_status_filter %}&delivery_status={{ delivery_status_filter }}{% endif %}" class="btn btn-ghost btn-sm">
+                        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if seller_filter %}&seller={{ seller_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if delivery_status_filter %}&delivery_status={{ delivery_status_filter }}{% endif %}" class="btn btn-ghost btn-sm">
                             <i class="fas fa-chevron-right"></i>
                         </a>
                     {% endif %}
@@ -344,7 +355,7 @@
 
         .filter-grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: var(--space-4);
             flex: 1;
         }

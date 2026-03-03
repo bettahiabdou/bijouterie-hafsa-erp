@@ -817,6 +817,11 @@ def invoice_list(request):
                 delivery__status=delivery_status_filter
             )
 
+    # Filter by seller
+    seller_filter = request.GET.get('seller', '')
+    if seller_filter:
+        invoices = invoices.filter(seller_id=seller_filter)
+
     # Filter by date range
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
@@ -881,17 +886,22 @@ def invoice_list(request):
         'total_revenue': total_stats['total_revenue'] or Decimal('0'),
     }
 
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
     context = {
         'page_obj': page_obj,
         'invoices': page_obj.object_list,
         'search_query': search_query,
         'status_filter': status_filter,
+        'seller_filter': seller_filter,
         'delivery_status_filter': delivery_status_filter,
         'date_from': date_from,
         'date_to': date_to,
         'sort_by': sort_by,
         'stats': stats,
         'statuses': SaleInvoice.Status.choices,
+        'sellers': User.objects.filter(is_active=True).order_by('first_name'),
     }
 
     return render(request, 'sales/invoice_list.html', context)
