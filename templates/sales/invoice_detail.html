@@ -97,9 +97,11 @@
                                 <thead>
                                     <tr>
                                         <th>Produit</th>
-                                        <th class="text-right">Quantite</th>
+                                        <th class="text-right">Qte</th>
+                                        <th class="text-right">Poids</th>
                                         <th class="text-right">Prix Unitaire</th>
                                         <th class="text-right">Total</th>
+                                        <th class="text-right">Prix/g</th>
                                         {% if invoice.status == 'draft' %}
                                             <th class="text-center">Actions</th>
                                         {% elif invoice.status == 'paid' %}
@@ -114,14 +116,19 @@
                                                 <div class="product-cell">
                                                     <span class="product-ref">{{ item.product.reference }}</span>
                                                     <span class="product-name">{{ item.product.name }}</span>
+                                                    {% if item.product.metal_type %}
+                                                        <span class="badge badge-neutral badge-sm" style="margin-left: 4px; font-size: 10px;">{{ item.product.metal_type.name }}</span>
+                                                    {% endif %}
                                                     {% if item.is_returned %}
-                                                        <span class="badge badge-error badge-sm" style="margin-left: 8px;">Retourné</span>
+                                                        <span class="badge badge-error badge-sm" style="margin-left: 4px;">Retourné</span>
                                                     {% endif %}
                                                 </div>
                                             </td>
                                             <td class="text-right">{{ item.quantity }}</td>
+                                            <td class="text-right font-mono">{% if item.product.gross_weight %}{{ item.product.gross_weight|floatformat:2 }}g{% else %}-{% endif %}</td>
                                             <td class="text-right font-mono">{{ item.unit_price }} DH</td>
                                             <td class="text-right font-mono font-semibold">{{ item.total_amount }} DH</td>
+                                            <td class="text-right font-mono font-bold">{% if item.product.gross_weight and item.product.gross_weight > 0 %}{{ item.prix_per_gram|floatformat:0 }}{% else %}-{% endif %}</td>
                                             {% if invoice.status == 'draft' %}
                                                 <td class="text-center">
                                                     <button type="button" onclick="deleteItem({{ item.id }})" class="btn btn-ghost btn-sm text-error">
@@ -170,16 +177,20 @@
                                     </div>
                                     <div class="mobile-item-details">
                                         <div class="mobile-item-row">
-                                            <span class="mobile-item-label">Quantite</span>
-                                            <span class="mobile-item-value">{{ item.quantity }}</span>
+                                            <span class="mobile-item-label">Poids</span>
+                                            <span class="mobile-item-value">{% if item.product.gross_weight %}{{ item.product.gross_weight|floatformat:2 }}g{% else %}-{% endif %}{% if item.product.metal_type %} <span class="badge badge-neutral badge-sm" style="font-size: 10px;">{{ item.product.metal_type.name }}</span>{% endif %}</span>
                                         </div>
                                         <div class="mobile-item-row">
                                             <span class="mobile-item-label">Prix Unitaire</span>
                                             <span class="mobile-item-value">{{ item.unit_price }} DH</span>
                                         </div>
-                                        <div class="mobile-item-row mobile-item-total">
+                                        <div class="mobile-item-row">
                                             <span class="mobile-item-label">Total</span>
                                             <span class="mobile-item-value">{{ item.total_amount }} DH</span>
+                                        </div>
+                                        <div class="mobile-item-row mobile-item-total">
+                                            <span class="mobile-item-label">Prix/g</span>
+                                            <span class="mobile-item-value font-bold">{% if item.product.gross_weight and item.product.gross_weight > 0 %}{{ item.prix_per_gram|floatformat:0 }} DH/g{% else %}-{% endif %}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -434,6 +445,16 @@
                             <span class="totals-highlight-label">Total</span>
                             <span class="totals-highlight-value">{{ invoice.total_amount }} DH</span>
                         </div>
+                        {% if invoice_total_weight > 0 %}
+                            <div class="totals-item" style="margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--neutral-200);">
+                                <span class="totals-label">Poids Total</span>
+                                <span class="totals-value">{{ invoice_total_weight|floatformat:2 }} g</span>
+                            </div>
+                            <div class="totals-item">
+                                <span class="totals-label font-bold">Prix/Gramme</span>
+                                <span class="totals-value font-bold" style="color: var(--primary-600); font-size: var(--text-lg);">{{ invoice_prix_per_gram|floatformat:0 }} DH/g</span>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>

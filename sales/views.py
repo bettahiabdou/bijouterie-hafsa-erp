@@ -1354,7 +1354,15 @@ def invoice_detail(request, reference):
     invoice_payments = invoice.payments.select_related('payment_method', 'bank_account').all()
 
     # Get remaining (non-returned) items for partial return handling
-    all_items = invoice.items.all()
+    all_items = list(invoice.items.select_related('product__metal_type').all())
+    # Compute per-item prix/g and invoice-level total weight + prix/g
+    invoice_total_weight = Decimal('0')
+    for item in all_items:
+        w = item.product.gross_weight or Decimal('0')
+        item.prix_per_gram = (item.total_amount / w) if w > 0 else Decimal('0')
+        if not item.is_returned:
+            invoice_total_weight += w
+    invoice_prix_per_gram = (invoice.total_amount / invoice_total_weight) if invoice_total_weight > 0 else Decimal('0')
     remaining_items = invoice.items.filter(is_returned=False)
     returned_items_count = invoice.items.filter(is_returned=True).count()
     has_remaining_items = remaining_items.exists() and returned_items_count > 0
@@ -1363,6 +1371,8 @@ def invoice_detail(request, reference):
     context = {
         'invoice': invoice,
         'items': all_items,
+        'invoice_total_weight': invoice_total_weight,
+        'invoice_prix_per_gram': invoice_prix_per_gram,
         'products': products,
         'exchange_products': exchange_products,
         'invoice_actions': invoice_actions,
