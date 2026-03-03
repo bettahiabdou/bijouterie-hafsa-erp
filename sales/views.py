@@ -2517,6 +2517,71 @@ def quote_to_invoice(request, quote_id):
 
 
 @login_required(login_url='login')
+def payment_list(request):
+    """List all payment records with search, filters, and stats"""
+    from payments.models import ClientPayment
+    from settings_app.models import PaymentMethod
+
+    payments = ClientPayment.objects.select_related(
+        'client', 'sale_invoice', 'payment_method', 'bank_account', 'created_by'
+    ).order_by('-date', '-created_at')
+
+    # Search by reference, client name, or invoice reference
+    search_query = request.GET.get('search', '')
+    if search_query:
+        payments = payments.filter(
+            Q(reference__icontains=search_query) |
+            Q(client__first_name__icontains=search_query) |
+            Q(client__last_name__icontains=search_query) |
+            Q(sale_invoice__reference__icontains=search_query)
+        )
+
+    # Filter by payment type
+    type_filter = request.GET.get('type', '')
+    if type_filter:
+        payments = payments.filter(payment_type=type_filter)
+
+    # Filter by payment method
+    method_filter = request.GET.get('method', '')
+    if method_filter:
+        payments = payments.filter(payment_method_id=method_filter)
+
+    # Filter by date range
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    if date_from:
+        payments = payments.filter(date__gte=date_from)
+    if date_to:
+        payments = payments.filter(date__lte=date_to)
+
+    # Stats on filtered queryset
+    today = timezone.now().date()
+    stats = {
+        'total_count': payments.count(),
+        'total_amount': payments.aggregate(t=Sum('amount'))['t'] or Decimal('0'),
+        'today_count': payments.filter(date=today).count(),
+        'today_amount': payments.filter(date=today).aggregate(t=Sum('amount'))['t'] or Decimal('0'),
+    }
+
+    # Pagination
+    paginator = Paginator(payments, 25)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    context = {
+        'page_obj': page_obj,
+        'payments': page_obj.object_list,
+        'search_query': search_query,
+        'type_filter': type_filter,
+        'method_filter': method_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+        'stats': stats,
+        'payment_types': ClientPayment.PaymentType.choices,
+        'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('name'),
+    }
+    return render(request, 'sales/payment_list.html', context)
+
+
 def payment_tracking(request):
     """View payment tracking dashboard"""
     if not request.user.is_staff:

@@ -1,0 +1,461 @@
+{% extends 'base.html' %}
+
+{% block title %}Paiements - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_list' %}" class="breadcrumb-item">Ventes</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Paiements</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Historique des Paiements</h1>
+                <p class="page-subtitle">Tous les paiements enregistres</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:invoice_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-file-invoice"></i>
+                    <span>Factures</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-4 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="fas fa-list"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Paiements</div>
+                <div class="stat-value">{{ stats.total_count }}</div>
+                <div class="stat-meta">enregistrements</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Montant Total</div>
+                <div class="stat-value">{{ stats.total_amount|floatformat:0 }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <i class="fas fa-calendar-day"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Aujourd'hui</div>
+                <div class="stat-value">{{ stats.today_count }}</div>
+                <div class="stat-meta">paiements</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Montant Aujourd'hui</div>
+                <div class="stat-value">{{ stats.today_amount|floatformat:0 }}</div>
+                <div class="stat-meta">DH</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="card animate-slide-up">
+        <!-- Filters -->
+        <div class="card-header filter-header">
+            <form method="get" class="filter-form">
+                <div class="filter-grid">
+                    <!-- Search -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Recherche</label>
+                        <input type="text" name="search" value="{{ search_query }}" placeholder="Ref, Client, Facture..." class="form-input">
+                    </div>
+
+                    <!-- Type Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Type</label>
+                        <select name="type" class="form-select">
+                            <option value="">Tous</option>
+                            {% for value, label in payment_types %}
+                                <option value="{{ value }}" {% if type_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Method Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Mode</label>
+                        <select name="method" class="form-select">
+                            <option value="">Tous</option>
+                            {% for pm in payment_methods %}
+                                <option value="{{ pm.id }}" {% if method_filter == pm.id|stringformat:"d" %}selected{% endif %}>{{ pm.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Date From -->
+                    <div class="form-group hide-mobile" style="margin-bottom: 0;">
+                        <label class="form-label">Du</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" class="form-input">
+                    </div>
+
+                    <!-- Date To -->
+                    <div class="form-group hide-mobile" style="margin-bottom: 0;">
+                        <label class="form-label">Au</label>
+                        <input type="date" name="date_to" value="{{ date_to }}" class="form-input">
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <a href="{% url 'sales:payment_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Payments Table - Desktop -->
+        <div class="card-body desktop-view" style="padding: 0;">
+            <div class="table-wrapper" style="border: none; border-radius: 0;">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Reference</th>
+                            <th>Facture</th>
+                            <th>Client</th>
+                            <th>Montant</th>
+                            <th>Mode</th>
+                            <th>Type</th>
+                            <th>Banque</th>
+                            <th>Date</th>
+                            <th>Cree par</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in payments %}
+                            <tr {% if p.sale_invoice %}style="cursor: pointer;" onclick="window.location='{% url 'sales:invoice_detail' p.sale_invoice.reference %}'"{% endif %}>
+                                <td>
+                                    <span class="font-semibold" style="font-size: var(--text-sm);">{{ p.reference }}</span>
+                                </td>
+                                <td>
+                                    {% if p.sale_invoice %}
+                                        <a href="{% url 'sales:invoice_detail' p.sale_invoice.reference %}" class="text-primary font-semibold" onclick="event.stopPropagation();">
+                                            {{ p.sale_invoice.reference }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if p.client %}
+                                        {{ p.client.first_name }} {{ p.client.last_name }}
+                                    {% else %}
+                                        <span class="text-muted">Anonyme</span>
+                                    {% endif %}
+                                </td>
+                                <td class="font-bold">{{ p.amount|floatformat:2 }} DH</td>
+                                <td>
+                                    {% if p.payment_method %}
+                                        <span class="badge badge-neutral" style="font-size: 11px;">
+                                            <i class="fas fa-{% if 'espece' in p.payment_method.name|lower or 'espèce' in p.payment_method.name|lower %}money-bill{% elif 'virement' in p.payment_method.name|lower %}exchange-alt{% elif 'carte' in p.payment_method.name|lower %}credit-card{% elif 'cheque' in p.payment_method.name|lower or 'chèque' in p.payment_method.name|lower %}money-check{% elif 'depot' in p.payment_method.name|lower or 'dépôt' in p.payment_method.name|lower %}piggy-bank{% else %}wallet{% endif %}"></i>
+                                            {{ p.payment_method.name }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge {% if p.payment_type == 'invoice' %}badge-success{% elif p.payment_type == 'refund' %}badge-error{% elif p.payment_type == 'deposit' %}badge-info{% elif p.payment_type == 'advance' %}badge-warning{% else %}badge-neutral{% endif %}" style="font-size: 11px;">
+                                        {{ p.get_payment_type_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if p.bank_account %}
+                                        <span style="font-size: var(--text-xs);">{{ p.bank_account.bank_name }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted">{{ p.date|date:"d/m/Y" }}</td>
+                                <td>
+                                    {% if p.created_by %}
+                                        <span style="font-size: var(--text-xs);">{{ p.created_by.get_full_name|default:p.created_by.username }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="9">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">
+                                            <i class="fas fa-money-check-alt"></i>
+                                        </div>
+                                        <h4 class="empty-state-title">Aucun paiement trouve</h4>
+                                        <p class="empty-state-text">Modifiez vos filtres ou effectuez une nouvelle recherche.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Payment Cards - Mobile -->
+        <div class="card-body mobile-view">
+            <div class="payment-cards">
+                {% for p in payments %}
+                    <div class="payment-card" {% if p.sale_invoice %}onclick="window.location='{% url 'sales:invoice_detail' p.sale_invoice.reference %}'"{% endif %}>
+                        <div class="payment-card-header">
+                            <span class="payment-card-ref">{{ p.reference|truncatechars:25 }}</span>
+                            <span class="badge {% if p.payment_type == 'invoice' %}badge-success{% elif p.payment_type == 'refund' %}badge-error{% elif p.payment_type == 'deposit' %}badge-info{% else %}badge-neutral{% endif %}" style="font-size: 10px;">
+                                {{ p.get_payment_type_display }}
+                            </span>
+                        </div>
+                        <div class="payment-card-details">
+                            {% if p.sale_invoice %}
+                                <span><i class="fas fa-file-invoice"></i> {{ p.sale_invoice.reference }}</span>
+                            {% endif %}
+                            {% if p.client %}
+                                <span><i class="fas fa-user"></i> {{ p.client.first_name }} {{ p.client.last_name }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="payment-card-amounts">
+                            <div class="payment-amount-item">
+                                <span class="payment-amount-label">Montant</span>
+                                <span class="payment-amount-value">{{ p.amount|floatformat:2 }} DH</span>
+                            </div>
+                            <div class="payment-amount-item">
+                                <span class="payment-amount-label">Mode</span>
+                                <span class="payment-amount-value" style="font-size: var(--text-sm);">{{ p.payment_method.name|default:"-" }}</span>
+                            </div>
+                        </div>
+                        <div class="payment-card-footer">
+                            <span class="payment-card-date">
+                                <i class="fas fa-calendar"></i> {{ p.date|date:"d/m/Y" }}
+                            </span>
+                            {% if p.bank_account %}
+                                <span style="font-size: var(--text-xs); color: var(--neutral-500);">{{ p.bank_account.bank_name }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-state" style="padding: var(--space-6);">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-money-check-alt"></i>
+                        </div>
+                        <h4 class="empty-state-title">Aucun paiement trouve</h4>
+                        <p class="empty-state-text">Modifiez vos filtres ou effectuez une nouvelle recherche.</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <div class="card-footer pagination-footer">
+                <div class="pagination-info">
+                    Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                    ({{ stats.total_count }} paiements)
+                </div>
+                <div class="pagination-buttons">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <style>
+        /* Filter Styles */
+        .filter-header {
+            background: white;
+            padding: var(--space-4) var(--space-5);
+        }
+
+        .filter-form {
+            width: 100%;
+            display: flex;
+            gap: var(--space-4);
+            align-items: flex-end;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: var(--space-4);
+            flex: 1;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Desktop/Mobile Toggle */
+        .desktop-view { display: block; }
+        .mobile-view { display: none; }
+        .hide-mobile { display: inline-block; }
+
+        /* Payment Cards (Mobile) */
+        .payment-cards {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+            padding: var(--space-4);
+        }
+
+        .payment-card {
+            background: var(--neutral-50);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            border: 1px solid var(--neutral-200);
+        }
+
+        .payment-card:hover {
+            background: white;
+            border-color: var(--primary-300);
+            box-shadow: var(--shadow-md);
+        }
+
+        .payment-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-2);
+        }
+
+        .payment-card-ref {
+            font-weight: var(--font-bold);
+            color: var(--primary-600);
+            font-size: var(--text-sm);
+        }
+
+        .payment-card-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-3);
+            color: var(--neutral-600);
+            font-size: var(--text-sm);
+            margin-bottom: var(--space-3);
+        }
+
+        .payment-card-details i {
+            margin-right: var(--space-1);
+            color: var(--neutral-400);
+        }
+
+        .payment-card-amounts {
+            display: flex;
+            gap: var(--space-4);
+            margin-bottom: var(--space-3);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--neutral-200);
+        }
+
+        .payment-amount-item { flex: 1; }
+
+        .payment-amount-label {
+            display: block;
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+            margin-bottom: var(--space-1);
+        }
+
+        .payment-amount-value {
+            font-weight: var(--font-bold);
+            font-size: var(--text-base);
+            color: var(--neutral-800);
+        }
+
+        .payment-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .payment-card-date {
+            font-size: var(--text-xs);
+            color: var(--neutral-500);
+        }
+
+        .payment-card-date i {
+            margin-right: var(--space-1);
+        }
+
+        /* Pagination */
+        .pagination-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pagination-info {
+            font-size: var(--text-sm);
+            color: var(--neutral-500);
+        }
+
+        .pagination-buttons {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1023px) {
+            .filter-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filter-form {
+                flex-direction: column;
+                gap: var(--space-3);
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr 1fr;
+                width: 100%;
+            }
+
+            .filter-actions {
+                width: 100%;
+            }
+
+            .filter-actions .btn {
+                flex: 1;
+            }
+
+            .desktop-view { display: none; }
+            .mobile-view { display: block; }
+            .hide-mobile { display: none !important; }
+        }
+    </style>
+{% endblock %}

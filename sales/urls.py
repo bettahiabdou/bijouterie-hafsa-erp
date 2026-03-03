@@ -38,7 +38,8 @@ urlpatterns = [
     # Quote to Invoice conversion
     path('quotes/<int:quote_id>/to-invoice/', views.quote_to_invoice, name='quote_to_invoice'),
 
-    # Payment tracking
+    # Payments
+    path('payments/', views.payment_list, name='payment_list'),
     path('payments/tracking/', views.payment_tracking, name='payment_tracking'),
 
     # Pending invoices (Brouillon - from Telegram)

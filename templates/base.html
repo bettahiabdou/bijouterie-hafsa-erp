@@ -504,6 +504,10 @@
                         <a href="{% url 'sales:invoice_list' %}" class="nav-link {% if 'invoices' in request.path and 'sales' in request.path %}active{% endif %}">
                             <span class="nav-text">Historique</span>
                         </a>
+                        <a href="{% url 'sales:payment_list' %}" class="nav-link {% if 'payments' in request.path and 'sales' in request.path %}active{% endif %}">
+                            <i class="fas fa-money-check-alt text-success" style="margin-right: 6px;"></i>
+                            <span class="nav-text">Paiements</span>
+                        </a>
                         <a href="{% url 'sales:delivery_list' %}" class="nav-link {% if 'livraisons' in request.path %}active{% endif %}">
                             <i class="fas fa-truck text-info" style="margin-right: 6px;"></i>
                             <span class="nav-text">Livraisons</span>
