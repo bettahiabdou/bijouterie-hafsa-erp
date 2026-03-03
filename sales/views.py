@@ -1339,7 +1339,7 @@ def invoice_detail(request, reference):
     # Get available products for exchange (available only)
     exchange_products = Product.objects.filter(
         status='available'
-    ).select_related('category', 'metal_type', 'metal_purity').order_by('-created_at')[:100]
+    ).select_related('category', 'metal_type', 'metal_purity').order_by('-created_at')
 
     # Get action history
     invoice_actions = invoice.actions.select_related(
