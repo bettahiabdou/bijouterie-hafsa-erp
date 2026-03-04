@@ -235,6 +235,62 @@
                 </div>
             </div>
 
+            <!-- Linked Invoices -->
+            {% if linked_invoices %}
+            <div class="card animate-slide-up" style="animation-delay: 25ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-file-invoice mr-2"></i> Facture(s)</h3>
+                    <span class="badge badge-neutral">{{ linked_invoices|length }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="info-list">
+                        {% for item in linked_invoices %}
+                        <div style="{% if not forloop.last %}border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-3); margin-bottom: var(--space-3);{% endif %}">
+                            <div class="info-item">
+                                <span class="info-label">Facture</span>
+                                <a href="{% url 'sales:invoice_detail' item.invoice.reference %}" class="text-primary font-medium" style="text-decoration: none;">
+                                    {{ item.invoice.reference }}
+                                </a>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Statut</span>
+                                <span class="badge {% if item.invoice.status == 'paid' %}badge-success{% elif item.invoice.status == 'draft' %}badge-warning{% elif item.invoice.status == 'exchanged' %}badge-info{% elif item.invoice.status == 'cancelled' or item.invoice.status == 'returned' %}badge-error{% else %}badge-neutral{% endif %}">
+                                    {{ item.invoice.get_status_display }}
+                                </span>
+                            </div>
+                            {% if item.invoice.client %}
+                            <div class="info-item">
+                                <span class="info-label">Client</span>
+                                <span class="info-value">{{ item.invoice.client.name }}</span>
+                            </div>
+                            {% endif %}
+                            {% if item.invoice.seller %}
+                            <div class="info-item">
+                                <span class="info-label">Vendeur</span>
+                                <span class="info-value">{{ item.invoice.seller.get_full_name|default:item.invoice.seller.username }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="info-item">
+                                <span class="info-label">Date</span>
+                                <span class="info-value">{{ item.invoice.date|date:"d/m/Y" }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Prix vendu</span>
+                                <span class="info-value font-semibold">{{ item.total_amount }} DH</span>
+                            </div>
+                            {% if item.is_returned %}
+                            <div class="info-item">
+                                <span class="info-label">Retour</span>
+                                <span class="badge badge-error">Retourné</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Metal Info -->
             <div class="card animate-slide-up" style="animation-delay: 50ms;">
                 <div class="card-header">

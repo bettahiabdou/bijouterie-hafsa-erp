@@ -211,10 +211,18 @@ def product_detail(request, reference):
         ip_address=get_client_ip(request)
     )
 
+    # Get linked invoices (sold, reserved, etc.)
+    linked_invoices = product.sale_items.select_related(
+        'invoice', 'invoice__client', 'invoice__seller'
+    ).filter(
+        invoice__is_deleted=False
+    ).order_by('-invoice__date')
+
     context = {
         'product': product,
         'images': product.images.all(),
         'stones': product.stones.all(),
+        'linked_invoices': linked_invoices,
     }
 
     return render(request, 'products/product_detail.html', context)
