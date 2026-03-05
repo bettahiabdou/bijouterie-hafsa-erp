@@ -202,8 +202,11 @@
             background: white;
             border-top: 1px solid var(--neutral-200);
             padding: var(--space-2) var(--space-4);
-            z-index: var(--z-sticky);
+            padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+            z-index: 99990;
             box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1);
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
         }
 
         @media (max-width: 767px) {
@@ -214,7 +217,7 @@
             }
 
             .page-wrapper {
-                padding-bottom: calc(var(--space-4) + 70px);
+                padding-bottom: calc(var(--space-4) + 80px);
             }
         }
 

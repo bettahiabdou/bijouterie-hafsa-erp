@@ -750,7 +750,7 @@
     <div class="db-section">
         <div class="card">
             <div class="card-header"><h3><i class="fas fa-trophy mr-2"></i> Top Factures</h3></div>
-            <div class="card-body" style="padding:0;">
+            <div class="card-body" style="padding:0; overflow-x:auto; -webkit-overflow-scrolling:touch;">
                 {% if recent_large %}
                 <table class="table">
                     <thead><tr><th>Reference</th><th>Client</th><th>Vendeur</th><th style="text-align:right;">Montant</th><th>Statut</th><th>Date</th></tr></thead>
@@ -968,20 +968,77 @@
         .db-charts-row { flex-direction:column; }
     }
     @media (max-width:768px) {
-        .db-kpi-row, .db-kpi-row--3 { grid-template-columns:repeat(2,1fr); }
-        .db-kpi { padding:var(--space-3); gap:var(--space-3); }
-        .db-kpi__icon { width:40px; height:40px; font-size:var(--text-base); }
-        .db-kpi__value { font-size:var(--text-base); }
-        .db-filter-form { flex-direction:column; }
-        .db-filter-grid { grid-template-columns:1fr 1fr; width:100%; }
+        .db { gap:var(--space-4); }
+        .db-title { font-size:var(--text-base); margin-bottom:var(--space-3); }
+
+        /* Filter: stack vertically */
+        .db-filter-card { padding:var(--space-3); }
+        .db-filter-form { flex-direction:column; gap:var(--space-3); }
+        .db-filter-grid { grid-template-columns:1fr 1fr; width:100%; gap:var(--space-3); }
         .db-filter-actions { width:100%; }
         .db-filter-actions .btn { flex:1; }
+
+        /* KPI cards: 2 columns, compact */
+        .db-kpi-row, .db-kpi-row--3, .db-kpi-row--6 { grid-template-columns:1fr 1fr; gap:var(--space-3); }
+        .db-kpi { padding:var(--space-3); gap:var(--space-3); flex-direction:column; align-items:flex-start; text-align:left; }
+        .db-kpi__icon { width:36px; height:36px; font-size:var(--text-sm); }
+        .db-kpi__value { font-size:var(--text-lg); }
+        .db-kpi__label { font-size:10px; line-height:1.3; }
+
+        /* Today method chips: wrap nicely */
+        .db-today-methods { gap:var(--space-2); }
+        .db-method-chip { font-size:var(--text-xs); padding:var(--space-1) var(--space-2); }
+
+        /* Charts: full width, shorter */
+        .db-charts-row { flex-direction:column; gap:var(--space-3); }
+        .db-chart-card { min-height:200px; }
+
+        /* Delivery type KPI: 2 columns */
         .db-delivery-grid { grid-template-columns:repeat(2,1fr); }
+
+        /* Payment summary: stack */
+        .db-pay-summary { flex-direction:column; gap:var(--space-2); }
+        .db-pay-summary__item { min-width:auto; padding:var(--space-3); }
+        .db-pay-summary__item strong { font-size:var(--text-base); }
+
+        /* Payment accordion: compact */
         .db-pay-card__header { padding:var(--space-3); }
-        .db-pay-card__banks { padding:0 var(--space-3) var(--space-2); }
-        .db-pay-summary { flex-direction:column; }
+        .db-pay-card__method { font-size:var(--text-sm); }
+        .db-pay-card__total { font-size:var(--text-base); }
+        .db-pay-card__banks { padding:0 var(--space-3) var(--space-2); gap:var(--space-2); }
+        .db-bank-chip { font-size:var(--text-xs); padding:var(--space-1) var(--space-2); }
+
+        /* Tables: horizontal scroll wrapper */
+        .db-grid-2 { grid-template-columns:1fr; gap:var(--space-4); }
+        .table { font-size:var(--text-xs); }
+        .table th, .table td { padding:var(--space-2) var(--space-3); white-space:nowrap; }
+
+        /* Invoice rows in expandable lists */
+        .db-inv-row { padding:var(--space-2) var(--space-3); gap:var(--space-2); }
+        .db-inv-ref { font-size:var(--text-xs); min-width:auto; }
+        .db-inv-client { font-size:var(--text-xs); min-width:60px; }
+        .db-inv-amount { font-size:var(--text-xs); min-width:auto; }
+
+        /* Bank detail */
         .db-bank-grid { grid-template-columns:1fr; }
-        .db-inv-ref { min-width:auto; }
+
+        /* Delivery status */
+        .db-ds__count { font-size:var(--text-xl); }
+        .db-ds__label { font-size:10px; }
+
+        /* Payment table inside accordion */
+        .db-pay-card__body { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        .db-pay-table th, .db-pay-table td { padding:var(--space-2); font-size:var(--text-xs); white-space:nowrap; }
+    }
+
+    @media (max-width:480px) {
+        /* Very small screens: single column KPIs for readability */
+        .db-kpi-row, .db-kpi-row--3, .db-kpi-row--6 { grid-template-columns:1fr 1fr; gap:var(--space-2); }
+        .db-kpi { padding:var(--space-2) var(--space-3); gap:var(--space-2); }
+        .db-kpi__icon { width:32px; height:32px; font-size:12px; }
+        .db-kpi__value { font-size:var(--text-base); }
+        .db-filter-grid { grid-template-columns:1fr; }
+        .db-delivery-grid { grid-template-columns:1fr 1fr; gap:var(--space-2); }
     }
 </style>
 
