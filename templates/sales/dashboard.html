@@ -563,18 +563,18 @@
                 <div class="card-header"><h3><i class="fas fa-ring mr-2"></i> Par Type de Metal</h3></div>
                 <div class="card-body" style="padding:0; overflow-x:auto;">
                     {% if metal_breakdown %}
-                    <table class="table">
+                    <table class="table db-responsive-table">
                         <thead><tr><th>Metal</th><th>Articles</th><th>Poids Brut</th><th>Poids Net</th><th>CA (DH)</th><th>Prix/g Net</th><th>%CA</th></tr></thead>
                         <tbody>
                             {% for m in metal_breakdown %}
                             <tr>
-                                <td class="font-semibold">{{ m.product__metal_type__name }}</td>
-                                <td>{{ m.item_count }}</td>
-                                <td>{{ m.gross_weight|floatformat:2 }}g</td>
-                                <td>{{ m.net_weight|floatformat:2 }}g</td>
-                                <td class="font-semibold">{{ m.revenue|floatformat:0 }}</td>
-                                <td class="font-bold">{{ m.prix_g_net|floatformat:0 }}</td>
-                                <td>{{ m.pct_revenue }}%</td>
+                                <td data-label="Metal" class="font-semibold">{{ m.product__metal_type__name }}</td>
+                                <td data-label="Articles">{{ m.item_count }}</td>
+                                <td data-label="Poids Brut">{{ m.gross_weight|floatformat:2 }}g</td>
+                                <td data-label="Poids Net">{{ m.net_weight|floatformat:2 }}g</td>
+                                <td data-label="CA (DH)" class="font-semibold">{{ m.revenue|floatformat:0 }}</td>
+                                <td data-label="Prix/g Net" class="font-bold">{{ m.prix_g_net|floatformat:0 }}</td>
+                                <td data-label="%CA">{{ m.pct_revenue }}%</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -589,17 +589,17 @@
                 <div class="card-header"><h3><i class="fas fa-th-large mr-2"></i> Par Categorie</h3></div>
                 <div class="card-body" style="padding:0; overflow-x:auto;">
                     {% if category_breakdown %}
-                    <table class="table">
+                    <table class="table db-responsive-table">
                         <thead><tr><th>Categorie</th><th>Articles</th><th>Poids</th><th>CA (DH)</th><th>%CA</th><th>Detail Metal</th></tr></thead>
                         <tbody>
                             {% for c in category_breakdown %}
                             <tr>
-                                <td class="font-semibold">{{ c.product__category__name }}</td>
-                                <td>{{ c.item_count }}</td>
-                                <td>{{ c.gross_weight|floatformat:2 }}g</td>
-                                <td class="font-semibold">{{ c.revenue|floatformat:0 }}</td>
-                                <td>{{ c.pct_revenue }}%</td>
-                                <td>{% for m in c.metals %}<span style="display:inline-block; margin:2px 4px; padding:2px 8px; border-radius:12px; font-size:var(--text-xs); background:var(--neutral-100);">{{ m.name }} {{ m.weight|floatformat:1 }}g <strong>{{ m.prix_g|floatformat:0 }} DH/g</strong></span>{% endfor %}</td>
+                                <td data-label="Categorie" class="font-semibold">{{ c.product__category__name }}</td>
+                                <td data-label="Articles">{{ c.item_count }}</td>
+                                <td data-label="Poids">{{ c.gross_weight|floatformat:2 }}g</td>
+                                <td data-label="CA (DH)" class="font-semibold">{{ c.revenue|floatformat:0 }}</td>
+                                <td data-label="%CA">{{ c.pct_revenue }}%</td>
+                                <td data-label="Detail Metal">{% for m in c.metals %}<span style="display:inline-block; margin:2px 4px; padding:2px 8px; border-radius:12px; font-size:var(--text-xs); background:var(--neutral-100);">{{ m.name }} {{ m.weight|floatformat:1 }}g <strong>{{ m.prix_g|floatformat:0 }} DH/g</strong></span>{% endfor %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -618,17 +618,17 @@
                 <div class="card-header"><h3><i class="fas fa-user-tie mr-2"></i> Performance Vendeurs</h3></div>
                 <div class="card-body" style="padding:0; overflow-x:auto;">
                     {% if seller_stats %}
-                    <table class="table">
+                    <table class="table db-responsive-table">
                         <thead><tr><th>Vendeur</th><th>Ventes</th><th>CA (DH)</th><th>Remise</th><th>%Rem</th><th>Detail Metal</th></tr></thead>
                         <tbody>
                             {% for s in seller_stats %}
                             <tr{% if s.discount_pct > 10 %} style="background:var(--error-50);"{% endif %}>
-                                <td class="font-semibold">{% if s.seller__first_name %}{{ s.seller__first_name }} {{ s.seller__last_name }}{% else %}{{ s.seller__username }}{% endif %}</td>
-                                <td>{{ s.count }}</td>
-                                <td class="font-semibold text-primary">{{ s.revenue|floatformat:0 }}</td>
-                                <td class="text-error">{{ s.discount|floatformat:0 }}</td>
-                                <td>{{ s.discount_pct }}%</td>
-                                <td>{% for m in s.metals %}<span style="display:inline-block; margin:2px 4px; padding:2px 8px; border-radius:12px; font-size:var(--text-xs); background:var(--neutral-100);">{{ m.name }} {{ m.weight|floatformat:1 }}g <strong>{{ m.prix_g|floatformat:0 }} DH/g</strong></span>{% endfor %}</td>
+                                <td data-label="Vendeur" class="font-semibold">{% if s.seller__first_name %}{{ s.seller__first_name }} {{ s.seller__last_name }}{% else %}{{ s.seller__username }}{% endif %}</td>
+                                <td data-label="Ventes">{{ s.count }}</td>
+                                <td data-label="CA (DH)" class="font-semibold text-primary">{{ s.revenue|floatformat:0 }}</td>
+                                <td data-label="Remise" class="text-error">{{ s.discount|floatformat:0 }}</td>
+                                <td data-label="%Rem">{{ s.discount_pct }}%</td>
+                                <td data-label="Detail Metal">{% for m in s.metals %}<span style="display:inline-block; margin:2px 4px; padding:2px 8px; border-radius:12px; font-size:var(--text-xs); background:var(--neutral-100);">{{ m.name }} {{ m.weight|floatformat:1 }}g <strong>{{ m.prix_g|floatformat:0 }} DH/g</strong></span>{% endfor %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -641,15 +641,15 @@
             <div class="card" style="margin-top:var(--space-4);">
                 <div class="card-header"><h3><i class="fas fa-star mr-2"></i> Vendeurs Aujourd'hui</h3></div>
                 <div class="card-body" style="padding:0; overflow-x:auto;">
-                    <table class="table">
+                    <table class="table db-responsive-table">
                         <thead><tr><th>Vendeur</th><th>Ventes</th><th>CA (DH)</th><th>Detail Metal</th></tr></thead>
                         <tbody>
                             {% for s in seller_stats_today %}
                             <tr>
-                                <td class="font-semibold">{% if s.seller__first_name %}{{ s.seller__first_name }} {{ s.seller__last_name }}{% else %}{{ s.seller__username }}{% endif %}</td>
-                                <td>{{ s.count }}</td>
-                                <td class="font-semibold text-primary">{{ s.revenue|floatformat:0 }}</td>
-                                <td>{% for m in s.metals %}<span style="display:inline-block; margin:2px 4px; padding:2px 8px; border-radius:12px; font-size:var(--text-xs); background:var(--neutral-100);">{{ m.name }} {{ m.weight|floatformat:1 }}g <strong>{{ m.prix_g|floatformat:0 }} DH/g</strong></span>{% endfor %}</td>
+                                <td data-label="Vendeur" class="font-semibold">{% if s.seller__first_name %}{{ s.seller__first_name }} {{ s.seller__last_name }}{% else %}{{ s.seller__username }}{% endif %}</td>
+                                <td data-label="Ventes">{{ s.count }}</td>
+                                <td data-label="CA (DH)" class="font-semibold text-primary">{{ s.revenue|floatformat:0 }}</td>
+                                <td data-label="Detail Metal">{% for m in s.metals %}<span style="display:inline-block; margin:2px 4px; padding:2px 8px; border-radius:12px; font-size:var(--text-xs); background:var(--neutral-100);">{{ m.name }} {{ m.weight|floatformat:1 }}g <strong>{{ m.prix_g|floatformat:0 }} DH/g</strong></span>{% endfor %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -752,17 +752,17 @@
             <div class="card-header"><h3><i class="fas fa-trophy mr-2"></i> Top Factures</h3></div>
             <div class="card-body" style="padding:0; overflow-x:auto; -webkit-overflow-scrolling:touch;">
                 {% if recent_large %}
-                <table class="table">
+                <table class="table db-responsive-table">
                     <thead><tr><th>Reference</th><th>Client</th><th>Vendeur</th><th style="text-align:right;">Montant</th><th>Statut</th><th>Date</th></tr></thead>
                     <tbody>
                         {% for inv in recent_large %}
                         <tr style="cursor:pointer;" onclick="window.location='{% url 'sales:invoice_detail' inv.reference %}'">
-                            <td><span class="font-semibold text-primary">{{ inv.reference }}</span></td>
-                            <td>{% if inv.client %}{{ inv.client.first_name }} {{ inv.client.last_name }}{% else %}<span class="text-muted">Anonyme</span>{% endif %}</td>
-                            <td>{{ inv.seller.get_full_name|default:inv.seller.username }}</td>
-                            <td style="text-align:right;" class="font-bold">{{ inv.total_amount|floatformat:0 }} DH</td>
-                            <td><span class="badge {% if inv.status == 'paid' %}badge-success{% elif inv.status == 'partial_paid' %}badge-warning{% elif inv.status == 'unpaid' %}badge-error{% else %}badge-neutral{% endif %}">{{ inv.get_status_display }}</span></td>
-                            <td class="text-muted">{{ inv.date|date:"d/m/Y" }}</td>
+                            <td data-label="Reference"><span class="font-semibold text-primary">{{ inv.reference }}</span></td>
+                            <td data-label="Client">{% if inv.client %}{{ inv.client.first_name }} {{ inv.client.last_name }}{% else %}<span class="text-muted">Anonyme</span>{% endif %}</td>
+                            <td data-label="Vendeur">{{ inv.seller.get_full_name|default:inv.seller.username }}</td>
+                            <td data-label="Montant" class="font-bold">{{ inv.total_amount|floatformat:0 }} DH</td>
+                            <td data-label="Statut"><span class="badge {% if inv.status == 'paid' %}badge-success{% elif inv.status == 'partial_paid' %}badge-warning{% elif inv.status == 'unpaid' %}badge-error{% else %}badge-neutral{% endif %}">{{ inv.get_status_display }}</span></td>
+                            <td data-label="Date" class="text-muted">{{ inv.date|date:"d/m/Y" }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -1008,10 +1008,48 @@
         .db-pay-card__banks { padding:0 var(--space-3) var(--space-2); gap:var(--space-2); }
         .db-bank-chip { font-size:var(--text-xs); padding:var(--space-1) var(--space-2); }
 
-        /* Tables: horizontal scroll wrapper */
+        /* Two-column grid: single column */
         .db-grid-2 { grid-template-columns:1fr; gap:var(--space-4); }
-        .table { font-size:var(--text-xs); }
-        .table th, .table td { padding:var(--space-2) var(--space-3); white-space:nowrap; }
+
+        /* ===== RESPONSIVE CARD TABLES ===== */
+        .db-responsive-table thead { display:none; }
+        .db-responsive-table tbody tr {
+            display:block;
+            background:white;
+            border:1px solid var(--neutral-200);
+            border-radius:var(--radius-lg);
+            margin-bottom:var(--space-3);
+            padding:var(--space-3);
+            box-shadow:var(--shadow-sm);
+        }
+        .db-responsive-table tbody td {
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding:var(--space-1) 0 !important;
+            border:none !important;
+            white-space:normal !important;
+            font-size:var(--text-sm);
+            text-align:right;
+        }
+        .db-responsive-table tbody td::before {
+            content:attr(data-label);
+            font-weight:600;
+            color:var(--neutral-500);
+            font-size:var(--text-xs);
+            text-transform:uppercase;
+            letter-spacing:.03em;
+            margin-right:var(--space-3);
+            text-align:left;
+            flex-shrink:0;
+        }
+        .db-responsive-table tbody td:first-child {
+            padding-top:0 !important;
+            font-size:var(--text-base);
+            border-bottom:1px solid var(--neutral-100) !important;
+            padding-bottom:var(--space-2) !important;
+            margin-bottom:var(--space-1);
+        }
 
         /* Invoice rows in expandable lists */
         .db-inv-row { padding:var(--space-2) var(--space-3); gap:var(--space-2); }
@@ -1032,13 +1070,16 @@
     }
 
     @media (max-width:480px) {
-        /* Very small screens: single column KPIs for readability */
+        /* Very small screens */
         .db-kpi-row, .db-kpi-row--3, .db-kpi-row--6 { grid-template-columns:1fr 1fr; gap:var(--space-2); }
         .db-kpi { padding:var(--space-2) var(--space-3); gap:var(--space-2); }
         .db-kpi__icon { width:32px; height:32px; font-size:12px; }
         .db-kpi__value { font-size:var(--text-base); }
         .db-filter-grid { grid-template-columns:1fr; }
         .db-delivery-grid { grid-template-columns:1fr 1fr; gap:var(--space-2); }
+
+        .db-responsive-table tbody td { font-size:var(--text-xs); }
+        .db-responsive-table tbody td:first-child { font-size:var(--text-sm); }
     }
 </style>
 

@@ -28,7 +28,7 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch: network-first strategy for HTML, cache-first for static assets
+// Fetch handler
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
@@ -38,24 +38,27 @@ self.addEventListener('fetch', event => {
   // Skip cross-origin requests (CDN, etc.)
   if (url.origin !== location.origin) return;
 
-  // Static assets: cache-first
+  // Static assets: stale-while-revalidate (instant from cache, update in background)
   if (url.pathname.startsWith('/static/') || url.pathname.startsWith('/media/')) {
     event.respondWith(
-      caches.match(event.request).then(cached => {
-        if (cached) return cached;
-        return fetch(event.request).then(response => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          }
-          return response;
-        });
-      })
+      caches.open(CACHE_NAME).then(cache =>
+        cache.match(event.request).then(cached => {
+          const fetchPromise = fetch(event.request).then(response => {
+            if (response.ok) {
+              cache.put(event.request, response.clone());
+            }
+            return response;
+          }).catch(() => cached);
+
+          // Return cached immediately, update in background
+          return cached || fetchPromise;
+        })
+      )
     );
     return;
   }
 
-  // HTML pages: network-first (always get fresh data for ERP)
+  // HTML pages: network-first with cache fallback
   event.respondWith(
     fetch(event.request)
       .then(response => {

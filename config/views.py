@@ -148,7 +148,7 @@ def get_client_ip(request):
 
 
 def service_worker(request):
-    """Serve service worker from root scope with no-cache headers"""
+    """Serve service worker from root scope"""
     from django.conf import settings
     sw_path = os.path.join(settings.STATIC_ROOT or os.path.join(settings.BASE_DIR, 'static'), 'sw.js')
     # Fallback to static dir if STATIC_ROOT not collected yet
@@ -156,8 +156,6 @@ def service_worker(request):
         sw_path = os.path.join(settings.BASE_DIR, 'static', 'sw.js')
     with open(sw_path, 'r') as f:
         response = HttpResponse(f.read(), content_type='application/javascript')
-    # Prevent caching of service worker itself - browsers should always check for updates
-    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response['Pragma'] = 'no-cache'
-    response['Expires'] = '0'
+    # Browser checks for SW updates but can still use cached version for quick startup
+    response['Cache-Control'] = 'max-age=0, must-revalidate'
     return response
