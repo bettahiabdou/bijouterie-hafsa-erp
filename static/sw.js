@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hafsa-erp-v1';
+const CACHE_NAME = 'hafsa-erp-v2';
 
 // Assets to cache on install (app shell)
 const PRECACHE_URLS = [
