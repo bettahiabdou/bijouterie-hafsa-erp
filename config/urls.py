@@ -24,6 +24,9 @@ urlpatterns = [
     # Django Admin - DISABLED in favor of consolidated dashboard
     # path('admin/', admin.site.urls),  # Replaced with mobile-responsive admin_dashboard
 
+    # PWA Service Worker (must be at root for proper scope)
+    path('sw.js', views.service_worker, name='service_worker'),
+
     # Authentication
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),

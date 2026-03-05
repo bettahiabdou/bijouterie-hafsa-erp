@@ -6,10 +6,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
+from django.http import HttpResponse
 from django.utils import timezone
 from django.db.models import Sum, Count
 from datetime import timedelta
 from decimal import Decimal
+import os
 from users.models import ActivityLog
 from sales.models import SaleInvoice
 from products.models import Product
@@ -143,3 +145,14 @@ def get_client_ip(request):
     else:
         ip = request.META.get('REMOTE_ADDR')
     return ip
+
+
+def service_worker(request):
+    """Serve service worker from root scope"""
+    from django.conf import settings
+    sw_path = os.path.join(settings.STATIC_ROOT or os.path.join(settings.BASE_DIR, 'static'), 'sw.js')
+    # Fallback to static dir if STATIC_ROOT not collected yet
+    if not os.path.exists(sw_path):
+        sw_path = os.path.join(settings.BASE_DIR, 'static', 'sw.js')
+    with open(sw_path, 'r') as f:
+        return HttpResponse(f.read(), content_type='application/javascript')
