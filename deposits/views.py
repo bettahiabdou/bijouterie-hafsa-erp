@@ -189,7 +189,7 @@ def deposit_create(request):
     # GET request
     # Get clients without deposit accounts
     clients_with_deposits = DepositAccount.objects.values_list('client_id', flat=True)
-    clients = Client.objects.filter(is_active=True).exclude(pk__in=clients_with_deposits)
+    clients = Client.objects.filter(is_active=True).exclude(pk__in=clients_with_deposits).order_by('first_name', 'last_name')
     payment_methods = PaymentMethod.objects.filter(is_active=True)
     bank_accounts = BankAccount.objects.filter(is_active=True)
 

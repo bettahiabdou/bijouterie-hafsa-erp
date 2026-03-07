@@ -32,14 +32,18 @@
             <div class="card-body">
                 <div class="form-group">
                     <label class="form-label required">Client</label>
-                    <select name="client" class="form-select" required id="clientSelect">
-                        <option value="">-- Sélectionner un client --</option>
-                        {% for client in clients %}
-                            <option value="{{ client.pk }}" data-phone="{{ client.phone }}" data-type="{{ client.get_client_type_display }}">
-                                {{ client.full_name }} ({{ client.code }})
-                            </option>
-                        {% endfor %}
-                    </select>
+                    <div class="search-select" id="clientSearchSelect">
+                        <input type="hidden" name="client" id="clientSelect" required>
+                        <input type="text" class="form-input" id="clientSearchInput" placeholder="Rechercher par nom ou téléphone..." autocomplete="off">
+                        <div class="search-select-dropdown" id="clientDropdown">
+                            {% for client in clients %}
+                            <div class="search-select-option" data-value="{{ client.pk }}" data-phone="{{ client.phone|default:'' }}" data-type="{{ client.get_client_type_display }}" data-name="{{ client.full_name }}" data-code="{{ client.code }}">
+                                <div class="search-opt-name">{{ client.full_name }}</div>
+                                <div class="search-opt-detail">{{ client.code }}{% if client.phone %} &middot; {{ client.phone }}{% endif %}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                     <small class="form-text">Seuls les clients sans compte dépôt sont affichés</small>
                 </div>
 
@@ -168,20 +172,100 @@
             color: var(--warning-700);
             border: 1px solid var(--warning-200);
         }
+
+        /* Searchable select */
+        .search-select { position:relative; }
+        .search-select-dropdown {
+            display:none;
+            position:absolute; top:100%; left:0; right:0;
+            background:white; border:1px solid var(--neutral-300);
+            border-radius:var(--radius-md); box-shadow:var(--shadow-lg);
+            max-height:280px; overflow-y:auto; z-index:100;
+            margin-top:2px;
+        }
+        .search-select-dropdown.open { display:block; }
+        .search-select-option {
+            padding:var(--space-3) var(--space-4); cursor:pointer;
+            border-bottom:1px solid var(--neutral-50);
+            transition:background .1s;
+        }
+        .search-select-option:hover, .search-select-option.active { background:var(--primary-50); }
+        .search-select-option.hidden { display:none; }
+        .search-opt-name { font-weight:var(--font-semibold); font-size:var(--text-sm); color:var(--neutral-800); }
+        .search-opt-detail { font-size:var(--text-xs); color:var(--neutral-500); margin-top:2px; }
+        .search-select-empty { padding:var(--space-4); text-align:center; color:var(--neutral-400); font-size:var(--text-sm); }
     </style>
 
     <script>
-        document.getElementById('clientSelect').addEventListener('change', function() {
-            const selected = this.options[this.selectedIndex];
-            const infoDiv = document.getElementById('clientInfo');
+    (function() {
+        const hiddenInput = document.getElementById('clientSelect');
+        const searchInput = document.getElementById('clientSearchInput');
+        const dropdown = document.getElementById('clientDropdown');
+        const options = dropdown.querySelectorAll('.search-select-option');
+        const infoDiv = document.getElementById('clientInfo');
 
-            if (this.value) {
-                document.getElementById('clientPhone').textContent = selected.dataset.phone || '-';
-                document.getElementById('clientType').textContent = selected.dataset.type || '-';
-                infoDiv.style.display = 'block';
-            } else {
-                infoDiv.style.display = 'none';
+        function selectClient(opt) {
+            hiddenInput.value = opt.dataset.value;
+            searchInput.value = opt.dataset.name + ' (' + opt.dataset.code + ')';
+            dropdown.classList.remove('open');
+            document.getElementById('clientPhone').textContent = opt.dataset.phone || '-';
+            document.getElementById('clientType').textContent = opt.dataset.type || '-';
+            infoDiv.style.display = 'block';
+        }
+
+        searchInput.addEventListener('focus', function() {
+            dropdown.classList.add('open');
+            filterOptions();
+        });
+
+        searchInput.addEventListener('input', function() {
+            hiddenInput.value = '';
+            infoDiv.style.display = 'none';
+            dropdown.classList.add('open');
+            filterOptions();
+        });
+
+        function filterOptions() {
+            const q = searchInput.value.toLowerCase().trim();
+            let visible = 0;
+            options.forEach(function(opt) {
+                const name = opt.dataset.name.toLowerCase();
+                const phone = (opt.dataset.phone || '').toLowerCase();
+                const code = (opt.dataset.code || '').toLowerCase();
+                const match = !q || name.includes(q) || phone.includes(q) || code.includes(q);
+                opt.classList.toggle('hidden', !match);
+                if (match) visible++;
+            });
+            // Show/hide empty message
+            let emptyMsg = dropdown.querySelector('.search-select-empty');
+            if (visible === 0) {
+                if (!emptyMsg) {
+                    emptyMsg = document.createElement('div');
+                    emptyMsg.className = 'search-select-empty';
+                    emptyMsg.textContent = 'Aucun client trouvé';
+                    dropdown.appendChild(emptyMsg);
+                }
+                emptyMsg.style.display = 'block';
+            } else if (emptyMsg) {
+                emptyMsg.style.display = 'none';
+            }
+        }
+
+        options.forEach(function(opt) {
+            opt.addEventListener('click', function() { selectClient(opt); });
+        });
+
+        // Close dropdown on outside click
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#clientSearchSelect')) {
+                dropdown.classList.remove('open');
             }
         });
+
+        // Keyboard nav
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') dropdown.classList.remove('open');
+        });
+    })();
     </script>
 {% endblock %}
