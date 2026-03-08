@@ -291,6 +291,47 @@
             </div>
             {% endif %}
 
+            <!-- Linked Purchase Invoice (Facture d'achat) -->
+            {% if linked_purchase_item %}
+            <div class="card animate-slide-up" style="animation-delay: 30ms;">
+                <div class="card-header">
+                    <h3><i class="fas fa-file-invoice-dollar mr-2"></i> Facture d'achat</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="info-label">Facture</span>
+                            <a href="{% url 'purchases:purchase_invoice_detail' linked_purchase_item.invoice.reference %}" class="text-primary font-medium" style="text-decoration: none;">
+                                {{ linked_purchase_item.invoice.reference }}
+                            </a>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Statut</span>
+                            <span class="badge {% if linked_purchase_item.invoice.status == 'paid' %}badge-success{% elif linked_purchase_item.invoice.status == 'draft' %}badge-warning{% elif linked_purchase_item.invoice.status == 'partial' %}badge-info{% else %}badge-neutral{% endif %}">
+                                {{ linked_purchase_item.invoice.get_status_display }}
+                            </span>
+                        </div>
+                        {% if linked_purchase_item.invoice.supplier %}
+                        <div class="info-item">
+                            <span class="info-label">Fournisseur</span>
+                            <span class="info-value">{{ linked_purchase_item.invoice.supplier.name }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="info-item">
+                            <span class="info-label">Date</span>
+                            <span class="info-value">{{ linked_purchase_item.invoice.date|date:"d/m/Y" }}</span>
+                        </div>
+                        {% if linked_purchase_item.total_amount %}
+                        <div class="info-item">
+                            <span class="info-label">Prix d'achat</span>
+                            <span class="info-value font-semibold">{{ linked_purchase_item.total_amount }} DH</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Metal Info -->
             <div class="card animate-slide-up" style="animation-delay: 50ms;">
                 <div class="card-header">

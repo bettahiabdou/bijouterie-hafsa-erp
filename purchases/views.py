@@ -812,7 +812,7 @@ def purchase_invoice_detail(request, reference):
         'category', 'metal_type', 'metal_purity'
     ).exclude(
         id__in=products_in_invoices
-    ).order_by('-created_at')[:100]  # Limit to recent 100
+    ).order_by('-created_at')
 
     # Get items and calculate dynamic totals from linked products
     items = invoice.items.select_related('product').all()

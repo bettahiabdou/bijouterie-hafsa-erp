@@ -173,6 +173,9 @@
             border: 1px solid var(--warning-200);
         }
 
+        /* Allow dropdown to overflow the card */
+        .card:has(.search-select) { overflow:visible; }
+
         /* Searchable select */
         .search-select { position:relative; }
         .search-select-dropdown {

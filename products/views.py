@@ -218,11 +218,17 @@ def product_detail(request, reference):
         invoice__is_deleted=False
     ).order_by('-invoice__date')
 
+    # Get linked purchase invoice item (facture d'achat)
+    linked_purchase_item = product.purchase_items.select_related(
+        'invoice', 'invoice__supplier'
+    ).first()
+
     context = {
         'product': product,
         'images': product.images.all(),
         'stones': product.stones.all(),
         'linked_invoices': linked_invoices,
+        'linked_purchase_item': linked_purchase_item,
     }
 
     return render(request, 'products/product_detail.html', context)
