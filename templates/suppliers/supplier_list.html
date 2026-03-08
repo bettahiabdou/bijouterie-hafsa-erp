@@ -106,6 +106,7 @@
                                 <th>Contact</th>
                                 <th>Ville</th>
                                 <th style="text-align: center;">Achats</th>
+                                <th style="text-align: right;">Grammes</th>
                                 <th style="text-align: center;">Statut</th>
                                 <th style="text-align: right;">Actions</th>
                             </tr>
@@ -140,6 +141,9 @@
                                     <td class="text-muted">{{ supplier.city|default:"-" }}</td>
                                     <td style="text-align: center;">
                                         <span class="badge badge-neutral">{{ supplier.purchase_count }}</span>
+                                    </td>
+                                    <td style="text-align: right; font-weight: 600;">
+                                        {% if supplier.total_grams %}{{ supplier.total_grams|floatformat:2 }} g{% else %}-{% endif %}
                                     </td>
                                     <td style="text-align: center;">
                                         <span class="badge {% if supplier.is_active %}badge-success{% else %}badge-error{% endif %}">
@@ -206,6 +210,9 @@
                                 {{ supplier.get_supplier_type_display }}
                             </span>
                             <span class="badge badge-neutral">{{ supplier.purchase_count }} achats</span>
+                            {% if supplier.total_grams %}
+                            <span class="badge badge-info">{{ supplier.total_grams|floatformat:2 }} g</span>
+                            {% endif %}
                         </div>
 
                         <div class="mobile-card-body">

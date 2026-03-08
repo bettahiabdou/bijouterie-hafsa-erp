@@ -48,10 +48,11 @@ def supplier_list(request):
     elif active_filter == 'false':
         suppliers = suppliers.filter(is_active=False)
 
-    # Add related data count
+    # Add related data count and total grams
     suppliers = suppliers.annotate(
-        purchase_count=Count('purchase_invoices'),
-        payment_count=Count('payments')
+        purchase_count=Count('purchase_invoices', distinct=True),
+        payment_count=Count('payments', distinct=True),
+        total_grams=Sum('products__net_weight')
     )
 
     # Pagination
