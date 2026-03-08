@@ -758,7 +758,25 @@
             padding: var(--space-3);
             border: 1px solid var(--neutral-300);
             border-radius: var(--radius-md);
-            margin-bottom: var(--space-4);
+            margin-bottom: var(--space-3);
+        }
+
+        .product-filters {
+            display: flex;
+            gap: var(--space-2);
+            margin-bottom: var(--space-3);
+            flex-wrap: wrap;
+        }
+
+        .product-filter-select {
+            flex: 1;
+            min-width: 120px;
+            padding: var(--space-2) var(--space-3);
+            border: 1px solid var(--neutral-300);
+            border-radius: var(--radius-md);
+            font-size: var(--text-sm);
+            background: white;
+            color: var(--neutral-700);
         }
 
         .product-list {
@@ -1069,9 +1087,31 @@
             </div>
             <div class="modal-body">
                 <input type="text" id="productSearch" class="product-search-input" placeholder="Rechercher par référence ou nom..." onkeyup="filterProducts()">
+                <div class="product-filters">
+                    <select id="filterStatus" class="product-filter-select" onchange="filterProducts()">
+                        <option value="">Tous les statuts</option>
+                        <option value="available">Disponible</option>
+                        <option value="sold">Vendu</option>
+                        <option value="reserved">Réservé</option>
+                        <option value="in_repair">En réparation</option>
+                        <option value="returned">Retourné</option>
+                        <option value="consigned_in">Consignation (reçu)</option>
+                        <option value="consigned_out">Consignation (prêté)</option>
+                    </select>
+                    <select id="filterCategory" class="product-filter-select" onchange="filterProducts()">
+                        <option value="">Toutes catégories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.name|lower }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <select id="filterSort" class="product-filter-select" onchange="sortProducts()">
+                        <option value="desc">Date ↓ (récent)</option>
+                        <option value="asc">Date ↑ (ancien)</option>
+                    </select>
+                </div>
                 <div class="product-list" id="productList">
                     {% for product in all_products %}
-                        <div class="product-item-wrapper" data-ref="{{ product.reference|lower }}" data-name="{{ product.name|lower }}" data-id="{{ product.id }}">
+                        <div class="product-item-wrapper" data-ref="{{ product.reference|lower }}" data-name="{{ product.name|lower }}" data-id="{{ product.id }}" data-status="{{ product.status }}" data-category="{{ product.category.name|lower|default:'' }}" data-created="{{ product.created_at|date:'Y-m-d' }}">
                             <div class="product-item" onclick="toggleProductSelection(this)">
                                 <input type="checkbox" class="product-item-checkbox" data-product-id="{{ product.id }}" onclick="event.stopPropagation(); toggleProductSelection(this.closest('.product-item'));">
                                 <div class="product-item-info">
@@ -1081,6 +1121,7 @@
                                         {{ product.net_weight|default:"0" }}g
                                         {% if product.metal_purity %}| {{ product.metal_purity.name }}{% endif %}
                                         {% if product.category %}| {{ product.category.name }}{% endif %}
+                                        | {{ product.created_at|date:"d/m/Y" }}
                                     </div>
                                 </div>
                                 <div class="product-item-status">
@@ -1165,17 +1206,37 @@
 
         function filterProducts() {
             const search = document.getElementById('productSearch').value.toLowerCase();
-            const items = document.querySelectorAll('.product-item-wrapper');
+            const statusFilter = document.getElementById('filterStatus').value;
+            const categoryFilter = document.getElementById('filterCategory').value;
+            const items = document.querySelectorAll('#productList .product-item-wrapper');
 
             items.forEach(item => {
                 const ref = item.dataset.ref;
                 const name = item.dataset.name;
-                if (ref.includes(search) || name.includes(search)) {
-                    item.style.display = 'block';
-                } else {
-                    item.style.display = 'none';
-                }
+                const status = item.dataset.status;
+                const category = item.dataset.category;
+
+                const matchSearch = !search || ref.includes(search) || name.includes(search);
+                const matchStatus = !statusFilter || status === statusFilter;
+                const matchCategory = !categoryFilter || category === categoryFilter;
+
+                item.style.display = (matchSearch && matchStatus && matchCategory) ? 'block' : 'none';
             });
+        }
+
+        function sortProducts() {
+            const sortVal = document.getElementById('filterSort').value;
+            const list = document.getElementById('productList');
+            const items = Array.from(list.querySelectorAll('.product-item-wrapper'));
+
+            items.sort(function(a, b) {
+                const valA = a.dataset.created || '0000-00-00';
+                const valB = b.dataset.created || '0000-00-00';
+                return sortVal === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            });
+
+            items.forEach(function(item) { list.appendChild(item); });
+            filterProducts();
         }
 
         // Close modal on outside click
