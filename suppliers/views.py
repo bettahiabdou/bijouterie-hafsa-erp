@@ -5,11 +5,11 @@ Includes supplier listing, creation, editing, deletion, and detail views
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum, Subquery, OuterRef, DecimalField
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from .models import Supplier
-from purchases.models import PurchaseInvoice, Consignment
+from purchases.models import PurchaseInvoice, PurchaseInvoiceItem, Consignment
 from payments.models import SupplierPayment
 from users.models import ActivityLog
 
@@ -48,11 +48,18 @@ def supplier_list(request):
     elif active_filter == 'false':
         suppliers = suppliers.filter(is_active=False)
 
-    # Add related data count and total grams from purchase invoice items
+    # Subquery for accurate total grams (avoids cross-join inflation)
+    grams_subquery = PurchaseInvoiceItem.objects.filter(
+        invoice__supplier=OuterRef('pk')
+    ).values('invoice__supplier').annotate(
+        total=Sum('net_weight')
+    ).values('total')[:1]
+
+    # Add related data count and total grams
     suppliers = suppliers.annotate(
         purchase_count=Count('purchase_invoices', distinct=True),
         payment_count=Count('payments', distinct=True),
-        total_grams=Sum('purchase_invoices__items__net_weight')
+        total_grams=Subquery(grams_subquery, output_field=DecimalField())
     )
 
     # Pagination
