@@ -3271,12 +3271,29 @@ def pending_invoice_complete(request, reference):
                 # Calculate totals first
                 invoice.calculate_totals()
 
+                # Handle exchange (reprise facture)
+                exchange_credit = Decimal('0')
+                exchange_invoice_id = request.POST.get('exchange_invoice_id', '')
+                exchange_inv = None
+                if exchange_invoice_id:
+                    try:
+                        exchange_inv = SaleInvoice.objects.prefetch_related('items__product').get(
+                            id=int(exchange_invoice_id),
+                            is_deleted=False,
+                            status__in=[SaleInvoice.Status.PAID, SaleInvoice.Status.PARTIAL_PAID, SaleInvoice.Status.UNPAID]
+                        )
+                        exchange_credit = exchange_inv.total_amount or Decimal('0')
+                    except (SaleInvoice.DoesNotExist, ValueError):
+                        exchange_inv = None
+
                 # Handle dynamic payments (N payments)
                 from payments.models import ClientPayment
                 from datetime import datetime
 
-                total_amount_paid = Decimal('0')
+                total_amount_paid = exchange_credit
                 payment_details = []
+                if exchange_inv:
+                    payment_details.append({'method': f'Échange ({exchange_inv.reference})', 'amount': exchange_credit})
 
                 # Find all payment sections by scanning POST keys
                 # Payment fields are named: payment_method_1, payment_method_2, etc.
@@ -3442,6 +3459,26 @@ def pending_invoice_complete(request, reference):
                         item.product.status = 'sold'
                         item.product.save(update_fields=['status'])
 
+                # Finalize exchange: mark old invoice as exchanged, return products
+                if exchange_inv:
+                    from sales.models import SaleInvoiceAction
+                    # Mark old invoice items as returned and products as available
+                    for ex_item in exchange_inv.items.all():
+                        ex_item.is_returned = True
+                        ex_item.returned_at = timezone.now()
+                        ex_item.save(update_fields=['is_returned', 'returned_at'])
+                        if ex_item.product:
+                            ex_item.product.status = 'available'
+                            ex_item.product.save(update_fields=['status'])
+                    exchange_inv.status = SaleInvoice.Status.EXCHANGED
+                    exchange_inv.save(update_fields=['status'])
+                    # Record the exchange action
+                    SaleInvoiceAction.objects.create(
+                        original_invoice=exchange_inv,
+                        action_type=SaleInvoiceAction.ActionType.EXCHANGE,
+                        new_invoice=invoice,
+                    )
+
                 # Log activity
                 payment_summary = ', '.join([f"{p['method']}: {p['amount']} DH" for p in payment_details]) if payment_details else 'Aucun paiement'
                 ActivityLog.objects.create(
@@ -3495,6 +3532,12 @@ def pending_invoice_complete(request, reference):
     bank_accounts = BankAccount.objects.filter(is_active=True)
     carriers = Carrier.objects.filter(is_active=True)
 
+    # Get eligible invoices for exchange (non-draft, non-cancelled, non-returned, non-exchanged)
+    exchange_invoices = SaleInvoice.objects.filter(
+        is_deleted=False,
+        status__in=[SaleInvoice.Status.PAID, SaleInvoice.Status.PARTIAL_PAID, SaleInvoice.Status.UNPAID]
+    ).select_related('client').prefetch_related('items__product').order_by('-date')
+
     context = {
         'invoice': invoice,
         'photos': invoice.photos.all(),
@@ -3507,6 +3550,7 @@ def pending_invoice_complete(request, reference):
         'payment_methods': payment_methods,
         'bank_accounts': bank_accounts,
         'carriers': carriers,
+        'exchange_invoices': exchange_invoices,
     }
 
     return render(request, 'sales/pending_invoice_complete.html', context)

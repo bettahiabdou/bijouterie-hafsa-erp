@@ -278,6 +278,58 @@
                 </div>
             </div>
 
+            <!-- Exchange Section -->
+            <div class="card mb-4">
+                <div class="card-header" style="cursor: pointer;" onclick="toggleExchangeSection()">
+                    <h3><i class="fas fa-exchange-alt mr-2"></i> Échange / Reprise</h3>
+                    <label class="toggle-switch" onclick="event.stopPropagation();">
+                        <input type="checkbox" id="exchange-toggle" onchange="toggleExchangeSection()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="card-body" id="exchange-body" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">Facture à reprendre</label>
+                        <input type="text" id="exchange-search" class="form-input" placeholder="Rechercher par référence ou client..." autocomplete="off" oninput="filterExchangeInvoices()">
+                        <div id="exchange-invoice-list" class="exchange-invoice-list" style="display: none;">
+                            {% for inv in exchange_invoices %}
+                            <div class="exchange-invoice-option" data-id="{{ inv.id }}" data-ref="{{ inv.reference }}" data-total="{{ inv.total_amount|floatformat:2 }}" data-client="{{ inv.client.full_name|default:'Anonyme' }}" data-date="{{ inv.date|date:'d/m/Y' }}" data-items="{% for it in inv.items.all %}{{ it.product.reference|default:'—' }} ({{ it.total_amount|floatformat:0 }} DH){% if not forloop.last %}, {% endif %}{% endfor %}" onclick="selectExchangeInvoice(this)">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <strong>{{ inv.reference }}</strong>
+                                        <span class="text-muted" style="margin-left: var(--space-2); font-size: var(--text-sm);">{{ inv.client.full_name|default:"Anonyme" }}</span>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <strong style="color: var(--primary-600);">{{ inv.total_amount|floatformat:2 }} DH</strong>
+                                        <div style="font-size: var(--text-xs); color: var(--neutral-500);">{{ inv.date|date:"d/m/Y" }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <!-- Selected exchange invoice display -->
+                    <div id="exchange-selected" style="display: none; margin-top: var(--space-3);">
+                        <div style="background: var(--warning-50); border: 1px solid var(--warning-200); border-radius: var(--radius-md); padding: var(--space-3);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                                <div>
+                                    <strong id="exchange-sel-ref" style="color: var(--warning-700);"></strong>
+                                    <span id="exchange-sel-client" class="text-muted" style="margin-left: var(--space-2); font-size: var(--text-sm);"></span>
+                                </div>
+                                <button type="button" class="btn btn-ghost btn-sm text-error" onclick="clearExchangeInvoice()" style="padding: 2px 8px;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div id="exchange-sel-items" style="font-size: var(--text-sm); color: var(--neutral-600); margin-bottom: var(--space-2);"></div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: var(--space-2); border-top: 1px solid var(--warning-200);">
+                                <span style="font-weight: 600; color: var(--warning-700);">Crédit échange:</span>
+                                <strong id="exchange-sel-total" style="font-size: var(--text-lg); color: var(--warning-700);"></strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Finalize Section -->
             <div class="card">
                 <div class="card-header">
@@ -287,6 +339,7 @@
                     <form method="post" id="complete-form">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="complete">
+                        <input type="hidden" name="exchange_invoice_id" id="exchange-invoice-id" value="">
                         <input type="hidden" name="custom_reference" id="hidden-custom-reference" value="{{ invoice.reference }}">
                         <input type="hidden" name="delivery_method_type_hidden" id="delivery-method-type-hidden" value="magasin">
                         <input type="hidden" name="carrier_id_hidden" id="carrier-id-hidden" value="">
@@ -419,7 +472,11 @@
                         <div class="form-group" style="background: var(--neutral-50); padding: var(--space-3); border-radius: var(--radius-md);">
                             <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-2);">
                                 <span>Total facture:</span>
-                                <strong>{{ invoice.total_amount|floatformat:2 }} DH</strong>
+                                <strong id="summary-total">{{ invoice.total_amount|floatformat:2 }} DH</strong>
+                            </div>
+                            <div id="exchange-credit-row" style="display: none; justify-content: space-between; margin-bottom: var(--space-2); color: var(--warning-600);">
+                                <span><i class="fas fa-exchange-alt mr-1"></i> Crédit échange:</span>
+                                <strong id="exchange-credit-display">0.00 DH</strong>
                             </div>
                             <div style="display: flex; justify-content: space-between; color: var(--primary-600);">
                                 <span>Total paiements:</span>
@@ -559,6 +616,27 @@
     </div>
 
     <style>
+        /* Exchange section */
+        .toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--neutral-300); border-radius: 22px; transition: .2s; }
+        .toggle-slider::before { content: ''; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary-500); }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+        .exchange-invoice-list {
+            max-height: 250px; overflow-y: auto;
+            border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
+            margin-top: var(--space-2);
+        }
+        .exchange-invoice-option {
+            padding: var(--space-3); cursor: pointer;
+            border-bottom: 1px solid var(--neutral-100); transition: background .15s;
+        }
+        .exchange-invoice-option:hover { background: var(--primary-50); }
+        .exchange-invoice-option:last-child { border-bottom: none; }
+        .exchange-invoice-option.hidden { display: none; }
+
         .completion-layout {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1193,6 +1271,55 @@
         let paymentCount = 1;
 
         // Payment Status Hint - supports N payments
+        // Exchange state
+        let exchangeAmount = 0;
+
+        function toggleExchangeSection() {
+            const toggle = document.getElementById('exchange-toggle');
+            const body = document.getElementById('exchange-body');
+            body.style.display = toggle.checked ? 'block' : 'none';
+            if (!toggle.checked) {
+                clearExchangeInvoice();
+            }
+        }
+
+        function filterExchangeInvoices() {
+            const q = document.getElementById('exchange-search').value.toLowerCase().trim();
+            const list = document.getElementById('exchange-invoice-list');
+            const options = list.querySelectorAll('.exchange-invoice-option');
+            list.style.display = q ? 'block' : 'none';
+            options.forEach(opt => {
+                const ref = opt.dataset.ref.toLowerCase();
+                const client = opt.dataset.client.toLowerCase();
+                opt.classList.toggle('hidden', q && !ref.includes(q) && !client.includes(q));
+            });
+        }
+
+        function selectExchangeInvoice(el) {
+            document.getElementById('exchange-invoice-id').value = el.dataset.id;
+            document.getElementById('exchange-sel-ref').textContent = el.dataset.ref;
+            document.getElementById('exchange-sel-client').textContent = el.dataset.client;
+            document.getElementById('exchange-sel-items').textContent = el.dataset.items;
+            document.getElementById('exchange-sel-total').textContent = el.dataset.total + ' DH';
+            exchangeAmount = parseFloat(el.dataset.total) || 0;
+            document.getElementById('exchange-selected').style.display = 'block';
+            document.getElementById('exchange-invoice-list').style.display = 'none';
+            document.getElementById('exchange-search').value = el.dataset.ref;
+            // Update exchange credit display
+            document.getElementById('exchange-credit-row').style.display = 'flex';
+            document.getElementById('exchange-credit-display').textContent = '-' + exchangeAmount.toFixed(2) + ' DH';
+            updatePaymentStatus();
+        }
+
+        function clearExchangeInvoice() {
+            document.getElementById('exchange-invoice-id').value = '';
+            document.getElementById('exchange-selected').style.display = 'none';
+            document.getElementById('exchange-search').value = '';
+            exchangeAmount = 0;
+            document.getElementById('exchange-credit-row').style.display = 'none';
+            updatePaymentStatus();
+        }
+
         function updatePaymentStatus() {
             const invoiceTotal = getInvoiceTotal();
             let totalPaid = 0;
@@ -1202,17 +1329,20 @@
                 totalPaid += parseFloat(input.value) || 0;
             });
 
+            // Add exchange credit
+            const totalWithExchange = totalPaid + exchangeAmount;
+
             const hint = document.getElementById('payment-status-hint');
             const totalPaymentsEl = document.getElementById('total-payments');
 
             if (totalPaymentsEl) {
-                totalPaymentsEl.textContent = totalPaid.toFixed(2) + ' DH';
+                totalPaymentsEl.textContent = totalWithExchange.toFixed(2) + ' DH';
             }
 
-            if (totalPaid >= invoiceTotal && invoiceTotal > 0) {
+            if (totalWithExchange >= invoiceTotal && invoiceTotal > 0) {
                 hint.innerHTML = '<span style="color: var(--success-600);"><i class="fas fa-check-circle"></i> Payée intégralement</span>';
-            } else if (totalPaid > 0 && invoiceTotal > 0) {
-                const remaining = invoiceTotal - totalPaid;
+            } else if (totalWithExchange > 0 && invoiceTotal > 0) {
+                const remaining = invoiceTotal - totalWithExchange;
                 hint.innerHTML = '<span style="color: var(--warning-600);"><i class="fas fa-exclamation-circle"></i> Partiellement payée - Reste: ' + remaining.toFixed(2) + ' DH</span>';
             } else if (invoiceTotal > 0) {
                 hint.innerHTML = '<span style="color: var(--error-600);"><i class="fas fa-times-circle"></i> Non payée</span>';
