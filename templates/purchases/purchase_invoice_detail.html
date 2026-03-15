@@ -112,14 +112,16 @@
                                                 {{ item.gross_weight }}
                                             {% endif %}
                                         </td>
-                                        <td style="text-align: right;">
-                                            {% if item.product %}
-                                                {{ item.product.purchase_price_per_gram|default:"0" }} DH
-                                            {% else %}
-                                                {{ item.price_per_gram }} DH
-                                            {% endif %}
+                                        <td style="text-align: right;" class="editable-ppg" data-item-id="{{ item.id }}">
+                                            <span class="ppg-display" onclick="editPricePerGram(this)" title="Cliquer pour modifier" style="cursor: pointer; border-bottom: 1px dashed var(--neutral-400);">
+                                                {% if item.product %}{{ item.product.purchase_price_per_gram|default:"0" }}{% else %}{{ item.price_per_gram }}{% endif %}
+                                            </span>
+                                            <input type="number" class="ppg-input" step="0.01" min="0" style="display:none; width: 80px; text-align: right; padding: 2px 4px; border: 1px solid var(--primary-400); border-radius: var(--radius-sm); font-size: inherit;"
+                                                   value="{% if item.product %}{{ item.product.purchase_price_per_gram|default:'0' }}{% else %}{{ item.price_per_gram }}{% endif %}"
+                                                   onblur="savePricePerGram(this)" onkeydown="if(event.key==='Enter'){this.blur();}if(event.key==='Escape'){cancelPpgEdit(this);}">
+                                            <span class="text-muted" style="font-size: var(--text-xs);"> DH</span>
                                         </td>
-                                        <td style="text-align: right;" class="font-semibold">
+                                        <td style="text-align: right;" class="font-semibold item-total-cell" data-item-id="{{ item.id }}">
                                             {% if item.product %}
                                                 {{ item.dynamic_total }} DH
                                             {% else %}
@@ -143,7 +145,7 @@
                                     <td colspan="2" style="text-align: right;">Total Poids:</td>
                                     <td style="text-align: right;">{{ total_net_weight|floatformat:3 }} g</td>
                                     <td></td>
-                                    <td style="text-align: right;">{{ dynamic_subtotal|floatformat:2 }} DH</td>
+                                    <td style="text-align: right;" id="dynamic-subtotal">{{ dynamic_subtotal|floatformat:2 }} DH</td>
                                     <td></td>
                                 </tr>
                             </tfoot>
@@ -169,15 +171,21 @@
                                             {% if item.product %}{{ item.product.net_weight|default:"0" }}{% else %}{{ item.gross_weight }}{% endif %} g
                                         </span>
                                     </div>
-                                    <div class="item-detail">
+                                    <div class="item-detail editable-ppg" data-item-id="{{ item.id }}">
                                         <span class="item-detail-label">Prix/g</span>
                                         <span class="item-detail-value">
-                                            {% if item.product %}{{ item.product.purchase_price_per_gram|default:"0" }}{% else %}{{ item.price_per_gram }}{% endif %} DH
+                                            <span class="ppg-display" onclick="editPricePerGram(this)" style="cursor: pointer; border-bottom: 1px dashed var(--neutral-400);">
+                                                {% if item.product %}{{ item.product.purchase_price_per_gram|default:"0" }}{% else %}{{ item.price_per_gram }}{% endif %}
+                                            </span>
+                                            <input type="number" class="ppg-input" step="0.01" min="0" style="display:none; width: 70px; text-align: right; padding: 2px 4px; border: 1px solid var(--primary-400); border-radius: var(--radius-sm); font-size: inherit;"
+                                                   value="{% if item.product %}{{ item.product.purchase_price_per_gram|default:'0' }}{% else %}{{ item.price_per_gram }}{% endif %}"
+                                                   onblur="savePricePerGram(this)" onkeydown="if(event.key==='Enter'){this.blur();}if(event.key==='Escape'){cancelPpgEdit(this);}">
+                                            DH
                                         </span>
                                     </div>
                                     <div class="item-detail">
                                         <span class="item-detail-label">Total</span>
-                                        <span class="item-detail-value font-semibold">
+                                        <span class="item-detail-value font-semibold item-total-cell" data-item-id="{{ item.id }}">
                                             {% if item.product %}{{ item.dynamic_total }}{% else %}{{ item.total_amount }}{% endif %} DH
                                         </span>
                                     </div>
@@ -361,7 +369,7 @@
                         {% endif %}
                         <div class="total-row total-final">
                             <span>Total</span>
-                            <span class="text-success">{{ dynamic_total|floatformat:2 }} DH</span>
+                            <span class="text-success" id="dynamic-total">{{ dynamic_total|floatformat:2 }} DH</span>
                         </div>
                     </div>
                 </div>
@@ -384,7 +392,7 @@
                         </div>
                         <div class="status-item">
                             <span class="status-label">Solde</span>
-                            <span class="status-value font-semibold {% if dynamic_balance > 0 %}text-error{% else %}text-success{% endif %}">
+                            <span class="status-value font-semibold {% if dynamic_balance > 0 %}text-error{% else %}text-success{% endif %}" id="dynamic-balance">
                                 {{ dynamic_balance|floatformat:2 }} DH
                             </span>
                         </div>
@@ -1247,6 +1255,86 @@
         });
 
         // ===== Remove/Return/Exchange Modal Functions =====
+        // Inline Price Per Gram editing
+        function editPricePerGram(displayEl) {
+            const cell = displayEl.closest('.editable-ppg');
+            const input = cell.querySelector('.ppg-input');
+            displayEl.style.display = 'none';
+            input.style.display = 'inline-block';
+            input.focus();
+            input.select();
+        }
+
+        function cancelPpgEdit(inputEl) {
+            const cell = inputEl.closest('.editable-ppg');
+            const display = cell.querySelector('.ppg-display');
+            inputEl.value = display.textContent.trim();
+            inputEl.style.display = 'none';
+            display.style.display = 'inline';
+        }
+
+        function savePricePerGram(inputEl) {
+            const cell = inputEl.closest('.editable-ppg');
+            const display = cell.querySelector('.ppg-display');
+            const itemId = cell.dataset.itemId;
+            const newPrice = inputEl.value;
+            const oldPrice = display.textContent.trim();
+
+            if (newPrice === oldPrice || newPrice === '') {
+                inputEl.style.display = 'none';
+                display.style.display = 'inline';
+                return;
+            }
+
+            // Show saving state
+            inputEl.disabled = true;
+
+            fetch("{% url 'purchases:update_item_price_per_gram' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'item_id=' + itemId + '&price_per_gram=' + newPrice
+            })
+            .then(r => r.json())
+            .then(data => {
+                inputEl.disabled = false;
+                if (data.success) {
+                    // Update ALL displays for this item (desktop + mobile)
+                    document.querySelectorAll('.editable-ppg[data-item-id="' + itemId + '"] .ppg-display').forEach(d => {
+                        d.textContent = parseFloat(newPrice).toFixed(2);
+                    });
+                    document.querySelectorAll('.editable-ppg[data-item-id="' + itemId + '"] .ppg-input').forEach(i => {
+                        i.value = parseFloat(newPrice).toFixed(2);
+                    });
+                    // Update item total cells
+                    document.querySelectorAll('.item-total-cell[data-item-id="' + itemId + '"]').forEach(el => {
+                        el.textContent = data.item_total + ' DH';
+                    });
+                    // Update footer totals
+                    var subtotalEl = document.getElementById('dynamic-subtotal');
+                    if (subtotalEl) subtotalEl.textContent = data.subtotal + ' DH';
+                    var totalEl = document.getElementById('dynamic-total');
+                    if (totalEl) totalEl.textContent = data.invoice_total + ' DH';
+                    var balanceEl = document.getElementById('dynamic-balance');
+                    if (balanceEl) balanceEl.textContent = data.invoice_balance + ' DH';
+                } else {
+                    alert('Erreur: ' + (data.error || 'Échec de la mise à jour'));
+                    inputEl.value = oldPrice;
+                }
+                inputEl.style.display = 'none';
+                display.style.display = 'inline';
+            })
+            .catch(err => {
+                inputEl.disabled = false;
+                alert('Erreur réseau');
+                inputEl.value = oldPrice;
+                inputEl.style.display = 'none';
+                display.style.display = 'inline';
+            });
+        }
+
         let currentRemoveItemId = null;
         let currentAction = null;
         let selectedExchangeProductId = null;

@@ -1183,6 +1183,71 @@ def delete_supplier_payment(request):
         return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
 
 
+# ============ UPDATE ITEM PRICE PER GRAM (AJAX) ============
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def update_item_price_per_gram(request):
+    """Update the purchase price per gram for a product linked to a purchase invoice item (AJAX)"""
+    try:
+        item_id = request.POST.get('item_id')
+        new_price = request.POST.get('price_per_gram')
+
+        if not item_id or not new_price:
+            return JsonResponse({'success': False, 'error': 'Paramètres manquants'}, status=400)
+
+        try:
+            new_price = Decimal(new_price)
+            if new_price < 0:
+                return JsonResponse({'success': False, 'error': 'Prix invalide'}, status=400)
+        except (InvalidOperation, TypeError):
+            return JsonResponse({'success': False, 'error': 'Prix invalide'}, status=400)
+
+        item = PurchaseInvoiceItem.objects.select_related('product', 'invoice').get(id=item_id)
+
+        if item.product:
+            # Update the product's purchase_price_per_gram and recalculate costs
+            item.product.purchase_price_per_gram = new_price
+            item.product.save()  # save() auto-recalculates metal_cost, total_cost, selling_price
+
+            # Recalculate dynamic total for response
+            net_weight = item.product.net_weight or Decimal('0')
+            labor_cost = item.product.labor_cost or Decimal('0')
+            dynamic_total = (net_weight * new_price) + labor_cost
+        else:
+            # Update the item's price_per_gram directly
+            item.price_per_gram = new_price
+            item.save()  # save() recalculates metal_cost, total_amount
+            dynamic_total = item.total_amount
+
+        # Recalculate invoice totals
+        invoice = item.invoice
+        invoice_items = invoice.items.select_related('product').all()
+        subtotal = Decimal('0')
+        for inv_item in invoice_items:
+            if inv_item.product:
+                nw = inv_item.product.net_weight or Decimal('0')
+                ppg = inv_item.product.purchase_price_per_gram or Decimal('0')
+                lc = inv_item.product.labor_cost or Decimal('0')
+                subtotal += (nw * ppg) + lc
+            else:
+                subtotal += inv_item.total_amount
+        invoice_total = subtotal - invoice.discount_amount
+        invoice_balance = invoice_total - invoice.amount_paid
+
+        return JsonResponse({
+            'success': True,
+            'item_total': str(dynamic_total.quantize(Decimal('0.01'))),
+            'subtotal': str(subtotal.quantize(Decimal('0.01'))),
+            'invoice_total': str(invoice_total.quantize(Decimal('0.01'))),
+            'invoice_balance': str(invoice_balance.quantize(Decimal('0.01'))),
+        })
+    except PurchaseInvoiceItem.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Article non trouvé'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
 # ============ AI INVOICE OCR ============
 
 @login_required(login_url='login')
