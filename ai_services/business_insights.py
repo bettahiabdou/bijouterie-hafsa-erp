@@ -329,14 +329,14 @@ def gather_business_data(period_days=None):
     )
 
     # ===== PROFITABILITY (products with known costs) =====
+    # Use product.total_cost (metal + labor + stones + other), not just metal cost
     profitable_items = items_qs.filter(
-        product__purchase_price_per_gram__gt=0,
-        product__net_weight__gt=0,
+        product__total_cost__gt=0,
     ).values(
         'product__category__name',
     ).annotate(
         items=Count('id'),
-        total_cost=Sum(F('product__net_weight') * F('product__purchase_price_per_gram')),
+        total_cost=Sum('product__total_cost'),
         total_revenue=Sum('total_amount'),
     ).order_by('-total_revenue')
 
