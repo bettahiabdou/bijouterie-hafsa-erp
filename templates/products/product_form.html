@@ -86,15 +86,47 @@
                 <!-- Upload New Images -->
                 <div class="image-upload-section">
                     <label class="form-label">{% if product %}Ajouter des images{% else %}Images du produit{% endif %}</label>
-                    <div class="image-upload-area" id="imageUploadArea">
-                        <input type="file" name="images" id="imageInput" multiple accept="image/*" class="image-input">
-                        <div class="upload-placeholder">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <p>Glissez vos images ici ou cliquez pour selectionner</p>
-                            <span class="upload-hint">JPG, PNG - Max 5MB par image</span>
+                    <div style="display: flex; gap: var(--space-3); flex-wrap: wrap;">
+                        <div class="image-upload-area" id="imageUploadArea" style="flex: 1; min-width: 200px;">
+                            <input type="file" name="images" id="imageInput" multiple accept="image/*" class="image-input">
+                            <div class="upload-placeholder">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Glissez vos images ici ou cliquez pour selectionner</p>
+                                <span class="upload-hint">JPG, PNG - Max 5MB par image</span>
+                            </div>
                         </div>
+                        <button type="button" id="cameraBtn" onclick="openCamera()" style="flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); border: 2px dashed var(--primary-300); border-radius: var(--radius-lg); background: var(--primary-50); color: var(--primary-600); cursor: pointer; transition: all .15s; min-width: 140px;">
+                            <i class="fas fa-camera" style="font-size: 1.5rem;"></i>
+                            <span style="font-size: var(--text-sm); font-weight: 500;">Webcam</span>
+                        </button>
                     </div>
                     <div class="image-preview-grid" id="imagePreviewGrid"></div>
+                </div>
+
+                <!-- Camera Modal -->
+                <div id="cameraModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.8); align-items:center; justify-content:center;">
+                    <div style="background:white; border-radius:var(--radius-xl); padding:var(--space-4); max-width:640px; width:95%; position:relative;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-3);">
+                            <h3 style="margin:0; font-size:var(--text-lg);"><i class="fas fa-camera mr-2"></i>Prendre une photo</h3>
+                            <button type="button" onclick="closeCamera()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--neutral-500);">&times;</button>
+                        </div>
+                        <video id="cameraVideo" autoplay playsinline style="width:100%; border-radius:var(--radius-md); background:#000; display:block;"></video>
+                        <canvas id="cameraCanvas" style="display:none;"></canvas>
+                        <div id="cameraPreview" style="display:none; text-align:center;">
+                            <img id="cameraPreviewImg" style="width:100%; border-radius:var(--radius-md);">
+                        </div>
+                        <div style="display:flex; gap:var(--space-3); margin-top:var(--space-3); justify-content:center;">
+                            <button type="button" id="captureBtn" onclick="capturePhoto()" class="btn btn-primary" style="padding:var(--space-3) var(--space-6);">
+                                <i class="fas fa-camera mr-2"></i>Capturer
+                            </button>
+                            <button type="button" id="retakeBtn" onclick="retakePhoto()" class="btn btn-secondary" style="display:none; padding:var(--space-3) var(--space-6);">
+                                <i class="fas fa-redo mr-2"></i>Reprendre
+                            </button>
+                            <button type="button" id="usePhotoBtn" onclick="usePhoto()" class="btn btn-primary" style="display:none; padding:var(--space-3) var(--space-6);">
+                                <i class="fas fa-check mr-2"></i>Utiliser
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -655,5 +687,92 @@
                 });
             }
         });
+
+        // ===== CAMERA CAPTURE =====
+        let cameraStream = null;
+        let capturedBlob = null;
+        const capturedFiles = []; // Store captured photos as Files
+
+        function openCamera() {
+            const modal = document.getElementById('cameraModal');
+            const video = document.getElementById('cameraVideo');
+            const preview = document.getElementById('cameraPreview');
+
+            modal.style.display = 'flex';
+            preview.style.display = 'none';
+            video.style.display = 'block';
+            document.getElementById('captureBtn').style.display = '';
+            document.getElementById('retakeBtn').style.display = 'none';
+            document.getElementById('usePhotoBtn').style.display = 'none';
+
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+            }).then(stream => {
+                cameraStream = stream;
+                video.srcObject = stream;
+            }).catch(err => {
+                alert('Impossible d\'acceder a la camera: ' + err.message);
+                closeCamera();
+            });
+        }
+
+        function closeCamera() {
+            document.getElementById('cameraModal').style.display = 'none';
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null;
+            }
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('cameraVideo');
+            const canvas = document.getElementById('cameraCanvas');
+            const preview = document.getElementById('cameraPreview');
+            const previewImg = document.getElementById('cameraPreviewImg');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            canvas.toBlob(blob => {
+                capturedBlob = blob;
+                previewImg.src = URL.createObjectURL(blob);
+                video.style.display = 'none';
+                preview.style.display = 'block';
+                document.getElementById('captureBtn').style.display = 'none';
+                document.getElementById('retakeBtn').style.display = '';
+                document.getElementById('usePhotoBtn').style.display = '';
+            }, 'image/jpeg', 0.9);
+        }
+
+        function retakePhoto() {
+            const video = document.getElementById('cameraVideo');
+            const preview = document.getElementById('cameraPreview');
+            preview.style.display = 'none';
+            video.style.display = 'block';
+            document.getElementById('captureBtn').style.display = '';
+            document.getElementById('retakeBtn').style.display = 'none';
+            document.getElementById('usePhotoBtn').style.display = 'none';
+        }
+
+        function usePhoto() {
+            if (!capturedBlob) return;
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const file = new File([capturedBlob], `photo-${timestamp}.jpg`, { type: 'image/jpeg' });
+            capturedFiles.push(file);
+
+            // Update the file input with all files (existing + captured)
+            const dt = new DataTransfer();
+            const existingInput = document.getElementById('imageInput');
+            if (existingInput.files) {
+                Array.from(existingInput.files).forEach(f => dt.items.add(f));
+            }
+            capturedFiles.forEach(f => dt.items.add(f));
+            existingInput.files = dt.files;
+            existingInput.dispatchEvent(new Event('change'));
+
+            closeCamera();
+        }
     </script>
 {% endblock %}
