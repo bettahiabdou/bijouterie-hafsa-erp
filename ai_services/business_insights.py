@@ -575,7 +575,7 @@ def generate_ai_insights(data):
             ],
             model=MODELS['chat_reasoning'],
             temperature=0.4,
-            max_tokens=4096,
+            max_tokens=8192,
         )
         return response
     except Exception as e:
