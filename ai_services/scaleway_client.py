@@ -66,12 +66,16 @@ def chat_completion(messages, model=None, temperature=0.3, max_tokens=1024,
     if response_format:
         payload['response_format'] = response_format
 
+    # Reasoning models (397b) need longer timeout
+    is_reasoning = 'reasoning' in (model or '') or '397b' in (model or '')
+    req_timeout = 180 if is_reasoning else 60
+
     try:
         response = requests.post(
             f'{SCALEWAY_BASE_URL}/chat/completions',
             headers=_get_headers(),
             json=payload,
-            timeout=60,
+            timeout=req_timeout,
         )
         response.raise_for_status()
         data = response.json()
