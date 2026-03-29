@@ -1078,15 +1078,27 @@
             const labelType = form.querySelector('select[name="label_type"]').value;
             const quantity = form.querySelector('input[name="quantity"]').value;
 
+            // DEBUG: Log printer state
+            console.log('=== PRINT DEBUG ===');
+            console.log('PRINTER_IP:', PRINTER_IP);
+            console.log('PRINTER_URL:', PRINTER_URL);
+            console.log('printerConnected:', printerConnected);
+            console.log('labelType:', labelType, 'quantity:', quantity);
+
             // Try browser-based printing (browser sends directly to local printer)
             if (printerConnected && PRINTER_URL) {
                 try {
                     // Get ZPL data from server API
+                    console.log('DEBUG: Fetching ZPL from server...');
                     const zplResponse = await fetch(`/products/api/product-zpl/{{ product.reference }}/?label_type=${labelType}&quantity=${quantity}`);
+                    console.log('DEBUG: ZPL response status:', zplResponse.status);
                     const zplData = await zplResponse.json();
+                    console.log('DEBUG: ZPL data received, length:', zplData.zpl ? zplData.zpl.length : 'NO ZPL', zplData);
 
                     if (zplData.zpl) {
+                        console.log('DEBUG: Sending to printer at', PRINTER_URL);
                         const result = await sendToPrinter(zplData.zpl);
+                        console.log('DEBUG: sendToPrinter result:', result);
 
                         if (result.success) {
                             closePrintModal();
@@ -1094,16 +1106,20 @@
                             submitBtn.innerHTML = originalText;
                             submitBtn.disabled = false;
                             return;
+                        } else {
+                            console.error('DEBUG: Print failed:', result.error);
                         }
                     }
                 } catch (error) {
-                    console.error('Browser print failed:', error);
+                    console.error('DEBUG: Browser print exception:', error);
                 }
+            } else {
+                console.error('DEBUG: Printer not connected or no URL. printerConnected:', printerConnected, 'PRINTER_URL:', PRINTER_URL);
             }
 
             // Fallback: show error with help
             closePrintModal();
-            showNotification('error', 'Erreur d\'impression. Verifiez que vous etes connecte au meme reseau WiFi que l\'imprimante.');
+            showNotification('error', `Erreur d'impression. IP: ${PRINTER_IP || 'non configuree'}, URL: ${PRINTER_URL || 'aucune'}. Verifiez le reseau WiFi.`);
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
         });
