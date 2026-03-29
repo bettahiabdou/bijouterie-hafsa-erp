@@ -17,10 +17,10 @@
                 <p class="page-subtitle">Analyse intelligente de vos ventes &mdash; {{ data.overview.date_first }} &rarr; {{ data.overview.date_last }}</p>
             </div>
             <div class="page-actions">
-                <a href="?period={{ period }}&refresh=1" class="btn btn-primary" id="refresh-btn">
+                <button class="btn btn-primary" id="refresh-btn" onclick="loadAIInsights(true)">
                     <i class="fas fa-robot"></i>
                     <span>Actualiser l'analyse IA</span>
-                </a>
+                </button>
                 <a href="{% url 'sales:sales_dashboard' %}" class="btn btn-secondary">
                     <i class="fas fa-chart-bar"></i>
                     <span>Dashboard</span>
@@ -357,40 +357,14 @@
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-robot mr-2"></i> Recommandations IA</h3>
-            {% if ai_sections %}
-            <span class="badge badge-success" style="font-size: var(--text-xs);">Genere</span>
-            {% endif %}
+            <span class="badge badge-success" style="font-size: var(--text-xs); display: none;" id="ai-badge">Genere</span>
         </div>
-        <div class="card-body">
-            {% if ai_sections %}
-                {% for section in ai_sections %}
-                <div class="ai-section {% if 'INVEST' in section.title|upper %}ai-section-invest{% elif 'MARKET' in section.title|upper %}ai-section-marketing{% elif 'PRIX' in section.title|upper %}ai-section-prix{% elif 'FIDEL' in section.title|upper %}ai-section-fidelisation{% elif 'ALERT' in section.title|upper or 'ACTION' in section.title|upper %}ai-section-alerte{% endif %}">
-                    <h4>
-                        {% if 'INVEST' in section.title|upper %}<i class="fas fa-coins"></i>
-                        {% elif 'MARKET' in section.title|upper %}<i class="fas fa-bullhorn"></i>
-                        {% elif 'PRIX' in section.title|upper %}<i class="fas fa-tag"></i>
-                        {% elif 'FIDEL' in section.title|upper %}<i class="fas fa-heart"></i>
-                        {% elif 'ALERT' in section.title|upper or 'ACTION' in section.title|upper %}<i class="fas fa-exclamation-triangle"></i>
-                        {% else %}<i class="fas fa-lightbulb"></i>
-                        {% endif %}
-                        {{ section.title }}
-                    </h4>
-                    <div class="ai-content">{{ section.content }}</div>
-                </div>
-                {% endfor %}
-            {% elif ai_raw %}
-                <div class="ai-section">
-                    <div class="ai-content">{{ ai_raw }}</div>
-                </div>
-            {% else %}
-                <div class="ai-loading">
-                    <i class="fas fa-robot"></i>
-                    <p>Cliquez sur <strong>"Actualiser l'analyse IA"</strong> pour generer les recommandations.</p>
-                    <a href="?period={{ period }}&refresh=1" class="btn btn-primary">
-                        <i class="fas fa-robot mr-1"></i> Generer l'analyse
-                    </a>
-                </div>
-            {% endif %}
+        <div class="card-body" id="ai-container">
+            <div class="ai-loading" id="ai-loading">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-500);"></i>
+                <p style="margin-top: var(--space-3);">Analyse en cours... L'IA examine vos donnees de vente.</p>
+                <p style="font-size: var(--text-xs); color: var(--neutral-400);">Cela peut prendre 30 a 60 secondes.</p>
+            </div>
         </div>
     </div>
 
@@ -460,5 +434,81 @@
             }
         }
     });
+
+    // === AI Insights AJAX ===
+    function getSectionClass(title) {
+        const t = title.toUpperCase();
+        if (t.includes('INVEST')) return 'ai-section-invest';
+        if (t.includes('MARKET')) return 'ai-section-marketing';
+        if (t.includes('PRIX')) return 'ai-section-prix';
+        if (t.includes('FIDEL')) return 'ai-section-fidelisation';
+        if (t.includes('ALERT') || t.includes('ACTION')) return 'ai-section-alerte';
+        return '';
+    }
+    function getSectionIcon(title) {
+        const t = title.toUpperCase();
+        if (t.includes('INVEST')) return 'fa-coins';
+        if (t.includes('MARKET')) return 'fa-bullhorn';
+        if (t.includes('PRIX')) return 'fa-tag';
+        if (t.includes('FIDEL')) return 'fa-heart';
+        if (t.includes('ALERT') || t.includes('ACTION')) return 'fa-exclamation-triangle';
+        return 'fa-lightbulb';
+    }
+
+    function renderAISections(sections) {
+        const container = document.getElementById('ai-container');
+        container.innerHTML = '';
+        sections.forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'ai-section ' + getSectionClass(s.title);
+            div.innerHTML = `<h4><i class="fas ${getSectionIcon(s.title)}"></i> ${s.title}</h4><div class="ai-content">${s.content.replace(/\n/g, '<br>')}</div>`;
+            container.appendChild(div);
+        });
+        document.getElementById('ai-badge').style.display = 'inline-block';
+    }
+
+    function showAIError(msg) {
+        const container = document.getElementById('ai-container');
+        container.innerHTML = `<div class="ai-loading">
+            <i class="fas fa-exclamation-circle" style="color: var(--error-500);"></i>
+            <p style="margin-top: var(--space-3); color: var(--error-600);">${msg}</p>
+            <button class="btn btn-primary" onclick="loadAIInsights(true)" style="margin-top: var(--space-2);">
+                <i class="fas fa-redo mr-1"></i> Reessayer
+            </button>
+        </div>`;
+    }
+
+    function loadAIInsights(refresh) {
+        const container = document.getElementById('ai-container');
+        document.getElementById('ai-badge').style.display = 'none';
+        container.innerHTML = `<div class="ai-loading">
+            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-500);"></i>
+            <p style="margin-top: var(--space-3);">Analyse en cours... L'IA examine vos donnees de vente.</p>
+            <p style="font-size: var(--text-xs); color: var(--neutral-400);">Cela peut prendre 30 a 60 secondes.</p>
+        </div>`;
+
+        const refreshParam = refresh ? '&refresh=1' : '';
+        fetch(`{% url 'sales:sales_insights_ai' %}?period={{ period }}${refreshParam}`)
+            .then(r => {
+                if (!r.ok) throw new Error('Erreur serveur (' + r.status + ')');
+                return r.json();
+            })
+            .then(data => {
+                if (data.sections && data.sections.length > 0) {
+                    renderAISections(data.sections);
+                } else if (data.raw) {
+                    container.innerHTML = `<div class="ai-section"><div class="ai-content">${data.raw.replace(/\n/g, '<br>')}</div></div>`;
+                    document.getElementById('ai-badge').style.display = 'inline-block';
+                } else {
+                    showAIError('Aucune recommandation generee.');
+                }
+            })
+            .catch(err => {
+                showAIError('Erreur: ' + err.message);
+            });
+    }
+
+    // Auto-load AI on page load
+    loadAIInsights(false);
 </script>
 {% endblock %}

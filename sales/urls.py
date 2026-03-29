@@ -10,6 +10,7 @@ urlpatterns = [
     # Dashboard & Insights
     path('dashboard/', views.sales_dashboard, name='sales_dashboard'),
     path('insights/', views.sales_insights, name='sales_insights'),
+    path('api/insights-ai/', views.sales_insights_ai, name='sales_insights_ai'),
 
     # Invoices
     path('invoices/', views.invoice_list, name='invoice_list'),

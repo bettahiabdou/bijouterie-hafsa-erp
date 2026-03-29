@@ -22,46 +22,15 @@ from settings_app.models import PaymentMethod, BankAccount
 
 @login_required(login_url='login')
 def sales_insights(request):
-    """AI-powered business insights page with computed metrics + AI interpretation."""
+    """AI-powered business insights page with computed metrics. AI loads async via AJAX."""
     import json
-    from django.core.cache import cache
-    from ai_services.business_insights import gather_business_data, generate_ai_insights, DecimalEncoder
+    from ai_services.business_insights import gather_business_data, DecimalEncoder
 
     period = request.GET.get('period', 'all')
     period_map = {'7d': 7, '30d': 30, '90d': 90, 'all': None}
     period_days = period_map.get(period)
 
     data = gather_business_data(period_days=period_days)
-
-    # AI insights with caching (6 hours per period)
-    cache_key = f'business_insights_{period}_{timezone.now().date()}'
-    ai_insights = cache.get(cache_key)
-    if not ai_insights or request.GET.get('refresh'):
-        ai_insights = generate_ai_insights(data)
-        if ai_insights:
-            cache.set(cache_key, ai_insights, 3600 * 6)
-
-    # Parse AI response into sections
-    sections = []
-    if ai_insights:
-        current_section = None
-        current_content = []
-        for line in ai_insights.split('\n'):
-            stripped = line.strip()
-            if stripped.startswith('**') and stripped.endswith('**') and any(kw in stripped.upper() for kw in ['INVESTISSEMENT', 'MARKETING', 'PRIX', 'FIDÉLISATION', 'FIDELISATION', 'ALERTE', 'ACTION']):
-                if current_section:
-                    sections.append({'title': current_section, 'content': '\n'.join(current_content)})
-                current_section = stripped.strip('*').strip()
-                current_content = []
-            elif stripped.startswith('## ') or stripped.startswith('# '):
-                if current_section:
-                    sections.append({'title': current_section, 'content': '\n'.join(current_content)})
-                current_section = stripped.lstrip('#').strip().strip('*').strip()
-                current_content = []
-            else:
-                current_content.append(line)
-        if current_section:
-            sections.append({'title': current_section, 'content': '\n'.join(current_content)})
 
     # Prepare chart data as JSON
     chart_categories = json.dumps(
@@ -86,8 +55,6 @@ def sales_insights(request):
 
     context = {
         'data': data,
-        'ai_sections': sections,
-        'ai_raw': ai_insights,
         'period': period,
         'chart_categories': chart_categories,
         'chart_cat_revenue': chart_cat_revenue,
@@ -97,6 +64,62 @@ def sales_insights(request):
         'chart_sell_through': chart_sell_through,
     }
     return render(request, 'sales/insights.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["GET"])
+def sales_insights_ai(request):
+    """AJAX endpoint: generate AI recommendations (can take 30-60s)."""
+    import json
+    import logging
+    from django.core.cache import cache
+    from ai_services.business_insights import gather_business_data, generate_ai_insights
+
+    logger = logging.getLogger(__name__)
+
+    period = request.GET.get('period', 'all')
+    period_map = {'7d': 7, '30d': 30, '90d': 90, 'all': None}
+    period_days = period_map.get(period)
+    refresh = request.GET.get('refresh') == '1'
+
+    cache_key = f'business_insights_{period}_{timezone.now().date()}'
+    ai_insights = cache.get(cache_key)
+
+    if not ai_insights or refresh:
+        try:
+            data = gather_business_data(period_days=period_days)
+            ai_insights = generate_ai_insights(data)
+            if ai_insights:
+                cache.set(cache_key, ai_insights, 3600 * 6)
+        except Exception as e:
+            logger.error(f'AI insights generation failed: {e}')
+            return JsonResponse({'error': str(e)}, status=500)
+
+    if not ai_insights:
+        return JsonResponse({'error': 'Aucune réponse de l\'IA'}, status=500)
+
+    # Parse into sections
+    sections = []
+    current_section = None
+    current_content = []
+    for line in ai_insights.split('\n'):
+        stripped = line.strip()
+        if stripped.startswith('**') and stripped.endswith('**') and any(kw in stripped.upper() for kw in ['INVESTISSEMENT', 'MARKETING', 'PRIX', 'FIDÉLISATION', 'FIDELISATION', 'ALERTE', 'ACTION']):
+            if current_section:
+                sections.append({'title': current_section, 'content': '\n'.join(current_content)})
+            current_section = stripped.strip('*').strip()
+            current_content = []
+        elif stripped.startswith('## ') or stripped.startswith('# '):
+            if current_section:
+                sections.append({'title': current_section, 'content': '\n'.join(current_content)})
+            current_section = stripped.lstrip('#').strip().strip('*').strip()
+            current_content = []
+        else:
+            current_content.append(line)
+    if current_section:
+        sections.append({'title': current_section, 'content': '\n'.join(current_content)})
+
+    return JsonResponse({'sections': sections, 'raw': ai_insights})
 
 
 @login_required(login_url='login')
