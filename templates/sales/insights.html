@@ -438,19 +438,25 @@
     // === AI Insights AJAX ===
     function getSectionClass(title) {
         const t = title.toUpperCase();
+        if (t.includes('OPPORTUN')) return 'ai-section-invest';
+        if (t.includes('ANOMAL') || t.includes('SIGNAL')) return 'ai-section-alerte';
+        if (t.includes('PRIX') || t.includes('STRATÉGIE') || t.includes('STRATEGIE')) return 'ai-section-prix';
+        if (t.includes('ACQUISITION') || t.includes('RÉTENTION') || t.includes('RETENTION') || t.includes('FIDEL')) return 'ai-section-fidelisation';
+        if (t.includes('STOCK') || t.includes('ACHAT') || t.includes('DÉCISION') || t.includes('DECISION')) return 'ai-section-marketing';
         if (t.includes('INVEST')) return 'ai-section-invest';
         if (t.includes('MARKET')) return 'ai-section-marketing';
-        if (t.includes('PRIX')) return 'ai-section-prix';
-        if (t.includes('FIDEL')) return 'ai-section-fidelisation';
         if (t.includes('ALERT') || t.includes('ACTION')) return 'ai-section-alerte';
         return '';
     }
     function getSectionIcon(title) {
         const t = title.toUpperCase();
+        if (t.includes('OPPORTUN')) return 'fa-gem';
+        if (t.includes('ANOMAL') || t.includes('SIGNAL')) return 'fa-exclamation-triangle';
+        if (t.includes('PRIX') || t.includes('STRATÉGIE') || t.includes('STRATEGIE')) return 'fa-tag';
+        if (t.includes('ACQUISITION') || t.includes('RÉTENTION') || t.includes('RETENTION') || t.includes('FIDEL')) return 'fa-users';
+        if (t.includes('STOCK') || t.includes('ACHAT') || t.includes('DÉCISION') || t.includes('DECISION')) return 'fa-shopping-cart';
         if (t.includes('INVEST')) return 'fa-coins';
         if (t.includes('MARKET')) return 'fa-bullhorn';
-        if (t.includes('PRIX')) return 'fa-tag';
-        if (t.includes('FIDEL')) return 'fa-heart';
         if (t.includes('ALERT') || t.includes('ACTION')) return 'fa-exclamation-triangle';
         return 'fa-lightbulb';
     }

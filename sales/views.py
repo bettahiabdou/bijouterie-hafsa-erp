@@ -104,7 +104,7 @@ def sales_insights_ai(request):
     current_content = []
     for line in ai_insights.split('\n'):
         stripped = line.strip()
-        if stripped.startswith('**') and stripped.endswith('**') and any(kw in stripped.upper() for kw in ['INVESTISSEMENT', 'MARKETING', 'PRIX', 'FIDÉLISATION', 'FIDELISATION', 'ALERTE', 'ACTION']):
+        if stripped.startswith('**') and stripped.endswith('**') and any(kw in stripped.upper() for kw in ['INVESTISSEMENT', 'MARKETING', 'PRIX', 'FIDÉLISATION', 'FIDELISATION', 'ALERTE', 'ACTION', 'OPPORTUN', 'ANOMAL', 'SIGNAL', 'ACQUISITION', 'RÉTENTION', 'RETENTION', 'STOCK', 'ACHAT', 'DÉCISION', 'DECISION']):
             if current_section:
                 sections.append({'title': current_section, 'content': '\n'.join(current_content)})
             current_section = stripped.strip('*').strip()

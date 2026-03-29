@@ -251,7 +251,84 @@ def gather_business_data(period_days=None):
         'total_sold': total_sold,
     }
 
-    # ===== 11. PROFITABILITY (products with known costs) =====
+    # ===== 11. DAY-OF-WEEK PATTERNS =====
+    from django.db.models.functions import ExtractWeekDay
+    dow_data = list(
+        base_qs.annotate(dow=ExtractWeekDay('date'))
+        .values('dow')
+        .annotate(count=Count('id'), revenue=Sum('total_amount'), avg_basket=Avg('total_amount'))
+        .order_by('dow')
+    )
+    dow_names = {1: 'Dimanche', 2: 'Lundi', 3: 'Mardi', 4: 'Mercredi', 5: 'Jeudi', 6: 'Vendredi', 7: 'Samedi'}
+    day_of_week = [{'day': dow_names.get(d['dow'], d['dow']), 'count': d['count'], 'revenue': _d(d['revenue']), 'avg_basket': _d(d['avg_basket'])} for d in dow_data]
+
+    # ===== 12. CATEGORY x CLIENT TYPE (anonymous vs identified) =====
+    cat_client_type = list(items_qs.filter(
+        product__category__isnull=False
+    ).values('product__category__name').annotate(
+        total_rev=Sum('total_amount'),
+        client_rev=Sum('total_amount', filter=Q(invoice__client__isnull=False)),
+        anon_rev=Sum('total_amount', filter=Q(invoice__client__isnull=True)),
+        client_count=Count('id', filter=Q(invoice__client__isnull=False)),
+        anon_count=Count('id', filter=Q(invoice__client__isnull=True)),
+    ).order_by('-total_rev')[:10])
+
+    # ===== 13. CO-PURCHASE PATTERNS (what categories are bought together) =====
+    from itertools import combinations
+    co_purchase = defaultdict(int)
+    invoices_with_items = base_qs.filter(items__product__category__isnull=False).prefetch_related('items__product__category').distinct()[:500]
+    for inv in invoices_with_items:
+        cats = list(set(
+            item.product.category.name for item in inv.items.all()
+            if item.product and item.product.category
+        ))
+        for pair in combinations(sorted(cats), 2):
+            co_purchase[pair] += 1
+    top_co_purchases = sorted(co_purchase.items(), key=lambda x: -x[1])[:10]
+
+    # ===== 14. REPEAT CLIENT CATEGORY PREFERENCE =====
+    repeat_client_ids = list(
+        base_qs.filter(client__isnull=False)
+        .values('client_id')
+        .annotate(inv_count=Count('id'))
+        .filter(inv_count__gte=2)
+        .values_list('client_id', flat=True)
+    )
+    repeat_cat_pref = list(
+        items_qs.filter(invoice__client_id__in=repeat_client_ids, product__category__isnull=False)
+        .values('product__category__name')
+        .annotate(count=Count('id'), revenue=Sum('total_amount'))
+        .order_by('-revenue')[:10]
+    )
+
+    # ===== 15. PRICE DISTRIBUTION PER CATEGORY =====
+    price_distribution = []
+    for cat in categories[:8]:
+        cat_prices = list(items_qs.filter(
+            product__category__name=cat['name']
+        ).values_list('total_amount', flat=True))
+        if cat_prices:
+            sorted_prices = sorted(float(p) for p in cat_prices if p)
+            n = len(sorted_prices)
+            price_distribution.append({
+                'category': cat['name'],
+                'min': sorted_prices[0] if sorted_prices else 0,
+                'p25': sorted_prices[n // 4] if n > 3 else sorted_prices[0],
+                'median': sorted_prices[n // 2] if n > 1 else sorted_prices[0],
+                'p75': sorted_prices[3 * n // 4] if n > 3 else sorted_prices[-1],
+                'max': sorted_prices[-1] if sorted_prices else 0,
+                'count': n,
+            })
+
+    # ===== 16. WEEKLY TREND (revenue per week) =====
+    weekly_trend = list(
+        base_qs.annotate(week=TruncWeek('date'))
+        .values('week')
+        .annotate(revenue=Sum('total_amount'), count=Count('id'), avg_basket=Avg('total_amount'))
+        .order_by('week')
+    )
+
+    # ===== PROFITABILITY (products with known costs) =====
     profitable_items = items_qs.filter(
         product__purchase_price_per_gram__gt=0,
         product__net_weight__gt=0,
@@ -290,12 +367,19 @@ def gather_business_data(period_days=None):
         'daily_trend': daily_trend,
         'data_quality': data_quality,
         'profitability': profitability,
+        'day_of_week': day_of_week,
+        'cat_client_type': cat_client_type,
+        'co_purchase': top_co_purchases,
+        'repeat_cat_pref': repeat_cat_pref,
+        'price_distribution': price_distribution,
+        'weekly_trend': weekly_trend,
     }
 
 
 def build_ai_prompt(data):
     """
     Build a structured prompt with computed data for the AI business advisor.
+    Focus on cross-correlations and non-obvious patterns.
     """
     ov = data['overview']
 
@@ -351,65 +435,123 @@ def build_ai_prompt(data):
     # Data quality
     dq = data['data_quality']
 
-    prompt = f"""Tu es un conseiller business expert en bijouterie marocaine (or 18 carats principalement).
-Analyse les données réelles suivantes et donne des recommandations SPÉCIFIQUES, CHIFFRÉES et ACTIONNABLES.
+    # NEW: Day-of-week patterns
+    dow_lines = []
+    for d in data.get('day_of_week', []):
+        dow_lines.append(f"  - {d['day']}: {d['count']} ventes, {d['revenue']} DH, panier moy {d['avg_basket']} DH")
 
-=== DONNÉES DE VENTE ===
+    # NEW: Category x client type
+    cat_client_lines = []
+    for c in data.get('cat_client_type', []):
+        total = float(c['total_rev'] or 1)
+        anon_pct = round(float(c['anon_rev'] or 0) * 100 / total, 1)
+        cat_client_lines.append(
+            f"  - {c['product__category__name']}: {anon_pct}% anonyme "
+            f"(client: {c['client_count']} pcs/{c['client_rev'] or 0} DH, "
+            f"anonyme: {c['anon_count']} pcs/{c['anon_rev'] or 0} DH)"
+        )
+
+    # NEW: Co-purchase patterns
+    co_lines = []
+    for pair, count in data.get('co_purchase', []):
+        co_lines.append(f"  - {pair[0]} + {pair[1]}: {count} fois achetés ensemble")
+
+    # NEW: Repeat client preferences
+    repeat_lines = []
+    for r in data.get('repeat_cat_pref', []):
+        repeat_lines.append(f"  - {r['product__category__name']}: {r['count']} articles, {_d(r['revenue'])} DH")
+
+    # NEW: Price distribution
+    price_lines = []
+    for p in data.get('price_distribution', []):
+        price_lines.append(
+            f"  - {p['category']}: min {p['min']:.0f}, P25 {p['p25']:.0f}, "
+            f"médiane {p['median']:.0f}, P75 {p['p75']:.0f}, max {p['max']:.0f} DH ({p['count']} ventes)"
+        )
+
+    # NEW: Weekly trend
+    week_lines = []
+    for w in data.get('weekly_trend', []):
+        week_lines.append(f"  - Sem {w['week'].strftime('%d/%m')}: {w['count']} factures, {_d(w['revenue'])} DH, panier {_d(w['avg_basket'])} DH")
+
+    prompt = f"""Tu es un analyste data senior spécialisé dans le retail bijouterie au Maroc.
+Je suis le propriétaire de cette bijouterie. Je connais DÉJÀ les bases (mes top catégories, que j'ai beaucoup d'anonymes, etc).
+
+Ce que je veux de toi : des INSIGHTS CACHÉS, des CORRÉLATIONS NON-ÉVIDENTES, des ANOMALIES dans mes données.
+NE ME DIS PAS ce que je sais déjà. Creuse les données croisées pour trouver ce que je ne vois pas.
+
+=== VUE D'ENSEMBLE ===
 Période: {ov['date_first']} → {ov['date_last']}
-CA total: {ov['total_revenue']} DH sur {ov['total_invoices']} factures
-Panier moyen: {ov['avg_basket']} DH
+CA: {ov['total_revenue']} DH | {ov['total_invoices']} factures | Panier moyen: {ov['avg_basket']} DH
+Client identifié: {ov['with_client']} ({100 - ov['anonymous_pct']}%) → {ov['revenue_client']} DH
+Anonyme: {ov['without_client']} ({ov['anonymous_pct']}%) → {ov['revenue_anonymous']} DH
 
-Ventes avec client identifié: {ov['with_client']} ({100 - ov['anonymous_pct']}%) → {ov['revenue_client']} DH
-Ventes anonymes: {ov['without_client']} ({ov['anonymous_pct']}%) → {ov['revenue_anonymous']} DH
-
-=== CATÉGORIES (classées par CA) ===
+=== CATÉGORIES (par CA) ===
 {chr(10).join(cat_lines)}
 
-=== GAMMES DE POIDS PAR CATÉGORIE ===
+=== GAMMES DE POIDS ===
 {chr(10).join(wr_lines)}
 
-=== TAUX D'ÉCOULEMENT (sell-through) ===
+=== TAUX D'ÉCOULEMENT ===
 {chr(10).join(st_lines)}
 
-=== RENTABILITÉ PAR CATÉGORIE (produits avec coût connu) ===
-{chr(10).join(prof_lines) if prof_lines else "  Données insuffisantes - beaucoup de produits sans prix d'achat"}
+=== RENTABILITÉ (produits avec coût connu) ===
+{chr(10).join(prof_lines) if prof_lines else "  Données insuffisantes"}
+
+=== DISTRIBUTION DES PRIX PAR CATÉGORIE ===
+{chr(10).join(price_lines)}
+
+=== PATTERN JOUR DE SEMAINE ===
+{chr(10).join(dow_lines)}
+
+=== TENDANCE HEBDOMADAIRE ===
+{chr(10).join(week_lines)}
+
+=== CATÉGORIE × TYPE CLIENT (anonyme vs identifié) ===
+{chr(10).join(cat_client_lines)}
+
+=== COMBINAISONS D'ACHAT (catégories achetées ensemble) ===
+{chr(10).join(co_lines) if co_lines else "  Peu de factures multi-catégories"}
+
+=== CE QUE LES CLIENTS FIDÈLES ACHÈTENT (2+ achats) ===
+{chr(10).join(repeat_lines) if repeat_lines else "  Peu de clients récurrents"}
 
 === CLIENTS ===
-{cs['total_unique']} clients identifiés
-- {freq['1_time']} achètent 1 seule fois ({cs['one_time_pct']}%)
-- {freq['2_times']} achètent 2 fois
-- {freq['3_plus']} achètent 3 fois ou plus
+{cs['total_unique']} clients identifiés: {freq['1_time']} one-shot ({cs['one_time_pct']}%), {freq['2_times']} x2, {freq['3_plus']} x3+
 
 === CANAUX DE LIVRAISON ===
 {chr(10).join(del_lines)}
 
-=== STOCK DISPONIBLE ===
-Total en stock: {sa['total_available']} articles
-- 0-30 jours: {sa['0_30d']} | 31-60 jours: {sa['31_60d']} | 60+ jours: {sa['60d_plus']}
-Par catégorie:
+=== STOCK ===
+Total: {sa['total_available']} | 0-30j: {sa['0_30d']} | 31-60j: {sa['31_60d']} | 60j+: {sa['60d_plus']}
 {chr(10).join(stock_cat_lines)}
 
-=== QUALITÉ DES DONNÉES ===
-{dq['zero_purchase_price']}/{dq['total_sold']} produits vendus ({dq['zero_price_pct']}%) ont un prix d'achat à 0 DH (création rapide)
+=== QUALITÉ DONNÉES ===
+{dq['zero_purchase_price']}/{dq['total_sold']} ({dq['zero_price_pct']}%) sans prix d'achat
 
-=== DONNE TES RECOMMANDATIONS EN 5 SECTIONS ===
+=== CE QUE J'ATTENDS DE TOI ===
 
-**1. INVESTISSEMENT PRODUITS**
-Quelles catégories acheter en priorité? Quelles gammes de poids privilégier? Combien investir proportionnellement? Base-toi sur le CA, le taux d'écoulement et le panier moyen.
+Réponds en 5 sections. Pour chaque section, je veux:
+- Des DÉCOUVERTES que je ne peux PAS voir juste en regardant un tableau
+- Des CORRÉLATIONS entre les différentes données ci-dessus
+- Des chiffres PRÉCIS tirés des données
 
-**2. STRATÉGIE MARKETING**
-Quels produits mettre en avant? Comment convertir les {ov['anonymous_pct']}% de ventes anonymes en clients identifiés? Quels canaux de livraison exploiter davantage?
+## 1. OPPORTUNITÉS CACHÉES
+Croise les données: quelles catégories ont un bon écoulement MAIS un stock insuffisant? Quels jours/semaines ont un panier moyen anormalement haut (et pourquoi)? Quelles combinaisons d'achat révèlent des opportunités de bundle? Y a-t-il un décalage entre ce qui se vend le mieux en volume vs en marge?
 
-**3. POLITIQUE DE PRIX**
-Analyse des marges par catégorie (quand les données sont disponibles). Les prix sont-ils cohérents? Y a-t-il des catégories sous-évaluées ou sur-évaluées?
+## 2. ANOMALIES & SIGNAUX D'ALERTE
+Quelles catégories ont un taux d'écoulement anormalement bas par rapport à leur stock? Le panier moyen est-il en hausse ou baisse sur les semaines? Y a-t-il des catégories où le prix médian est très loin du prix moyen (signe de pricing incohérent)? Des jours de la semaine sous-exploités?
 
-**4. FIDÉLISATION CLIENT**
-{cs['one_time_pct']}% des clients n'achètent qu'une fois. Comment les faire revenir? Stratégies concrètes adaptées à une bijouterie marocaine.
+## 3. STRATÉGIE PRIX (basée sur les données)
+Analyse la distribution des prix: où y a-t-il des "trous" dans la gamme de prix? Compare marge vs volume par catégorie. Les catégories que les clients fidèles achètent sont-elles les plus rentables? Sinon, quel est le coût de fidélisation réel?
 
-**5. ALERTES & ACTIONS IMMÉDIATES**
-Problèmes détectés, actions urgentes à prendre (qualité des données, stock qui ne bouge pas, etc.)
+## 4. ACQUISITION & RÉTENTION INTELLIGENTE
+Quelles catégories convertissent le mieux les anonymes en clients identifiés? Quel canal de livraison a le meilleur ratio identification? Les clients fidèles achètent-ils les mêmes catégories ou diversifient-ils? Quel est le profil d'un "bon client" selon les données?
 
-Sois CONCRET avec des chiffres. Pas de généralités. Chaque recommandation doit être actionnable CETTE SEMAINE."""
+## 5. DÉCISIONS STOCK & ACHAT
+En croisant écoulement + stock + marge + tendance hebdomadaire: quels articles SPÉCIFIQUES commander cette semaine? Lesquels sont en surstockage? Où investir le prochain dirham? Donne un mini "plan d'achat" chiffré basé sur les données.
+
+PAS DE CONSEILS GÉNÉRIQUES. Si tu ne peux pas le prouver avec un chiffre des données ci-dessus, ne le dis pas."""
 
     return prompt
 
