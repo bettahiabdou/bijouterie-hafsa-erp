@@ -25,6 +25,7 @@ MODELS = {
     'vision_large': 'holo2-30b-a3b',
     'chat': 'gpt-oss-120b',
     'chat_large': 'qwen3-235b-a22b-instruct-2507',
+    'chat_reasoning': 'qwen3.5-397b-a17b',
     'embedding': 'bge-multilingual-gemma2',
     'whisper': 'whisper-large-v3',
     'voice_chat': 'voxtral-small-24b-2507',

@@ -7,8 +7,9 @@ from . import views
 app_name = 'sales'
 
 urlpatterns = [
-    # Dashboard
+    # Dashboard & Insights
     path('dashboard/', views.sales_dashboard, name='sales_dashboard'),
+    path('insights/', views.sales_insights, name='sales_insights'),
 
     # Invoices
     path('invoices/', views.invoice_list, name='invoice_list'),

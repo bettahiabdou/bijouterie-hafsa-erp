@@ -1,0 +1,464 @@
+{% extends 'base.html' %}
+
+{% block title %}Insights Business - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:sales_dashboard' %}" class="breadcrumb-item">Ventes</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Insights</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Business Insights</h1>
+                <p class="page-subtitle">Analyse intelligente de vos ventes &mdash; {{ data.overview.date_first }} &rarr; {{ data.overview.date_last }}</p>
+            </div>
+            <div class="page-actions">
+                <a href="?period={{ period }}&refresh=1" class="btn btn-primary" id="refresh-btn">
+                    <i class="fas fa-robot"></i>
+                    <span>Actualiser l'analyse IA</span>
+                </a>
+                <a href="{% url 'sales:sales_dashboard' %}" class="btn btn-secondary">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Dashboard</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .insights-layout { display: flex; flex-direction: column; gap: var(--space-6); }
+    .insights-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    .insights-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-4); }
+    @media (max-width: 768px) {
+        .insights-grid-2, .insights-grid-3 { grid-template-columns: 1fr; }
+    }
+    .insight-section { margin-bottom: var(--space-2); }
+    .insight-section h3 { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); color: var(--neutral-700); font-size: var(--text-lg); }
+    .insight-section h3 i { color: var(--primary-500); }
+
+    /* AI sections */
+    .ai-section { border-left: 4px solid var(--primary-400); padding: var(--space-4); margin-bottom: var(--space-4); background: var(--neutral-50); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+    .ai-section h4 { color: var(--primary-700); margin: 0 0 var(--space-3) 0; font-size: var(--text-base); display: flex; align-items: center; gap: var(--space-2); }
+    .ai-section-invest { border-left-color: var(--success-500); }
+    .ai-section-invest h4 { color: var(--success-700); }
+    .ai-section-marketing { border-left-color: var(--primary-500); }
+    .ai-section-prix { border-left-color: var(--warning-500); }
+    .ai-section-prix h4 { color: var(--warning-700); }
+    .ai-section-fidelisation { border-left-color: #8b5cf6; }
+    .ai-section-fidelisation h4 { color: #7c3aed; }
+    .ai-section-alerte { border-left-color: var(--error-500); background: #fef2f2; }
+    .ai-section-alerte h4 { color: var(--error-700); }
+    .ai-content { font-size: var(--text-sm); line-height: 1.7; color: var(--neutral-700); white-space: pre-wrap; }
+    .ai-content strong { color: var(--neutral-900); }
+
+    /* KPI mini cards */
+    .kpi-mini { text-align: center; padding: var(--space-4); background: white; border-radius: var(--radius-lg); border: 1px solid var(--neutral-200); }
+    .kpi-mini-value { font-size: var(--text-2xl); font-weight: 700; color: var(--neutral-800); }
+    .kpi-mini-label { font-size: var(--text-xs); color: var(--neutral-500); margin-top: 2px; }
+    .kpi-mini-sub { font-size: var(--text-xs); color: var(--neutral-400); margin-top: 2px; }
+    .kpi-mini--success .kpi-mini-value { color: var(--success-600); }
+    .kpi-mini--warning .kpi-mini-value { color: var(--warning-600); }
+    .kpi-mini--error .kpi-mini-value { color: var(--error-600); }
+    .kpi-mini--primary .kpi-mini-value { color: var(--primary-600); }
+
+    /* Compact table */
+    .table-compact { font-size: var(--text-sm); }
+    .table-compact th { font-size: var(--text-xs); text-transform: uppercase; color: var(--neutral-500); padding: var(--space-2) var(--space-3); }
+    .table-compact td { padding: var(--space-2) var(--space-3); }
+
+    /* Period pills */
+    .period-pills { display: flex; gap: var(--space-2); margin-bottom: var(--space-4); flex-wrap: wrap; }
+    .period-pill { padding: var(--space-2) var(--space-4); border-radius: 999px; font-size: var(--text-sm); text-decoration: none; border: 1px solid var(--neutral-300); color: var(--neutral-600); transition: all .15s; }
+    .period-pill:hover { border-color: var(--primary-400); color: var(--primary-600); }
+    .period-pill.active { background: var(--primary-500); color: white; border-color: var(--primary-500); }
+
+    /* Loading */
+    .ai-loading { text-align: center; padding: var(--space-8); color: var(--neutral-500); }
+    .ai-loading i { font-size: 2rem; margin-bottom: var(--space-3); }
+
+    .chart-container { position: relative; height: 300px; }
+</style>
+
+<div class="insights-layout">
+
+    <!-- Period Filter -->
+    <div class="period-pills">
+        <a href="?period=7d" class="period-pill {% if period == '7d' %}active{% endif %}">7 jours</a>
+        <a href="?period=30d" class="period-pill {% if period == '30d' %}active{% endif %}">30 jours</a>
+        <a href="?period=90d" class="period-pill {% if period == '90d' %}active{% endif %}">90 jours</a>
+        <a href="?period=all" class="period-pill {% if period == 'all' %}active{% endif %}">Tout</a>
+    </div>
+
+    <!-- ===== KPI OVERVIEW ===== -->
+    <div class="insights-grid-3" style="grid-template-columns: repeat(6, 1fr);">
+        <div class="kpi-mini">
+            <div class="kpi-mini-value">{{ data.overview.total_revenue|floatformat:0 }}</div>
+            <div class="kpi-mini-label">CA Total (DH)</div>
+        </div>
+        <div class="kpi-mini">
+            <div class="kpi-mini-value">{{ data.overview.total_invoices }}</div>
+            <div class="kpi-mini-label">Factures</div>
+        </div>
+        <div class="kpi-mini">
+            <div class="kpi-mini-value">{{ data.overview.avg_basket|floatformat:0 }}</div>
+            <div class="kpi-mini-label">Panier Moyen (DH)</div>
+        </div>
+        <div class="kpi-mini kpi-mini--primary">
+            <div class="kpi-mini-value">{{ data.overview.with_client }}</div>
+            <div class="kpi-mini-label">Ventes Client</div>
+            <div class="kpi-mini-sub">{{ data.overview.revenue_client|floatformat:0 }} DH</div>
+        </div>
+        <div class="kpi-mini kpi-mini--warning">
+            <div class="kpi-mini-value">{{ data.overview.anonymous_pct }}%</div>
+            <div class="kpi-mini-label">Ventes Anonymes</div>
+            <div class="kpi-mini-sub">{{ data.overview.revenue_anonymous|floatformat:0 }} DH</div>
+        </div>
+        <div class="kpi-mini kpi-mini--error">
+            <div class="kpi-mini-value">{{ data.client_stats.one_time_pct }}%</div>
+            <div class="kpi-mini-label">Clients 1 seul achat</div>
+            <div class="kpi-mini-sub">{{ data.client_stats.frequency.1_time }}/{{ data.client_stats.total_unique }}</div>
+        </div>
+    </div>
+
+    <!-- ===== DATA QUALITY ALERT ===== -->
+    {% if data.data_quality.zero_price_pct > 20 %}
+    <div class="card" style="border: 2px solid var(--warning-300); background: var(--warning-50);">
+        <div class="card-body" style="display: flex; align-items: center; gap: var(--space-3);">
+            <i class="fas fa-exclamation-triangle" style="font-size: 1.5rem; color: var(--warning-500);"></i>
+            <div>
+                <strong style="color: var(--warning-700);">Alerte Qualite des Donnees</strong>
+                <p style="margin: 0; font-size: var(--text-sm); color: var(--warning-600);">
+                    {{ data.data_quality.zero_purchase_price }}/{{ data.data_quality.total_sold }} produits vendus ({{ data.data_quality.zero_price_pct }}%) n'ont pas de prix d'achat (creation rapide). L'analyse de rentabilite est limitee.
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===== CHARTS ROW ===== -->
+    <div class="insights-grid-2">
+        <!-- Category Revenue Chart -->
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-chart-bar mr-2"></i> CA par Categorie</h3></div>
+            <div class="card-body">
+                <div class="chart-container"><canvas id="catRevenueChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Daily Trend Chart -->
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-chart-line mr-2"></i> Tendance Quotidienne (30j)</h3></div>
+            <div class="card-body">
+                <div class="chart-container"><canvas id="dailyTrendChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== CATEGORY TABLE + SELL-THROUGH ===== -->
+    <div class="insights-grid-2">
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-tags mr-2"></i> Performance Categories</h3></div>
+            <div class="card-body" style="overflow-x: auto;">
+                <table class="table table-compact">
+                    <thead>
+                        <tr>
+                            <th>Categorie</th>
+                            <th style="text-align:right;">Vendus</th>
+                            <th style="text-align:right;">CA (DH)</th>
+                            <th style="text-align:right;">Prix Moy</th>
+                            <th style="text-align:right;">Poids Moy</th>
+                            <th style="text-align:right;">% CA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cat in data.categories %}
+                        <tr>
+                            <td><strong>{{ cat.name }}</strong></td>
+                            <td style="text-align:right;">{{ cat.items_sold }}</td>
+                            <td style="text-align:right;">{{ cat.revenue|floatformat:0 }}</td>
+                            <td style="text-align:right;">{{ cat.avg_price|floatformat:0 }}</td>
+                            <td style="text-align:right;">{{ cat.avg_weight_g }}g</td>
+                            <td style="text-align:right;">
+                                <span class="badge badge-neutral">{{ cat.pct_revenue }}%</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-tachometer-alt mr-2"></i> Taux d'Ecoulement</h3></div>
+            <div class="card-body">
+                <table class="table table-compact">
+                    <thead>
+                        <tr>
+                            <th>Categorie</th>
+                            <th style="text-align:right;">Vendus</th>
+                            <th style="text-align:right;">En Stock</th>
+                            <th style="text-align:right;">Ecoulement</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for st in data.sell_through %}
+                        <tr>
+                            <td><strong>{{ st.category }}</strong></td>
+                            <td style="text-align:right;">{{ st.sold }}</td>
+                            <td style="text-align:right;">{{ st.available }}</td>
+                            <td style="text-align:right;">
+                                <span class="badge {% if st.sell_through_pct >= 80 %}badge-success{% elif st.sell_through_pct >= 50 %}badge-warning{% else %}badge-error{% endif %}">
+                                    {{ st.sell_through_pct }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div style="margin-top: var(--space-4);">
+                    <h4 style="font-size: var(--text-sm); color: var(--neutral-600); margin-bottom: var(--space-2);"><i class="fas fa-clock mr-1"></i> Anciennete du Stock</h4>
+                    <div style="display: flex; gap: var(--space-3);">
+                        <div class="kpi-mini kpi-mini--success" style="flex: 1; padding: var(--space-3);">
+                            <div class="kpi-mini-value" style="font-size: var(--text-lg);">{{ data.stock_aging.0_30d }}</div>
+                            <div class="kpi-mini-label">0-30j</div>
+                        </div>
+                        <div class="kpi-mini kpi-mini--warning" style="flex: 1; padding: var(--space-3);">
+                            <div class="kpi-mini-value" style="font-size: var(--text-lg);">{{ data.stock_aging.31_60d }}</div>
+                            <div class="kpi-mini-label">31-60j</div>
+                        </div>
+                        <div class="kpi-mini kpi-mini--error" style="flex: 1; padding: var(--space-3);">
+                            <div class="kpi-mini-value" style="font-size: var(--text-lg);">{{ data.stock_aging.60d_plus }}</div>
+                            <div class="kpi-mini-label">60j+</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TOP CLIENTS ===== -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-users mr-2"></i> Top 20 Clients</h3></div>
+        <div class="card-body" style="overflow-x: auto;">
+            <table class="table table-compact">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Client</th>
+                        <th>Telephone</th>
+                        <th style="text-align:right;">Factures</th>
+                        <th style="text-align:right;">CA Total (DH)</th>
+                        <th style="text-align:right;">Dernier Achat</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cl in data.top_clients %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td><strong>{{ cl.client__first_name }} {{ cl.client__last_name }}</strong></td>
+                        <td style="font-size: var(--text-sm);">{{ cl.client__phone }}</td>
+                        <td style="text-align:right;">
+                            <span class="badge {% if cl.invoice_count >= 3 %}badge-success{% elif cl.invoice_count >= 2 %}badge-warning{% else %}badge-neutral{% endif %}">
+                                {{ cl.invoice_count }}
+                            </span>
+                        </td>
+                        <td style="text-align:right; font-weight: 600;">{{ cl.total_revenue|floatformat:0 }}</td>
+                        <td style="text-align:right; font-size: var(--text-sm); color: var(--neutral-500);">{{ cl.last_purchase }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== WEIGHT RANGES ===== -->
+    {% if data.weight_ranges %}
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-weight mr-2"></i> Gammes de Poids les Plus Vendues</h3></div>
+        <div class="card-body" style="overflow-x: auto;">
+            <table class="table table-compact">
+                <thead>
+                    <tr>
+                        <th>Categorie</th>
+                        <th>Meilleure Gamme</th>
+                        <th style="text-align:right;">Pieces</th>
+                        <th style="text-align:right;">CA (DH)</th>
+                        <th>Detail</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for wr in data.weight_ranges %}
+                    <tr>
+                        <td><strong>{{ wr.category }}</strong></td>
+                        <td><span class="badge badge-success">{{ wr.best_range }}</span></td>
+                        <td style="text-align:right;">{{ wr.best_range_count }}</td>
+                        <td style="text-align:right; font-weight: 600;">{{ wr.best_range_revenue|floatformat:0 }}</td>
+                        <td style="font-size: var(--text-xs); color: var(--neutral-500);">
+                            {% for range_key, range_val in wr.all_ranges.items %}
+                                {{ range_key }}: {{ range_val.count }}pcs
+                                {% if not forloop.last %}&middot; {% endif %}
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===== PROFITABILITY ===== -->
+    {% if data.profitability %}
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-percentage mr-2"></i> Rentabilite par Categorie (produits avec cout connu)</h3></div>
+        <div class="card-body" style="overflow-x: auto;">
+            <table class="table table-compact">
+                <thead>
+                    <tr>
+                        <th>Categorie</th>
+                        <th style="text-align:right;">Articles</th>
+                        <th style="text-align:right;">Cout Total</th>
+                        <th style="text-align:right;">CA Total</th>
+                        <th style="text-align:right;">Marge</th>
+                        <th style="text-align:right;">Marge %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in data.profitability %}
+                    <tr>
+                        <td><strong>{{ p.category }}</strong></td>
+                        <td style="text-align:right;">{{ p.items }}</td>
+                        <td style="text-align:right;">{{ p.total_cost|floatformat:0 }} DH</td>
+                        <td style="text-align:right;">{{ p.total_revenue|floatformat:0 }} DH</td>
+                        <td style="text-align:right; font-weight: 600; color: {% if p.margin > 0 %}var(--success-600){% else %}var(--error-600){% endif %};">
+                            {{ p.margin|floatformat:0 }} DH
+                        </td>
+                        <td style="text-align:right;">
+                            <span class="badge {% if p.margin_pct >= 20 %}badge-success{% elif p.margin_pct >= 10 %}badge-warning{% else %}badge-error{% endif %}">
+                                {{ p.margin_pct }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===== AI RECOMMENDATIONS ===== -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-robot mr-2"></i> Recommandations IA</h3>
+            {% if ai_sections %}
+            <span class="badge badge-success" style="font-size: var(--text-xs);">Genere</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if ai_sections %}
+                {% for section in ai_sections %}
+                <div class="ai-section {% if 'INVEST' in section.title|upper %}ai-section-invest{% elif 'MARKET' in section.title|upper %}ai-section-marketing{% elif 'PRIX' in section.title|upper %}ai-section-prix{% elif 'FIDEL' in section.title|upper %}ai-section-fidelisation{% elif 'ALERT' in section.title|upper or 'ACTION' in section.title|upper %}ai-section-alerte{% endif %}">
+                    <h4>
+                        {% if 'INVEST' in section.title|upper %}<i class="fas fa-coins"></i>
+                        {% elif 'MARKET' in section.title|upper %}<i class="fas fa-bullhorn"></i>
+                        {% elif 'PRIX' in section.title|upper %}<i class="fas fa-tag"></i>
+                        {% elif 'FIDEL' in section.title|upper %}<i class="fas fa-heart"></i>
+                        {% elif 'ALERT' in section.title|upper or 'ACTION' in section.title|upper %}<i class="fas fa-exclamation-triangle"></i>
+                        {% else %}<i class="fas fa-lightbulb"></i>
+                        {% endif %}
+                        {{ section.title }}
+                    </h4>
+                    <div class="ai-content">{{ section.content }}</div>
+                </div>
+                {% endfor %}
+            {% elif ai_raw %}
+                <div class="ai-section">
+                    <div class="ai-content">{{ ai_raw }}</div>
+                </div>
+            {% else %}
+                <div class="ai-loading">
+                    <i class="fas fa-robot"></i>
+                    <p>Cliquez sur <strong>"Actualiser l'analyse IA"</strong> pour generer les recommandations.</p>
+                    <a href="?period={{ period }}&refresh=1" class="btn btn-primary">
+                        <i class="fas fa-robot mr-1"></i> Generer l'analyse
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    const colors = {
+        primary: '#6366f1', primaryLight: 'rgba(99,102,241,0.15)',
+        success: '#22c55e', successLight: 'rgba(34,197,94,0.15)',
+        warning: '#f59e0b', error: '#ef4444',
+        blue: '#3b82f6', purple: '#8b5cf6', pink: '#ec4899', teal: '#14b8a6', orange: '#f97316',
+    };
+    const pieColors = [colors.primary, colors.success, colors.warning, colors.error, colors.blue, colors.purple, colors.pink, colors.teal, colors.orange, '#9ca3af'];
+
+    // Category Revenue Chart
+    new Chart(document.getElementById('catRevenueChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ chart_categories|safe }},
+            datasets: [{
+                label: 'CA (DH)',
+                data: {{ chart_cat_revenue|safe }},
+                backgroundColor: pieColors,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => new Intl.NumberFormat('fr-MA').format(ctx.parsed.x) + ' DH' } }
+            },
+            scales: {
+                x: { ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v }, grid: { color: 'rgba(0,0,0,0.04)' } },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Daily Trend Chart
+    new Chart(document.getElementById('dailyTrendChart'), {
+        type: 'line',
+        data: {
+            labels: {{ chart_daily_labels|safe }},
+            datasets: [{
+                label: 'CA (DH)',
+                data: {{ chart_daily_revenue|safe }},
+                borderColor: colors.primary,
+                backgroundColor: colors.primaryLight,
+                fill: true,
+                tension: 0.3,
+                borderWidth: 2,
+                pointRadius: 2,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => new Intl.NumberFormat('fr-MA').format(ctx.parsed.y) + ' DH' } }
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v }, grid: { color: 'rgba(0,0,0,0.04)' } },
+                x: { grid: { display: false }, ticks: { maxRotation: 45 } }
+            }
+        }
+    });
+</script>
+{% endblock %}

@@ -21,6 +21,85 @@ from settings_app.models import PaymentMethod, BankAccount
 
 
 @login_required(login_url='login')
+def sales_insights(request):
+    """AI-powered business insights page with computed metrics + AI interpretation."""
+    import json
+    from django.core.cache import cache
+    from ai_services.business_insights import gather_business_data, generate_ai_insights, DecimalEncoder
+
+    period = request.GET.get('period', 'all')
+    period_map = {'7d': 7, '30d': 30, '90d': 90, 'all': None}
+    period_days = period_map.get(period)
+
+    data = gather_business_data(period_days=period_days)
+
+    # AI insights with caching (6 hours per period)
+    cache_key = f'business_insights_{period}_{timezone.now().date()}'
+    ai_insights = cache.get(cache_key)
+    if not ai_insights or request.GET.get('refresh'):
+        ai_insights = generate_ai_insights(data)
+        if ai_insights:
+            cache.set(cache_key, ai_insights, 3600 * 6)
+
+    # Parse AI response into sections
+    sections = []
+    if ai_insights:
+        current_section = None
+        current_content = []
+        for line in ai_insights.split('\n'):
+            stripped = line.strip()
+            if stripped.startswith('**') and stripped.endswith('**') and any(kw in stripped.upper() for kw in ['INVESTISSEMENT', 'MARKETING', 'PRIX', 'FIDÉLISATION', 'FIDELISATION', 'ALERTE', 'ACTION']):
+                if current_section:
+                    sections.append({'title': current_section, 'content': '\n'.join(current_content)})
+                current_section = stripped.strip('*').strip()
+                current_content = []
+            elif stripped.startswith('## ') or stripped.startswith('# '):
+                if current_section:
+                    sections.append({'title': current_section, 'content': '\n'.join(current_content)})
+                current_section = stripped.lstrip('#').strip().strip('*').strip()
+                current_content = []
+            else:
+                current_content.append(line)
+        if current_section:
+            sections.append({'title': current_section, 'content': '\n'.join(current_content)})
+
+    # Prepare chart data as JSON
+    chart_categories = json.dumps(
+        [c['name'] for c in data['categories'][:10]], cls=DecimalEncoder
+    )
+    chart_cat_revenue = json.dumps(
+        [float(c['revenue']) for c in data['categories'][:10]], cls=DecimalEncoder
+    )
+    chart_cat_items = json.dumps(
+        [c['items_sold'] for c in data['categories'][:10]], cls=DecimalEncoder
+    )
+    chart_daily_labels = json.dumps(
+        [d['day'].strftime('%d/%m') for d in data['daily_trend']]
+    )
+    chart_daily_revenue = json.dumps(
+        [float(d['revenue'] or 0) for d in data['daily_trend']]
+    )
+    chart_sell_through = json.dumps(
+        [{'cat': s['category'], 'rate': s['sell_through_pct']} for s in data['sell_through']],
+        cls=DecimalEncoder
+    )
+
+    context = {
+        'data': data,
+        'ai_sections': sections,
+        'ai_raw': ai_insights,
+        'period': period,
+        'chart_categories': chart_categories,
+        'chart_cat_revenue': chart_cat_revenue,
+        'chart_cat_items': chart_cat_items,
+        'chart_daily_labels': chart_daily_labels,
+        'chart_daily_revenue': chart_daily_revenue,
+        'chart_sell_through': chart_sell_through,
+    }
+    return render(request, 'sales/insights.html', context)
+
+
+@login_required(login_url='login')
 def sales_dashboard(request):
     """Comprehensive sales dashboard with full payment analytics"""
     from django.db.models import Avg, Min, Max, Subquery, OuterRef, Value, Case, When, DecimalField as DjDecimalField
