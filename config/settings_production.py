@@ -1,7 +1,7 @@
 from .settings import *
 
 DEBUG = False
-ALLOWED_HOSTS = ['89.167.27.57', 'localhost', 'hafsa-erp.com', 'hafsaerp.duckdns.org']
+ALLOWED_HOSTS = ['89.167.27.57', 'localhost', 'hafsa-erp.com', 'hafsaerp.duckdns.org', 'hafsaerp.live', 'www.hafsaerp.live']
 
 # PostgreSQL Database
 DATABASES = {
@@ -20,5 +20,5 @@ STATIC_ROOT = '/var/www/bijouterie-hafsa-erp/staticfiles'
 STATIC_URL = '/static/'
 
 # Security settings
-CSRF_TRUSTED_ORIGINS = ['http://89.167.27.57', 'https://89.167.27.57', 'https://hafsaerp.duckdns.org']
+CSRF_TRUSTED_ORIGINS = ['http://89.167.27.57', 'https://89.167.27.57', 'https://hafsaerp.duckdns.org', 'https://hafsaerp.live', 'https://www.hafsaerp.live']
 SECRET_KEY = 'your-production-secret-key-change-this-to-something-random'
