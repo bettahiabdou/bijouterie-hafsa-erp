@@ -6,6 +6,7 @@ product-on-model generation (FLUX Kontext).
 
 import os
 import io
+import base64
 import logging
 import requests
 from PIL import Image
@@ -52,6 +53,27 @@ CATEGORY_PROMPTS = {
 
 def is_configured():
     return bool(FAL_API_KEY)
+
+
+def image_file_to_data_uri(file_path):
+    """Convert a local image file to a base64 data URI for fal.ai."""
+    with open(file_path, 'rb') as f:
+        data = f.read()
+
+    # Convert HEIC to JPEG since fal.ai may not support HEIC
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext in ('.heic', '.heif'):
+        img = Image.open(io.BytesIO(data))
+        buf = io.BytesIO()
+        img.convert('RGB').save(buf, 'JPEG', quality=90)
+        data = buf.getvalue()
+        mime = 'image/jpeg'
+    else:
+        mime_map = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}
+        mime = mime_map.get(ext, 'image/jpeg')
+
+    b64 = base64.b64encode(data).decode('utf-8')
+    return f'data:{mime};base64,{b64}'
 
 
 def _get_headers():

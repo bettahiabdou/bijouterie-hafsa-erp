@@ -981,13 +981,13 @@ def enhance_image_api(request, reference):
     if mode == 'model':
         # Fal.ai: generate product-on-model photo
         try:
-            from ai_services.fal_client import enhance_product_image, is_configured
+            from ai_services.fal_client import enhance_product_image, is_configured, image_file_to_data_uri
 
             if not is_configured():
                 return JsonResponse({'success': False, 'error': 'Cle API fal.ai non configuree (FAL_AI_KEY)'}, status=500)
 
-            # Build a public URL for the image
-            image_url = request.build_absolute_uri(source_image.url)
+            # Convert local file to base64 data URI (avoids Cloudflare blocking fal.ai)
+            image_url = image_file_to_data_uri(source_image.path)
 
             category_name = product.category.name if product.category else None
             result = enhance_product_image(image_url, category_name=category_name, mode='model')
