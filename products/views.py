@@ -952,60 +952,96 @@ def product_zpl_api(request, reference):
 @require_http_methods(["POST"])
 def enhance_image_api(request, reference):
     """
-    Enhance a product image: remove background, enhance, add clean background.
-    Saves as a new ProductImage and returns the URL.
+    Enhance a product image.
+    mode='background': remove bg + solid color (local rembg)
+    mode='model': generate product-on-model photo via fal.ai
     """
     import json
     import os
+    import requests as http_requests
     from django.core.files.base import ContentFile
 
     product = get_object_or_404(Product, reference=reference)
 
     body = json.loads(request.body) if request.body else {}
+    mode = body.get('mode', 'background')
     background = body.get('background', 'white')
-    image_id = body.get('image_id')  # specific ProductImage, or None for main_image
+    image_id = body.get('image_id')
 
     # Get the source image
     if image_id:
         from .models import ProductImage
         img_obj = get_object_or_404(ProductImage, id=image_id, product=product)
-        image_path = img_obj.image.path
+        source_image = img_obj.image
     elif product.main_image:
-        image_path = product.main_image.path
+        source_image = product.main_image
     else:
         return JsonResponse({'success': False, 'error': 'Aucune image a ameliorer'}, status=400)
 
-    try:
-        from .image_enhance import process_product_image, BACKGROUNDS
-        import io
+    if mode == 'model':
+        # Fal.ai: generate product-on-model photo
+        try:
+            from ai_services.fal_client import enhance_product_image, is_configured
 
-        result = process_product_image(image_path, background=background)
+            if not is_configured():
+                return JsonResponse({'success': False, 'error': 'Cle API fal.ai non configuree (FAL_AI_KEY)'}, status=500)
 
-        # Save to bytes
-        buffer = io.BytesIO()
-        result.save(buffer, 'JPEG', quality=92, optimize=True)
-        buffer.seek(0)
+            # Build a public URL for the image
+            image_url = request.build_absolute_uri(source_image.url)
 
-        # Save as new ProductImage
-        from .models import ProductImage
-        filename = f"enhanced_{background}_{os.path.basename(image_path)}"
-        if not filename.lower().endswith('.jpg'):
-            filename = filename.rsplit('.', 1)[0] + '.jpg'
+            category_name = product.category.name if product.category else None
+            result = enhance_product_image(image_url, category_name=category_name, mode='model')
 
-        new_img = ProductImage(product=product, display_order=99)
-        new_img.image.save(filename, ContentFile(buffer.read()), save=True)
+            # Download the generated image and save it
+            img_response = http_requests.get(result['url'], timeout=30)
+            img_response.raise_for_status()
 
-        return JsonResponse({
-            'success': True,
-            'image_url': new_img.image.url,
-            'image_id': new_img.id,
-            'message': f'Image amelioree avec fond {background}'
-        })
-    except ImportError:
-        return JsonResponse({'success': False, 'error': 'rembg non installe sur le serveur. Executez: pip install rembg[cpu]'}, status=500)
-    except Exception as e:
-        logger.error(f'Image enhancement failed: {e}')
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            filename = f"model_{os.path.basename(source_image.name)}"
+            if not filename.lower().endswith('.jpg'):
+                filename = filename.rsplit('.', 1)[0] + '.jpg'
+
+            new_img = ProductImage(product=product, display_order=99)
+            new_img.image.save(filename, ContentFile(img_response.content), save=True)
+
+            return JsonResponse({
+                'success': True,
+                'image_url': new_img.image.url,
+                'image_id': new_img.id,
+                'message': 'Photo sur modele generee avec succes'
+            })
+        except Exception as e:
+            logger.error(f'Fal.ai model photo failed: {e}')
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    else:
+        # Local: rembg background removal
+        try:
+            from .image_enhance import process_product_image
+            import io
+
+            result = process_product_image(source_image.path, background=background)
+
+            buffer = io.BytesIO()
+            result.save(buffer, 'JPEG', quality=92, optimize=True)
+            buffer.seek(0)
+
+            filename = f"enhanced_{background}_{os.path.basename(source_image.name)}"
+            if not filename.lower().endswith('.jpg'):
+                filename = filename.rsplit('.', 1)[0] + '.jpg'
+
+            new_img = ProductImage(product=product, display_order=99)
+            new_img.image.save(filename, ContentFile(buffer.read()), save=True)
+
+            return JsonResponse({
+                'success': True,
+                'image_url': new_img.image.url,
+                'image_id': new_img.id,
+                'message': f'Image amelioree avec fond {background}'
+            })
+        except ImportError:
+            return JsonResponse({'success': False, 'error': 'rembg non installe sur le serveur. Executez: pip install rembg[cpu]'}, status=500)
+        except Exception as e:
+            logger.error(f'Image enhancement failed: {e}')
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 # =============================================================================
