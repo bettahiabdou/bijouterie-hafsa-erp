@@ -945,6 +945,70 @@ def product_zpl_api(request, reference):
 
 
 # =============================================================================
+# Image Enhancement API
+# =============================================================================
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def enhance_image_api(request, reference):
+    """
+    Enhance a product image: remove background, enhance, add clean background.
+    Saves as a new ProductImage and returns the URL.
+    """
+    import json
+    import os
+    from django.core.files.base import ContentFile
+
+    product = get_object_or_404(Product, reference=reference)
+
+    body = json.loads(request.body) if request.body else {}
+    background = body.get('background', 'white')
+    image_id = body.get('image_id')  # specific ProductImage, or None for main_image
+
+    # Get the source image
+    if image_id:
+        from .models import ProductImage
+        img_obj = get_object_or_404(ProductImage, id=image_id, product=product)
+        image_path = img_obj.image.path
+    elif product.main_image:
+        image_path = product.main_image.path
+    else:
+        return JsonResponse({'success': False, 'error': 'Aucune image a ameliorer'}, status=400)
+
+    try:
+        from .image_enhance import process_product_image, BACKGROUNDS
+        import io
+
+        result = process_product_image(image_path, background=background)
+
+        # Save to bytes
+        buffer = io.BytesIO()
+        result.save(buffer, 'JPEG', quality=92, optimize=True)
+        buffer.seek(0)
+
+        # Save as new ProductImage
+        from .models import ProductImage
+        filename = f"enhanced_{background}_{os.path.basename(image_path)}"
+        if not filename.lower().endswith('.jpg'):
+            filename = filename.rsplit('.', 1)[0] + '.jpg'
+
+        new_img = ProductImage(product=product, display_order=99)
+        new_img.image.save(filename, ContentFile(buffer.read()), save=True)
+
+        return JsonResponse({
+            'success': True,
+            'image_url': new_img.image.url,
+            'image_id': new_img.id,
+            'message': f'Image amelioree avec fond {background}'
+        })
+    except ImportError:
+        return JsonResponse({'success': False, 'error': 'rembg non installe sur le serveur. Executez: pip install rembg[cpu]'}, status=500)
+    except Exception as e:
+        logger.error(f'Image enhancement failed: {e}')
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# =============================================================================
 # Print Direct API - Server sends ZPL to printer via TCP (for mobile devices)
 # =============================================================================
 

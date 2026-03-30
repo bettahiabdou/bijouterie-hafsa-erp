@@ -39,6 +39,7 @@ urlpatterns = [
     path('api/search/', views.product_search_api, name='product_search_api'),
     path('api/smart-search/', views.smart_search_api, name='smart_search_api'),
     path('api/upload-images/<str:reference>/', views.product_image_upload_api, name='product_image_upload_api'),
+    path('api/enhance-image/<str:reference>/', views.enhance_image_api, name='enhance_image_api'),
 
     # Product detail routes (catch-all, must be last)
     path('<str:reference>/', views.product_detail, name='detail'),
