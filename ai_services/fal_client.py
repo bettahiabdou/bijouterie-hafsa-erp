@@ -13,7 +13,7 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 FAL_API_KEY = os.getenv('FAL_AI_KEY', '')
-FAL_BASE_URL = 'https://queue.fal.run'
+FAL_QUEUE_URL = 'https://queue.fal.run'
 
 # Category → prompt mapping for jewelry-on-model generation
 CATEGORY_PROMPTS = {
@@ -61,6 +61,46 @@ def _get_headers():
     }
 
 
+def _submit_and_poll(endpoint, payload, timeout=180):
+    """Submit a job to fal.ai queue and poll until complete."""
+    import time
+
+    # Submit to queue
+    response = requests.post(
+        f'{FAL_QUEUE_URL}/{endpoint}',
+        headers=_get_headers(),
+        json=payload,
+        timeout=30,
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    response_url = data.get('response_url')
+    status_url = data.get('status_url')
+
+    if not response_url:
+        raise Exception(f'No response_url from fal.ai: {data}')
+
+    # Poll for result
+    start = time.time()
+    while time.time() - start < timeout:
+        status_resp = requests.get(status_url, headers=_get_headers(), timeout=15)
+        status_data = status_resp.json()
+        status = status_data.get('status')
+
+        if status == 'COMPLETED':
+            # Fetch the actual result
+            result_resp = requests.get(response_url, headers=_get_headers(), timeout=30)
+            result_resp.raise_for_status()
+            return result_resp.json()
+        elif status in ('FAILED', 'CANCELLED'):
+            raise Exception(f'Fal.ai job {status}: {status_data}')
+
+        time.sleep(3)
+
+    raise Exception(f'Fal.ai job timed out after {timeout}s')
+
+
 def _get_category_prompt(category_name):
     """Match category name to the best prompt."""
     if not category_name:
@@ -85,19 +125,12 @@ def remove_background(image_url):
     Remove background using BiRefNet on fal.ai.
     Returns the URL of the processed image.
     """
-    response = requests.post(
-        f'{FAL_BASE_URL}/fal-ai/birefnet',
-        headers=_get_headers(),
-        json={
-            'image_url': image_url,
-            'model': 'General Use (Heavy)',
-            'operating_resolution': '1024x1024',
-            'output_format': 'png',
-        },
-        timeout=60,
-    )
-    response.raise_for_status()
-    data = response.json()
+    data = _submit_and_poll('fal-ai/birefnet', {
+        'image_url': image_url,
+        'model': 'General Use (Heavy)',
+        'operating_resolution': '1024x1024',
+        'output_format': 'png',
+    }, timeout=120)
     return data['image']['url']
 
 
@@ -105,37 +138,22 @@ def generate_model_photo(image_url, category_name=None, custom_prompt=None):
     """
     Generate a product-on-model photo using FLUX Kontext.
     Takes the product image and generates it worn by a model.
-
-    Args:
-        image_url: URL of the product image
-        category_name: Product category name (auto-selects prompt)
-        custom_prompt: Override prompt (optional)
-
-    Returns:
-        dict with 'url', 'width', 'height'
     """
     prompt = custom_prompt or _get_category_prompt(category_name)
 
-    response = requests.post(
-        f'{FAL_BASE_URL}/fal-ai/flux-pro/kontext',
-        headers=_get_headers(),
-        json={
-            'image_url': image_url,
-            'prompt': prompt,
-            'num_images': 1,
-            'output_format': 'jpeg',
-            'guidance_scale': 3.5,
-            'aspect_ratio': '1:1',
-        },
-        timeout=120,
-    )
-    response.raise_for_status()
-    data = response.json()
+    data = _submit_and_poll('fal-ai/flux-pro/kontext', {
+        'image_url': image_url,
+        'prompt': prompt,
+        'num_images': 1,
+        'output_format': 'jpeg',
+        'guidance_scale': 3.5,
+        'aspect_ratio': '1:1',
+    }, timeout=180)
 
     if data.get('images') and len(data['images']) > 0:
         return data['images'][0]
 
-    raise Exception('No image returned from fal.ai')
+    raise Exception(f'No image returned from fal.ai: {data}')
 
 
 def enhance_product_image(image_url, category_name=None, mode='background', background='white', custom_prompt=None):
