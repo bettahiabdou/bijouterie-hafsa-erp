@@ -18,7 +18,7 @@ FAL_QUEUE_URL = 'https://queue.fal.run'
 
 # Moroccan cultural context for all prompts
 _MOROCCAN_STYLE = "elegant Moroccan woman with olive skin, wearing a colorful embroidered Moroccan caftan with rich jewel tones (emerald green, royal blue, burgundy, or deep purple) and gold thread details, modest high neckline"
-_PHOTO_STYLE = "professional luxury jewelry e-commerce photography, sharp focus on the jewelry, soft warm studio lighting, dark gradient background, 4K detail"
+_PHOTO_STYLE = "professional luxury jewelry e-commerce photography, sharp focus on the jewelry, soft warm studio lighting, dark gradient background, 4K detail. CRITICAL: preserve the exact jewelry piece as-is, do NOT add, remove, or modify any details, stones, engravings, or patterns on the jewelry. The jewelry must look identical to the original photo"
 
 # Category → prompt mapping for jewelry-on-model generation
 # Rules: preserve EXACT jewelry piece, no extra accessories, Moroccan modest styling
