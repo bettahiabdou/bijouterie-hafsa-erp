@@ -17,7 +17,7 @@ FAL_API_KEY = os.getenv('FAL_AI_KEY', '')
 FAL_QUEUE_URL = 'https://queue.fal.run'
 
 # Moroccan cultural context for all prompts
-_MOROCCAN_STYLE = "elegant Moroccan woman with olive skin, wearing modest dark caftan with high neckline"
+_MOROCCAN_STYLE = "elegant Moroccan woman with olive skin, wearing a colorful embroidered Moroccan caftan with rich jewel tones (emerald green, royal blue, burgundy, or deep purple) and gold thread details, modest high neckline"
 _PHOTO_STYLE = "professional luxury jewelry e-commerce photography, sharp focus on the jewelry, soft warm studio lighting, dark gradient background, 4K detail"
 
 # Category → prompt mapping for jewelry-on-model generation
