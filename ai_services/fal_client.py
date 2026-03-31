@@ -16,38 +16,43 @@ logger = logging.getLogger(__name__)
 FAL_API_KEY = os.getenv('FAL_AI_KEY', '')
 FAL_QUEUE_URL = 'https://queue.fal.run'
 
+# Moroccan cultural context for all prompts
+_MOROCCAN_STYLE = "elegant Moroccan woman with olive skin, wearing modest dark caftan with high neckline"
+_PHOTO_STYLE = "professional luxury jewelry e-commerce photography, sharp focus on the jewelry, soft warm studio lighting, dark gradient background, 4K detail"
+
 # Category → prompt mapping for jewelry-on-model generation
+# Rules: preserve EXACT jewelry piece, no extra accessories, Moroccan modest styling
 CATEGORY_PROMPTS = {
     # Necklaces / Chains
-    'collier': "This elegant gold necklace worn on a beautiful woman's neck, close-up shot, soft studio lighting, luxury jewelry photography, dark background",
-    'chaine': "This delicate gold chain worn on a woman's neck, close-up shot, soft studio lighting, luxury jewelry photography, dark background",
-    'sautoir': "This long gold sautoir necklace worn on a woman's neck and chest, close-up shot, studio lighting, luxury jewelry photography",
+    'collier': f"Place this exact gold necklace around the neck of an {_MOROCCAN_STYLE}. Show ONLY this one necklace, absolutely no other jewelry, no earrings, no bracelets. Tight close-up of neck and upper chest area. {_PHOTO_STYLE}",
+    'chaine': f"Place this exact gold chain around the neck of an {_MOROCCAN_STYLE}. Show ONLY this one chain, no other jewelry at all. Close-up of neck area. {_PHOTO_STYLE}",
+    'sautoir': f"Place this exact long gold necklace on an {_MOROCCAN_STYLE}, hanging to mid-chest. Show ONLY this necklace, no other jewelry. Close-up shot from chin to chest. {_PHOTO_STYLE}",
     # Bracelets
-    'bracelet': "This gold bracelet worn on a woman's wrist, close-up shot of the hand and wrist, studio lighting, luxury jewelry photography, dark background",
-    'gourmette': "This gold gourmette chain bracelet worn on a woman's wrist, close-up shot, studio lighting, luxury jewelry photography",
+    'bracelet': f"Place this exact gold bracelet on the wrist of an {_MOROCCAN_STYLE}. Show ONLY this bracelet, no rings, no other jewelry. Tight close-up of wrist and hand with henna-style elegance. {_PHOTO_STYLE}",
+    'gourmette': f"Place this exact gold chain bracelet on the wrist of an {_MOROCCAN_STYLE}. Show ONLY this bracelet, no other jewelry. Close-up of wrist. {_PHOTO_STYLE}",
     # Bangles
-    'demlij': "These traditional Moroccan gold bangles worn on a woman's wrist, close-up shot showing multiple bangles stacked, studio lighting, luxury jewelry photography",
+    'demlij': f"Place these exact gold bangles stacked on the wrist of an {_MOROCCAN_STYLE}. Show ONLY these bangles, no other jewelry. Close-up of wrist showing the stack. {_PHOTO_STYLE}",
     # Rings
-    'bague': "This gold ring worn on a woman's finger, close-up shot of the hand, soft studio lighting, luxury jewelry photography, dark background",
-    'alliance': "This gold wedding ring worn on a woman's ring finger, close-up shot, romantic studio lighting, luxury jewelry photography",
+    'bague': f"Place this exact gold ring on the finger of an {_MOROCCAN_STYLE}. Show ONLY this ring, no other rings or jewelry. Tight close-up of hand and fingers. {_PHOTO_STYLE}",
+    'alliance': f"Place this exact gold wedding ring on the ring finger of an {_MOROCCAN_STYLE}. Show ONLY this ring, no other jewelry. Close-up of hand. {_PHOTO_STYLE}",
     # Earrings
-    'boucle': "These gold earrings worn on a woman's ear, close-up side profile shot, studio lighting, luxury jewelry photography, dark background",
-    "boucles d'oreilles": "These gold earrings worn on a woman's ear, close-up side profile shot, studio lighting, luxury jewelry photography",
+    'boucle': f"Place these exact gold earrings on the ear of an {_MOROCCAN_STYLE} wearing a hijab that frames the face showing the ears. Show ONLY these earrings, no necklace, no other jewelry. Close-up side profile. {_PHOTO_STYLE}",
+    "boucles d'oreilles": f"Place these exact gold earrings on the ear of an {_MOROCCAN_STYLE} wearing a hijab that frames the face showing the ears. Show ONLY these earrings, no other jewelry. Close-up side profile. {_PHOTO_STYLE}",
     # Pendants
-    'pendentif': "This gold pendant hanging on a woman's neck on a fine chain, close-up shot, studio lighting, luxury jewelry photography, dark background",
+    'pendentif': f"Place this exact gold pendant on a chain around the neck of an {_MOROCCAN_STYLE}. Show ONLY this pendant, no earrings, no other jewelry. Close-up of neck and pendant. {_PHOTO_STYLE}",
     # Belts
-    'sertla': "This traditional Moroccan gold belt (sertla) worn on a woman's waist over fabric, close-up shot, studio lighting, luxury jewelry photography",
-    'ceinture': "This ornate gold belt worn on a woman's waist, close-up shot, studio lighting, luxury jewelry photography",
+    'sertla': f"Place this exact traditional Moroccan gold belt (sertla) around the waist of an {_MOROCCAN_STYLE} wearing an embroidered caftan. Show ONLY this belt. Medium close-up of waist area. {_PHOTO_STYLE}",
+    'ceinture': f"Place this exact ornate gold belt around the waist of an {_MOROCCAN_STYLE} wearing a caftan. Show ONLY this belt, no other jewelry. Close-up of waist. {_PHOTO_STYLE}",
     # Headpieces
-    'madmma': "This traditional Moroccan gold headpiece (madmma) worn on a woman's forehead, close-up portrait shot, studio lighting, luxury jewelry photography",
-    'tawss': "This traditional gold headpiece worn on a woman's head, close-up shot, studio lighting, luxury jewelry photography",
+    'madmma': f"Place this exact traditional Moroccan gold headpiece (tama/madmma) on the forehead of an {_MOROCCAN_STYLE} wearing traditional Moroccan bridal attire with head covering. Show ONLY this headpiece. Close-up portrait. {_PHOTO_STYLE}",
+    'tawss': f"Place this exact gold headpiece on the head of an {_MOROCCAN_STYLE} wearing traditional Moroccan attire. Show ONLY this headpiece, no other jewelry. Close-up portrait. {_PHOTO_STYLE}",
     # Sets
-    'ensemble': "This complete gold jewelry set (necklace, bracelet, earrings) elegantly displayed on a woman, medium shot, studio lighting, luxury jewelry photography",
-    'parure': "This matching gold jewelry set worn by a woman, showing necklace and earrings, studio lighting, luxury jewelry photography",
+    'ensemble': f"Place this exact complete gold jewelry set on an {_MOROCCAN_STYLE} wearing traditional Moroccan bridal caftan. Show all pieces of the set together. Medium shot. {_PHOTO_STYLE}",
+    'parure': f"Place this exact matching gold jewelry set on an {_MOROCCAN_STYLE} wearing a caftan. Show all matching pieces. Medium shot. {_PHOTO_STYLE}",
     # Brooches
-    'broche': "This gold brooch pinned on dark fabric on a woman's chest, close-up shot, studio lighting, luxury jewelry photography",
+    'broche': f"Place this exact gold brooch pinned on the chest area of an {_MOROCCAN_STYLE}. Show ONLY this brooch, no other jewelry. Close-up of chest area. {_PHOTO_STYLE}",
     # Default
-    'default': "This gold jewelry piece displayed in a professional studio setting, close-up shot, soft lighting, luxury jewelry photography, dark background",
+    'default': f"Place this exact gold jewelry piece on an {_MOROCCAN_STYLE} in the appropriate body position. Show ONLY this piece, no other jewelry. Close-up, {_PHOTO_STYLE}",
 }
 
 
@@ -168,8 +173,9 @@ def generate_model_photo(image_url, category_name=None, custom_prompt=None):
         'prompt': prompt,
         'num_images': 1,
         'output_format': 'jpeg',
-        'guidance_scale': 3.5,
-        'aspect_ratio': '1:1',
+        'guidance_scale': 7.0,
+        'num_inference_steps': 28,
+        'aspect_ratio': '3:4',
     }, timeout=180)
 
     if data.get('images') and len(data['images']) > 0:
