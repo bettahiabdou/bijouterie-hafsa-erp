@@ -958,9 +958,12 @@ def enhance_image_api(request, reference):
     """
     import json
     import os
+    import logging
     import requests as http_requests
     from django.core.files.base import ContentFile
+    from .models import ProductImage
 
+    log = logging.getLogger(__name__)
     product = get_object_or_404(Product, reference=reference)
 
     body = json.loads(request.body) if request.body else {}
@@ -970,7 +973,6 @@ def enhance_image_api(request, reference):
 
     # Get the source image
     if image_id:
-        from .models import ProductImage
         img_obj = get_object_or_404(ProductImage, id=image_id, product=product)
         source_image = img_obj.image
     elif product.main_image:
@@ -1010,7 +1012,7 @@ def enhance_image_api(request, reference):
                 'message': 'Photo sur modele generee avec succes'
             })
         except Exception as e:
-            logger.error(f'Fal.ai model photo failed: {e}')
+            log.error(f'Fal.ai model photo failed: {e}')
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
     else:
         # Local: rembg background removal
