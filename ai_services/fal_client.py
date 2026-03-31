@@ -163,11 +163,28 @@ def remove_background(image_url):
 
 def generate_model_photo(image_url, category_name=None, custom_prompt=None):
     """
-    Generate a product-on-model photo using FLUX Kontext.
+    Generate a product-on-model photo using Google Nano Banana (edit endpoint).
     Takes the product image and generates it worn by a model.
+    Falls back to FLUX Kontext max if Nano Banana fails.
     """
     prompt = custom_prompt or _get_category_prompt(category_name)
 
+    # Try Nano Banana first (better quality, cheaper at $0.039/image)
+    try:
+        data = _submit_and_poll('fal-ai/nano-banana/edit', {
+            'image_urls': [image_url],
+            'prompt': prompt,
+            'num_images': 1,
+            'output_format': 'jpeg',
+            'aspect_ratio': '3:4',
+        }, timeout=180)
+
+        if data.get('images') and len(data['images']) > 0:
+            return data['images'][0]
+    except Exception as e:
+        logger.warning(f'Nano Banana failed, falling back to FLUX Kontext: {e}')
+
+    # Fallback to FLUX Kontext max
     data = _submit_and_poll('fal-ai/flux-pro/kontext/max', {
         'image_url': image_url,
         'prompt': prompt,
