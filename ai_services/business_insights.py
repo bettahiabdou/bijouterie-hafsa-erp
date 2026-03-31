@@ -474,11 +474,20 @@ def build_ai_prompt(data):
     for w in data.get('weekly_trend', []):
         week_lines.append(f"  - Sem {w['week'].strftime('%d/%m')}: {w['count']} factures, {_d(w['revenue'])} DH, panier {_d(w['avg_basket'])} DH")
 
-    prompt = f"""Tu es un analyste data senior spécialisé dans le retail bijouterie au Maroc.
+    prompt = f"""Tu es un expert-conseil en bijouterie or au Maroc avec 20 ans d'expérience dans le secteur.
+Tu connais parfaitement :
+- Le marché marocain de l'or : cours de l'or, impact du prix du gramme sur les marges, différence entre or 18k et 9k
+- La culture d'achat bijouterie au Maroc : trousseau de mariage (jihaz), dot (sadaq), cadeaux de fêtes (Eid, Mouloud), saison des moussems, achats Ramadan
+- Les spécificités produit : Sertla = pièce maîtresse du trousseau marocain, Demlij = tradition de mariage, Mcherta = bijou festif, importance du poids en or vs le travail artisanal (siyagha)
+- La saisonnalité : pic avant Ramadan, mariages en été (juin-septembre), Eid al-Adha, rentrée scolaire (baisse), période creuse janvier-février
+- Le comportement client marocain : achat cash fréquent (d'où les anonymes), négociation sur le prix du gramme, achat familial (mère + fille), revente/échange d'ancien or contre du neuf
+- La gestion de trésorerie bijouterie : l'or est un actif qui ne perd pas de valeur, le stock n'est pas un coût mort comme en retail classique, importance du ratio cash/stock
+
 Je suis le propriétaire de cette bijouterie. Je connais DÉJÀ les bases (mes top catégories, que j'ai beaucoup d'anonymes, etc).
 
-Ce que je veux de toi : des INSIGHTS CACHÉS, des CORRÉLATIONS NON-ÉVIDENTES, des ANOMALIES dans mes données.
-NE ME DIS PAS ce que je sais déjà. Creuse les données croisées pour trouver ce que je ne vois pas.
+Ce que je veux de toi : des INSIGHTS CACHÉS spécifiques au MÉTIER DE BIJOUTIER, des CORRÉLATIONS NON-ÉVIDENTES, des ANOMALIES dans mes données.
+NE ME DIS PAS ce que je sais déjà. NE DONNE PAS de conseils génériques de retail.
+Chaque recommandation doit être contextualisée au marché marocain de la bijouterie or.
 
 === VUE D'ENSEMBLE ===
 Période: {ov['date_first']} → {ov['date_last']}
@@ -535,23 +544,44 @@ Réponds en 5 sections. Pour chaque section, je veux:
 - Des DÉCOUVERTES que je ne peux PAS voir juste en regardant un tableau
 - Des CORRÉLATIONS entre les différentes données ci-dessus
 - Des chiffres PRÉCIS tirés des données
+- Un raisonnement MÉTIER BIJOUTERIE (pas du retail générique)
 
-## 1. OPPORTUNITÉS CACHÉES
-Croise les données: quelles catégories ont un bon écoulement MAIS un stock insuffisant? Quels jours/semaines ont un panier moyen anormalement haut (et pourquoi)? Quelles combinaisons d'achat révèlent des opportunités de bundle? Y a-t-il un décalage entre ce qui se vend le mieux en volume vs en marge?
+## 1. OPPORTUNITÉS CACHÉES (Spécifique Bijouterie)
+- Croise écoulement + stock + marge : quelles pièces sont en rupture imminente sur des articles à forte demande (trousseau, mariage)?
+- Quelles combinaisons d'achat révèlent un comportement "trousseau" (Sertla + Demlij + Ensemble = probable mariage)?
+- Y a-t-il un décalage entre le poids moyen vendu et le poids moyen en stock (tu stockes du lourd mais vends du léger, ou l'inverse)?
+- Compare le CA/gramme entre catégories : où la valeur ajoutée artisanale (siyagha) est-elle la mieux valorisée?
+- Bundle naturels à proposer basés sur les co-achats ET les traditions marocaines
 
-## 2. ANOMALIES & SIGNAUX D'ALERTE
-Quelles catégories ont un taux d'écoulement anormalement bas par rapport à leur stock? Le panier moyen est-il en hausse ou baisse sur les semaines? Y a-t-il des catégories où le prix médian est très loin du prix moyen (signe de pricing incohérent)? Des jours de la semaine sous-exploités?
+## 2. ANOMALIES & SIGNAUX D'ALERTE (Contexte Or Maroc)
+- Catégories avec taux d'écoulement anormalement bas : est-ce un problème de design dépassé, de prix trop élevé vs cours de l'or, ou de stock mal calibré en poids?
+- Le panier moyen varie-t-il selon les jours de manière cohérente avec le calendrier marocain (vendredi = jour de souk/marché)?
+- Catégories où le prix médian ≠ prix moyen : signe de pièces invendables qui tirent la moyenne (or ancien/modèle démodé)?
+- Attention aux articles en stock >60 jours : en bijouterie, ce n'est PAS forcément un problème (l'or garde sa valeur), MAIS le coût d'opportunité de ce capital immobilisé doit être évalué vs le cours actuel de l'or
 
-## 3. STRATÉGIE PRIX (basée sur les données)
-Analyse la distribution des prix: où y a-t-il des "trous" dans la gamme de prix? Compare marge vs volume par catégorie. Les catégories que les clients fidèles achètent sont-elles les plus rentables? Sinon, quel est le coût de fidélisation réel?
+## 3. STRATÉGIE PRIX & MARGE (Réalité Bijoutier)
+- Analyse le ratio marge/poids : certaines catégories ont-elles une siyagha (valeur artisanale) sous-évaluée?
+- Compare le prix de vente au gramme entre catégories : lesquelles valorisent le mieux le travail du bijoutier vs simple poids d'or?
+- Les "trous" dans la gamme de prix : manque-t-il des pièces accessibles (premier achat or, cadeau Eid) ou des pièces premium (mariage haut de gamme)?
+- Les clients fidèles achètent-ils les mêmes catégories (besoin récurrent = cadeaux) ou diversifient-ils (trousseau progressif)?
 
-## 4. ACQUISITION & RÉTENTION INTELLIGENTE
-Quelles catégories convertissent le mieux les anonymes en clients identifiés? Quel canal de livraison a le meilleur ratio identification? Les clients fidèles achètent-ils les mêmes catégories ou diversifient-ils? Quel est le profil d'un "bon client" selon les données?
+## 4. CLIENTÈLE & SAISONNALITÉ MAROCAINE
+- Comportement d'achat anonyme : au Maroc c'est culturel (cash, discrétion), ne PAS considérer comme un problème à résoudre. Mais identifier les leviers naturels de captation (livraison, SAV, échange)
+- Quel canal convertit le mieux? Le transporteur force l'identification — propose un service de livraison pour les achats trousseau
+- Anticipe la prochaine saison : basé sur les tendances, qu'est-ce qui va se vendre dans les 2-4 prochaines semaines? (Ramadan? Eid? Saison mariages?)
+- Profil des meilleurs clients : acheteurs one-shot à gros panier (trousseau) vs clients réguliers à petit panier (cadeaux) — lesquels sont les plus rentables?
 
-## 5. DÉCISIONS STOCK & ACHAT
-En croisant écoulement + stock + marge + tendance hebdomadaire: quels articles SPÉCIFIQUES commander cette semaine? Lesquels sont en surstockage? Où investir le prochain dirham? Donne un mini "plan d'achat" chiffré basé sur les données.
+## 5. PLAN D'ACHAT & STOCK (Décisions Bijoutier)
+En croisant écoulement + marge + stock + saisonnalité marocaine à venir:
+- Quelles pièces SPÉCIFIQUES commander cette semaine et en quelle quantité?
+- Stock à écouler en priorité (promotion, fonte/transformation, échange?)
+- Où investir le prochain dirham en tenant compte du cours de l'or actuel?
+- Faut-il privilégier des pièces légères (accessibles, rotation rapide) ou lourdes (marge en DH, trousseau)?
+- Mini plan d'achat chiffré avec budget estimé
 
-PAS DE CONSEILS GÉNÉRIQUES. Si tu ne peux pas le prouver avec un chiffre des données ci-dessus, ne le dis pas."""
+RAPPEL: Tu es un EXPERT BIJOUTIER MAROCAIN, pas un consultant retail générique.
+PAS DE CONSEILS GÉNÉRIQUES (type "améliorez votre marketing digital" ou "fidélisez vos clients").
+Si tu ne peux pas le prouver avec un chiffre des données ci-dessus, ne le dis pas."""
 
     return prompt
 
