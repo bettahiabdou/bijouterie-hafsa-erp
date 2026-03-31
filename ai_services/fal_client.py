@@ -27,14 +27,14 @@ CATEGORY_PROMPTS = {
     'collier': f"Place this exact gold necklace around the neck of an {_MOROCCAN_STYLE}. Show ONLY this one necklace, absolutely no other jewelry, no earrings, no bracelets. Tight close-up of neck and upper chest area. {_PHOTO_STYLE}",
     'chaine': f"Place this exact gold chain around the neck of an {_MOROCCAN_STYLE}. Show ONLY this one chain, no other jewelry at all. Close-up of neck area. {_PHOTO_STYLE}",
     'sautoir': f"Place this exact long gold necklace on an {_MOROCCAN_STYLE}, hanging to mid-chest. Show ONLY this necklace, no other jewelry. Close-up shot from chin to chest. {_PHOTO_STYLE}",
-    # Bracelets
-    'bracelet': f"Place this exact gold bracelet on the wrist of an {_MOROCCAN_STYLE}. Show ONLY this bracelet, no rings, no other jewelry. Tight close-up of wrist and hand with henna-style elegance. {_PHOTO_STYLE}",
-    'gourmette': f"Place this exact gold chain bracelet on the wrist of an {_MOROCCAN_STYLE}. Show ONLY this bracelet, no other jewelry. Close-up of wrist. {_PHOTO_STYLE}",
-    # Bangles
-    'demlij': f"Place these exact gold bangles stacked on the wrist of an {_MOROCCAN_STYLE}. Show ONLY these bangles, no other jewelry. Close-up of wrist showing the stack. {_PHOTO_STYLE}",
-    # Rings
-    'bague': f"Place this exact gold ring on the finger of an {_MOROCCAN_STYLE}. Show ONLY this ring, no other rings or jewelry. Tight close-up of hand and fingers. {_PHOTO_STYLE}",
-    'alliance': f"Place this exact gold wedding ring on the ring finger of an {_MOROCCAN_STYLE}. Show ONLY this ring, no other jewelry. Close-up of hand. {_PHOTO_STYLE}",
+    # Bracelets — hand/wrist only, no face
+    'bracelet': f"This exact gold bracelet worn on a woman's wrist. Show ONLY wrist and hand, no face or body. Extreme close-up of feminine wrist with olive skin against dark velvet background. {_PHOTO_STYLE}",
+    'gourmette': f"This exact gold chain bracelet on a woman's wrist. Show ONLY wrist and hand, no face. Extreme close-up of wrist against dark background. {_PHOTO_STYLE}",
+    # Bangles — wrist only
+    'demlij': f"These exact gold bangles stacked on a woman's wrist. Show ONLY the wrist with bangles, no face or body. Extreme close-up of feminine wrist with olive skin against dark velvet. {_PHOTO_STYLE}",
+    # Rings — hand only, absolutely no face
+    'bague': f"This exact gold ring worn on a woman's finger. Show ONLY the hand and fingers, absolutely no face, no body, no portrait. Extreme close-up of a feminine hand with olive skin and manicured nails against dark velvet background. {_PHOTO_STYLE}",
+    'alliance': f"This exact gold wedding ring on a woman's ring finger. Show ONLY the hand, no face, no body. Extreme close-up of feminine hand with olive skin against dark velvet. {_PHOTO_STYLE}",
     # Earrings
     'boucle': f"Place these exact gold earrings on the ear of an {_MOROCCAN_STYLE} wearing a hijab that frames the face showing the ears. Show ONLY these earrings, no necklace, no other jewelry. Close-up side profile. {_PHOTO_STYLE}",
     "boucles d'oreilles": f"Place these exact gold earrings on the ear of an {_MOROCCAN_STYLE} wearing a hijab that frames the face showing the ears. Show ONLY these earrings, no other jewelry. Close-up side profile. {_PHOTO_STYLE}",
@@ -168,13 +168,12 @@ def generate_model_photo(image_url, category_name=None, custom_prompt=None):
     """
     prompt = custom_prompt or _get_category_prompt(category_name)
 
-    data = _submit_and_poll('fal-ai/flux-pro/kontext', {
+    data = _submit_and_poll('fal-ai/flux-pro/kontext/max', {
         'image_url': image_url,
         'prompt': prompt,
         'num_images': 1,
         'output_format': 'jpeg',
         'guidance_scale': 7.0,
-        'num_inference_steps': 28,
         'aspect_ratio': '3:4',
     }, timeout=180)
 
