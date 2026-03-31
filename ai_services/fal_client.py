@@ -18,7 +18,7 @@ FAL_QUEUE_URL = 'https://queue.fal.run'
 
 # Moroccan cultural context for all prompts
 _MOROCCAN_STYLE = "elegant Moroccan woman with olive skin, wearing a colorful embroidered Moroccan caftan with rich jewel tones (emerald green, royal blue, burgundy, or deep purple) and gold thread details, modest high neckline"
-_PHOTO_STYLE = "professional luxury jewelry e-commerce photography, sharp focus on the jewelry, soft warm studio lighting, dark gradient background, 4K detail. CRITICAL: preserve the exact jewelry piece as-is, do NOT add, remove, or modify any details, stones, engravings, or patterns on the jewelry. The jewelry must look identical to the original photo"
+_PHOTO_STYLE = "professional luxury jewelry e-commerce photography, sharp focus on the jewelry, soft warm golden-hour studio lighting, beautiful bokeh background with warm tones, 4K detail. CRITICAL: preserve the exact jewelry piece as-is, do NOT add, remove, or modify any details, stones, engravings, or patterns on the jewelry. The jewelry must look identical to the original photo"
 
 # Category → prompt mapping for jewelry-on-model generation
 # Rules: preserve EXACT jewelry piece, no extra accessories, Moroccan modest styling
@@ -28,13 +28,13 @@ CATEGORY_PROMPTS = {
     'chaine': f"Place this exact gold chain around the neck of an {_MOROCCAN_STYLE}. Show ONLY this one chain, no other jewelry at all. Close-up of neck area. {_PHOTO_STYLE}",
     'sautoir': f"Place this exact long gold necklace on an {_MOROCCAN_STYLE}, hanging to mid-chest. Show ONLY this necklace, no other jewelry. Close-up shot from chin to chest. {_PHOTO_STYLE}",
     # Bracelets — hand/wrist only, no face
-    'bracelet': f"This exact gold bracelet worn on a woman's wrist. Show ONLY wrist and hand, no face or body. Extreme close-up of feminine wrist with olive skin against dark velvet background. {_PHOTO_STYLE}",
-    'gourmette': f"This exact gold chain bracelet on a woman's wrist. Show ONLY wrist and hand, no face. Extreme close-up of wrist against dark background. {_PHOTO_STYLE}",
+    'bracelet': f"This exact gold bracelet worn on a woman's wrist. Show ONLY wrist and hand, no face or body. Extreme close-up of feminine wrist with olive skin against warm blurred bokeh background. {_PHOTO_STYLE}",
+    'gourmette': f"This exact gold chain bracelet on a woman's wrist. Show ONLY wrist and hand, no face. Extreme close-up of wrist against soft blurred background. {_PHOTO_STYLE}",
     # Bangles — wrist only
-    'demlij': f"These exact gold bangles stacked on a woman's wrist. Show ONLY the wrist with bangles, no face or body. Extreme close-up of feminine wrist with olive skin against dark velvet. {_PHOTO_STYLE}",
+    'demlij': f"These exact gold bangles stacked on a woman's wrist. Show ONLY the wrist with bangles, no face or body. Extreme close-up of feminine wrist with olive skin against warm blurred bokeh background. {_PHOTO_STYLE}",
     # Rings — hand only, absolutely no face
-    'bague': f"This exact gold ring worn on a woman's finger. Show ONLY the hand and fingers, absolutely no face, no body, no portrait. Extreme close-up of a feminine hand with olive skin and manicured nails against dark velvet background. {_PHOTO_STYLE}",
-    'alliance': f"This exact gold wedding ring on a woman's ring finger. Show ONLY the hand, no face, no body. Extreme close-up of feminine hand with olive skin against dark velvet. {_PHOTO_STYLE}",
+    'bague': f"This exact gold ring worn on a woman's finger. Show ONLY the hand and fingers, absolutely no face, no body, no portrait. Extreme close-up of a feminine hand with olive skin and manicured nails against warm blurred bokeh background. {_PHOTO_STYLE}",
+    'alliance': f"This exact gold wedding ring on a woman's ring finger. Show ONLY the hand, no face, no body. Extreme close-up of feminine hand with olive skin against warm blurred bokeh background. {_PHOTO_STYLE}",
     # Earrings
     'boucle': f"Place these exact gold earrings on the ear of an {_MOROCCAN_STYLE} wearing a hijab that frames the face showing the ears. Show ONLY these earrings, no necklace, no other jewelry. Close-up side profile. {_PHOTO_STYLE}",
     "boucles d'oreilles": f"Place these exact gold earrings on the ear of an {_MOROCCAN_STYLE} wearing a hijab that frames the face showing the ears. Show ONLY these earrings, no other jewelry. Close-up side profile. {_PHOTO_STYLE}",
