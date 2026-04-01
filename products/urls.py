@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/rfid/session/<int:session_id>/', api_views.rfid_session_detail, name='rfid_session_detail'),
     path('api/rfid/sessions/', api_views.rfid_session_list, name='rfid_session_list'),
 
+    path('api/server-images/', views.server_images_api, name='server_images_api'),
     path('api/search/', views.product_search_api, name='product_search_api'),
     path('api/smart-search/', views.smart_search_api, name='smart_search_api'),
     path('api/upload-images/<str:reference>/', views.product_image_upload_api, name='product_image_upload_api'),

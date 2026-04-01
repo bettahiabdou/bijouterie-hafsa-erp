@@ -99,8 +99,42 @@
                             <i class="fas fa-camera" style="font-size: 1.5rem;"></i>
                             <span style="font-size: var(--text-sm); font-weight: 500;">Webcam</span>
                         </button>
+                        <button type="button" onclick="openLibrary()" style="flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); border: 2px dashed var(--accent-300); border-radius: var(--radius-lg); background: var(--accent-50, #fdf4ff); color: var(--accent-600, #9333ea); cursor: pointer; transition: all .15s; min-width: 140px;">
+                            <i class="fas fa-folder-open" style="font-size: 1.5rem;"></i>
+                            <span style="font-size: var(--text-sm); font-weight: 500;">Bibliothèque</span>
+                        </button>
                     </div>
                     <div class="image-preview-grid" id="imagePreviewGrid"></div>
+                </div>
+
+                <!-- Library Modal -->
+                <div id="libraryModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.8); align-items:center; justify-content:center;">
+                    <div style="background:white; border-radius:var(--radius-xl); padding:var(--space-4); max-width:900px; width:95%; max-height:90vh; display:flex; flex-direction:column; position:relative;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-3);">
+                            <h3 style="margin:0; font-size:var(--text-lg);"><i class="fas fa-folder-open mr-2"></i>Bibliothèque d'images</h3>
+                            <button type="button" onclick="closeLibrary()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--neutral-500);">&times;</button>
+                        </div>
+                        <div style="margin-bottom:var(--space-3);">
+                            <input type="text" id="librarySearch" class="form-input" placeholder="Rechercher par nom de fichier..." oninput="librarySearchDebounce()">
+                        </div>
+                        <div id="libraryGrid" style="flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:var(--space-3); padding:var(--space-2);">
+                            <div style="grid-column:1/-1; text-align:center; padding:var(--space-8); color:var(--neutral-400);">
+                                <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
+                                <p style="margin-top:var(--space-2);">Chargement...</p>
+                            </div>
+                        </div>
+                        <div id="libraryPagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:var(--space-3); padding-top:var(--space-3); border-top:1px solid var(--neutral-100);">
+                            <span id="libraryInfo" style="font-size:var(--text-sm); color:var(--neutral-500);"></span>
+                            <div style="display:flex; gap:var(--space-2);">
+                                <button type="button" id="libraryPrev" onclick="loadLibrary(libraryPage-1)" class="btn btn-ghost btn-sm" disabled>
+                                    <i class="fas fa-chevron-left"></i> Précédent
+                                </button>
+                                <button type="button" id="libraryNext" onclick="loadLibrary(libraryPage+1)" class="btn btn-ghost btn-sm" disabled>
+                                    Suivant <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Camera Modal -->
@@ -774,5 +808,99 @@
 
             closeCamera();
         }
+
+        // ===== IMAGE LIBRARY =====
+        let libraryPage = 1;
+        let librarySearchTimer = null;
+
+        function openLibrary() {
+            document.getElementById('libraryModal').style.display = 'flex';
+            document.getElementById('librarySearch').value = '';
+            libraryPage = 1;
+            loadLibrary(1);
+        }
+
+        function closeLibrary() {
+            document.getElementById('libraryModal').style.display = 'none';
+        }
+
+        function librarySearchDebounce() {
+            clearTimeout(librarySearchTimer);
+            librarySearchTimer = setTimeout(function() {
+                libraryPage = 1;
+                loadLibrary(1);
+            }, 300);
+        }
+
+        function loadLibrary(page) {
+            libraryPage = page;
+            var search = document.getElementById('librarySearch').value.trim();
+            var grid = document.getElementById('libraryGrid');
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:var(--space-8); color:var(--neutral-400);"><i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i></div>';
+
+            var url = '{% url "products:server_images_api" %}?page=' + page;
+            if (search) url += '&search=' + encodeURIComponent(search);
+
+            fetch(url)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    grid.innerHTML = '';
+                    if (data.images.length === 0) {
+                        grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:var(--space-8); color:var(--neutral-400);"><i class="fas fa-images" style="font-size:2rem;"></i><p style="margin-top:var(--space-2);">Aucune image trouvée</p></div>';
+                    } else {
+                        data.images.forEach(function(img) {
+                            var div = document.createElement('div');
+                            div.style.cssText = 'cursor:pointer; border:2px solid transparent; border-radius:var(--radius-md); overflow:hidden; transition:all .15s; aspect-ratio:1; position:relative;';
+                            div.innerHTML = '<img src="' + img.url + '" style="width:100%; height:100%; object-fit:cover;" loading="lazy">' +
+                                '<div style="position:absolute; bottom:0; left:0; right:0; padding:4px 6px; background:rgba(0,0,0,0.6); color:white; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + img.filename + '</div>';
+                            div.onmouseenter = function() { this.style.borderColor = 'var(--primary-500)'; this.style.transform = 'scale(1.03)'; };
+                            div.onmouseleave = function() { this.style.borderColor = 'transparent'; this.style.transform = 'scale(1)'; };
+                            div.onclick = function() { selectLibraryImage(img.url, img.filename); };
+                            grid.appendChild(div);
+                        });
+                    }
+
+                    document.getElementById('libraryInfo').textContent = data.total + ' image(s) — Page ' + data.page;
+                    document.getElementById('libraryPrev').disabled = (page <= 1);
+                    document.getElementById('libraryNext').disabled = !data.has_next;
+                })
+                .catch(function(err) {
+                    console.error(err);
+                    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:var(--space-8); color:var(--error-500);">Erreur de chargement</div>';
+                });
+        }
+
+        function selectLibraryImage(url, filename) {
+            // Fetch the image as blob, then add as File to the input
+            fetch(url)
+                .then(function(r) { return r.blob(); })
+                .then(function(blob) {
+                    var file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+                    capturedFiles.push(file);
+
+                    var dt = new DataTransfer();
+                    var existingInput = document.getElementById('imageInput');
+                    if (existingInput.files) {
+                        Array.from(existingInput.files).forEach(function(f) { dt.items.add(f); });
+                    }
+                    capturedFiles.forEach(function(f) { dt.items.add(f); });
+                    existingInput.files = dt.files;
+                    existingInput.dispatchEvent(new Event('change'));
+
+                    closeLibrary();
+                })
+                .catch(function(err) {
+                    console.error(err);
+                    alert('Erreur lors du chargement de l\'image');
+                });
+        }
+
+        // Close library on escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeLibrary();
+        });
+        document.getElementById('libraryModal').addEventListener('click', function(e) {
+            if (e.target === this) closeLibrary();
+        });
     </script>
 {% endblock %}

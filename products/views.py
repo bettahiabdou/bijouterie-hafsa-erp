@@ -1175,6 +1175,58 @@ def product_search_api(request):
 
 
 @login_required(login_url='login')
+def server_images_api(request):
+    """API endpoint to browse existing images in media/products/ directory"""
+    from django.conf import settings
+    import glob
+
+    search = request.GET.get('search', '').strip().lower()
+    page = int(request.GET.get('page', 1))
+    per_page = 24
+
+    products_dir = os.path.join(settings.MEDIA_ROOT, 'products')
+    if not os.path.isdir(products_dir):
+        return JsonResponse({'images': [], 'has_next': False, 'total': 0})
+
+    # List image files
+    extensions = ('*.jpg', '*.jpeg', '*.png', '*.webp')
+    all_files = []
+    for ext in extensions:
+        all_files.extend(glob.glob(os.path.join(products_dir, ext)))
+        all_files.extend(glob.glob(os.path.join(products_dir, ext.upper())))
+
+    # Deduplicate and sort by modification time (newest first)
+    all_files = list(set(all_files))
+    all_files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
+
+    # Filter by search
+    if search:
+        all_files = [f for f in all_files if search in os.path.basename(f).lower()]
+
+    total = len(all_files)
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_files = all_files[start:end]
+
+    images = []
+    for filepath in page_files:
+        filename = os.path.basename(filepath)
+        size = os.path.getsize(filepath)
+        images.append({
+            'url': f'{settings.MEDIA_URL}products/{filename}',
+            'filename': filename,
+            'size': size,
+        })
+
+    return JsonResponse({
+        'images': images,
+        'has_next': end < total,
+        'total': total,
+        'page': page,
+    })
+
+
+@login_required(login_url='login')
 def smart_search_api(request):
     """AI-powered semantic product search - falls back to keyword if AI unavailable."""
     query = request.GET.get('q', '').strip()
