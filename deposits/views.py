@@ -107,6 +107,10 @@ def deposit_detail(request, pk):
     payment_methods = PaymentMethod.objects.filter(is_active=True)
     bank_accounts = BankAccount.objects.filter(is_active=True)
 
+    # Get staff users for "managed by" dropdown
+    from users.models import User
+    staff_users = User.objects.filter(is_active=True).order_by('first_name', 'last_name')
+
     context = {
         'account': account,
         'transactions': page_obj,
@@ -115,6 +119,7 @@ def deposit_detail(request, pk):
         'transaction_types': DepositTransaction.TransactionType.choices,
         'payment_methods': payment_methods,
         'bank_accounts': bank_accounts,
+        'staff_users': staff_users,
         'today': timezone.now().date(),
     }
     return render(request, 'deposits/deposit_detail.html', context)
@@ -125,6 +130,7 @@ def deposit_create(request):
     """Create a new deposit account for a client"""
     if request.method == 'POST':
         client_id = request.POST.get('client')
+        managed_by_id = request.POST.get('managed_by')
         notes = request.POST.get('notes', '')
         initial_amount = request.POST.get('initial_amount', '0')
         payment_method_id = request.POST.get('payment_method')
@@ -147,10 +153,20 @@ def deposit_create(request):
         except InvalidOperation:
             initial_amount = Decimal('0')
 
+        # Get managed_by user
+        managed_by = None
+        if managed_by_id:
+            from users.models import User
+            try:
+                managed_by = User.objects.get(pk=managed_by_id)
+            except User.DoesNotExist:
+                pass
+
         with transaction.atomic():
             # Create deposit account
             account = DepositAccount.objects.create(
                 client=client,
+                managed_by=managed_by,
                 notes=notes,
                 created_by=request.user
             )
@@ -193,10 +209,15 @@ def deposit_create(request):
     payment_methods = PaymentMethod.objects.filter(is_active=True)
     bank_accounts = BankAccount.objects.filter(is_active=True)
 
+    # Get staff users for "managed by" dropdown
+    from users.models import User
+    staff_users = User.objects.filter(is_active=True).order_by('first_name', 'last_name')
+
     context = {
         'clients': clients,
         'payment_methods': payment_methods,
         'bank_accounts': bank_accounts,
+        'staff_users': staff_users,
     }
     return render(request, 'deposits/deposit_form.html', context)
 
@@ -932,4 +953,35 @@ def delete_deposit_transaction(request):
 
     except Exception as e:
         logger.exception(f'Error deleting deposit transaction: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
+
+
+@login_required
+def update_managed_by(request, pk):
+    """Update the managed_by field of a deposit account (AJAX)"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST requis'}, status=405)
+    try:
+        account = get_object_or_404(DepositAccount, pk=pk)
+        managed_by_id = request.POST.get('managed_by')
+
+        if managed_by_id:
+            from users.models import User
+            try:
+                user = User.objects.get(pk=managed_by_id, is_active=True)
+                account.managed_by = user
+            except User.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Utilisateur non trouvé'}, status=400)
+        else:
+            account.managed_by = None
+
+        account.save(update_fields=['managed_by', 'updated_at'])
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Responsable mis à jour',
+            'managed_by': str(account.managed_by) if account.managed_by else None,
+        })
+    except Exception as e:
+        logger.exception(f'Error updating managed_by: {str(e)}')
         return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)

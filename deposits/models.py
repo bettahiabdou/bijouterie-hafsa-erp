@@ -23,6 +23,16 @@ class DepositAccount(models.Model):
         verbose_name=_('Client')
     )
 
+    # Person in charge of this account
+    managed_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='managed_deposit_accounts',
+        verbose_name=_('Responsable du compte')
+    )
+
     # Status
     is_active = models.BooleanField(
         _('Actif'),

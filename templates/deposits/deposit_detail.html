@@ -110,6 +110,19 @@
                         <span class="info-label">Compte créé</span>
                         <span class="info-value">{{ account.created_at|date:"d/m/Y" }}</span>
                     </div>
+                    <div class="info-item">
+                        <span class="info-label">Responsable</span>
+                        <span class="info-value" id="managedByDisplay">
+                            {% if account.managed_by %}
+                                <span class="badge badge-info">{{ account.managed_by.get_full_name }}</span>
+                            {% else %}
+                                <span class="text-muted">Non assigné</span>
+                            {% endif %}
+                            <button type="button" onclick="openManagedByModal()" class="btn btn-ghost btn-sm" style="padding: 2px 6px; margin-left: 4px;" title="Modifier">
+                                <i class="fas fa-edit" style="font-size: 11px;"></i>
+                            </button>
+                        </span>
+                    </div>
                 </div>
 
                 <!-- Quick Actions -->
@@ -572,6 +585,37 @@
         </div>
     </div>
 
+    <!-- Managed By Modal -->
+    <div id="managedByModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-tie mr-2"></i> Responsable du Compte</h3>
+                <button onclick="closeManagedByModal()" class="btn btn-ghost btn-sm">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Personne en charge</label>
+                    <select id="managedBySelect" class="form-select">
+                        <option value="">-- Aucun --</option>
+                        {% for user in staff_users %}
+                            <option value="{{ user.pk }}" {% if account.managed_by and account.managed_by.pk == user.pk %}selected{% endif %}>
+                                {{ user.get_full_name }} ({{ user.get_role_display }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeManagedByModal()" class="btn btn-ghost">Annuler</button>
+                <button type="button" onclick="saveManagedBy()" class="btn btn-primary" id="managedBySaveBtn">
+                    <i class="fas fa-check"></i> Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         function openAddFundModal() {
             document.getElementById('addFundModal').style.display = 'flex';
@@ -597,12 +641,52 @@
             document.getElementById('adjustmentModal').style.display = 'none';
         }
 
+        function openManagedByModal() {
+            document.getElementById('managedByModal').style.display = 'flex';
+        }
+
+        function closeManagedByModal() {
+            document.getElementById('managedByModal').style.display = 'none';
+        }
+
+        function saveManagedBy() {
+            var select = document.getElementById('managedBySelect');
+            var btn = document.getElementById('managedBySaveBtn');
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ...';
+
+            var formData = new FormData();
+            formData.append('managed_by', select.value);
+
+            fetch('{% url "deposits:update_managed_by" account.pk %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(function(err) { console.error(err); alert('Erreur de connexion'); })
+            .finally(function() {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check"></i> Enregistrer';
+            });
+        }
+
         // Close modals on escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeAddFundModal();
                 closeWithdrawalModal();
                 closeAdjustmentModal();
+                closeManagedByModal();
             }
         });
 

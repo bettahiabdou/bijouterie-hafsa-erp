@@ -67,6 +67,25 @@
             </div>
         </div>
 
+        <!-- Responsable du Compte -->
+        <div class="card mb-6">
+            <div class="card-header">
+                <h3><i class="fas fa-user-tie mr-2"></i> Responsable du Compte</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Personne en charge</label>
+                    <select name="managed_by" class="form-select">
+                        <option value="">-- Aucun --</option>
+                        {% for user in staff_users %}
+                            <option value="{{ user.pk }}">{{ user.get_full_name }} ({{ user.get_role_display }})</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text">Le membre du personnel responsable de ce compte dépôt</small>
+                </div>
+            </div>
+        </div>
+
         <!-- Initial Deposit (Optional) -->
         <div class="card mb-6">
             <div class="card-header">

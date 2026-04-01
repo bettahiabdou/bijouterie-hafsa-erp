@@ -29,4 +29,7 @@ urlpatterns = [
     # Transaction editing (AJAX)
     path('api/update-transaction/', views.update_deposit_transaction, name='update_transaction'),
     path('api/delete-transaction/', views.delete_deposit_transaction, name='delete_transaction'),
+
+    # Account management (AJAX)
+    path('<int:pk>/update-managed-by/', views.update_managed_by, name='update_managed_by'),
 ]
