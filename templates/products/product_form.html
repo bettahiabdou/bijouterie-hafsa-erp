@@ -108,24 +108,30 @@
                 </div>
 
                 <!-- Library Modal -->
-                <div id="libraryModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.8); align-items:center; justify-content:center;">
-                    <div style="background:white; border-radius:var(--radius-xl); padding:var(--space-4); max-width:900px; width:95%; max-height:90vh; display:flex; flex-direction:column; position:relative;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-3);">
-                            <h3 style="margin:0; font-size:var(--text-lg);"><i class="fas fa-folder-open mr-2"></i>Bibliothèque d'images</h3>
-                            <button type="button" onclick="closeLibrary()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--neutral-500);">&times;</button>
+                <div id="libraryModal" class="lib-modal-overlay">
+                    <div class="lib-modal">
+                        <div class="lib-modal-header">
+                            <div>
+                                <h3 style="margin:0; font-size:var(--text-lg); font-weight:600;">
+                                    <i class="fas fa-images mr-2" style="color:var(--primary-500);"></i>Bibliothèque d'images
+                                </h3>
+                                <p style="margin:4px 0 0; font-size:var(--text-xs); color:var(--neutral-400);">Cliquez sur une image pour l'ajouter au produit</p>
+                            </div>
+                            <button type="button" onclick="closeLibrary()" class="lib-modal-close">&times;</button>
                         </div>
-                        <div style="margin-bottom:var(--space-3);">
-                            <input type="text" id="librarySearch" class="form-input" placeholder="Rechercher par nom de fichier..." oninput="librarySearchDebounce()">
+                        <div class="lib-search-wrap">
+                            <i class="fas fa-search lib-search-icon"></i>
+                            <input type="text" id="librarySearch" class="lib-search-input" placeholder="Rechercher par nom de fichier..." oninput="librarySearchDebounce()">
                         </div>
-                        <div id="libraryGrid" style="flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:var(--space-3); padding:var(--space-2);">
-                            <div style="grid-column:1/-1; text-align:center; padding:var(--space-8); color:var(--neutral-400);">
+                        <div id="libraryGrid" class="lib-grid">
+                            <div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--neutral-400);">
                                 <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
-                                <p style="margin-top:var(--space-2);">Chargement...</p>
+                                <p style="margin-top:8px;">Chargement...</p>
                             </div>
                         </div>
-                        <div id="libraryPagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:var(--space-3); padding-top:var(--space-3); border-top:1px solid var(--neutral-100);">
-                            <span id="libraryInfo" style="font-size:var(--text-sm); color:var(--neutral-500);"></span>
-                            <div style="display:flex; gap:var(--space-2);">
+                        <div class="lib-footer">
+                            <span id="libraryInfo" style="font-size:var(--text-xs); color:var(--neutral-400);"></span>
+                            <div style="display:flex; gap:8px;">
                                 <button type="button" id="libraryPrev" onclick="loadLibrary(libraryPage-1)" class="btn btn-ghost btn-sm" disabled>
                                     <i class="fas fa-chevron-left"></i> Précédent
                                 </button>
@@ -136,6 +142,105 @@
                         </div>
                     </div>
                 </div>
+
+                <style>
+                    .lib-modal-overlay {
+                        display:none; position:fixed; inset:0; z-index:9999;
+                        background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+                        align-items:center; justify-content:center;
+                    }
+                    .lib-modal {
+                        background:white; border-radius:16px;
+                        max-width:960px; width:95%; max-height:88vh;
+                        display:flex; flex-direction:column;
+                        box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+                        overflow:hidden;
+                    }
+                    .lib-modal-header {
+                        display:flex; justify-content:space-between; align-items:flex-start;
+                        padding:20px 24px 16px; border-bottom:1px solid var(--neutral-100);
+                    }
+                    .lib-modal-close {
+                        background:var(--neutral-100); border:none; width:36px; height:36px;
+                        border-radius:50%; font-size:1.3rem; cursor:pointer;
+                        color:var(--neutral-500); display:flex; align-items:center; justify-content:center;
+                        transition:all .15s;
+                    }
+                    .lib-modal-close:hover { background:var(--neutral-200); color:var(--neutral-700); }
+                    .lib-search-wrap {
+                        position:relative; padding:12px 24px;
+                    }
+                    .lib-search-icon {
+                        position:absolute; left:38px; top:50%; transform:translateY(-50%);
+                        color:var(--neutral-400); font-size:14px;
+                    }
+                    .lib-search-input {
+                        width:100%; padding:10px 14px 10px 36px;
+                        border:1px solid var(--neutral-200); border-radius:10px;
+                        font-size:14px; background:var(--neutral-50);
+                        transition:all .15s; outline:none;
+                    }
+                    .lib-search-input:focus {
+                        border-color:var(--primary-400); background:white;
+                        box-shadow:0 0 0 3px rgba(var(--primary-500-rgb, 99,102,241), 0.1);
+                    }
+                    .lib-grid {
+                        flex:1; overflow-y:auto; padding:16px 24px;
+                        display:grid;
+                        grid-template-columns:repeat(5, 1fr);
+                        gap:12px;
+                    }
+                    .lib-img-card {
+                        position:relative; border-radius:10px; overflow:hidden;
+                        cursor:pointer; aspect-ratio:1;
+                        border:2px solid var(--neutral-100);
+                        background:var(--neutral-50);
+                        transition:all .2s ease;
+                    }
+                    .lib-img-card:hover {
+                        border-color:var(--primary-400);
+                        box-shadow:0 4px 16px rgba(0,0,0,0.12);
+                        transform:translateY(-2px);
+                    }
+                    .lib-img-card img {
+                        width:100%; height:100%; object-fit:cover;
+                        display:block;
+                    }
+                    .lib-img-card .lib-img-overlay {
+                        position:absolute; inset:0;
+                        background:linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%);
+                        opacity:0; transition:opacity .2s;
+                        display:flex; align-items:flex-end; padding:8px;
+                    }
+                    .lib-img-card:hover .lib-img-overlay { opacity:1; }
+                    .lib-img-card .lib-img-name {
+                        color:white; font-size:10px; font-weight:500;
+                        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+                        width:100%;
+                    }
+                    .lib-img-card .lib-img-check {
+                        position:absolute; top:8px; right:8px;
+                        width:28px; height:28px; border-radius:50%;
+                        background:var(--primary-500); color:white;
+                        display:flex; align-items:center; justify-content:center;
+                        font-size:12px; opacity:0; transform:scale(0.5);
+                        transition:all .2s;
+                    }
+                    .lib-img-card:hover .lib-img-check { opacity:1; transform:scale(1); }
+                    .lib-footer {
+                        display:flex; justify-content:space-between; align-items:center;
+                        padding:12px 24px; border-top:1px solid var(--neutral-100);
+                        background:var(--neutral-50);
+                    }
+                    @media (max-width: 768px) {
+                        .lib-grid { grid-template-columns:repeat(3, 1fr); gap:8px; padding:12px 16px; }
+                        .lib-modal-header, .lib-search-wrap, .lib-footer { padding-left:16px; padding-right:16px; }
+                        .lib-search-icon { left:30px; }
+                    }
+                    @media (max-width: 480px) {
+                        .lib-grid { grid-template-columns:repeat(2, 1fr); }
+                    }
+                </style>
 
                 <!-- Camera Modal -->
                 <div id="cameraModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.8); align-items:center; justify-content:center;">
@@ -836,7 +941,7 @@
             libraryPage = page;
             var search = document.getElementById('librarySearch').value.trim();
             var grid = document.getElementById('libraryGrid');
-            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:var(--space-8); color:var(--neutral-400);"><i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i></div>';
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--neutral-400);"><i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i><p style="margin-top:8px; font-size:13px;">Chargement...</p></div>';
 
             var url = '{% url "products:server_images_api" %}?page=' + page;
             if (search) url += '&search=' + encodeURIComponent(search);
@@ -846,15 +951,14 @@
                 .then(function(data) {
                     grid.innerHTML = '';
                     if (data.images.length === 0) {
-                        grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:var(--space-8); color:var(--neutral-400);"><i class="fas fa-images" style="font-size:2rem;"></i><p style="margin-top:var(--space-2);">Aucune image trouvée</p></div>';
+                        grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--neutral-400);"><i class="fas fa-images" style="font-size:2.5rem; margin-bottom:8px;"></i><p>Aucune image trouvée</p></div>';
                     } else {
                         data.images.forEach(function(img) {
                             var div = document.createElement('div');
-                            div.style.cssText = 'cursor:pointer; border:2px solid transparent; border-radius:var(--radius-md); overflow:hidden; transition:all .15s; aspect-ratio:1; position:relative;';
-                            div.innerHTML = '<img src="' + img.url + '" style="width:100%; height:100%; object-fit:cover;" loading="lazy">' +
-                                '<div style="position:absolute; bottom:0; left:0; right:0; padding:4px 6px; background:rgba(0,0,0,0.6); color:white; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + img.filename + '</div>';
-                            div.onmouseenter = function() { this.style.borderColor = 'var(--primary-500)'; this.style.transform = 'scale(1.03)'; };
-                            div.onmouseleave = function() { this.style.borderColor = 'transparent'; this.style.transform = 'scale(1)'; };
+                            div.className = 'lib-img-card';
+                            div.innerHTML = '<img src="' + img.url + '" loading="lazy" alt="' + img.filename + '">' +
+                                '<div class="lib-img-overlay"><span class="lib-img-name">' + img.filename + '</span></div>' +
+                                '<div class="lib-img-check"><i class="fas fa-plus"></i></div>';
                             div.onclick = function() { selectLibraryImage(img.url, img.filename); };
                             grid.appendChild(div);
                         });
@@ -866,7 +970,7 @@
                 })
                 .catch(function(err) {
                     console.error(err);
-                    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:var(--space-8); color:var(--error-500);">Erreur de chargement</div>';
+                    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--error-500);"><i class="fas fa-exclamation-circle" style="font-size:2rem; margin-bottom:8px;"></i><p>Erreur de chargement</p></div>';
                 });
         }
 
