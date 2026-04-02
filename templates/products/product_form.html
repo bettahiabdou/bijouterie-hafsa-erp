@@ -697,19 +697,28 @@
 
         .preview-remove {
             position: absolute;
-            top: 4px;
-            right: 4px;
-            width: 24px;
-            height: 24px;
+            top: 6px;
+            right: 6px;
+            width: 26px;
+            height: 26px;
             background: var(--error-500);
             color: white;
-            border: none;
-            border-radius: var(--radius-full);
+            border: 2px solid white;
+            border-radius: 50%;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: var(--text-xs);
+            font-size: 16px;
+            font-weight: bold;
+            line-height: 1;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: all .15s;
+            z-index: 2;
+        }
+        .preview-remove:hover {
+            background: var(--error-600);
+            transform: scale(1.15);
         }
 
         .preview-name {
@@ -797,16 +806,21 @@
                     previewGrid.innerHTML = '';
                     const files = Array.from(this.files);
 
-                    files.forEach((file, index) => {
+                    files.forEach((file, idx) => {
                         if (file.type.startsWith('image/')) {
                             const reader = new FileReader();
                             reader.onload = function(e) {
                                 const div = document.createElement('div');
                                 div.className = 'preview-item';
+                                div.style.position = 'relative';
                                 div.innerHTML = `
                                     <img src="${e.target.result}" alt="Preview">
                                     <span class="preview-name">${file.name}</span>
+                                    <button type="button" class="preview-remove" data-idx="${idx}" title="Supprimer">&times;</button>
                                 `;
+                                div.querySelector('.preview-remove').addEventListener('click', function() {
+                                    removeImageAtIndex(parseInt(this.dataset.idx));
+                                });
                                 previewGrid.appendChild(div);
                             };
                             reader.readAsDataURL(file);
@@ -832,6 +846,24 @@
                 });
             }
         });
+
+        // ===== REMOVE IMAGE =====
+        function removeImageAtIndex(idx) {
+            const input = document.getElementById('imageInput');
+            const dt = new DataTransfer();
+            const files = Array.from(input.files);
+
+            // Also remove from capturedFiles if it came from there
+            const removedFile = files[idx];
+            const capIdx = capturedFiles.indexOf(removedFile);
+            if (capIdx !== -1) capturedFiles.splice(capIdx, 1);
+
+            files.forEach(function(f, i) {
+                if (i !== idx) dt.items.add(f);
+            });
+            input.files = dt.files;
+            input.dispatchEvent(new Event('change'));
+        }
 
         // ===== CAMERA CAPTURE =====
         let cameraStream = null;
