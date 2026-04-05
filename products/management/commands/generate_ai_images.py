@@ -73,9 +73,10 @@ class Command(BaseCommand):
                     ai_image_attempts__lt=3,
                 )
 
-            # Must have at least one image (main_image or ProductImage)
+            # Only process available (active) products with at least one image
             products = list(
                 Product.objects.filter(q)
+                .filter(status=Product.Status.AVAILABLE)
                 .filter(
                     Q(main_image__isnull=False) & ~Q(main_image='') |
                     Q(images__isnull=False)
@@ -84,9 +85,16 @@ class Command(BaseCommand):
                 .order_by('created_at')[:batch_size]
             )
 
-            # Also mark products with no image as skipped
+            # Mark non-available pending products as skipped
+            Product.objects.filter(
+                ai_image_status=Product.AIImageStatus.PENDING
+            ).exclude(
+                status=Product.Status.AVAILABLE
+            ).update(ai_image_status=Product.AIImageStatus.SKIPPED)
+
+            # Also mark available products with no image as skipped
             no_image_products = (
-                Product.objects.filter(ai_image_status=Product.AIImageStatus.PENDING)
+                Product.objects.filter(ai_image_status=Product.AIImageStatus.PENDING, status=Product.Status.AVAILABLE)
                 .filter(Q(main_image__isnull=True) | Q(main_image=''))
                 .exclude(images__isnull=False)
                 .distinct()
