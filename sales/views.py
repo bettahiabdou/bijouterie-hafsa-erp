@@ -3748,6 +3748,7 @@ def _handle_quick_product_creation(request, invoice):
             margin_type='fixed',
             margin_value=selling_price,  # This will be added to total_cost (which is 0) = selling_price
             status='available',
+            ai_image_status='skipped',
         )
 
         # Update selling_price directly in case save() calculation differs
