@@ -3373,10 +3373,11 @@ def pending_invoice_complete(request, reference):
                 # Calculate totals first
                 invoice.calculate_totals()
 
-                # Handle exchange (reprise facture)
+                # Handle exchange (reprise facture) — supports partial item selection
                 exchange_credit = Decimal('0')
                 exchange_invoice_id = request.POST.get('exchange_invoice_id', '')
                 exchange_inv = None
+                exchange_selected_items = []  # list of {item_id, reprise_value}
                 if exchange_invoice_id:
                     try:
                         exchange_inv = SaleInvoice.objects.prefetch_related('items__product').get(
@@ -3384,7 +3385,27 @@ def pending_invoice_complete(request, reference):
                             is_deleted=False,
                             status__in=[SaleInvoice.Status.PAID, SaleInvoice.Status.PARTIAL_PAID, SaleInvoice.Status.UNPAID]
                         )
-                        exchange_credit = exchange_inv.total_amount or Decimal('0')
+                        # Parse selected items JSON
+                        import json as _json
+                        items_json = request.POST.get('exchange_items_json', '')
+                        if items_json:
+                            try:
+                                exchange_selected_items = _json.loads(items_json)
+                                # Validate items belong to this invoice
+                                valid_item_ids = set(exchange_inv.items.values_list('id', flat=True))
+                                exchange_selected_items = [
+                                    si for si in exchange_selected_items
+                                    if int(si['item_id']) in valid_item_ids
+                                ]
+                                exchange_credit = sum(
+                                    Decimal(str(si['reprise_value'])) for si in exchange_selected_items
+                                )
+                            except (ValueError, KeyError, _json.JSONDecodeError):
+                                exchange_credit = exchange_inv.total_amount or Decimal('0')
+                                exchange_selected_items = []
+                        else:
+                            # Fallback: no items JSON means old behavior (full invoice)
+                            exchange_credit = exchange_inv.total_amount or Decimal('0')
                     except (SaleInvoice.DoesNotExist, ValueError):
                         exchange_inv = None
 
@@ -3561,25 +3582,38 @@ def pending_invoice_complete(request, reference):
                         item.product.status = 'sold'
                         item.product.save(update_fields=['status'])
 
-                # Finalize exchange: mark old invoice as exchanged, return products
+                # Finalize exchange: mark selected items as returned, return their products
                 if exchange_inv:
                     from sales.models import SaleInvoiceAction
-                    # Mark old invoice items as returned and products as available
+                    selected_item_ids = {int(si['item_id']) for si in exchange_selected_items} if exchange_selected_items else None
+                    reprise_values = {int(si['item_id']): Decimal(str(si['reprise_value'])) for si in exchange_selected_items} if exchange_selected_items else {}
+
                     for ex_item in exchange_inv.items.all():
+                        # If we have selected items, only process those; otherwise process all (backwards compat)
+                        if selected_item_ids is not None and ex_item.id not in selected_item_ids:
+                            continue
                         ex_item.is_returned = True
                         ex_item.returned_at = timezone.now()
                         ex_item.save(update_fields=['is_returned', 'returned_at'])
                         if ex_item.product:
                             ex_item.product.status = 'available'
                             ex_item.product.save(update_fields=['status'])
-                    exchange_inv.status = SaleInvoice.Status.EXCHANGED
-                    exchange_inv.save(update_fields=['status'])
-                    # Record the exchange action
-                    SaleInvoiceAction.objects.create(
-                        original_invoice=exchange_inv,
-                        action_type=SaleInvoiceAction.ActionType.EXCHANGE,
-                        new_invoice=invoice,
-                    )
+                        # Per-item action record
+                        SaleInvoiceAction.objects.create(
+                            original_invoice=exchange_inv,
+                            action_type=SaleInvoiceAction.ActionType.EXCHANGE,
+                            original_product=ex_item.product,
+                            original_product_ref=ex_item.product.reference if ex_item.product else '',
+                            new_invoice=invoice,
+                            refund_amount=reprise_values.get(ex_item.id, ex_item.total_amount),
+                            created_by=request.user,
+                        )
+
+                    # Check if ALL items in old invoice are now returned
+                    all_returned = not exchange_inv.items.filter(is_returned=False).exists()
+                    if all_returned:
+                        exchange_inv.status = SaleInvoice.Status.EXCHANGED
+                        exchange_inv.save(update_fields=['status'])
 
                 # Log activity
                 payment_summary = ', '.join([f"{p['method']}: {p['amount']} DH" for p in payment_details]) if payment_details else 'Aucun paiement'
@@ -3635,10 +3669,14 @@ def pending_invoice_complete(request, reference):
     carriers = Carrier.objects.filter(is_active=True)
 
     # Get eligible invoices for exchange (non-draft, non-cancelled, non-returned, non-exchanged)
+    # Exclude current invoice and invoices where all items are already returned
     exchange_invoices = SaleInvoice.objects.filter(
         is_deleted=False,
-        status__in=[SaleInvoice.Status.PAID, SaleInvoice.Status.PARTIAL_PAID, SaleInvoice.Status.UNPAID]
-    ).select_related('client').prefetch_related('items__product').order_by('-date')
+        status__in=[SaleInvoice.Status.PAID, SaleInvoice.Status.PARTIAL_PAID, SaleInvoice.Status.UNPAID],
+        items__is_returned=False,  # has at least one non-returned item
+    ).exclude(
+        pk=invoice.pk,
+    ).select_related('client').prefetch_related('items__product').distinct().order_by('-date')
 
     context = {
         'invoice': invoice,

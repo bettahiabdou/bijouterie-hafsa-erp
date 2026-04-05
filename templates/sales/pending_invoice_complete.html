@@ -293,7 +293,7 @@
                         <input type="text" id="exchange-search" class="form-input" placeholder="Rechercher par référence ou client..." autocomplete="off" oninput="filterExchangeInvoices()">
                         <div id="exchange-invoice-list" class="exchange-invoice-list" style="display: none;">
                             {% for inv in exchange_invoices %}
-                            <div class="exchange-invoice-option" data-id="{{ inv.id }}" data-ref="{{ inv.reference }}" data-total="{{ inv.total_amount|floatformat:2 }}" data-client="{{ inv.client.full_name|default:'Anonyme' }}" data-date="{{ inv.date|date:'d/m/Y' }}" data-items="{% for it in inv.items.all %}{{ it.product.reference|default:'—' }} ({{ it.total_amount|floatformat:0 }} DH){% if not forloop.last %}, {% endif %}{% endfor %}" onclick="selectExchangeInvoice(this)">
+                            <div class="exchange-invoice-option" data-id="{{ inv.id }}" data-ref="{{ inv.reference }}" data-total="{{ inv.total_amount|floatformat:2 }}" data-client="{{ inv.client.full_name|default:'Anonyme' }}" data-date="{{ inv.date|date:'d/m/Y' }}" data-items-json='[{% for it in inv.items.all %}{% if not it.is_returned %}{"id":{{ it.id }},"ref":"{{ it.product.reference|default:"—" }}","name":"{{ it.product.name|default:"" }}","amount":"{{ it.total_amount|floatformat:2 }}"}{% if not forloop.last %},{% endif %}{% endif %}{% endfor %}]' onclick="selectExchangeInvoice(this)">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
                                     <div>
                                         <strong>{{ inv.reference }}</strong>
@@ -311,7 +311,7 @@
                     <!-- Selected exchange invoice display -->
                     <div id="exchange-selected" style="display: none; margin-top: var(--space-3);">
                         <div style="background: var(--warning-50); border: 1px solid var(--warning-200); border-radius: var(--radius-md); padding: var(--space-3);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
                                 <div>
                                     <strong id="exchange-sel-ref" style="color: var(--warning-700);"></strong>
                                     <span id="exchange-sel-client" class="text-muted" style="margin-left: var(--space-2); font-size: var(--text-sm);"></span>
@@ -320,12 +320,14 @@
                                     <i class="fas fa-times"></i>
                                 </button>
                             </div>
-                            <div id="exchange-sel-items" style="font-size: var(--text-sm); color: var(--neutral-600); margin-bottom: var(--space-2);"></div>
+                            <!-- Item selection rows -->
+                            <div id="exchange-items-list" style="margin-bottom: var(--space-3);"></div>
                             <div style="display: flex; justify-content: space-between; align-items: center; padding-top: var(--space-2); border-top: 1px solid var(--warning-200);">
-                                <span style="font-weight: 600; color: var(--warning-700);">Crédit échange:</span>
+                                <span style="font-weight: 600; color: var(--warning-700);">Crédit échange total:</span>
                                 <strong id="exchange-sel-total" style="font-size: var(--text-lg); color: var(--warning-700);"></strong>
                             </div>
                         </div>
+                        <input type="hidden" name="exchange_items_json" id="exchange-items-json" value="">
                     </div>
                 </div>
             </div>
@@ -1299,15 +1301,80 @@
             document.getElementById('exchange-invoice-id').value = el.dataset.id;
             document.getElementById('exchange-sel-ref').textContent = el.dataset.ref;
             document.getElementById('exchange-sel-client').textContent = el.dataset.client;
-            document.getElementById('exchange-sel-items').textContent = el.dataset.items;
-            document.getElementById('exchange-sel-total').textContent = el.dataset.total + ' DH';
-            exchangeAmount = parseFloat(el.dataset.total) || 0;
             document.getElementById('exchange-selected').style.display = 'block';
             document.getElementById('exchange-invoice-list').style.display = 'none';
             document.getElementById('exchange-search').value = el.dataset.ref;
-            // Update exchange credit display
-            document.getElementById('exchange-credit-row').style.display = 'flex';
-            document.getElementById('exchange-credit-display').textContent = '-' + exchangeAmount.toFixed(2) + ' DH';
+
+            // Parse items JSON and render item selection rows
+            var items = [];
+            try { items = JSON.parse(el.dataset.itemsJson || '[]'); } catch(e) { items = []; }
+
+            var listEl = document.getElementById('exchange-items-list');
+            listEl.innerHTML = '';
+
+            if (items.length === 0) {
+                listEl.innerHTML = '<p style="color:var(--neutral-400); font-size:var(--text-sm); text-align:center; padding:8px;">Aucun article disponible pour reprise</p>';
+                exchangeAmount = 0;
+            } else {
+                items.forEach(function(item, idx) {
+                    var row = document.createElement('div');
+                    row.style.cssText = 'display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--warning-100);';
+                    row.innerHTML =
+                        '<label style="display:flex; align-items:center; cursor:pointer; flex-shrink:0;">' +
+                            '<input type="checkbox" class="exchange-item-check" data-idx="' + idx + '" data-item-id="' + item.id + '" checked onchange="updateExchangeTotal()" style="width:18px; height:18px; accent-color:var(--warning-600);">' +
+                        '</label>' +
+                        '<div style="flex:1; min-width:0;">' +
+                            '<div style="font-weight:600; font-size:var(--text-sm); color:var(--neutral-800);">' + item.ref + '</div>' +
+                            (item.name ? '<div style="font-size:var(--text-xs); color:var(--neutral-500); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + item.name + '</div>' : '') +
+                            '<div style="font-size:var(--text-xs); color:var(--neutral-400);">Prix original: ' + item.amount + ' DH</div>' +
+                        '</div>' +
+                        '<div style="flex-shrink:0; width:130px;">' +
+                            '<div style="font-size:var(--text-xs); color:var(--warning-700); font-weight:500; margin-bottom:2px;">Valeur reprise</div>' +
+                            '<div style="display:flex; align-items:center; gap:4px;">' +
+                                '<input type="number" class="exchange-item-value form-input" data-idx="' + idx + '" value="' + item.amount + '" step="0.01" min="0" oninput="updateExchangeTotal()" style="padding:4px 8px; font-size:var(--text-sm); width:100px; text-align:right;">' +
+                                '<span style="font-size:var(--text-xs); color:var(--neutral-500);">DH</span>' +
+                            '</div>' +
+                        '</div>';
+                    listEl.appendChild(row);
+                });
+            }
+
+            updateExchangeTotal();
+        }
+
+        function updateExchangeTotal() {
+            var checks = document.querySelectorAll('.exchange-item-check');
+            var values = document.querySelectorAll('.exchange-item-value');
+            var total = 0;
+            var selectedItems = [];
+
+            checks.forEach(function(chk, idx) {
+                var val = parseFloat(values[idx].value) || 0;
+                // Dim unchecked rows
+                var row = chk.closest('div[style]');
+                if (row) row.style.opacity = chk.checked ? '1' : '0.4';
+                values[idx].disabled = !chk.checked;
+
+                if (chk.checked) {
+                    total += val;
+                    selectedItems.push({
+                        item_id: parseInt(chk.dataset.itemId),
+                        reprise_value: val.toFixed(2)
+                    });
+                }
+            });
+
+            exchangeAmount = total;
+            document.getElementById('exchange-sel-total').textContent = total.toFixed(2) + ' DH';
+            document.getElementById('exchange-items-json').value = JSON.stringify(selectedItems);
+
+            // Update exchange credit display in payment summary
+            if (total > 0) {
+                document.getElementById('exchange-credit-row').style.display = 'flex';
+                document.getElementById('exchange-credit-display').textContent = '-' + total.toFixed(2) + ' DH';
+            } else {
+                document.getElementById('exchange-credit-row').style.display = 'none';
+            }
             updatePaymentStatus();
         }
 
@@ -1315,6 +1382,8 @@
             document.getElementById('exchange-invoice-id').value = '';
             document.getElementById('exchange-selected').style.display = 'none';
             document.getElementById('exchange-search').value = '';
+            document.getElementById('exchange-items-json').value = '';
+            document.getElementById('exchange-items-list').innerHTML = '';
             exchangeAmount = 0;
             document.getElementById('exchange-credit-row').style.display = 'none';
             updatePaymentStatus();
