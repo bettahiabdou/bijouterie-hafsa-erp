@@ -88,11 +88,8 @@ def _get_headers():
     }
 
 
-def _submit_and_poll(endpoint, payload, timeout=180):
-    """Submit a job to fal.ai queue and poll until complete."""
-    import time
-
-    # Submit to queue
+def _submit_job(endpoint, payload):
+    """Submit a job to fal.ai queue without polling. Returns (status_url, response_url)."""
     response = requests.post(
         f'{FAL_QUEUE_URL}/{endpoint}',
         headers=_get_headers(),
@@ -108,7 +105,13 @@ def _submit_and_poll(endpoint, payload, timeout=180):
     if not response_url:
         raise Exception(f'No response_url from fal.ai: {data}')
 
-    # Poll for result
+    return status_url, response_url
+
+
+def _poll_job(status_url, response_url, timeout=180):
+    """Poll a submitted fal.ai job until complete."""
+    import time
+
     start = time.time()
     while time.time() - start < timeout:
         status_resp = requests.get(status_url, headers=_get_headers(), timeout=15)
@@ -116,7 +119,6 @@ def _submit_and_poll(endpoint, payload, timeout=180):
         status = status_data.get('status')
 
         if status == 'COMPLETED':
-            # Fetch the actual result
             result_resp = requests.get(response_url, headers=_get_headers(), timeout=30)
             result_resp.raise_for_status()
             return result_resp.json()
@@ -126,6 +128,12 @@ def _submit_and_poll(endpoint, payload, timeout=180):
         time.sleep(3)
 
     raise Exception(f'Fal.ai job timed out after {timeout}s')
+
+
+def _submit_and_poll(endpoint, payload, timeout=180):
+    """Submit a job to fal.ai queue and poll until complete."""
+    status_url, response_url = _submit_job(endpoint, payload)
+    return _poll_job(status_url, response_url, timeout=timeout)
 
 
 def _get_category_prompt(category_name):
@@ -198,6 +206,72 @@ def generate_model_photo(image_url, category_name=None, custom_prompt=None):
         return data['images'][0]
 
     raise Exception(f'No image returned from fal.ai: {data}')
+
+
+def generate_model_photos_batch(items):
+    """
+    Generate model photos for multiple products in parallel.
+
+    Args:
+        items: list of (image_url, category_name) tuples
+
+    Returns:
+        list of results in same order. Each is either:
+        - dict with 'url', 'width', 'height' on success
+        - Exception instance on failure
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    if not is_configured():
+        raise Exception('Fal.ai API key not configured (FAL_AI_KEY)')
+
+    def _process_one(image_url, category_name):
+        prompt = _get_category_prompt(category_name)
+        # Try Nano Banana first
+        try:
+            status_url, response_url = _submit_job('fal-ai/nano-banana/edit', {
+                'image_urls': [image_url],
+                'prompt': prompt,
+                'num_images': 1,
+                'output_format': 'jpeg',
+                'aspect_ratio': '3:4',
+            })
+            data = _poll_job(status_url, response_url, timeout=180)
+            if data.get('images') and len(data['images']) > 0:
+                return data['images'][0]
+        except Exception as e:
+            logger.warning(f'Nano Banana failed for batch item, falling back to FLUX Kontext: {e}')
+
+        # Fallback to FLUX Kontext max
+        status_url, response_url = _submit_job('fal-ai/flux-pro/kontext/max', {
+            'image_url': image_url,
+            'prompt': prompt,
+            'num_images': 1,
+            'output_format': 'jpeg',
+            'guidance_scale': 7.0,
+            'aspect_ratio': '3:4',
+        })
+        data = _poll_job(status_url, response_url, timeout=180)
+        if data.get('images') and len(data['images']) > 0:
+            return data['images'][0]
+        raise Exception(f'No image returned from fal.ai: {data}')
+
+    results = [None] * len(items)
+
+    with ThreadPoolExecutor(max_workers=len(items)) as executor:
+        future_to_idx = {}
+        for idx, (image_url, category_name) in enumerate(items):
+            future = executor.submit(_process_one, image_url, category_name)
+            future_to_idx[future] = idx
+
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            try:
+                results[idx] = future.result()
+            except Exception as e:
+                results[idx] = e
+
+    return results
 
 
 def enhance_product_image(image_url, category_name=None, mode='background', background='white', custom_prompt=None):

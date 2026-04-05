@@ -354,6 +354,11 @@ def batch_product_create(request):
                             product.main_image = prod_image.image
                             product.save(update_fields=['main_image'])
 
+                    # Set AI image status based on whether images were uploaded
+                    if not product_images:
+                        product.ai_image_status = Product.AIImageStatus.SKIPPED
+                        product.save(update_fields=['ai_image_status'])
+
                     # Log activity
                     ActivityLog.objects.create(
                         user=request.user,
@@ -513,6 +518,11 @@ def product_create(request):
                 if i == 0:
                     product.main_image = product_image.image
                     product.save(update_fields=['main_image'])
+
+            # Set AI image status based on whether images were uploaded
+            if not images:
+                product.ai_image_status = Product.AIImageStatus.SKIPPED
+                product.save(update_fields=['ai_image_status'])
 
             # Log activity
             ActivityLog.objects.create(
@@ -1004,6 +1014,13 @@ def enhance_image_api(request, reference):
 
             new_img = ProductImage(product=product, display_order=99)
             new_img.image.save(filename, ContentFile(img_response.content), save=True)
+
+            # Mark AI image as completed
+            from django.utils import timezone as tz
+            product.ai_image_status = Product.AIImageStatus.COMPLETED
+            product.ai_image_completed_at = tz.now()
+            product.ai_image_error = None
+            product.save(update_fields=['ai_image_status', 'ai_image_completed_at', 'ai_image_error'])
 
             return JsonResponse({
                 'success': True,

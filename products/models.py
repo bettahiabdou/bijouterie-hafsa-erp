@@ -299,6 +299,35 @@ class Product(models.Model):
     created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
     updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
 
+    # AI Image Generation
+    class AIImageStatus(models.TextChoices):
+        PENDING = 'pending', _('En attente')
+        PROCESSING = 'processing', _('En cours')
+        COMPLETED = 'completed', _('Terminé')
+        FAILED = 'failed', _('Échoué')
+        SKIPPED = 'skipped', _('Ignoré')
+
+    ai_image_status = models.CharField(
+        _('Statut image IA'),
+        max_length=20,
+        choices=AIImageStatus.choices,
+        default=AIImageStatus.PENDING,
+    )
+    ai_image_error = models.TextField(
+        _('Erreur image IA'),
+        blank=True,
+        null=True,
+    )
+    ai_image_attempts = models.PositiveIntegerField(
+        _('Tentatives image IA'),
+        default=0,
+    )
+    ai_image_completed_at = models.DateTimeField(
+        _('Image IA générée le'),
+        blank=True,
+        null=True,
+    )
+
     # Notes
     notes = models.TextField(_('Notes'), blank=True)
 
