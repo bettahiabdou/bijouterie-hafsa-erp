@@ -927,3 +927,38 @@ class RFIDInventorySession(models.Model):
 
     def __str__(self):
         return f"RFID #{self.pk} - {self.started_at:%Y-%m-%d %H:%M} ({self.get_status_display()})"
+
+
+class CatalogToken(models.Model):
+    """Token-based access to the product catalog for the online sales team."""
+    token = models.CharField(
+        _('Token'),
+        max_length=64,
+        unique=True,
+    )
+    name = models.CharField(
+        _('Nom'),
+        max_length=100,
+        help_text=_('Ex: Equipe en ligne Casablanca'),
+    )
+    is_active = models.BooleanField(_('Actif'), default=True)
+    created_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name=_('Créé par'),
+    )
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('Token catalogue')
+        verbose_name_plural = _('Tokens catalogue')
+
+    def __str__(self):
+        return f"{self.name} ({'actif' if self.is_active else 'inactif'})"
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            import secrets
+            self.token = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)

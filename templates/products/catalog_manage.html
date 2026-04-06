@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion du Catalogue{% endblock %}
+
+{% block content %}
+<div style="max-width:800px;margin:0 auto;padding:20px;">
+    <h1 style="font-size:24px;margin-bottom:20px;"><i class="fas fa-link"></i> Liens du Catalogue</h1>
+
+    <!-- Create Token -->
+    <div style="background:white;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:24px;">
+        <h2 style="font-size:16px;margin-bottom:12px;">Creer un nouveau lien</h2>
+        <form method="post" style="display:flex;gap:10px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            <input type="text" name="name" placeholder="Nom (ex: Equipe Casablanca)" required
+                   style="flex:1;padding:10px 14px;border:1px solid #e5e5e0;border-radius:8px;font-size:14px;outline:none;">
+            <button type="submit" style="padding:10px 20px;background:#b8860b;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;">
+                <i class="fas fa-plus"></i> Creer
+            </button>
+        </form>
+    </div>
+
+    <!-- Token List -->
+    {% if tokens %}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+        {% for ct in tokens %}
+        <div style="background:white;border-radius:10px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.08);display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+                <div style="font-weight:600;font-size:15px;{% if not ct.is_active %}opacity:0.5;text-decoration:line-through;{% endif %}">
+                    {{ ct.name }}
+                </div>
+                <div style="font-size:12px;color:#6b7280;margin-top:2px;">
+                    Cree le {{ ct.created_at|date:"d/m/Y H:i" }}
+                    {% if ct.created_by %} par {{ ct.created_by.get_full_name|default:ct.created_by.username }}{% endif %}
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                {% if ct.is_active %}
+                <span style="padding:4px 10px;background:#ecfdf5;color:#059669;border-radius:20px;font-size:12px;font-weight:600;">Actif</span>
+                {% else %}
+                <span style="padding:4px 10px;background:#fef2f2;color:#dc2626;border-radius:20px;font-size:12px;font-weight:600;">Inactif</span>
+                {% endif %}
+
+                {% if ct.is_active %}
+                <button onclick="copyLink('{{ request.scheme }}://{{ request.get_host }}/products/catalog/{{ ct.token }}/')" title="Copier le lien"
+                        style="padding:8px 12px;background:#f3f4f6;border:1px solid #e5e5e0;border-radius:6px;cursor:pointer;font-size:13px;">
+                    <i class="fas fa-copy"></i> Copier
+                </button>
+                {% endif %}
+
+                <form method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle">
+                    <input type="hidden" name="token_id" value="{{ ct.id }}">
+                    <button type="submit" title="{% if ct.is_active %}Desactiver{% else %}Activer{% endif %}"
+                            style="padding:8px 12px;background:{% if ct.is_active %}#fef2f2{% else %}#ecfdf5{% endif %};border:1px solid #e5e5e0;border-radius:6px;cursor:pointer;font-size:13px;">
+                        <i class="fas fa-{% if ct.is_active %}pause{% else %}play{% endif %}"></i>
+                    </button>
+                </form>
+
+                <form method="post" style="display:inline;" onsubmit="return confirm('Supprimer ce token ?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="token_id" value="{{ ct.id }}">
+                    <button type="submit" title="Supprimer"
+                            style="padding:8px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;cursor:pointer;font-size:13px;color:#dc2626;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:40px;color:#6b7280;">
+        <i class="fas fa-link" style="font-size:36px;color:#d1d5db;margin-bottom:12px;display:block;"></i>
+        <p>Aucun lien de catalogue. Creez-en un ci-dessus.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function copyLink(url) {
+    navigator.clipboard.writeText(url).then(function() {
+        alert('Lien copie !');
+    }).catch(function() {
+        prompt('Copiez ce lien:', url);
+    });
+}
+</script>
+{% endblock %}

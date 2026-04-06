@@ -1527,3 +1527,213 @@ def print_queue_fail(request, job_id):
         })
     except PrintQueue.DoesNotExist:
         return JsonResponse({'error': 'Job not found'}, status=404)
+
+
+# =============================================================================
+# Catalog (token-based public access for online team)
+# =============================================================================
+
+def _get_catalog_token(token):
+    """Validate catalog token. Returns CatalogToken or None."""
+    from .models import CatalogToken
+    try:
+        return CatalogToken.objects.get(token=token, is_active=True)
+    except CatalogToken.DoesNotExist:
+        return None
+
+
+def catalog_view(request, token):
+    """Render the catalog page for the online team."""
+    catalog_token = _get_catalog_token(token)
+    if not catalog_token:
+        return render(request, 'products/catalog_invalid.html', status=403)
+
+    context = {
+        'token': token,
+        'catalog_name': catalog_token.name,
+        'categories': ProductCategory.objects.filter(is_active=True).order_by('display_order', 'name'),
+        'metal_types': MetalType.objects.filter(is_active=True).order_by('name'),
+        'metal_purities': MetalPurity.objects.filter(is_active=True).order_by('name'),
+    }
+    return render(request, 'products/catalog.html', context)
+
+
+def catalog_api(request, token):
+    """JSON API for filtered product listing."""
+    catalog_token = _get_catalog_token(token)
+    if not catalog_token:
+        return JsonResponse({'error': 'Token invalide'}, status=403)
+
+    # Parse filters
+    q = request.GET.get('q', '').strip()
+    category = request.GET.get('category', '')
+    metal_type = request.GET.get('metal_type', '')
+    purity = request.GET.get('purity', '')
+    price_min = request.GET.get('price_min', '')
+    price_max = request.GET.get('price_max', '')
+    cost_min = request.GET.get('cost_min', '')
+    cost_max = request.GET.get('cost_max', '')
+    weight_min = request.GET.get('weight_min', '')
+    weight_max = request.GET.get('weight_max', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    sort = request.GET.get('sort', 'date_desc')
+    page = int(request.GET.get('page', 1))
+    per_page = min(int(request.GET.get('per_page', 20)), 50)
+
+    # Base queryset: only available products
+    qs = Product.objects.filter(
+        status=Product.Status.AVAILABLE
+    ).select_related(
+        'category', 'metal_type', 'metal_purity'
+    ).prefetch_related('images')
+
+    # Text search
+    if q:
+        qs = qs.filter(
+            Q(name__icontains=q) |
+            Q(reference__icontains=q) |
+            Q(barcode__icontains=q) |
+            Q(category__name__icontains=q)
+        )
+
+    # Dropdown filters
+    if category:
+        qs = qs.filter(category_id=category)
+    if metal_type:
+        qs = qs.filter(metal_type_id=metal_type)
+    if purity:
+        qs = qs.filter(metal_purity_id=purity)
+
+    # Range filters
+    if price_min:
+        qs = qs.filter(selling_price__gte=price_min)
+    if price_max:
+        qs = qs.filter(selling_price__lte=price_max)
+    if cost_min:
+        qs = qs.filter(total_cost__gte=cost_min)
+    if cost_max:
+        qs = qs.filter(total_cost__lte=cost_max)
+    if weight_min:
+        qs = qs.filter(gross_weight__gte=weight_min)
+    if weight_max:
+        qs = qs.filter(gross_weight__lte=weight_max)
+
+    # Date filters
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+
+    # Sorting
+    valid_sorts = {
+        'price_asc': 'selling_price',
+        'price_desc': '-selling_price',
+        'cost_asc': 'total_cost',
+        'cost_desc': '-total_cost',
+        'date_asc': 'created_at',
+        'date_desc': '-created_at',
+        'weight_asc': 'gross_weight',
+        'weight_desc': '-gross_weight',
+        'name_asc': 'name',
+        'name_desc': '-name',
+    }
+    order = valid_sorts.get(sort, '-created_at')
+    qs = qs.order_by(order)
+
+    # Pagination
+    total = qs.count()
+    start = (page - 1) * per_page
+    products = qs[start:start + per_page]
+
+    # Format results
+    results = []
+    for p in products:
+        # Get best image: AI-generated first, then main_image, then first ProductImage
+        image_url = None
+        ai_image = None
+        all_images = []
+
+        for img in p.images.all():
+            img_url = img.image.url if img.image else None
+            if img_url:
+                all_images.append(img_url)
+                if 'model_' in os.path.basename(img.image.name):
+                    ai_image = img_url
+
+        if ai_image:
+            image_url = ai_image
+        elif p.main_image:
+            image_url = p.main_image.url
+        elif all_images:
+            image_url = all_images[0]
+
+        results.append({
+            'id': p.id,
+            'reference': p.reference,
+            'name': p.name,
+            'category': p.category.name if p.category else '',
+            'metal': p.metal_type.name if p.metal_type else '',
+            'purity': p.metal_purity.name if p.metal_purity else '',
+            'weight': str(p.gross_weight or 0),
+            'total_cost': str(p.total_cost or 0),
+            'selling_price': str(p.selling_price or 0),
+            'image_url': image_url,
+            'all_images': all_images,
+            'created_at': p.created_at.strftime('%Y-%m-%d') if p.created_at else '',
+        })
+
+    pages = (total + per_page - 1) // per_page
+
+    return JsonResponse({
+        'products': results,
+        'total': total,
+        'page': page,
+        'pages': pages,
+        'has_next': page < pages,
+    })
+
+
+@login_required(login_url='login')
+def catalog_manage(request):
+    """Manage catalog access tokens."""
+    from .models import CatalogToken
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'create':
+            name = request.POST.get('name', '').strip()
+            if name:
+                CatalogToken.objects.create(name=name, created_by=request.user)
+                messages.success(request, f'Token "{name}" créé.')
+            else:
+                messages.error(request, 'Le nom est requis.')
+
+        elif action == 'toggle':
+            token_id = request.POST.get('token_id')
+            try:
+                ct = CatalogToken.objects.get(id=token_id)
+                ct.is_active = not ct.is_active
+                ct.save(update_fields=['is_active'])
+                status = 'activé' if ct.is_active else 'désactivé'
+                messages.success(request, f'Token "{ct.name}" {status}.')
+            except CatalogToken.DoesNotExist:
+                messages.error(request, 'Token introuvable.')
+
+        elif action == 'delete':
+            token_id = request.POST.get('token_id')
+            try:
+                ct = CatalogToken.objects.get(id=token_id)
+                ct.delete()
+                messages.success(request, f'Token "{ct.name}" supprimé.')
+            except CatalogToken.DoesNotExist:
+                messages.error(request, 'Token introuvable.')
+
+        return redirect('products:catalog_manage')
+
+    tokens = CatalogToken.objects.all().order_by('-created_at')
+    context = {
+        'tokens': tokens,
+    }
+    return render(request, 'products/catalog_manage.html', context)

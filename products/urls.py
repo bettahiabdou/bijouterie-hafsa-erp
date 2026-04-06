@@ -42,6 +42,11 @@ urlpatterns = [
     path('api/upload-images/<str:reference>/', views.product_image_upload_api, name='product_image_upload_api'),
     path('api/enhance-image/<str:reference>/', views.enhance_image_api, name='enhance_image_api'),
 
+    # Catalog (token-based access for online team)
+    path('catalog/manage/', views.catalog_manage, name='catalog_manage'),
+    path('catalog/<str:token>/', views.catalog_view, name='catalog'),
+    path('catalog/<str:token>/api/products/', views.catalog_api, name='catalog_api'),
+
     # Product detail routes (catch-all, must be last)
     path('<str:reference>/', views.product_detail, name='detail'),
     path('<str:reference>/edit/', views.product_edit, name='edit'),
