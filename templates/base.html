@@ -489,6 +489,9 @@
                         <a href="{% url 'products:batch_create' %}" class="nav-link">
                             <span class="nav-text">Ajout en Lot</span>
                         </a>
+                        <a href="{% url 'products:catalog_manage' %}" class="nav-link {% if 'catalog/manage' in request.path %}active{% endif %}">
+                            <span class="nav-text">Catalogue en ligne</span>
+                        </a>
                     </div>
                 </div>
 
