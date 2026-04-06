@@ -646,6 +646,12 @@ def product_edit(request, reference):
                     product.main_image = product_image.image
                     product.save(update_fields=['main_image'])
 
+            # If new images were added and the product was previously skipped
+            # (no images at creation), reset AI status so cron picks it up
+            if images and product.ai_image_status == Product.AIImageStatus.SKIPPED:
+                product.ai_image_status = Product.AIImageStatus.PENDING
+                product.save(update_fields=['ai_image_status'])
+
             # Log activity
             ActivityLog.objects.create(
                 user=request.user,
@@ -1131,6 +1137,12 @@ def product_image_upload_api(request, reference):
             })
         except Exception as e:
             return JsonResponse({'success': False, 'message': f'Erreur: {str(e)}'})
+
+    # If images were added and the product was previously skipped,
+    # reset AI status so cron picks it up
+    if uploaded and product.ai_image_status == Product.AIImageStatus.SKIPPED:
+        product.ai_image_status = Product.AIImageStatus.PENDING
+        product.save(update_fields=['ai_image_status'])
 
     # Log activity
     try:
