@@ -991,10 +991,11 @@ def enhance_image_api(request, reference):
     if image_id:
         img_obj = get_object_or_404(ProductImage, id=image_id, product=product)
         source_image = img_obj.image
-    elif product.main_image:
-        source_image = product.main_image
     else:
-        return JsonResponse({'success': False, 'error': 'Aucune image a ameliorer'}, status=400)
+        from .ai_image_utils import get_source_image
+        source_image = get_source_image(product)
+        if not source_image:
+            return JsonResponse({'success': False, 'error': 'Aucune image a ameliorer'}, status=400)
 
     if mode == 'model':
         # Fal.ai: generate product-on-model photo
