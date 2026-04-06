@@ -1649,24 +1649,26 @@ def catalog_api(request, token):
     # Format results
     results = []
     for p in products:
-        # Get best image: AI-generated first, then main_image, then first ProductImage
-        image_url = None
-        ai_image = None
-        all_images = []
+        # Separate AI-generated and original images
+        ai_images = []
+        original_images = []
+
+        if p.main_image:
+            original_images.append(p.main_image.url)
 
         for img in p.images.all():
             img_url = img.image.url if img.image else None
             if img_url:
-                all_images.append(img_url)
                 if 'model_' in os.path.basename(img.image.name):
-                    ai_image = img_url
+                    ai_images.append(img_url)
+                elif img_url not in original_images:
+                    original_images.append(img_url)
 
-        if ai_image:
-            image_url = ai_image
-        elif p.main_image:
-            image_url = p.main_image.url
-        elif all_images:
-            image_url = all_images[0]
+        # Best display image: AI first, then original
+        image_url = ai_images[0] if ai_images else (original_images[0] if original_images else None)
+
+        # Price per gram
+        price_per_gram = str(p.purchase_price_per_gram or 0)
 
         results.append({
             'id': p.id,
@@ -1676,10 +1678,13 @@ def catalog_api(request, token):
             'metal': p.metal_type.name if p.metal_type else '',
             'purity': p.metal_purity.name if p.metal_purity else '',
             'weight': str(p.gross_weight or 0),
+            'price_per_gram': price_per_gram,
             'total_cost': str(p.total_cost or 0),
             'selling_price': str(p.selling_price or 0),
             'image_url': image_url,
-            'all_images': all_images,
+            'ai_images': ai_images,
+            'original_images': original_images,
+            'all_images': ai_images + original_images,
             'created_at': p.created_at.strftime('%Y-%m-%d') if p.created_at else '',
         })
 

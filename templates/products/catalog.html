@@ -27,10 +27,8 @@
             --text: #1a1a1a;
             --text-muted: #6b7280;
             --border: #e5e5e0;
-            --success: #059669;
             --radius: 10px;
             --shadow: 0 1px 3px rgba(0,0,0,0.08);
-            --shadow-lg: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -41,6 +39,7 @@
             color: var(--text);
             -webkit-font-smoothing: antialiased;
             padding-bottom: env(safe-area-inset-bottom, 0);
+            overflow-x: hidden;
         }
 
         /* === TOP BAR === */
@@ -49,30 +48,30 @@
             top: 0;
             z-index: 100;
             background: var(--gold);
-            padding: 12px 16px;
+            padding: 12px 12px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             box-shadow: 0 2px 8px rgba(184,134,11,0.3);
         }
 
         .top-bar h1 {
             color: white;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            flex-shrink: 0;
         }
 
         .search-box {
             flex: 1;
             position: relative;
+            min-width: 0;
         }
 
         .search-box input {
             width: 100%;
-            padding: 8px 12px 8px 34px;
+            padding: 8px 12px 8px 32px;
             border: none;
             border-radius: 8px;
             font-size: 14px;
@@ -86,15 +85,15 @@
             top: 50%;
             transform: translateY(-50%);
             color: var(--text-muted);
-            font-size: 14px;
+            font-size: 13px;
         }
 
-        .filter-toggle {
+        .top-btn {
             background: rgba(255,255,255,0.2);
             border: 1px solid rgba(255,255,255,0.4);
             color: white;
-            width: 38px;
-            height: 38px;
+            width: 36px;
+            height: 36px;
             border-radius: 8px;
             display: flex;
             align-items: center;
@@ -102,9 +101,10 @@
             cursor: pointer;
             position: relative;
             flex-shrink: 0;
+            font-size: 14px;
         }
 
-        .filter-toggle.active {
+        .top-btn.active {
             background: white;
             color: var(--gold);
         }
@@ -125,11 +125,27 @@
             font-weight: 700;
         }
 
+        .select-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #3b82f6;
+            color: white;
+            font-size: 10px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
         /* === STATS BAR === */
         .stats-bar {
             display: flex;
             gap: 8px;
-            padding: 10px 16px;
+            padding: 8px 12px;
             background: white;
             border-bottom: 1px solid var(--border);
             overflow-x: auto;
@@ -152,28 +168,24 @@
             display: none;
             background: white;
             border-bottom: 1px solid var(--border);
-            padding: 16px;
-            animation: slideDown 0.2s ease;
+            padding: 12px;
+            max-height: 70vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .filter-panel.open { display: block; }
 
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
         .filter-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 8px;
         }
 
-        .filter-group { display: flex; flex-direction: column; gap: 4px; }
-        .filter-group.full { grid-column: 1 / -1; }
+        .filter-group { display: flex; flex-direction: column; gap: 3px; }
 
         .filter-group label {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
@@ -182,35 +194,30 @@
 
         .filter-group select,
         .filter-group input {
-            padding: 8px 10px;
+            padding: 7px 8px;
             border: 1px solid var(--border);
             border-radius: 6px;
             font-size: 13px;
             background: white;
             color: var(--text);
             outline: none;
-            -webkit-appearance: none;
-        }
-
-        .filter-group select:focus,
-        .filter-group input:focus {
-            border-color: var(--gold);
-            box-shadow: 0 0 0 2px rgba(184,134,11,0.15);
+            width: 100%;
+            min-width: 0;
         }
 
         .range-row {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             align-items: center;
         }
 
         .range-row input { flex: 1; min-width: 0; }
-        .range-row span { color: var(--text-muted); font-size: 12px; }
+        .range-row span { color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
 
         .filter-actions {
             display: flex;
             gap: 8px;
-            margin-top: 12px;
+            margin-top: 10px;
             grid-column: 1 / -1;
         }
 
@@ -241,7 +248,7 @@
         .active-filters {
             display: flex;
             gap: 6px;
-            padding: 8px 16px;
+            padding: 6px 12px;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
@@ -251,21 +258,16 @@
             display: flex;
             align-items: center;
             gap: 4px;
-            padding: 4px 10px;
+            padding: 3px 8px;
             background: #fef3c7;
             border: 1px solid #fcd34d;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 11px;
             color: var(--gold-dark);
             white-space: nowrap;
         }
 
-        .filter-chip i {
-            cursor: pointer;
-            font-size: 10px;
-            opacity: 0.6;
-        }
-
+        .filter-chip i { cursor: pointer; font-size: 10px; opacity: 0.6; }
         .filter-chip i:hover { opacity: 1; }
 
         /* === SORT BAR === */
@@ -273,7 +275,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 16px;
+            padding: 6px 12px;
             background: white;
             border-bottom: 1px solid var(--border);
         }
@@ -284,30 +286,24 @@
             border-radius: 4px;
             font-size: 12px;
             background: white;
-            color: var(--text);
         }
 
-        .sort-bar .count {
-            font-size: 12px;
-            color: var(--text-muted);
-        }
+        .sort-bar .count { font-size: 12px; color: var(--text-muted); }
 
         /* === PRODUCT GRID === */
         .product-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            padding: 12px;
+            gap: 8px;
+            padding: 8px;
         }
 
         @media (min-width: 640px) {
-            .product-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 16px; }
-            .filter-grid { grid-template-columns: repeat(3, 1fr); }
+            .product-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 12px; }
         }
 
         @media (min-width: 1024px) {
-            .product-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 20px; }
-            .filter-grid { grid-template-columns: repeat(4, 1fr); }
+            .product-grid { grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 16px; }
         }
 
         /* === PRODUCT CARD === */
@@ -317,12 +313,33 @@
             box-shadow: var(--shadow);
             overflow: hidden;
             cursor: pointer;
-            transition: transform 0.15s, box-shadow 0.15s;
+            transition: transform 0.15s;
+            position: relative;
         }
 
-        .product-card:active {
-            transform: scale(0.98);
+        .product-card:active { transform: scale(0.98); }
+
+        .product-card.selected { outline: 3px solid #3b82f6; outline-offset: -3px; }
+
+        .card-select {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.8);
+            border: 2px solid #d1d5db;
+            z-index: 5;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
         }
+
+        .select-mode .card-select { display: flex; }
+        .product-card.selected .card-select { background: #3b82f6; border-color: #3b82f6; }
 
         .card-img {
             position: relative;
@@ -345,7 +362,7 @@
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             color: var(--gold-light);
-            font-size: 32px;
+            font-size: 28px;
             opacity: 0.4;
         }
 
@@ -361,73 +378,48 @@
             font-family: monospace;
         }
 
-        .card-body {
-            padding: 8px 10px 10px;
-        }
+        .card-body { padding: 6px 8px 8px; }
 
         .card-name {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             line-height: 1.3;
             display: -webkit-box;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 1;
             -webkit-box-orient: vertical;
             overflow: hidden;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
         .card-tags {
             display: flex;
             flex-wrap: wrap;
-            gap: 3px;
-            margin-bottom: 6px;
+            gap: 2px;
+            margin-bottom: 4px;
         }
 
         .card-tag {
-            font-size: 10px;
-            padding: 1px 6px;
+            font-size: 9px;
+            padding: 1px 5px;
             border-radius: 3px;
             background: #f3f4f6;
             color: var(--text-muted);
         }
 
-        .card-weight {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-        }
+        .card-weight { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
 
-        .card-prices {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
+        .card-prices { display: flex; flex-direction: column; gap: 1px; }
+        .price-gram { font-size: 10px; color: var(--text-muted); }
+        .price-cost { font-size: 10px; color: var(--text-muted); }
+        .price-sell { font-size: 14px; font-weight: 700; color: var(--gold-dark); }
 
-        .price-cost {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        .price-sell {
-            font-size: 15px;
-            font-weight: 700;
-            color: var(--gold-dark);
-        }
-
-        .card-date {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
+        .card-date { font-size: 9px; color: var(--text-muted); margin-top: 2px; }
 
         /* === LOAD MORE === */
-        .load-more {
-            text-align: center;
-            padding: 20px;
-        }
+        .load-more { text-align: center; padding: 16px; }
 
         .btn-load {
-            padding: 12px 32px;
+            padding: 10px 28px;
             border: 2px solid var(--gold);
             border-radius: 8px;
             background: white;
@@ -438,14 +430,9 @@
         }
 
         .btn-load:active { background: #fef3c7; }
-        .btn-load:disabled { opacity: 0.5; cursor: default; }
 
-        /* === LOADING === */
-        .loading {
-            display: flex;
-            justify-content: center;
-            padding: 40px;
-        }
+        /* === LOADING / EMPTY === */
+        .loading { display: flex; justify-content: center; padding: 40px; }
 
         .spinner {
             width: 32px;
@@ -458,22 +445,11 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* === EMPTY STATE === */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-muted);
-        }
-
-        .empty-state i {
-            font-size: 48px;
-            color: var(--border);
-            margin-bottom: 12px;
-        }
-
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 48px; color: var(--border); margin-bottom: 12px; }
         .empty-state p { font-size: 14px; }
 
-        /* === PRODUCT DETAIL MODAL === */
+        /* === MODAL === */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -484,9 +460,7 @@
             justify-content: center;
         }
 
-        .modal-overlay.open {
-            display: flex;
-        }
+        .modal-overlay.open { display: flex; }
 
         .modal-sheet {
             background: white;
@@ -496,6 +470,7 @@
             max-height: 85vh;
             overflow-y: auto;
             animation: sheetUp 0.25s ease;
+            position: relative;
         }
 
         @keyframes sheetUp {
@@ -516,32 +491,52 @@
             overflow-x: auto;
             scroll-snap-type: x mandatory;
             -webkit-overflow-scrolling: touch;
-            gap: 0;
         }
 
-        .modal-images img {
+        .modal-img-wrap {
             width: 100%;
             flex-shrink: 0;
             scroll-snap-align: start;
+            position: relative;
+        }
+
+        .modal-img-wrap img {
+            width: 100%;
             aspect-ratio: 1;
             object-fit: cover;
         }
 
-        .modal-info {
-            padding: 16px;
+        .img-label {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 4px;
         }
 
-        .modal-info h2 {
-            font-size: 18px;
-            margin-bottom: 4px;
+        .img-dl {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(255,255,255,0.9);
+            color: var(--text);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
         }
 
-        .modal-info .ref {
-            font-family: monospace;
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 12px;
-        }
+        .modal-info { padding: 16px; }
+        .modal-info h2 { font-size: 18px; margin-bottom: 4px; }
+        .modal-info .ref { font-family: monospace; font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
 
         .modal-detail-grid {
             display: grid;
@@ -559,15 +554,31 @@
             margin-bottom: 2px;
         }
 
-        .detail-item span {
-            font-size: 14px;
-            font-weight: 600;
+        .detail-item span { font-size: 14px; font-weight: 600; }
+        .detail-item.price-highlight span { color: var(--gold-dark); font-size: 20px; }
+
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
         }
 
-        .detail-item.price-highlight span {
-            color: var(--gold-dark);
-            font-size: 20px;
+        .modal-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
+
+        .btn-whatsapp { background: #25d366; color: white; }
+        .btn-download { background: #f3f4f6; color: var(--text); border: 1px solid var(--border); }
 
         .modal-close {
             position: absolute;
@@ -586,14 +597,48 @@
             z-index: 10;
         }
 
-        /* Hide scrollbar */
+        /* === SHARE BAR (multi-select) === */
+        .share-bar {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 12px 16px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 150;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .share-bar.open { display: flex; }
+
+        .share-bar .info { font-size: 13px; font-weight: 600; }
+
+        .share-bar-btns { display: flex; gap: 8px; }
+
+        .share-bar-btns button {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Hide scrollbars */
         .modal-images::-webkit-scrollbar,
         .stats-bar::-webkit-scrollbar,
         .active-filters::-webkit-scrollbar { display: none; }
 
-        /* PWA standalone mode tweaks */
         @media (display-mode: standalone) {
             .top-bar { padding-top: max(12px, env(safe-area-inset-top)); }
+            .share-bar { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
         }
     </style>
 </head>
@@ -601,19 +646,23 @@
 
 <!-- TOP BAR -->
 <div class="top-bar">
-    <h1><i class="fas fa-gem"></i> {{ catalog_name }}</h1>
+    <h1><i class="fas fa-gem"></i></h1>
     <div class="search-box">
         <i class="fas fa-search"></i>
         <input type="text" id="searchInput" placeholder="Rechercher..." autocomplete="off">
     </div>
-    <div class="filter-toggle" id="filterToggle" onclick="toggleFilters()">
+    <div class="top-btn" id="filterToggle" onclick="toggleFilters()">
         <i class="fas fa-sliders-h"></i>
         <span class="filter-badge" id="filterBadge">0</span>
+    </div>
+    <div class="top-btn" id="selectToggle" onclick="toggleSelectMode()">
+        <i class="fas fa-check-double"></i>
+        <span class="select-badge" id="selectBadge">0</span>
     </div>
 </div>
 
 <!-- STATS BAR -->
-<div class="stats-bar" id="statsBar">
+<div class="stats-bar">
     <span class="stat-chip"><i class="fas fa-box"></i>&nbsp; <span id="statTotal">-</span> produits</span>
 </div>
 
@@ -622,30 +671,15 @@
     <div class="filter-grid">
         <div class="filter-group">
             <label>Categorie</label>
-            <select id="fCategory">
-                <option value="">Toutes</option>
-                {% for cat in categories %}
-                <option value="{{ cat.id }}">{{ cat.name }}</option>
-                {% endfor %}
-            </select>
+            <select id="fCategory"><option value="">Toutes</option>{% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select>
         </div>
         <div class="filter-group">
             <label>Metal</label>
-            <select id="fMetal">
-                <option value="">Tous</option>
-                {% for m in metal_types %}
-                <option value="{{ m.id }}">{{ m.name }}</option>
-                {% endfor %}
-            </select>
+            <select id="fMetal"><option value="">Tous</option>{% for m in metal_types %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select>
         </div>
         <div class="filter-group">
             <label>Purete</label>
-            <select id="fPurity">
-                <option value="">Toutes</option>
-                {% for p in metal_purities %}
-                <option value="{{ p.id }}">{{ p.name }}</option>
-                {% endfor %}
-            </select>
+            <select id="fPurity"><option value="">Toutes</option>{% for p in metal_purities %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
         </div>
         <div class="filter-group">
             <label>Trier par</label>
@@ -654,11 +688,8 @@
                 <option value="date_asc">Plus ancien</option>
                 <option value="price_asc">Prix croissant</option>
                 <option value="price_desc">Prix decroissant</option>
-                <option value="cost_asc">Cout croissant</option>
-                <option value="cost_desc">Cout decroissant</option>
                 <option value="weight_desc">Poids decroissant</option>
                 <option value="weight_asc">Poids croissant</option>
-                <option value="name_asc">Nom A-Z</option>
             </select>
         </div>
         <div class="filter-group">
@@ -718,9 +749,7 @@
 <div class="product-grid" id="productGrid"></div>
 
 <!-- LOADING -->
-<div class="loading" id="loading" style="display:none;">
-    <div class="spinner"></div>
-</div>
+<div class="loading" id="loading" style="display:none;"><div class="spinner"></div></div>
 
 <!-- EMPTY STATE -->
 <div class="empty-state" id="emptyState" style="display:none;">
@@ -733,9 +762,19 @@
     <button class="btn-load" onclick="loadMore()">Charger plus</button>
 </div>
 
+<!-- SHARE BAR (multi-select) -->
+<div class="share-bar" id="shareBar">
+    <span class="info"><span id="selectedCount">0</span> selectionne(s)</span>
+    <div class="share-bar-btns">
+        <button class="btn-whatsapp" onclick="shareSelected()"><i class="fab fa-whatsapp"></i> Partager</button>
+        <button class="btn-download" onclick="downloadSelected()"><i class="fas fa-download"></i></button>
+        <button class="btn-reset" onclick="clearSelection()" style="padding:8px 12px;"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+
 <!-- PRODUCT DETAIL MODAL -->
 <div class="modal-overlay" id="detailModal" onclick="if(event.target===this)closeModal()">
-    <div class="modal-sheet" style="position:relative;">
+    <div class="modal-sheet">
         <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
         <div class="modal-handle"></div>
         <div class="modal-images" id="modalImages"></div>
@@ -749,8 +788,10 @@ var currentPage = 1;
 var hasNext = false;
 var isLoading = false;
 var searchTimer = null;
+var selectMode = false;
+var selectedProducts = {};
+var allProductData = {};
 
-// Filter state
 function getFilters() {
     return {
         q: document.getElementById('searchInput').value.trim(),
@@ -773,32 +814,24 @@ function buildQuery(filters, page) {
     var params = new URLSearchParams();
     params.set('page', page);
     params.set('per_page', '20');
-    for (var k in filters) {
-        if (filters[k]) params.set(k, filters[k]);
-    }
+    for (var k in filters) { if (filters[k]) params.set(k, filters[k]); }
     return API_URL + '?' + params.toString();
 }
 
 function loadProducts(reset) {
     if (isLoading) return;
-    if (reset) {
-        currentPage = 1;
-        document.getElementById('productGrid').innerHTML = '';
-    }
+    if (reset) { currentPage = 1; document.getElementById('productGrid').innerHTML = ''; }
     isLoading = true;
     document.getElementById('loading').style.display = 'flex';
     document.getElementById('emptyState').style.display = 'none';
     document.getElementById('loadMore').style.display = 'none';
 
-    var url = buildQuery(getFilters(), currentPage);
-
-    fetch(url)
+    fetch(buildQuery(getFilters(), currentPage))
         .then(function(r) { return r.json(); })
         .then(function(data) {
             isLoading = false;
             document.getElementById('loading').style.display = 'none';
-
-            if (data.error) { return; }
+            if (data.error) return;
 
             hasNext = data.has_next;
             document.getElementById('statTotal').textContent = data.total;
@@ -811,39 +844,38 @@ function loadProducts(reset) {
 
             var grid = document.getElementById('productGrid');
             data.products.forEach(function(p) {
+                allProductData[p.id] = p;
                 grid.appendChild(createCard(p));
             });
 
-            if (hasNext) {
-                document.getElementById('loadMore').style.display = 'block';
-            }
-
+            if (hasNext) document.getElementById('loadMore').style.display = 'block';
             updateFilterBadge();
             updateActiveFilters();
         })
         .catch(function(err) {
             isLoading = false;
             document.getElementById('loading').style.display = 'none';
-            console.error(err);
         });
 }
 
-function loadMore() {
-    currentPage++;
-    loadProducts(false);
-}
+function loadMore() { currentPage++; loadProducts(false); }
 
 function createCard(p) {
     var card = document.createElement('div');
-    card.className = 'product-card';
-    card.onclick = function() { openModal(p); };
+    card.className = 'product-card' + (selectedProducts[p.id] ? ' selected' : '');
+    card.dataset.id = p.id;
 
-    var imgHtml;
-    if (p.image_url) {
-        imgHtml = '<img src="' + p.image_url + '" alt="" loading="lazy">';
-    } else {
-        imgHtml = '<i class="fas fa-gem no-img"></i>';
-    }
+    card.onclick = function(e) {
+        if (selectMode) {
+            toggleProduct(p.id, card);
+        } else {
+            openModal(p);
+        }
+    };
+
+    var imgHtml = p.image_url
+        ? '<img src="' + p.image_url + '" alt="" loading="lazy">'
+        : '<i class="fas fa-gem no-img"></i>';
 
     var tags = '';
     if (p.category) tags += '<span class="card-tag">' + esc(p.category) + '</span>';
@@ -851,16 +883,15 @@ function createCard(p) {
     if (p.purity) tags += '<span class="card-tag">' + esc(p.purity) + '</span>';
 
     card.innerHTML =
-        '<div class="card-img">' +
-            imgHtml +
-            '<span class="card-ref">' + esc(p.reference) + '</span>' +
-        '</div>' +
+        '<div class="card-select"><i class="fas fa-check"></i></div>' +
+        '<div class="card-img">' + imgHtml + '<span class="card-ref">' + esc(p.reference) + '</span></div>' +
         '<div class="card-body">' +
             '<div class="card-name">' + esc(p.name) + '</div>' +
             '<div class="card-tags">' + tags + '</div>' +
             '<div class="card-weight"><i class="fas fa-weight-hanging"></i> ' + p.weight + ' g</div>' +
             '<div class="card-prices">' +
-                '<span class="price-cost"><i class="fas fa-tag"></i> Achat: ' + formatPrice(p.total_cost) + '</span>' +
+                '<span class="price-gram">Prix/g: ' + formatPrice(p.price_per_gram) + ' DH</span>' +
+                '<span class="price-cost">Achat: ' + formatPrice(p.total_cost) + ' DH</span>' +
                 '<span class="price-sell">' + formatPrice(p.selling_price) + ' DH</span>' +
             '</div>' +
             '<div class="card-date">' + p.created_at + '</div>' +
@@ -881,7 +912,7 @@ function esc(s) {
     return d.innerHTML;
 }
 
-// Filters
+// === FILTERS ===
 function toggleFilters() {
     var panel = document.getElementById('filterPanel');
     var btn = document.getElementById('filterToggle');
@@ -896,17 +927,9 @@ function applyFilters() {
 }
 
 function resetFilters() {
-    document.getElementById('fCategory').value = '';
-    document.getElementById('fMetal').value = '';
-    document.getElementById('fPurity').value = '';
-    document.getElementById('fPriceMin').value = '';
-    document.getElementById('fPriceMax').value = '';
-    document.getElementById('fCostMin').value = '';
-    document.getElementById('fCostMax').value = '';
-    document.getElementById('fWeightMin').value = '';
-    document.getElementById('fWeightMax').value = '';
-    document.getElementById('fDateFrom').value = '';
-    document.getElementById('fDateTo').value = '';
+    ['fCategory','fMetal','fPurity','fPriceMin','fPriceMax','fCostMin','fCostMax','fWeightMin','fWeightMax','fDateFrom','fDateTo'].forEach(function(id) {
+        document.getElementById(id).value = '';
+    });
     document.getElementById('fSort').value = 'date_desc';
     document.getElementById('searchInput').value = '';
     document.getElementById('filterPanel').classList.remove('open');
@@ -924,14 +947,9 @@ function updateFilterBadge() {
     if (f.cost_min || f.cost_max) count++;
     if (f.weight_min || f.weight_max) count++;
     if (f.date_from || f.date_to) count++;
-
     var badge = document.getElementById('filterBadge');
-    if (count > 0) {
-        badge.textContent = count;
-        badge.style.display = 'flex';
-    } else {
-        badge.style.display = 'none';
-    }
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'flex' : 'none';
 }
 
 function updateActiveFilters() {
@@ -941,24 +959,17 @@ function updateActiveFilters() {
 
     sel = document.getElementById('fCategory');
     if (f.category && sel.selectedIndex > 0) chips.push({label: sel.options[sel.selectedIndex].text, clear: function(){ document.getElementById('fCategory').value=''; loadProducts(true); }});
-
     sel = document.getElementById('fMetal');
     if (f.metal_type && sel.selectedIndex > 0) chips.push({label: sel.options[sel.selectedIndex].text, clear: function(){ document.getElementById('fMetal').value=''; loadProducts(true); }});
-
     sel = document.getElementById('fPurity');
     if (f.purity && sel.selectedIndex > 0) chips.push({label: sel.options[sel.selectedIndex].text, clear: function(){ document.getElementById('fPurity').value=''; loadProducts(true); }});
-
     if (f.price_min || f.price_max) chips.push({label: 'Prix: ' + (f.price_min||'0') + '-' + (f.price_max||'...'), clear: function(){ document.getElementById('fPriceMin').value=''; document.getElementById('fPriceMax').value=''; loadProducts(true); }});
     if (f.cost_min || f.cost_max) chips.push({label: 'Cout: ' + (f.cost_min||'0') + '-' + (f.cost_max||'...'), clear: function(){ document.getElementById('fCostMin').value=''; document.getElementById('fCostMax').value=''; loadProducts(true); }});
     if (f.weight_min || f.weight_max) chips.push({label: 'Poids: ' + (f.weight_min||'0') + '-' + (f.weight_max||'...') + 'g', clear: function(){ document.getElementById('fWeightMin').value=''; document.getElementById('fWeightMax').value=''; loadProducts(true); }});
     if (f.date_from || f.date_to) chips.push({label: (f.date_from||'...') + ' - ' + (f.date_to||'...'), clear: function(){ document.getElementById('fDateFrom').value=''; document.getElementById('fDateTo').value=''; loadProducts(true); }});
 
     var container = document.getElementById('activeFilters');
-    if (chips.length === 0) {
-        container.style.display = 'none';
-        return;
-    }
-
+    if (chips.length === 0) { container.style.display = 'none'; return; }
     container.style.display = 'flex';
     container.innerHTML = '';
     chips.forEach(function(c) {
@@ -970,32 +981,130 @@ function updateActiveFilters() {
     });
 }
 
-// Search debounce
-document.getElementById('searchInput').addEventListener('input', function() {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(function() { loadProducts(true); }, 300);
-});
+// === SELECT MODE ===
+function toggleSelectMode() {
+    selectMode = !selectMode;
+    document.getElementById('selectToggle').classList.toggle('active', selectMode);
+    document.body.classList.toggle('select-mode', selectMode);
+    if (!selectMode) clearSelection();
+    updateShareBar();
+}
 
-// Quick sort sync
-document.getElementById('quickSort').addEventListener('change', function() {
-    document.getElementById('fSort').value = this.value;
-    loadProducts(true);
-});
+function toggleProduct(id, card) {
+    if (selectedProducts[id]) {
+        delete selectedProducts[id];
+        card.classList.remove('selected');
+    } else {
+        selectedProducts[id] = allProductData[id];
+        card.classList.add('selected');
+    }
+    updateShareBar();
+}
 
-// Modal
+function clearSelection() {
+    selectedProducts = {};
+    document.querySelectorAll('.product-card.selected').forEach(function(c) { c.classList.remove('selected'); });
+    updateShareBar();
+}
+
+function updateShareBar() {
+    var count = Object.keys(selectedProducts).length;
+    document.getElementById('selectedCount').textContent = count;
+    document.getElementById('shareBar').classList.toggle('open', selectMode && count > 0);
+    var badge = document.getElementById('selectBadge');
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'flex' : 'none';
+}
+
+// === SHARE (WhatsApp) ===
+function shareProduct(p) {
+    // Share without prices, just grams
+    var text = p.name + '\n' +
+        p.reference + '\n' +
+        (p.category ? p.category + ' | ' : '') +
+        (p.metal ? p.metal + ' ' : '') + (p.purity ? p.purity : '') + '\n' +
+        'Poids: ' + p.weight + ' g';
+
+    // If we can share images via Web Share API
+    var imgs = (p.ai_images || []).concat(p.original_images || []);
+    if (navigator.share && imgs.length > 0) {
+        // Try to share with image
+        fetch(imgs[0]).then(function(r) { return r.blob(); }).then(function(blob) {
+            var file = new File([blob], p.reference + '.jpg', { type: 'image/jpeg' });
+            navigator.share({ text: text, files: [file] }).catch(function() {
+                // Fallback to WhatsApp URL
+                window.open('https://wa.me/?text=' + encodeURIComponent(text));
+            });
+        }).catch(function() {
+            window.open('https://wa.me/?text=' + encodeURIComponent(text));
+        });
+    } else {
+        window.open('https://wa.me/?text=' + encodeURIComponent(text));
+    }
+}
+
+function shareSelected() {
+    var products = Object.values(selectedProducts);
+    var lines = products.map(function(p) {
+        return p.name + ' | ' +
+            (p.category ? p.category + ' | ' : '') +
+            (p.metal ? p.metal + ' ' : '') + (p.purity || '') +
+            ' | ' + p.weight + 'g';
+    });
+    var text = 'Bijouterie Hafsa - ' + products.length + ' produit(s)\n\n' + lines.join('\n');
+
+    if (navigator.share) {
+        navigator.share({ text: text }).catch(function() {
+            window.open('https://wa.me/?text=' + encodeURIComponent(text));
+        });
+    } else {
+        window.open('https://wa.me/?text=' + encodeURIComponent(text));
+    }
+}
+
+// === DOWNLOAD ===
+function downloadImage(url, filename) {
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'image.jpg';
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+function downloadSelected() {
+    Object.values(selectedProducts).forEach(function(p) {
+        var imgs = (p.ai_images || []).concat(p.original_images || []);
+        imgs.forEach(function(url, i) {
+            setTimeout(function() {
+                downloadImage(url, p.reference + '_' + (i + 1) + '.jpg');
+            }, i * 300);
+        });
+    });
+}
+
+// === MODAL ===
 function openModal(p) {
     var imagesDiv = document.getElementById('modalImages');
     var infoDiv = document.getElementById('modalInfo');
 
-    var imgs = p.all_images && p.all_images.length > 0 ? p.all_images : (p.image_url ? [p.image_url] : []);
+    var aiImgs = p.ai_images || [];
+    var origImgs = p.original_images || [];
 
-    if (imgs.length > 0) {
-        imagesDiv.innerHTML = imgs.map(function(url) {
-            return '<img src="' + url + '" alt="">';
-        }).join('');
-    } else {
-        imagesDiv.innerHTML = '<div style="width:100%;aspect-ratio:1;background:#f5f0e6;display:flex;align-items:center;justify-content:center;"><i class="fas fa-gem" style="font-size:48px;color:#d4a528;opacity:0.3;"></i></div>';
+    var imgHtml = '';
+    aiImgs.forEach(function(url) {
+        imgHtml += '<div class="modal-img-wrap"><img src="' + url + '" alt=""><span class="img-label">IA</span><button class="img-dl" onclick="event.stopPropagation();downloadImage(\'' + url + '\',\'' + esc(p.reference) + '_ai.jpg\')"><i class="fas fa-download"></i></button></div>';
+    });
+    origImgs.forEach(function(url) {
+        imgHtml += '<div class="modal-img-wrap"><img src="' + url + '" alt=""><span class="img-label">Original</span><button class="img-dl" onclick="event.stopPropagation();downloadImage(\'' + url + '\',\'' + esc(p.reference) + '_orig.jpg\')"><i class="fas fa-download"></i></button></div>';
+    });
+
+    if (!imgHtml) {
+        imgHtml = '<div class="modal-img-wrap" style="background:#f5f0e6;display:flex;align-items:center;justify-content:center;aspect-ratio:1;"><i class="fas fa-gem" style="font-size:48px;color:#d4a528;opacity:0.3;"></i></div>';
     }
+
+    imagesDiv.innerHTML = imgHtml;
 
     infoDiv.innerHTML =
         '<h2>' + esc(p.name) + '</h2>' +
@@ -1005,9 +1114,14 @@ function openModal(p) {
             '<div class="detail-item"><label>Metal</label><span>' + esc(p.metal || '-') + '</span></div>' +
             '<div class="detail-item"><label>Purete</label><span>' + esc(p.purity || '-') + '</span></div>' +
             '<div class="detail-item"><label>Poids</label><span>' + p.weight + ' g</span></div>' +
+            '<div class="detail-item"><label>Prix par gramme</label><span>' + formatPrice(p.price_per_gram) + ' DH</span></div>' +
             '<div class="detail-item"><label>Cout achat</label><span>' + formatPrice(p.total_cost) + ' DH</span></div>' +
             '<div class="detail-item price-highlight"><label>Prix de vente</label><span>' + formatPrice(p.selling_price) + ' DH</span></div>' +
             '<div class="detail-item"><label>Date ajout</label><span>' + (p.created_at || '-') + '</span></div>' +
+        '</div>' +
+        '<div class="modal-actions">' +
+            '<button class="modal-btn btn-whatsapp" onclick="shareProduct(allProductData[' + p.id + '])"><i class="fab fa-whatsapp"></i> Partager</button>' +
+            '<button class="modal-btn btn-download" onclick="var imgs=(' + JSON.stringify(aiImgs.concat(origImgs)).replace(/'/g, "\\'") + ');imgs.forEach(function(u,i){setTimeout(function(){downloadImage(u,\'' + esc(p.reference) + '_\'+(i+1)+\'.jpg\');},i*300);});"><i class="fas fa-download"></i> Telecharger</button>' +
         '</div>';
 
     document.getElementById('detailModal').classList.add('open');
@@ -1019,11 +1133,15 @@ function closeModal() {
     document.body.style.overflow = '';
 }
 
-// Handle back button to close modal
+// Search debounce
+document.getElementById('searchInput').addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() { loadProducts(true); }, 300);
+});
+
+// Back button closes modal
 window.addEventListener('popstate', function() {
-    if (document.getElementById('detailModal').classList.contains('open')) {
-        closeModal();
-    }
+    if (document.getElementById('detailModal').classList.contains('open')) closeModal();
 });
 
 // Initial load
@@ -1034,6 +1152,5 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(function(){});
 }
 </script>
-
 </body>
 </html>
