@@ -940,10 +940,19 @@ class CatalogToken(models.Model):
         max_length=64,
         unique=True,
     )
+    user = models.OneToOneField(
+        'users.User',
+        on_delete=models.CASCADE,
+        related_name='catalog_token',
+        null=True,
+        blank=True,
+        verbose_name=_('Utilisateur système'),
+    )
     name = models.CharField(
         _('Nom de l\'utilisateur'),
         max_length=100,
-        help_text=_('Ex: Ahmed - Equipe Casablanca'),
+        blank=True,
+        help_text=_('Auto-rempli depuis l\'utilisateur système'),
     )
     password_hash = models.CharField(
         _('Mot de passe (hash)'),
@@ -973,6 +982,9 @@ class CatalogToken(models.Model):
         if not self.token:
             import secrets
             self.token = secrets.token_urlsafe(32)
+        if self.user and not self.name:
+            full = (self.user.get_full_name() or '').strip()
+            self.name = full or self.user.username
         super().save(*args, **kwargs)
 
     def set_password(self, raw_password):

@@ -1813,26 +1813,35 @@ def _validate_catalog_password(password):
 
 @login_required(login_url='login')
 def catalog_manage(request):
-    """Manage catalog access users (one CatalogToken = one user)."""
+    """Manage catalog access (pick a system user, give them a password)."""
     from .models import CatalogToken
+    from users.models import User
 
     if request.method == 'POST':
         action = request.POST.get('action')
 
         if action == 'create':
-            name = request.POST.get('name', '').strip()
+            user_id = request.POST.get('user_id')
             password = request.POST.get('password', '')
-            if not name:
-                messages.error(request, 'Le nom est requis.')
+            if not user_id:
+                messages.error(request, 'Veuillez choisir un utilisateur.')
+                return redirect('products:catalog_manage')
+            try:
+                sys_user = User.objects.get(id=user_id, is_active=True)
+            except User.DoesNotExist:
+                messages.error(request, 'Utilisateur introuvable.')
+                return redirect('products:catalog_manage')
+            if CatalogToken.objects.filter(user=sys_user).exists():
+                messages.error(request, f'"{sys_user.get_full_name() or sys_user.username}" a déjà un accès catalogue.')
             else:
                 err = _validate_catalog_password(password)
                 if err:
                     messages.error(request, err)
                 else:
-                    ct = CatalogToken(name=name, created_by=request.user)
+                    ct = CatalogToken(user=sys_user, created_by=request.user)
                     ct.set_password(password)
                     ct.save()
-                    messages.success(request, f'Utilisateur "{name}" créé.')
+                    messages.success(request, f'Accès créé pour "{ct.name}".')
 
         elif action == 'change_password':
             token_id = request.POST.get('token_id')
@@ -1871,9 +1880,12 @@ def catalog_manage(request):
 
         return redirect('products:catalog_manage')
 
-    tokens = CatalogToken.objects.all().order_by('-created_at')
+    tokens = CatalogToken.objects.select_related('user').order_by('-created_at')
+    used_user_ids = list(tokens.values_list('user_id', flat=True))
+    available_users = User.objects.filter(is_active=True).exclude(id__in=used_user_ids).order_by('first_name', 'last_name', 'username')
     context = {
         'tokens': tokens,
+        'available_users': available_users,
     }
     return render(request, 'products/catalog_manage.html', context)
 

@@ -19,15 +19,21 @@
     {% endfor %}
     {% endif %}
 
-    <!-- Create User -->
+    <!-- Grant Catalog Access -->
     <div style="background:white;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:24px;">
-        <h2 style="font-size:16px;margin-bottom:12px;"><i class="fas fa-user-plus"></i> Créer un nouvel utilisateur</h2>
+        <h2 style="font-size:16px;margin-bottom:12px;"><i class="fas fa-key"></i> Donner accès au catalogue</h2>
+        {% if available_users %}
         <form method="post" autocomplete="off">
             {% csrf_token %}
             <input type="hidden" name="action" value="create">
             <div style="display:flex;flex-direction:column;gap:10px;">
-                <input type="text" name="name" placeholder="Nom de l'utilisateur (ex: Ahmed - Casablanca)" required
-                       style="padding:10px 14px;border:1px solid #e5e5e0;border-radius:8px;font-size:14px;outline:none;">
+                <select name="user_id" required
+                        style="padding:10px 14px;border:1px solid #e5e5e0;border-radius:8px;font-size:14px;outline:none;background:white;">
+                    <option value="">— Choisir un utilisateur —</option>
+                    {% for u in available_users %}
+                    <option value="{{ u.id }}">{{ u.get_full_name|default:u.username }}{% if u.role %} ({{ u.get_role_display }}){% endif %}</option>
+                    {% endfor %}
+                </select>
                 <div style="display:flex;gap:8px;align-items:stretch;">
                     <input type="password" name="password" id="newPwd" placeholder="Mot de passe (12+ car., maj/min/chiffre/symbole)" required
                            autocomplete="new-password" spellcheck="false"
@@ -40,13 +46,18 @@
                     </button>
                 </div>
                 <button type="submit" style="padding:12px 20px;background:#b8860b;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
-                    <i class="fas fa-plus"></i> Créer l'utilisateur
+                    <i class="fas fa-plus"></i> Donner l'accès
                 </button>
             </div>
         </form>
         <p style="font-size:12px;color:#6b7280;margin-top:10px;">
             <i class="fas fa-info-circle"></i> Le mot de passe est haché (PBKDF2) et ne peut pas être récupéré. Notez-le avant de l'envoyer à l'utilisateur.
         </p>
+        {% else %}
+        <p style="font-size:14px;color:#6b7280;margin:0;">
+            <i class="fas fa-check-circle" style="color:#059669;"></i> Tous les utilisateurs système actifs ont déjà un accès au catalogue.
+        </p>
+        {% endif %}
     </div>
 
     <!-- User List -->
