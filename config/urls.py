@@ -19,8 +19,13 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from . import views
+from products import views as product_views
 
 urlpatterns = [
+    # Public client catalog (no login, no prices)
+    path('catalogue/', product_views.public_catalog, name='public_catalog'),
+    path('catalogue/api/products/', product_views.public_catalog_api, name='public_catalog_api'),
+
     # Django Admin - DISABLED in favor of consolidated dashboard
     # path('admin/', admin.site.urls),  # Replaced with mobile-responsive admin_dashboard
 

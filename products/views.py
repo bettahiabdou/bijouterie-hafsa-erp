@@ -1546,6 +1546,100 @@ def print_queue_fail(request, job_id):
 # Catalog (token-based public access for online team)
 # =============================================================================
 
+def public_catalog(request):
+    """Public catalog page for clients (no prices, no login required)."""
+    context = {
+        'categories': ProductCategory.objects.filter(is_active=True).order_by('display_order', 'name'),
+        'metal_types': MetalType.objects.filter(is_active=True).order_by('name'),
+        'metal_purities': MetalPurity.objects.filter(is_active=True).order_by('name'),
+    }
+    return render(request, 'products/public_catalog.html', context)
+
+
+def public_catalog_api(request):
+    """JSON API for the public catalog. No prices/cost fields exposed."""
+    q = request.GET.get('q', '').strip()
+    category = request.GET.get('category', '')
+    metal_type = request.GET.get('metal_type', '')
+    purity = request.GET.get('purity', '')
+    weight_min = request.GET.get('weight_min', '')
+    weight_max = request.GET.get('weight_max', '')
+    sort = request.GET.get('sort', 'date_desc')
+    page = int(request.GET.get('page', 1))
+    per_page = min(int(request.GET.get('per_page', 24)), 50)
+
+    qs = Product.objects.filter(
+        status=Product.Status.AVAILABLE
+    ).select_related('category', 'metal_type', 'metal_purity').prefetch_related('images')
+
+    if q:
+        qs = qs.filter(
+            Q(name__icontains=q) |
+            Q(reference__icontains=q) |
+            Q(category__name__icontains=q)
+        )
+    if category:
+        qs = qs.filter(category_id=category)
+    if metal_type:
+        qs = qs.filter(metal_type_id=metal_type)
+    if purity:
+        qs = qs.filter(metal_purity_id=purity)
+    if weight_min:
+        qs = qs.filter(gross_weight__gte=weight_min)
+    if weight_max:
+        qs = qs.filter(gross_weight__lte=weight_max)
+
+    valid_sorts = {
+        'weight_asc': 'gross_weight',
+        'weight_desc': '-gross_weight',
+        'date_asc': 'created_at',
+        'date_desc': '-created_at',
+        'name_asc': 'name',
+        'name_desc': '-name',
+    }
+    qs = qs.order_by(valid_sorts.get(sort, '-created_at'))
+
+    total = qs.count()
+    start = (page - 1) * per_page
+    products = qs[start:start + per_page]
+
+    results = []
+    for p in products:
+        ai_images = []
+        original_images = []
+        if p.main_image:
+            original_images.append(p.main_image.url)
+        for img in p.images.all():
+            img_url = img.image.url if img.image else None
+            if img_url:
+                if 'model_' in os.path.basename(img.image.name):
+                    ai_images.append(img_url)
+                elif img_url not in original_images:
+                    original_images.append(img_url)
+        image_url = ai_images[0] if ai_images else (original_images[0] if original_images else None)
+
+        results.append({
+            'id': p.id,
+            'reference': p.reference,
+            'name': p.name,
+            'category': p.category.name if p.category else '',
+            'metal': p.metal_type.name if p.metal_type else '',
+            'purity': p.metal_purity.name if p.metal_purity else '',
+            'weight': str(p.gross_weight or 0),
+            'image_url': image_url,
+            'all_images': ai_images + original_images,
+        })
+
+    pages = (total + per_page - 1) // per_page
+    return JsonResponse({
+        'products': results,
+        'total': total,
+        'page': page,
+        'pages': pages,
+        'has_next': page < pages,
+    })
+
+
 def _get_catalog_token(token):
     """Validate catalog token. Returns CatalogToken or None."""
     from .models import CatalogToken

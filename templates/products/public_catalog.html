@@ -1,0 +1,379 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Catalogue - Bijouterie Hafsa</title>
+    <meta name="description" content="Découvrez la collection Bijouterie Hafsa">
+    <meta name="theme-color" content="#b8860b">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --gold:#b8860b; --gold-light:#d4a528; --gold-dark:#8b6914;
+            --bg:#fafaf7; --card:#ffffff; --text:#1a1a1a; --muted:#6b7280;
+            --border:#e5e5e0; --radius:12px; --shadow:0 2px 8px rgba(0,0,0,0.06);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+            background:var(--bg); color:var(--text);
+            -webkit-font-smoothing:antialiased;
+            padding-bottom:env(safe-area-inset-bottom,0);
+        }
+        .top-bar {
+            position:sticky; top:0; z-index:100;
+            background:linear-gradient(135deg,var(--gold) 0%,var(--gold-dark) 100%);
+            padding:14px 14px 14px;
+            box-shadow:0 2px 12px rgba(184,134,11,0.35);
+        }
+        .top-bar h1 {
+            color:white; font-size:18px; font-weight:700;
+            text-align:center; letter-spacing:1px; margin-bottom:10px;
+            font-family:Georgia,'Times New Roman',serif;
+        }
+        .search-row { display:flex; gap:8px; }
+        .search-box {
+            flex:1; background:white; border-radius:24px;
+            display:flex; align-items:center; padding:8px 16px;
+        }
+        .search-box i { color:var(--muted); margin-right:8px; }
+        .search-box input { border:none; outline:none; flex:1; font-size:14px; background:transparent; }
+        .filter-btn {
+            background:rgba(255,255,255,0.18); border:none; color:white;
+            border-radius:24px; padding:8px 16px; font-size:13px;
+            cursor:pointer; font-weight:600;
+        }
+        .stats-bar {
+            padding:10px 14px; font-size:12px; color:var(--muted);
+            background:white; border-bottom:1px solid var(--border);
+        }
+        .filter-panel {
+            display:none; background:white; padding:14px;
+            border-bottom:1px solid var(--border);
+        }
+        .filter-panel.open { display:block; }
+        .filter-grid {
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+            gap:10px;
+        }
+        .filter-group label {
+            display:block; font-size:11px; color:var(--muted);
+            margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px;
+        }
+        .filter-group select, .filter-group input {
+            width:100%; padding:8px 12px; border:1px solid var(--border);
+            border-radius:8px; font-size:13px; background:white;
+        }
+        .weight-range { display:flex; gap:6px; }
+        .weight-range input { width:50%; }
+        .filter-actions { margin-top:12px; display:flex; justify-content:flex-end; }
+        .clear-btn {
+            background:#f3f4f6; border:none; padding:8px 16px;
+            border-radius:8px; font-size:12px; cursor:pointer; color:var(--muted);
+        }
+        .grid {
+            padding:14px;
+            display:grid;
+            grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+            gap:14px;
+        }
+        @media (min-width:600px) { .grid { grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); } }
+        .card {
+            background:var(--card); border-radius:var(--radius);
+            overflow:hidden; box-shadow:var(--shadow);
+            cursor:pointer; transition:transform .15s, box-shadow .15s;
+        }
+        .card:active { transform:scale(0.98); }
+        .card:hover { box-shadow:0 4px 16px rgba(0,0,0,0.1); }
+        .card-img {
+            position:relative; aspect-ratio:1; background:#f3f4f6;
+            overflow:hidden;
+        }
+        .card-img img { width:100%; height:100%; object-fit:cover; display:block; }
+        .card-img .no-img {
+            position:absolute; inset:0; display:flex; align-items:center;
+            justify-content:center; color:#d1d5db; font-size:36px;
+        }
+        .card-body { padding:10px 12px 12px; }
+        .card-name {
+            font-size:13px; font-weight:600; color:var(--text);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+            margin-bottom:2px;
+        }
+        .card-ref {
+            font-size:10px; color:var(--gold-dark); font-weight:600;
+            font-family:ui-monospace,Menlo,monospace;
+            margin-bottom:6px;
+        }
+        .card-meta {
+            display:flex; flex-wrap:wrap; gap:4px;
+            font-size:10px; color:var(--muted);
+        }
+        .chip {
+            background:#faf6e8; color:var(--gold-dark);
+            padding:2px 7px; border-radius:10px; font-weight:600;
+        }
+        .empty {
+            text-align:center; padding:80px 20px; color:var(--muted);
+        }
+        .pager { display:flex; justify-content:center; gap:8px; padding:20px 14px 30px; }
+        .pager button {
+            padding:10px 16px; background:white; border:1px solid var(--border);
+            border-radius:8px; cursor:pointer; font-size:13px;
+        }
+        .pager button:disabled { opacity:.4; cursor:not-allowed; }
+
+        /* Modal */
+        .modal-overlay {
+            display:none; position:fixed; inset:0;
+            background:rgba(0,0,0,0.85); z-index:1000;
+            align-items:center; justify-content:center; padding:14px;
+        }
+        .modal-overlay.open { display:flex; }
+        .modal-box {
+            background:white; border-radius:16px; max-width:600px;
+            width:100%; max-height:92vh; overflow:hidden;
+            display:flex; flex-direction:column;
+        }
+        .modal-head {
+            padding:14px 18px; border-bottom:1px solid var(--border);
+            display:flex; justify-content:space-between; align-items:center;
+        }
+        .modal-head h3 { font-size:15px; font-weight:700; }
+        .modal-head button {
+            background:transparent; border:none; font-size:24px;
+            cursor:pointer; color:var(--muted); line-height:1;
+        }
+        .modal-body { padding:14px 18px 20px; overflow-y:auto; flex:1; }
+        .gallery {
+            position:relative; aspect-ratio:1; background:#f3f4f6;
+            border-radius:12px; overflow:hidden; margin-bottom:14px;
+        }
+        .gallery img { width:100%; height:100%; object-fit:cover; }
+        .gallery-nav {
+            position:absolute; top:50%; transform:translateY(-50%);
+            background:rgba(0,0,0,0.5); color:white; border:none;
+            width:38px; height:38px; border-radius:50%; cursor:pointer;
+            font-size:14px;
+        }
+        .gallery-nav.prev { left:10px; }
+        .gallery-nav.next { right:10px; }
+        .thumbs {
+            display:flex; gap:6px; overflow-x:auto; margin-top:8px;
+            padding-bottom:6px;
+        }
+        .thumbs img {
+            width:54px; height:54px; object-fit:cover; border-radius:6px;
+            cursor:pointer; opacity:.6; flex-shrink:0;
+        }
+        .thumbs img.active { opacity:1; outline:2px solid var(--gold); }
+        .modal-name { font-size:18px; font-weight:700; margin-bottom:4px; }
+        .modal-ref { font-size:11px; color:var(--gold-dark); font-family:ui-monospace,Menlo,monospace; margin-bottom:12px; }
+        .specs { display:flex; flex-direction:column; gap:8px; }
+        .spec-row {
+            display:flex; justify-content:space-between; padding:10px 0;
+            border-bottom:1px dashed #eee; font-size:13px;
+        }
+        .spec-row .lbl { color:var(--muted); }
+        .spec-row .val { font-weight:600; color:var(--text); }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <h1>BIJOUTERIE HAFSA</h1>
+    <div class="search-row">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="q" placeholder="Rechercher un article..." autocomplete="off">
+        </div>
+        <button class="filter-btn" onclick="toggleFilters()"><i class="fas fa-sliders-h"></i></button>
+    </div>
+</div>
+
+<div class="filter-panel" id="filterPanel">
+    <div class="filter-grid">
+        <div class="filter-group">
+            <label>Catégorie</label>
+            <select id="fCategory"><option value="">Toutes</option>{% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select>
+        </div>
+        <div class="filter-group">
+            <label>Métal</label>
+            <select id="fMetal"><option value="">Tous</option>{% for m in metal_types %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select>
+        </div>
+        <div class="filter-group">
+            <label>Pureté</label>
+            <select id="fPurity"><option value="">Toutes</option>{% for p in metal_purities %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+        </div>
+        <div class="filter-group">
+            <label>Poids (g)</label>
+            <div class="weight-range">
+                <input type="number" id="fWeightMin" placeholder="Min" step="0.01">
+                <input type="number" id="fWeightMax" placeholder="Max" step="0.01">
+            </div>
+        </div>
+        <div class="filter-group">
+            <label>Trier par</label>
+            <select id="fSort">
+                <option value="date_desc">Plus récent</option>
+                <option value="date_asc">Plus ancien</option>
+                <option value="weight_asc">Poids ↑</option>
+                <option value="weight_desc">Poids ↓</option>
+                <option value="name_asc">Nom A-Z</option>
+            </select>
+        </div>
+    </div>
+    <div class="filter-actions">
+        <button class="clear-btn" onclick="clearFilters()"><i class="fas fa-times"></i> Réinitialiser</button>
+    </div>
+</div>
+
+<div class="stats-bar"><span id="statTotal">-</span> articles disponibles</div>
+
+<div class="grid" id="grid">
+    <div class="empty"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>
+</div>
+
+<div class="pager" id="pager"></div>
+
+<!-- Detail modal -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box">
+        <div class="modal-head">
+            <h3>Détails de l'article</h3>
+            <button onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+const API = '/catalogue/api/products/';
+let currentPage = 1;
+let lastResults = [];
+let galleryIndex = 0;
+let galleryImages = [];
+
+function fetchProducts(page=1) {
+    currentPage = page;
+    const params = new URLSearchParams({
+        page,
+        q: document.getElementById('q').value,
+        category: document.getElementById('fCategory').value,
+        metal_type: document.getElementById('fMetal').value,
+        purity: document.getElementById('fPurity').value,
+        weight_min: document.getElementById('fWeightMin').value,
+        weight_max: document.getElementById('fWeightMax').value,
+        sort: document.getElementById('fSort').value,
+    });
+    fetch(`${API}?${params}`).then(r => r.json()).then(data => {
+        lastResults = data.products || [];
+        document.getElementById('statTotal').textContent = data.total;
+        renderGrid(lastResults);
+        renderPager(data);
+    }).catch(() => {
+        document.getElementById('grid').innerHTML = '<div class="empty">Erreur de chargement</div>';
+    });
+}
+
+function renderGrid(products) {
+    if (!products.length) {
+        document.getElementById('grid').innerHTML = '<div class="empty" style="grid-column:1/-1;"><i class="fas fa-gem" style="font-size:36px;display:block;margin-bottom:10px;color:#d1d5db;"></i>Aucun article trouvé</div>';
+        return;
+    }
+    document.getElementById('grid').innerHTML = products.map((p, i) => `
+        <div class="card" onclick="openModal(${i})">
+            <div class="card-img">
+                ${p.image_url ? `<img src="${p.image_url}" alt="${escapeHtml(p.name)}" loading="lazy">` : '<div class="no-img"><i class="fas fa-gem"></i></div>'}
+            </div>
+            <div class="card-body">
+                <div class="card-name">${escapeHtml(p.name)}</div>
+                <div class="card-ref">${escapeHtml(p.reference)}</div>
+                <div class="card-meta">
+                    ${p.category ? `<span class="chip">${escapeHtml(p.category)}</span>` : ''}
+                    ${p.weight && parseFloat(p.weight) > 0 ? `<span class="chip">${parseFloat(p.weight).toFixed(2)}g</span>` : ''}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderPager(data) {
+    if (!data.pages || data.pages <= 1) { document.getElementById('pager').innerHTML = ''; return; }
+    document.getElementById('pager').innerHTML = `
+        <button ${data.page <= 1 ? 'disabled' : ''} onclick="fetchProducts(${data.page - 1})"><i class="fas fa-chevron-left"></i></button>
+        <span style="padding:10px 14px;font-size:13px;color:var(--muted);">Page ${data.page} / ${data.pages}</span>
+        <button ${!data.has_next ? 'disabled' : ''} onclick="fetchProducts(${data.page + 1})"><i class="fas fa-chevron-right"></i></button>
+    `;
+}
+
+function openModal(idx) {
+    const p = lastResults[idx];
+    if (!p) return;
+    galleryImages = (p.all_images && p.all_images.length) ? p.all_images : (p.image_url ? [p.image_url] : []);
+    galleryIndex = 0;
+    const body = document.getElementById('modalBody');
+    body.innerHTML = `
+        <div class="gallery">
+            ${galleryImages.length ? `<img id="galleryImg" src="${galleryImages[0]}" alt="${escapeHtml(p.name)}">` : '<div class="no-img" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:60px;"><i class="fas fa-gem"></i></div>'}
+            ${galleryImages.length > 1 ? `
+                <button class="gallery-nav prev" onclick="navGallery(-1)"><i class="fas fa-chevron-left"></i></button>
+                <button class="gallery-nav next" onclick="navGallery(1)"><i class="fas fa-chevron-right"></i></button>
+            ` : ''}
+        </div>
+        ${galleryImages.length > 1 ? `
+            <div class="thumbs" id="thumbs">
+                ${galleryImages.map((url, i) => `<img src="${url}" class="${i===0?'active':''}" onclick="setGallery(${i})">`).join('')}
+            </div>
+        ` : ''}
+        <div class="modal-name" style="margin-top:12px;">${escapeHtml(p.name)}</div>
+        <div class="modal-ref">${escapeHtml(p.reference)}</div>
+        <div class="specs">
+            ${p.category ? `<div class="spec-row"><span class="lbl">Catégorie</span><span class="val">${escapeHtml(p.category)}</span></div>` : ''}
+            ${p.metal ? `<div class="spec-row"><span class="lbl">Métal</span><span class="val">${escapeHtml(p.metal)}</span></div>` : ''}
+            ${p.purity ? `<div class="spec-row"><span class="lbl">Pureté</span><span class="val">${escapeHtml(p.purity)}</span></div>` : ''}
+            ${p.weight && parseFloat(p.weight) > 0 ? `<div class="spec-row"><span class="lbl">Poids</span><span class="val">${parseFloat(p.weight).toFixed(2)} g</span></div>` : ''}
+        </div>
+    `;
+    document.getElementById('modal').classList.add('open');
+}
+function setGallery(i) {
+    galleryIndex = i;
+    document.getElementById('galleryImg').src = galleryImages[i];
+    document.querySelectorAll('#thumbs img').forEach((el, j) => el.classList.toggle('active', j === i));
+}
+function navGallery(delta) {
+    setGallery((galleryIndex + delta + galleryImages.length) % galleryImages.length);
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function toggleFilters() { document.getElementById('filterPanel').classList.toggle('open'); }
+function clearFilters() {
+    ['q','fCategory','fMetal','fPurity','fWeightMin','fWeightMax'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fSort').value = 'date_desc';
+    fetchProducts(1);
+}
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+let timer;
+['q','fCategory','fMetal','fPurity','fWeightMin','fWeightMax','fSort'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fetchProducts(1), 300);
+    });
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+    if (document.getElementById('modal').classList.contains('open')) {
+        if (e.key === 'ArrowLeft' && galleryImages.length > 1) navGallery(-1);
+        if (e.key === 'ArrowRight' && galleryImages.length > 1) navGallery(1);
+    }
+});
+fetchProducts(1);
+</script>
+</body>
+</html>
