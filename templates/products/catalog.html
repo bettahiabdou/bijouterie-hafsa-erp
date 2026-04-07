@@ -661,6 +661,13 @@
     </div>
 </div>
 
+<!-- NAV TABS -->
+<div style="display:flex;gap:6px;padding:10px 12px;background:white;border-bottom:1px solid var(--border);overflow-x:auto;">
+    <a href="{% url 'products:catalog' token=token %}" style="padding:8px 14px;border-radius:20px;text-decoration:none;color:white;background:var(--gold);font-size:13px;font-weight:600;white-space:nowrap;"><i class="fas fa-gem"></i> Catalogue</a>
+    <a href="{% url 'products:catalog_my_sales' token=token %}" style="padding:8px 14px;border-radius:20px;text-decoration:none;color:var(--text-muted);background:#f3f4f6;font-size:13px;font-weight:600;white-space:nowrap;"><i class="fas fa-receipt"></i> Mes ventes</a>
+    <a href="{% url 'products:catalog_my_deliveries' token=token %}" style="padding:8px 14px;border-radius:20px;text-decoration:none;color:var(--text-muted);background:#f3f4f6;font-size:13px;font-weight:600;white-space:nowrap;"><i class="fas fa-truck"></i> Mes livraisons</a>
+</div>
+
 <!-- STATS BAR -->
 <div class="stats-bar">
     <span class="stat-chip"><i class="fas fa-box"></i>&nbsp; <span id="statTotal">-</span> produits</span>

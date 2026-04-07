@@ -1,0 +1,168 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Mes livraisons - {{ catalog_name }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --gold:#b8860b; --gold-dark:#8b6914; --bg:#fafaf7; --text:#1a1a1a; --muted:#6b7280; --border:#e5e5e0; --radius:10px; --shadow:0 1px 3px rgba(0,0,0,0.08); }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); padding-bottom:env(safe-area-inset-bottom,0); }
+        .top-bar { position:sticky; top:0; z-index:100; background:var(--gold); padding:12px; display:flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(184,134,11,0.3); }
+        .top-bar h1 { color:white; font-size:14px; flex:1; font-weight:600; }
+        .top-bar a { color:white; text-decoration:none; padding:8px 10px; background:rgba(255,255,255,0.15); border-radius:8px; font-size:13px; }
+        .nav-tabs { display:flex; gap:6px; padding:10px 12px; background:white; border-bottom:1px solid var(--border); overflow-x:auto; }
+        .nav-tabs a { padding:8px 14px; border-radius:20px; text-decoration:none; color:var(--muted); font-size:13px; font-weight:600; background:#f3f4f6; white-space:nowrap; }
+        .nav-tabs a.active { background:var(--gold); color:white; }
+        .filters { padding:12px; display:flex; gap:8px; flex-wrap:wrap; }
+        .filters input, .filters select { padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; background:white; flex:1; min-width:140px; }
+        .list { padding:0 12px 80px; display:flex; flex-direction:column; gap:10px; }
+        .deliv-card { background:white; border-radius:var(--radius); padding:14px; box-shadow:var(--shadow); }
+        .deliv-card .row { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+        .ref { font-weight:700; font-size:14px; }
+        .invoice-link { font-size:12px; color:var(--muted); margin-top:2px; }
+        .client { font-size:13px; margin:8px 0 4px; }
+        .meta { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:3px; margin-top:6px; padding-top:8px; border-top:1px dashed #eee; }
+        .meta i { color:var(--gold); width:14px; }
+        .badge { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
+        .b-pending { background:#fef3c7; color:#92400e; }
+        .b-in_transit { background:#dbeafe; color:#1e40af; }
+        .b-to_pickup { background:#e0e7ff; color:#4338ca; }
+        .b-delivered { background:#ecfdf5; color:#059669; }
+        .b-returned { background:#fef2f2; color:#dc2626; }
+        .actions { margin-top:10px; display:flex; gap:6px; flex-wrap:wrap; }
+        .actions select { padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:12px; background:#fff; flex:1; }
+        .actions button { padding:8px 14px; background:var(--gold); color:white; border:none; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; }
+        .empty { text-align:center; padding:60px 20px; color:var(--muted); }
+        .pager { display:flex; justify-content:center; gap:8px; padding:16px; }
+        .pager button { padding:8px 14px; background:white; border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13px; }
+        .pager button:disabled { opacity:.4; cursor:not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1><i class="fas fa-truck"></i> Mes livraisons</h1>
+        <a href="{% url 'products:catalog' token=token %}"><i class="fas fa-arrow-left"></i></a>
+    </div>
+
+    <div class="nav-tabs">
+        <a href="{% url 'products:catalog' token=token %}"><i class="fas fa-gem"></i> Catalogue</a>
+        <a href="{% url 'products:catalog_my_sales' token=token %}"><i class="fas fa-receipt"></i> Mes ventes</a>
+        <a href="{% url 'products:catalog_my_deliveries' token=token %}" class="active"><i class="fas fa-truck"></i> Mes livraisons</a>
+    </div>
+
+    <div class="filters">
+        <input type="text" id="q" placeholder="Recherche (réf, suivi, client...)">
+        <select id="status">
+            <option value="">Tous les statuts</option>
+            {% for value, label in status_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="list" id="list">
+        <div class="empty"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>
+    </div>
+
+    <div class="pager" id="pager"></div>
+
+<script>
+const TOKEN = "{{ token }}";
+const API = `/products/catalog/${TOKEN}/api/deliveries/`;
+const STATUS_OPTS = [
+    {% for value, label in status_choices %}{value:"{{ value }}", label:"{{ label }}"},{% endfor %}
+];
+let currentPage = 1;
+function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '=([^;]+)');
+    return m ? m.pop() : '';
+}
+function load(page=1) {
+    currentPage = page;
+    const params = new URLSearchParams({
+        page,
+        q: document.getElementById('q').value,
+        status: document.getElementById('status').value,
+    });
+    fetch(`${API}?${params}`).then(r => r.json()).then(data => {
+        renderList(data.deliveries);
+        renderPager(data);
+    });
+}
+function fmt(n) {
+    const v = parseFloat(n || 0);
+    return v.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' MAD';
+}
+function renderList(items) {
+    if (!items || !items.length) {
+        document.getElementById('list').innerHTML = '<div class="empty"><i class="fas fa-truck-loading" style="font-size:28px;display:block;margin-bottom:8px;"></i>Aucune livraison</div>';
+        return;
+    }
+    document.getElementById('list').innerHTML = items.map(d => {
+        const optsHtml = STATUS_OPTS.map(o => `<option value="${o.value}" ${o.value === d.status ? 'selected' : ''}>${o.label}</option>`).join('');
+        return `
+        <div class="deliv-card" id="d-${d.id}">
+            <div class="row">
+                <div>
+                    <div class="ref">${d.reference}</div>
+                    <div class="invoice-link"><i class="fas fa-receipt"></i> ${d.invoice_reference}</div>
+                </div>
+                <span class="badge b-${d.status}" id="status-${d.id}">${d.status_display}</span>
+            </div>
+            <div class="client"><i class="fas fa-user" style="color:var(--muted)"></i> ${d.client_name || '—'} ${d.client_phone ? '· ' + d.client_phone : ''}</div>
+            <div class="meta">
+                ${d.carrier ? `<div><i class="fas fa-shipping-fast"></i> ${d.carrier}</div>` : ''}
+                ${d.tracking_number ? `<div><i class="fas fa-barcode"></i> ${d.tracking_number}</div>` : ''}
+                ${d.current_position ? `<div><i class="fas fa-map-marker-alt"></i> ${d.current_position}</div>` : ''}
+                ${d.destination ? `<div><i class="fas fa-flag-checkered"></i> ${d.destination}</div>` : ''}
+                <div><i class="fas fa-money-bill-wave"></i> ${fmt(d.total_amount)}</div>
+                <div><i class="far fa-clock"></i> ${d.created_at}</div>
+            </div>
+            <div class="actions">
+                <select id="sel-${d.id}">${optsHtml}</select>
+                <button onclick="updateStatus(${d.id})"><i class="fas fa-save"></i> Mettre à jour</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+function updateStatus(id) {
+    const newStatus = document.getElementById(`sel-${id}`).value;
+    const fd = new FormData();
+    fd.append('status', newStatus);
+    fd.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+    fetch(`/products/catalog/${TOKEN}/api/deliveries/${id}/status/`, {
+        method: 'POST',
+        body: fd,
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+    }).then(r => r.json()).then(data => {
+        if (data.ok) {
+            const badge = document.getElementById(`status-${id}`);
+            badge.className = `badge b-${data.status}`;
+            badge.textContent = data.status_display;
+        } else {
+            alert(data.error || 'Erreur');
+        }
+    }).catch(() => alert('Erreur réseau'));
+}
+function renderPager(data) {
+    if (!data.pages || data.pages <= 1) { document.getElementById('pager').innerHTML = ''; return; }
+    document.getElementById('pager').innerHTML = `
+        <button ${data.page <= 1 ? 'disabled' : ''} onclick="load(${data.page - 1})"><i class="fas fa-chevron-left"></i></button>
+        <span style="padding:8px 14px;">Page ${data.page} / ${data.pages}</span>
+        <button ${!data.has_next ? 'disabled' : ''} onclick="load(${data.page + 1})"><i class="fas fa-chevron-right"></i></button>
+    `;
+}
+let timer;
+['q','status'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => load(1), 300);
+    });
+});
+load(1);
+</script>
+</body>
+</html>

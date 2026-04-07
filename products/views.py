@@ -1796,6 +1796,237 @@ def catalog_api(request, token):
     })
 
 
+def _catalog_require_user(request, token):
+    """Common guard for catalog 'my-data' views. Returns (catalog_token, error_response).
+    error_response is non-None if request should be aborted.
+    """
+    catalog_token = _get_catalog_token(token)
+    if not catalog_token:
+        return None, render(request, 'products/catalog_invalid.html', status=403)
+    if not _catalog_is_authenticated(request, catalog_token):
+        return None, redirect('products:catalog', token=token)
+    if not catalog_token.user_id:
+        return None, render(request, 'products/catalog_invalid.html', {
+            'message': "Cet accès n'est lié à aucun utilisateur système. Demandez à l'administrateur de recréer l'accès."
+        }, status=403)
+    return catalog_token, None
+
+
+def catalog_my_sales(request, token):
+    """Render the user's own sales list (HTML shell, JS loads via API)."""
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        return err
+    return render(request, 'products/catalog_my_sales.html', {
+        'token': token,
+        'catalog_name': catalog_token.name,
+    })
+
+
+def catalog_my_sales_api(request, token):
+    """JSON API for the catalog user's own sales."""
+    from sales.models import SaleInvoice
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        if isinstance(err, JsonResponse):
+            return err
+        return JsonResponse({'error': 'Authentification requise'}, status=401)
+
+    q = request.GET.get('q', '').strip()
+    status = request.GET.get('status', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    page = int(request.GET.get('page', 1))
+    per_page = min(int(request.GET.get('per_page', 20)), 50)
+
+    qs = SaleInvoice.objects.filter(
+        seller=catalog_token.user,
+        is_deleted=False,
+    ).select_related('client', 'payment_method').prefetch_related('delivery')
+
+    if q:
+        qs = qs.filter(
+            Q(reference__icontains=q) |
+            Q(client__first_name__icontains=q) |
+            Q(client__last_name__icontains=q) |
+            Q(client__phone__icontains=q)
+        )
+    if status:
+        qs = qs.filter(status=status)
+    if date_from:
+        qs = qs.filter(date__gte=date_from)
+    if date_to:
+        qs = qs.filter(date__lte=date_to)
+
+    qs = qs.order_by('-date', '-created_at')
+
+    total = qs.count()
+    start = (page - 1) * per_page
+    invoices = qs[start:start + per_page]
+
+    results = []
+    for inv in invoices:
+        client_name = ''
+        if inv.client:
+            client_name = inv.client.full_name if hasattr(inv.client, 'full_name') else str(inv.client)
+        else:
+            client_name = 'Vente anonyme'
+        delivery_ref = ''
+        try:
+            delivery_ref = inv.delivery.reference if inv.delivery else ''
+        except Exception:
+            delivery_ref = ''
+        results.append({
+            'id': inv.id,
+            'reference': inv.reference,
+            'date': inv.date.strftime('%Y-%m-%d') if inv.date else '',
+            'client': client_name,
+            'status': inv.status,
+            'status_display': inv.get_status_display(),
+            'total_amount': str(inv.total_amount or 0),
+            'amount_paid': str(inv.amount_paid or 0),
+            'balance_due': str(inv.balance_due or 0),
+            'delivery_method': inv.get_delivery_method_type_display() if inv.delivery_method_type else '',
+            'delivery_status': inv.delivery_status,
+            'delivery_reference': delivery_ref,
+        })
+
+    pages = (total + per_page - 1) // per_page
+    # Stats
+    from django.db.models import Sum
+    stats = SaleInvoice.objects.filter(
+        seller=catalog_token.user, is_deleted=False
+    ).aggregate(
+        total_sales=Sum('total_amount'),
+        total_paid=Sum('amount_paid'),
+        total_due=Sum('balance_due'),
+    )
+    return JsonResponse({
+        'invoices': results,
+        'total': total,
+        'page': page,
+        'pages': pages,
+        'has_next': page < pages,
+        'stats': {
+            'count': SaleInvoice.objects.filter(seller=catalog_token.user, is_deleted=False).count(),
+            'total_sales': str(stats['total_sales'] or 0),
+            'total_paid': str(stats['total_paid'] or 0),
+            'total_due': str(stats['total_due'] or 0),
+        }
+    })
+
+
+def catalog_my_deliveries(request, token):
+    """Render the user's own deliveries list."""
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        return err
+    from sales.models import Delivery
+    return render(request, 'products/catalog_my_deliveries.html', {
+        'token': token,
+        'catalog_name': catalog_token.name,
+        'status_choices': Delivery.Status.choices,
+    })
+
+
+def catalog_my_deliveries_api(request, token):
+    """JSON API for the catalog user's own deliveries (via invoice.seller)."""
+    from sales.models import Delivery
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        if isinstance(err, JsonResponse):
+            return err
+        return JsonResponse({'error': 'Authentification requise'}, status=401)
+
+    q = request.GET.get('q', '').strip()
+    status = request.GET.get('status', '')
+    page = int(request.GET.get('page', 1))
+    per_page = min(int(request.GET.get('per_page', 20)), 50)
+
+    qs = Delivery.objects.filter(
+        invoice__seller=catalog_token.user,
+        invoice__is_deleted=False,
+    ).select_related('invoice', 'carrier')
+
+    if q:
+        qs = qs.filter(
+            Q(reference__icontains=q) |
+            Q(tracking_number__icontains=q) |
+            Q(client_name__icontains=q) |
+            Q(invoice__reference__icontains=q)
+        )
+    if status:
+        qs = qs.filter(status=status)
+
+    qs = qs.order_by('-created_at')
+
+    total = qs.count()
+    start = (page - 1) * per_page
+    deliveries = qs[start:start + per_page]
+
+    results = []
+    for d in deliveries:
+        results.append({
+            'id': d.id,
+            'reference': d.reference,
+            'invoice_reference': d.invoice.reference if d.invoice else '',
+            'client_name': d.client_name,
+            'client_phone': d.client_phone,
+            'carrier': d.carrier.name if d.carrier else '',
+            'tracking_number': d.tracking_number,
+            'status': d.status,
+            'status_display': d.get_status_display(),
+            'delivery_method': d.get_delivery_method_type_display(),
+            'total_amount': str(d.total_amount or 0),
+            'current_position': d.current_position,
+            'destination': d.destination,
+            'created_at': d.created_at.strftime('%Y-%m-%d %H:%M') if d.created_at else '',
+        })
+
+    pages = (total + per_page - 1) // per_page
+    return JsonResponse({
+        'deliveries': results,
+        'total': total,
+        'page': page,
+        'pages': pages,
+        'has_next': page < pages,
+    })
+
+
+def catalog_update_delivery_status(request, token, delivery_id):
+    """Allow catalog user to update status of one of their own deliveries."""
+    from sales.models import Delivery
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST requis'}, status=405)
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        if isinstance(err, JsonResponse):
+            return err
+        return JsonResponse({'error': 'Authentification requise'}, status=401)
+
+    new_status = request.POST.get('status', '').strip()
+    valid = {choice[0] for choice in Delivery.Status.choices}
+    if new_status not in valid:
+        return JsonResponse({'error': 'Statut invalide'}, status=400)
+
+    try:
+        delivery = Delivery.objects.select_related('invoice').get(
+            id=delivery_id,
+            invoice__seller=catalog_token.user,
+            invoice__is_deleted=False,
+        )
+    except Delivery.DoesNotExist:
+        return JsonResponse({'error': 'Livraison introuvable'}, status=404)
+
+    delivery.status = new_status
+    delivery.save(update_fields=['status', 'updated_at'])
+    return JsonResponse({
+        'ok': True,
+        'status': delivery.status,
+        'status_display': delivery.get_status_display(),
+    })
+
+
 def _validate_catalog_password(password):
     """Returns error message string or None."""
     if not password:

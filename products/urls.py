@@ -47,6 +47,11 @@ urlpatterns = [
     path('catalog/manage/logs/', views.catalog_access_logs, name='catalog_access_logs'),
     path('catalog/<str:token>/', views.catalog_view, name='catalog'),
     path('catalog/<str:token>/api/products/', views.catalog_api, name='catalog_api'),
+    path('catalog/<str:token>/sales/', views.catalog_my_sales, name='catalog_my_sales'),
+    path('catalog/<str:token>/api/sales/', views.catalog_my_sales_api, name='catalog_my_sales_api'),
+    path('catalog/<str:token>/deliveries/', views.catalog_my_deliveries, name='catalog_my_deliveries'),
+    path('catalog/<str:token>/api/deliveries/', views.catalog_my_deliveries_api, name='catalog_my_deliveries_api'),
+    path('catalog/<str:token>/api/deliveries/<int:delivery_id>/status/', views.catalog_update_delivery_status, name='catalog_update_delivery_status'),
 
     # Product detail routes (catch-all, must be last)
     path('<str:reference>/', views.product_detail, name='detail'),

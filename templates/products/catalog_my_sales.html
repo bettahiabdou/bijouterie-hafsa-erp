@@ -1,0 +1,162 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Mes ventes - {{ catalog_name }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --gold:#b8860b; --gold-dark:#8b6914; --bg:#fafaf7; --text:#1a1a1a; --muted:#6b7280; --border:#e5e5e0; --radius:10px; --shadow:0 1px 3px rgba(0,0,0,0.08); }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); padding-bottom:env(safe-area-inset-bottom,0); }
+        .top-bar { position:sticky; top:0; z-index:100; background:var(--gold); padding:12px; display:flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(184,134,11,0.3); }
+        .top-bar h1 { color:white; font-size:14px; flex:1; font-weight:600; }
+        .top-bar a { color:white; text-decoration:none; padding:8px 10px; background:rgba(255,255,255,0.15); border-radius:8px; font-size:13px; }
+        .nav-tabs { display:flex; gap:6px; padding:10px 12px; background:white; border-bottom:1px solid var(--border); overflow-x:auto; }
+        .nav-tabs a { padding:8px 14px; border-radius:20px; text-decoration:none; color:var(--muted); font-size:13px; font-weight:600; background:#f3f4f6; white-space:nowrap; }
+        .nav-tabs a.active { background:var(--gold); color:white; }
+        .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; padding:12px; }
+        .stat-card { background:white; border-radius:var(--radius); padding:14px; box-shadow:var(--shadow); }
+        .stat-card .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+        .stat-card .value { font-size:18px; font-weight:700; color:var(--text); }
+        .filters { padding:0 12px 12px; display:flex; gap:8px; flex-wrap:wrap; }
+        .filters input, .filters select { padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; background:white; flex:1; min-width:140px; }
+        .list { padding:0 12px 80px; display:flex; flex-direction:column; gap:10px; }
+        .invoice-card { background:white; border-radius:var(--radius); padding:14px; box-shadow:var(--shadow); }
+        .invoice-card .row { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:6px; }
+        .ref { font-weight:700; font-size:14px; color:var(--text); }
+        .date { font-size:12px; color:var(--muted); }
+        .client { font-size:13px; color:var(--text); margin:4px 0; }
+        .amounts { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:8px; padding-top:8px; border-top:1px dashed #eee; }
+        .amount-item .lbl { color:var(--muted); display:block; font-size:10px; }
+        .amount-item .val { font-weight:700; font-size:14px; color:var(--text); }
+        .amount-item .val.due { color:#dc2626; }
+        .amount-item .val.paid { color:#059669; }
+        .badge { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
+        .badge-paid { background:#ecfdf5; color:#059669; }
+        .badge-unpaid { background:#fef2f2; color:#dc2626; }
+        .badge-partial { background:#fef3c7; color:#92400e; }
+        .badge-cancelled { background:#f3f4f6; color:#6b7280; }
+        .badge-default { background:#eff6ff; color:#1e40af; }
+        .empty { text-align:center; padding:60px 20px; color:var(--muted); }
+        .pager { display:flex; justify-content:center; gap:8px; padding:16px; }
+        .pager button { padding:8px 14px; background:white; border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13px; }
+        .pager button:disabled { opacity:.4; cursor:not-allowed; }
+        .delivery-info { font-size:11px; color:var(--muted); margin-top:6px; }
+        .delivery-info i { color:var(--gold); }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1><i class="fas fa-receipt"></i> Mes ventes</h1>
+        <a href="{% url 'products:catalog' token=token %}"><i class="fas fa-arrow-left"></i></a>
+    </div>
+
+    <div class="nav-tabs">
+        <a href="{% url 'products:catalog' token=token %}"><i class="fas fa-gem"></i> Catalogue</a>
+        <a href="{% url 'products:catalog_my_sales' token=token %}" class="active"><i class="fas fa-receipt"></i> Mes ventes</a>
+        <a href="{% url 'products:catalog_my_deliveries' token=token %}"><i class="fas fa-truck"></i> Mes livraisons</a>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="filters">
+        <input type="text" id="q" placeholder="Recherche (n° facture, client...)">
+        <select id="status">
+            <option value="">Tous les statuts</option>
+            <option value="paid">Payée</option>
+            <option value="unpaid">Non payée</option>
+            <option value="partial">Partiellement payée</option>
+            <option value="cancelled">Annulée</option>
+            <option value="returned">Retournée</option>
+        </select>
+        <input type="date" id="date_from">
+        <input type="date" id="date_to">
+    </div>
+
+    <div class="list" id="list">
+        <div class="empty"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>
+    </div>
+
+    <div class="pager" id="pager"></div>
+
+<script>
+const TOKEN = "{{ token }}";
+const API = `/products/catalog/${TOKEN}/api/sales/`;
+let currentPage = 1;
+
+function fmt(n) {
+    const v = parseFloat(n || 0);
+    return v.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' MAD';
+}
+function badgeClass(status) {
+    return ({paid:'badge-paid', unpaid:'badge-unpaid', partial:'badge-partial', cancelled:'badge-cancelled', returned:'badge-cancelled'})[status] || 'badge-default';
+}
+function load(page=1) {
+    currentPage = page;
+    const params = new URLSearchParams({
+        page,
+        q: document.getElementById('q').value,
+        status: document.getElementById('status').value,
+        date_from: document.getElementById('date_from').value,
+        date_to: document.getElementById('date_to').value,
+    });
+    fetch(`${API}?${params}`).then(r => r.json()).then(data => {
+        renderStats(data.stats);
+        renderList(data.invoices);
+        renderPager(data);
+    });
+}
+function renderStats(s) {
+    if (!s) return;
+    document.getElementById('stats').innerHTML = `
+        <div class="stat-card"><div class="label">Nb. ventes</div><div class="value">${s.count}</div></div>
+        <div class="stat-card"><div class="label">Total</div><div class="value">${fmt(s.total_sales)}</div></div>
+        <div class="stat-card"><div class="label">Encaissé</div><div class="value" style="color:#059669">${fmt(s.total_paid)}</div></div>
+        <div class="stat-card"><div class="label">Solde dû</div><div class="value" style="color:#dc2626">${fmt(s.total_due)}</div></div>
+    `;
+}
+function renderList(invoices) {
+    if (!invoices || !invoices.length) {
+        document.getElementById('list').innerHTML = '<div class="empty"><i class="fas fa-inbox" style="font-size:28px;display:block;margin-bottom:8px;"></i>Aucune vente</div>';
+        return;
+    }
+    document.getElementById('list').innerHTML = invoices.map(inv => `
+        <div class="invoice-card">
+            <div class="row">
+                <div>
+                    <div class="ref">${inv.reference}</div>
+                    <div class="date"><i class="far fa-calendar"></i> ${inv.date}</div>
+                </div>
+                <span class="badge ${badgeClass(inv.status)}">${inv.status_display}</span>
+            </div>
+            <div class="client"><i class="fas fa-user" style="color:var(--muted)"></i> ${inv.client}</div>
+            <div class="amounts">
+                <div class="amount-item"><span class="lbl">Total</span><span class="val">${fmt(inv.total_amount)}</span></div>
+                <div class="amount-item"><span class="lbl">Encaissé</span><span class="val paid">${fmt(inv.amount_paid)}</span></div>
+                ${parseFloat(inv.balance_due) > 0 ? `<div class="amount-item"><span class="lbl">Solde dû</span><span class="val due">${fmt(inv.balance_due)}</span></div>` : ''}
+            </div>
+            ${inv.delivery_method ? `<div class="delivery-info"><i class="fas fa-truck"></i> ${inv.delivery_method}${inv.delivery_reference ? ' — ' + inv.delivery_reference : ''}</div>` : ''}
+        </div>
+    `).join('');
+}
+function renderPager(data) {
+    if (!data.pages || data.pages <= 1) { document.getElementById('pager').innerHTML = ''; return; }
+    document.getElementById('pager').innerHTML = `
+        <button ${data.page <= 1 ? 'disabled' : ''} onclick="load(${data.page - 1})"><i class="fas fa-chevron-left"></i></button>
+        <span style="padding:8px 14px;">Page ${data.page} / ${data.pages}</span>
+        <button ${!data.has_next ? 'disabled' : ''} onclick="load(${data.page + 1})"><i class="fas fa-chevron-right"></i></button>
+    `;
+}
+let timer;
+['q','status','date_from','date_to'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => load(1), 300);
+    });
+});
+load(1);
+</script>
+</body>
+</html>
