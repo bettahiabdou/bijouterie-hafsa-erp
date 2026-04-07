@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <title>Catalogue — Connexion</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 32px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .login-header .icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #b8860b, #d4a52a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+        .login-header h1 {
+            font-size: 1.4rem;
+            color: #1e293b;
+            margin-bottom: 6px;
+        }
+        .login-header p {
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        .user-name {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            color: #475569;
+            text-align: center;
+        }
+        .user-name strong { color: #1e293b; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 6px;
+        }
+        .password-wrap { position: relative; }
+        .password-wrap input {
+            width: 100%;
+            padding: 12px 44px 12px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+            transition: all .15s;
+        }
+        .password-wrap input:focus {
+            border-color: #b8860b;
+            box-shadow: 0 0 0 3px rgba(184,134,11,0.1);
+        }
+        .password-wrap .toggle-vis {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 4px;
+        }
+        .error-msg {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, #b8860b, #d4a52a);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s;
+        }
+        .submit-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(184,134,11,0.3);
+        }
+        .footer-note {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-header">
+            <div class="icon"><i class="fas fa-lock"></i></div>
+            <h1>Catalogue Bijouterie Hafsa</h1>
+            <p>Veuillez vous identifier pour continuer</p>
+        </div>
+
+        <div class="user-name">
+            <i class="fas fa-user mr-2"></i> Compte: <strong>{{ catalog_name }}</strong>
+        </div>
+
+        {% if error %}
+        <div class="error-msg"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
+        {% endif %}
+
+        <form method="post" autocomplete="off">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="password">Mot de passe</label>
+                <div class="password-wrap">
+                    <input type="password" name="password" id="password" required autofocus
+                           autocomplete="current-password" spellcheck="false">
+                    <button type="button" class="toggle-vis" onclick="togglePwd()" tabindex="-1">
+                        <i class="fas fa-eye" id="eyeIcon"></i>
+                    </button>
+                </div>
+            </div>
+            <button type="submit" class="submit-btn">
+                <i class="fas fa-sign-in-alt mr-2"></i> Se connecter
+            </button>
+        </form>
+
+        <div class="footer-note">
+            Accès restreint — toutes les connexions sont enregistrées
+        </div>
+    </div>
+
+    <script>
+        function togglePwd() {
+            const input = document.getElementById('password');
+            const icon = document.getElementById('eyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        }
+    </script>
+</body>
+</html>

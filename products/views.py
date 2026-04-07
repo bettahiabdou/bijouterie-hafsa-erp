@@ -1555,11 +1555,92 @@ def _get_catalog_token(token):
         return None
 
 
+def _catalog_session_key(token_id):
+    return f'catalog_auth_{token_id}'
+
+
+def _catalog_is_authenticated(request, catalog_token):
+    """Token has no password OR session marks this token as authed."""
+    if not catalog_token.password_hash:
+        return True
+    return bool(request.session.get(_catalog_session_key(catalog_token.id)))
+
+
+def _catalog_throttle_key(request, token_str):
+    ip = get_client_ip(request) or 'unknown'
+    return f'catalog_throttle:{token_str}:{ip}'
+
+
+def _catalog_check_throttle(request, token_str):
+    """Returns (is_throttled, attempts_remaining). Max 5 fails per 15 min."""
+    from django.core.cache import cache
+    key = _catalog_throttle_key(request, token_str)
+    attempts = cache.get(key, 0)
+    return attempts >= 5, max(0, 5 - attempts)
+
+
+def _catalog_record_failure(request, token_str):
+    from django.core.cache import cache
+    key = _catalog_throttle_key(request, token_str)
+    attempts = cache.get(key, 0) + 1
+    cache.set(key, attempts, 15 * 60)  # 15 minutes
+    return attempts
+
+
+def _catalog_clear_throttle(request, token_str):
+    from django.core.cache import cache
+    cache.delete(_catalog_throttle_key(request, token_str))
+
+
 def catalog_view(request, token):
-    """Render the catalog page for the online team."""
+    """Render the catalog page for the online team. Requires per-token password."""
+    from .models import CatalogAccessLog
     catalog_token = _get_catalog_token(token)
     if not catalog_token:
         return render(request, 'products/catalog_invalid.html', status=403)
+
+    # Login flow if password protected
+    if catalog_token.password_hash and not _catalog_is_authenticated(request, catalog_token):
+        if request.method == 'POST':
+            is_throttled, _remaining = _catalog_check_throttle(request, token)
+            if is_throttled:
+                return render(request, 'products/catalog_login.html', {
+                    'token': token,
+                    'catalog_name': catalog_token.name,
+                    'error': 'Trop de tentatives. Réessayez dans 15 minutes.',
+                }, status=429)
+
+            password = request.POST.get('password', '')
+            if catalog_token.check_password(password):
+                _catalog_clear_throttle(request, token)
+                request.session[_catalog_session_key(catalog_token.id)] = True
+                # Sliding session: 8 hours
+                request.session.set_expiry(8 * 60 * 60)
+                # Log access
+                from django.utils import timezone
+                CatalogAccessLog.objects.create(
+                    token=catalog_token,
+                    ip_address=get_client_ip(request),
+                    user_agent=(request.META.get('HTTP_USER_AGENT') or '')[:500],
+                )
+                catalog_token.last_accessed_at = timezone.now()
+                catalog_token.access_count = (catalog_token.access_count or 0) + 1
+                catalog_token.save(update_fields=['last_accessed_at', 'access_count'])
+                return redirect('products:catalog', token=token)
+            else:
+                attempts = _catalog_record_failure(request, token)
+                remaining = max(0, 5 - attempts)
+                return render(request, 'products/catalog_login.html', {
+                    'token': token,
+                    'catalog_name': catalog_token.name,
+                    'error': f'Mot de passe incorrect. {remaining} tentative(s) restante(s).',
+                }, status=401)
+
+        # GET: show login form
+        return render(request, 'products/catalog_login.html', {
+            'token': token,
+            'catalog_name': catalog_token.name,
+        })
 
     context = {
         'token': token,
@@ -1576,6 +1657,9 @@ def catalog_api(request, token):
     catalog_token = _get_catalog_token(token)
     if not catalog_token:
         return JsonResponse({'error': 'Token invalide'}, status=403)
+
+    if not _catalog_is_authenticated(request, catalog_token):
+        return JsonResponse({'error': 'Authentification requise'}, status=401)
 
     # Parse filters
     q = request.GET.get('q', '').strip()
@@ -1712,9 +1796,24 @@ def catalog_api(request, token):
     })
 
 
+def _validate_catalog_password(password):
+    """Returns error message string or None."""
+    if not password:
+        return 'Le mot de passe est requis.'
+    if len(password) < 12:
+        return 'Le mot de passe doit contenir au moins 12 caractères.'
+    has_upper = any(c.isupper() for c in password)
+    has_lower = any(c.islower() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    has_symbol = any(not c.isalnum() for c in password)
+    if not (has_upper and has_lower and has_digit and has_symbol):
+        return 'Le mot de passe doit contenir majuscules, minuscules, chiffres et symboles.'
+    return None
+
+
 @login_required(login_url='login')
 def catalog_manage(request):
-    """Manage catalog access tokens."""
+    """Manage catalog access users (one CatalogToken = one user)."""
     from .models import CatalogToken
 
     if request.method == 'POST':
@@ -1722,11 +1821,33 @@ def catalog_manage(request):
 
         if action == 'create':
             name = request.POST.get('name', '').strip()
-            if name:
-                CatalogToken.objects.create(name=name, created_by=request.user)
-                messages.success(request, f'Token "{name}" créé.')
-            else:
+            password = request.POST.get('password', '')
+            if not name:
                 messages.error(request, 'Le nom est requis.')
+            else:
+                err = _validate_catalog_password(password)
+                if err:
+                    messages.error(request, err)
+                else:
+                    ct = CatalogToken(name=name, created_by=request.user)
+                    ct.set_password(password)
+                    ct.save()
+                    messages.success(request, f'Utilisateur "{name}" créé.')
+
+        elif action == 'change_password':
+            token_id = request.POST.get('token_id')
+            password = request.POST.get('password', '')
+            err = _validate_catalog_password(password)
+            if err:
+                messages.error(request, err)
+            else:
+                try:
+                    ct = CatalogToken.objects.get(id=token_id)
+                    ct.set_password(password)
+                    ct.save(update_fields=['password_hash'])
+                    messages.success(request, f'Mot de passe mis à jour pour "{ct.name}".')
+                except CatalogToken.DoesNotExist:
+                    messages.error(request, 'Utilisateur introuvable.')
 
         elif action == 'toggle':
             token_id = request.POST.get('token_id')
@@ -1735,18 +1856,18 @@ def catalog_manage(request):
                 ct.is_active = not ct.is_active
                 ct.save(update_fields=['is_active'])
                 status = 'activé' if ct.is_active else 'désactivé'
-                messages.success(request, f'Token "{ct.name}" {status}.')
+                messages.success(request, f'"{ct.name}" {status}.')
             except CatalogToken.DoesNotExist:
-                messages.error(request, 'Token introuvable.')
+                messages.error(request, 'Utilisateur introuvable.')
 
         elif action == 'delete':
             token_id = request.POST.get('token_id')
             try:
                 ct = CatalogToken.objects.get(id=token_id)
                 ct.delete()
-                messages.success(request, f'Token "{ct.name}" supprimé.')
+                messages.success(request, f'"{ct.name}" supprimé.')
             except CatalogToken.DoesNotExist:
-                messages.error(request, 'Token introuvable.')
+                messages.error(request, 'Utilisateur introuvable.')
 
         return redirect('products:catalog_manage')
 
@@ -1755,3 +1876,11 @@ def catalog_manage(request):
         'tokens': tokens,
     }
     return render(request, 'products/catalog_manage.html', context)
+
+
+@login_required(login_url='login')
+def catalog_access_logs(request):
+    """Show recent catalog accesses (who accessed when from which IP)."""
+    from .models import CatalogAccessLog
+    logs = CatalogAccessLog.objects.select_related('token').order_by('-accessed_at')[:200]
+    return render(request, 'products/catalog_access_logs.html', {'logs': logs})

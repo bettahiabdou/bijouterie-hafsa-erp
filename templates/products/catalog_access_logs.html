@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Historique des accès catalogue{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px;margin:0 auto;padding:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <h1 style="font-size:24px;"><i class="fas fa-history"></i> Historique des accès</h1>
+        <a href="{% url 'products:catalog_manage' %}" style="padding:10px 16px;background:#f3f4f6;border:1px solid #e5e5e0;border-radius:8px;text-decoration:none;color:#374151;font-size:14px;">
+            <i class="fas fa-arrow-left"></i> Retour à la gestion
+        </a>
+    </div>
+
+    {% if logs %}
+    <div style="background:white;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;">
+        <div style="padding:14px 20px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#6b7280;">
+            200 derniers accès — du plus récent au plus ancien
+        </div>
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+                <thead>
+                    <tr style="background:#f9fafb;text-align:left;">
+                        <th style="padding:12px 16px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">Date</th>
+                        <th style="padding:12px 16px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">Utilisateur</th>
+                        <th style="padding:12px 16px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">Adresse IP</th>
+                        <th style="padding:12px 16px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">User-Agent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr style="border-bottom:1px solid #f3f4f6;">
+                        <td style="padding:12px 16px;color:#374151;white-space:nowrap;">
+                            <i class="fas fa-clock" style="color:#9ca3af;"></i> {{ log.accessed_at|date:"d/m/Y H:i:s" }}
+                        </td>
+                        <td style="padding:12px 16px;font-weight:600;color:#1e293b;">
+                            <i class="fas fa-user" style="color:#b8860b;"></i> {{ log.token.name }}
+                        </td>
+                        <td style="padding:12px 16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#475569;">
+                            {{ log.ip_address|default:"—" }}
+                        </td>
+                        <td style="padding:12px 16px;color:#6b7280;font-size:12px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ log.user_agent }}">
+                            {{ log.user_agent|default:"—"|truncatechars:80 }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:60px 20px;color:#6b7280;background:white;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+        <i class="fas fa-history" style="font-size:36px;color:#d1d5db;margin-bottom:12px;display:block;"></i>
+        <p>Aucun accès enregistré pour le moment.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -3,70 +3,138 @@
 {% block title %}Gestion du Catalogue{% endblock %}
 
 {% block content %}
-<div style="max-width:800px;margin:0 auto;padding:20px;">
-    <h1 style="font-size:24px;margin-bottom:20px;"><i class="fas fa-link"></i> Liens du Catalogue</h1>
-
-    <!-- Create Token -->
-    <div style="background:white;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:24px;">
-        <h2 style="font-size:16px;margin-bottom:12px;">Creer un nouveau lien</h2>
-        <form method="post" style="display:flex;gap:10px;">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create">
-            <input type="text" name="name" placeholder="Nom (ex: Equipe Casablanca)" required
-                   style="flex:1;padding:10px 14px;border:1px solid #e5e5e0;border-radius:8px;font-size:14px;outline:none;">
-            <button type="submit" style="padding:10px 20px;background:#b8860b;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;">
-                <i class="fas fa-plus"></i> Creer
-            </button>
-        </form>
+<div style="max-width:900px;margin:0 auto;padding:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <h1 style="font-size:24px;"><i class="fas fa-users"></i> Accès au Catalogue</h1>
+        <a href="{% url 'products:catalog_access_logs' %}" style="padding:10px 16px;background:#f3f4f6;border:1px solid #e5e5e0;border-radius:8px;text-decoration:none;color:#374151;font-size:14px;">
+            <i class="fas fa-history"></i> Historique des accès
+        </a>
     </div>
 
-    <!-- Token List -->
+    {% if messages %}
+    {% for message in messages %}
+    <div style="padding:12px 16px;border-radius:8px;margin-bottom:12px;background:{% if message.tags == 'error' %}#fef2f2;color:#dc2626;border:1px solid #fecaca{% else %}#ecfdf5;color:#059669;border:1px solid #a7f3d0{% endif %};font-size:14px;">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Create User -->
+    <div style="background:white;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:24px;">
+        <h2 style="font-size:16px;margin-bottom:12px;"><i class="fas fa-user-plus"></i> Créer un nouvel utilisateur</h2>
+        <form method="post" autocomplete="off">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <input type="text" name="name" placeholder="Nom de l'utilisateur (ex: Ahmed - Casablanca)" required
+                       style="padding:10px 14px;border:1px solid #e5e5e0;border-radius:8px;font-size:14px;outline:none;">
+                <div style="display:flex;gap:8px;align-items:stretch;">
+                    <input type="password" name="password" id="newPwd" placeholder="Mot de passe (12+ car., maj/min/chiffre/symbole)" required
+                           autocomplete="new-password" spellcheck="false"
+                           style="flex:1;padding:10px 14px;border:1px solid #e5e5e0;border-radius:8px;font-size:14px;outline:none;">
+                    <button type="button" onclick="togglePwd('newPwd', this)" style="padding:10px 14px;background:#f3f4f6;border:1px solid #e5e5e0;border-radius:8px;cursor:pointer;">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button type="button" onclick="generatePwd('newPwd')" title="Générer un mot de passe" style="padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;cursor:pointer;color:#1e40af;">
+                        <i class="fas fa-magic"></i>
+                    </button>
+                </div>
+                <button type="submit" style="padding:12px 20px;background:#b8860b;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+                    <i class="fas fa-plus"></i> Créer l'utilisateur
+                </button>
+            </div>
+        </form>
+        <p style="font-size:12px;color:#6b7280;margin-top:10px;">
+            <i class="fas fa-info-circle"></i> Le mot de passe est haché (PBKDF2) et ne peut pas être récupéré. Notez-le avant de l'envoyer à l'utilisateur.
+        </p>
+    </div>
+
+    <!-- User List -->
     {% if tokens %}
     <div style="display:flex;flex-direction:column;gap:12px;">
         {% for ct in tokens %}
-        <div style="background:white;border-radius:10px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.08);display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <div style="flex:1;min-width:200px;">
-                <div style="font-weight:600;font-size:15px;{% if not ct.is_active %}opacity:0.5;text-decoration:line-through;{% endif %}">
-                    {{ ct.name }}
+        <div style="background:white;border-radius:10px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;">
+                    <div style="font-weight:600;font-size:15px;{% if not ct.is_active %}opacity:0.5;text-decoration:line-through;{% endif %}">
+                        <i class="fas fa-user"></i> {{ ct.name }}
+                    </div>
+                    <div style="font-size:12px;color:#6b7280;margin-top:4px;">
+                        Créé le {{ ct.created_at|date:"d/m/Y H:i" }}
+                        {% if ct.created_by %} par {{ ct.created_by.get_full_name|default:ct.created_by.username }}{% endif %}
+                    </div>
+                    {% if ct.last_accessed_at %}
+                    <div style="font-size:12px;color:#059669;margin-top:2px;">
+                        <i class="fas fa-clock"></i> Dernier accès: {{ ct.last_accessed_at|date:"d/m/Y H:i" }} ({{ ct.access_count }} fois)
+                    </div>
+                    {% else %}
+                    <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
+                        <i class="fas fa-clock"></i> Jamais connecté
+                    </div>
+                    {% endif %}
                 </div>
-                <div style="font-size:12px;color:#6b7280;margin-top:2px;">
-                    Cree le {{ ct.created_at|date:"d/m/Y H:i" }}
-                    {% if ct.created_by %} par {{ ct.created_by.get_full_name|default:ct.created_by.username }}{% endif %}
+
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    {% if ct.is_active %}
+                    <span style="padding:4px 10px;background:#ecfdf5;color:#059669;border-radius:20px;font-size:12px;font-weight:600;">Actif</span>
+                    {% else %}
+                    <span style="padding:4px 10px;background:#fef2f2;color:#dc2626;border-radius:20px;font-size:12px;font-weight:600;">Inactif</span>
+                    {% endif %}
+
+                    {% if ct.is_active %}
+                    <button onclick="copyLink('{{ request.scheme }}://{{ request.get_host }}/products/catalog/{{ ct.token }}/')" title="Copier le lien"
+                            style="padding:8px 12px;background:#f3f4f6;border:1px solid #e5e5e0;border-radius:6px;cursor:pointer;font-size:13px;">
+                        <i class="fas fa-copy"></i> Lien
+                    </button>
+                    {% endif %}
+
+                    <button onclick="togglePwdForm({{ ct.id }})" title="Changer le mot de passe"
+                            style="padding:8px 12px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;cursor:pointer;font-size:13px;color:#92400e;">
+                        <i class="fas fa-key"></i>
+                    </button>
+
+                    <form method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="toggle">
+                        <input type="hidden" name="token_id" value="{{ ct.id }}">
+                        <button type="submit" title="{% if ct.is_active %}Désactiver{% else %}Activer{% endif %}"
+                                style="padding:8px 12px;background:{% if ct.is_active %}#fef2f2{% else %}#ecfdf5{% endif %};border:1px solid #e5e5e0;border-radius:6px;cursor:pointer;font-size:13px;">
+                            <i class="fas fa-{% if ct.is_active %}pause{% else %}play{% endif %}"></i>
+                        </button>
+                    </form>
+
+                    <form method="post" style="display:inline;" onsubmit="return confirm('Supprimer cet utilisateur ? Tous les logs seront aussi supprimés.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="token_id" value="{{ ct.id }}">
+                        <button type="submit" title="Supprimer"
+                                style="padding:8px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;cursor:pointer;font-size:13px;color:#dc2626;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
                 </div>
             </div>
 
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                {% if ct.is_active %}
-                <span style="padding:4px 10px;background:#ecfdf5;color:#059669;border-radius:20px;font-size:12px;font-weight:600;">Actif</span>
-                {% else %}
-                <span style="padding:4px 10px;background:#fef2f2;color:#dc2626;border-radius:20px;font-size:12px;font-weight:600;">Inactif</span>
-                {% endif %}
-
-                {% if ct.is_active %}
-                <button onclick="copyLink('{{ request.scheme }}://{{ request.get_host }}/products/catalog/{{ ct.token }}/')" title="Copier le lien"
-                        style="padding:8px 12px;background:#f3f4f6;border:1px solid #e5e5e0;border-radius:6px;cursor:pointer;font-size:13px;">
-                    <i class="fas fa-copy"></i> Copier
-                </button>
-                {% endif %}
-
-                <form method="post" style="display:inline;">
+            <!-- Inline change-password form -->
+            <div id="pwd-form-{{ ct.id }}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #e5e7eb;">
+                <form method="post" autocomplete="off">
                     {% csrf_token %}
-                    <input type="hidden" name="action" value="toggle">
+                    <input type="hidden" name="action" value="change_password">
                     <input type="hidden" name="token_id" value="{{ ct.id }}">
-                    <button type="submit" title="{% if ct.is_active %}Desactiver{% else %}Activer{% endif %}"
-                            style="padding:8px 12px;background:{% if ct.is_active %}#fef2f2{% else %}#ecfdf5{% endif %};border:1px solid #e5e5e0;border-radius:6px;cursor:pointer;font-size:13px;">
-                        <i class="fas fa-{% if ct.is_active %}pause{% else %}play{% endif %}"></i>
-                    </button>
-                </form>
-
-                <form method="post" style="display:inline;" onsubmit="return confirm('Supprimer ce token ?');">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="token_id" value="{{ ct.id }}">
-                    <button type="submit" title="Supprimer"
-                            style="padding:8px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;cursor:pointer;font-size:13px;color:#dc2626;">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <div style="display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;">
+                        <input type="password" name="password" id="pwd-{{ ct.id }}" placeholder="Nouveau mot de passe" required
+                               autocomplete="new-password" spellcheck="false"
+                               style="flex:1;min-width:200px;padding:10px 14px;border:1px solid #e5e5e0;border-radius:8px;font-size:14px;outline:none;">
+                        <button type="button" onclick="togglePwd('pwd-{{ ct.id }}', this)" style="padding:10px 14px;background:#f3f4f6;border:1px solid #e5e5e0;border-radius:8px;cursor:pointer;">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button type="button" onclick="generatePwd('pwd-{{ ct.id }}')" style="padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;cursor:pointer;color:#1e40af;">
+                            <i class="fas fa-magic"></i>
+                        </button>
+                        <button type="submit" style="padding:10px 16px;background:#b8860b;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+                            Mettre à jour
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -74,8 +142,8 @@
     </div>
     {% else %}
     <div style="text-align:center;padding:40px;color:#6b7280;">
-        <i class="fas fa-link" style="font-size:36px;color:#d1d5db;margin-bottom:12px;display:block;"></i>
-        <p>Aucun lien de catalogue. Creez-en un ci-dessus.</p>
+        <i class="fas fa-users" style="font-size:36px;color:#d1d5db;margin-bottom:12px;display:block;"></i>
+        <p>Aucun utilisateur. Créez-en un ci-dessus.</p>
     </div>
     {% endif %}
 </div>
@@ -83,9 +151,53 @@
 <script>
 function copyLink(url) {
     navigator.clipboard.writeText(url).then(function() {
-        alert('Lien copie !');
+        alert('Lien copié !');
     }).catch(function() {
         prompt('Copiez ce lien:', url);
+    });
+}
+
+function togglePwd(id, btn) {
+    const input = document.getElementById(id);
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.querySelector('i').className = 'fas fa-eye-slash';
+    } else {
+        input.type = 'password';
+        btn.querySelector('i').className = 'fas fa-eye';
+    }
+}
+
+function togglePwdForm(id) {
+    const el = document.getElementById('pwd-form-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function generatePwd(id) {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = '!@#$%^&*-_=+?';
+    const all = upper + lower + digits + symbols;
+    const arr = new Uint32Array(16);
+    crypto.getRandomValues(arr);
+    let pwd = '';
+    // Guarantee one of each class
+    pwd += upper[arr[0] % upper.length];
+    pwd += lower[arr[1] % lower.length];
+    pwd += digits[arr[2] % digits.length];
+    pwd += symbols[arr[3] % symbols.length];
+    for (let i = 4; i < 16; i++) pwd += all[arr[i] % all.length];
+    // Shuffle
+    pwd = pwd.split('').sort(function() { return 0.5 - Math.random(); }).join('');
+    const input = document.getElementById(id);
+    input.type = 'text';
+    input.value = pwd;
+    // Copy to clipboard
+    navigator.clipboard.writeText(pwd).then(function() {
+        alert('Mot de passe généré et copié dans le presse-papier:\n\n' + pwd + '\n\nNotez-le maintenant !');
+    }).catch(function() {
+        alert('Mot de passe généré:\n\n' + pwd);
     });
 }
 </script>

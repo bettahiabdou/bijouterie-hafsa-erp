@@ -44,6 +44,7 @@ urlpatterns = [
 
     # Catalog (token-based access for online team)
     path('catalog/manage/', views.catalog_manage, name='catalog_manage'),
+    path('catalog/manage/logs/', views.catalog_access_logs, name='catalog_access_logs'),
     path('catalog/<str:token>/', views.catalog_view, name='catalog'),
     path('catalog/<str:token>/api/products/', views.catalog_api, name='catalog_api'),
 

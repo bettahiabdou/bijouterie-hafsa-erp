@@ -930,18 +930,30 @@ class RFIDInventorySession(models.Model):
 
 
 class CatalogToken(models.Model):
-    """Token-based access to the product catalog for the online sales team."""
+    """
+    Password-protected access to the product catalog for one online sales user.
+    The 'name' field identifies WHO this credential belongs to so accesses can
+    be attributed back to a specific person.
+    """
     token = models.CharField(
         _('Token'),
         max_length=64,
         unique=True,
     )
     name = models.CharField(
-        _('Nom'),
+        _('Nom de l\'utilisateur'),
         max_length=100,
-        help_text=_('Ex: Equipe en ligne Casablanca'),
+        help_text=_('Ex: Ahmed - Equipe Casablanca'),
+    )
+    password_hash = models.CharField(
+        _('Mot de passe (hash)'),
+        max_length=255,
+        blank=True,
+        help_text=_('Hash PBKDF2 du mot de passe — jamais en clair'),
     )
     is_active = models.BooleanField(_('Actif'), default=True)
+    last_accessed_at = models.DateTimeField(_('Dernier accès'), null=True, blank=True)
+    access_count = models.PositiveIntegerField(_('Nombre d\'accès'), default=0)
     created_by = models.ForeignKey(
         'users.User',
         on_delete=models.SET_NULL,
@@ -951,8 +963,8 @@ class CatalogToken(models.Model):
     created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
 
     class Meta:
-        verbose_name = _('Token catalogue')
-        verbose_name_plural = _('Tokens catalogue')
+        verbose_name = _('Accès catalogue')
+        verbose_name_plural = _('Accès catalogue')
 
     def __str__(self):
         return f"{self.name} ({'actif' if self.is_active else 'inactif'})"
@@ -962,3 +974,37 @@ class CatalogToken(models.Model):
             import secrets
             self.token = secrets.token_urlsafe(32)
         super().save(*args, **kwargs)
+
+    def set_password(self, raw_password):
+        from django.contrib.auth.hashers import make_password
+        self.password_hash = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        from django.contrib.auth.hashers import check_password
+        if not self.password_hash:
+            return False
+        return check_password(raw_password, self.password_hash)
+
+
+class CatalogAccessLog(models.Model):
+    """Logs each successful catalog login for audit / attribution."""
+    token = models.ForeignKey(
+        CatalogToken,
+        on_delete=models.CASCADE,
+        related_name='access_logs',
+    )
+    ip_address = models.GenericIPAddressField(_('Adresse IP'), null=True, blank=True)
+    user_agent = models.CharField(_('User-Agent'), max_length=500, blank=True)
+    accessed_at = models.DateTimeField(_('Date'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('Accès catalogue (log)')
+        verbose_name_plural = _('Accès catalogue (logs)')
+        ordering = ['-accessed_at']
+        indexes = [
+            models.Index(fields=['-accessed_at']),
+            models.Index(fields=['token', '-accessed_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.token.name} @ {self.accessed_at:%Y-%m-%d %H:%M}"
