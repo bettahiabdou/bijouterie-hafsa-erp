@@ -225,11 +225,21 @@
                                                 <label class="form-label"><i class="fas fa-image mr-1"></i> Image du Produit</label>
                                                 <div class="image-upload-area">
                                                     <input type="file" name="product_image_0" class="product_image form-input" accept="image/*" style="display: none;">
-                                                    <div class="image-upload-trigger" onclick="this.previousElementSibling.click()">
-                                                        <i class="fas fa-camera"></i>
-                                                        <span>Cliquez pour ajouter une image</span>
+                                                    <div style="display:flex; gap:var(--space-2); flex-wrap:wrap; align-items:stretch;">
+                                                        <div class="image-upload-trigger" onclick="this.parentElement.parentElement.querySelector('.product_image').click()" style="flex:1; min-width:160px;">
+                                                            <i class="fas fa-cloud-upload-alt"></i>
+                                                            <span>Fichier</span>
+                                                        </div>
+                                                        <button type="button" class="batch-img-action-btn batch-cam-btn" onclick="batchOpenCamera(this)">
+                                                            <i class="fas fa-camera"></i>
+                                                            <span>Webcam</span>
+                                                        </button>
+                                                        <button type="button" class="batch-img-action-btn batch-lib-btn" onclick="batchOpenLibrary(this)">
+                                                            <i class="fas fa-folder-open"></i>
+                                                            <span>Bibliothèque</span>
+                                                        </button>
                                                     </div>
-                                                    <div class="image-preview-container" style="display: none;">
+                                                    <div class="image-preview-container" style="display: none; margin-top: var(--space-2);">
                                                         <img class="image-preview" src="" alt="Preview">
                                                         <button type="button" class="btn btn-error btn-sm remove-image-btn">
                                                             <i class="fas fa-times"></i>
@@ -353,11 +363,21 @@
                                             <label class="form-label"><i class="fas fa-image mr-1"></i> Image du Produit</label>
                                             <div class="image-upload-area-mobile">
                                                 <input type="file" name="product_image_0" class="product_image_mobile" accept="image/*" style="display: none;">
-                                                <div class="image-upload-trigger-mobile" onclick="this.previousElementSibling.click()">
-                                                    <i class="fas fa-camera"></i>
-                                                    <span>Ajouter une image</span>
+                                                <div style="display:flex; gap:var(--space-2); flex-wrap:wrap;">
+                                                    <div class="image-upload-trigger-mobile" onclick="this.parentElement.parentElement.querySelector('.product_image_mobile').click()" style="flex:1; min-width:120px;">
+                                                        <i class="fas fa-cloud-upload-alt"></i>
+                                                        <span>Fichier</span>
+                                                    </div>
+                                                    <button type="button" class="batch-img-action-btn batch-cam-btn-mobile" onclick="batchOpenCameraMobile(this)">
+                                                        <i class="fas fa-camera"></i>
+                                                        <span>Webcam</span>
+                                                    </button>
+                                                    <button type="button" class="batch-img-action-btn batch-lib-btn-mobile" onclick="batchOpenLibraryMobile(this)">
+                                                        <i class="fas fa-folder-open"></i>
+                                                        <span>Bibliothèque</span>
+                                                    </button>
                                                 </div>
-                                                <div class="image-preview-container-mobile" style="display: none;">
+                                                <div class="image-preview-container-mobile" style="display: none; margin-top: var(--space-2);">
                                                     <img class="image-preview-mobile" src="" alt="Preview">
                                                     <button type="button" class="btn btn-error btn-sm remove-image-btn-mobile">
                                                         <i class="fas fa-times"></i>
@@ -419,6 +439,59 @@
             </button>
         </div>
     </form>
+
+    <!-- Camera Modal (shared) -->
+    <div id="batchCameraModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.8); align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:var(--radius-xl); padding:var(--space-4); max-width:640px; width:95%;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-3);">
+                <h3 style="margin:0; font-size:var(--text-lg);"><i class="fas fa-camera mr-2"></i>Prendre une photo</h3>
+                <button type="button" onclick="batchCloseCamera()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--neutral-500);">&times;</button>
+            </div>
+            <video id="batchCameraVideo" autoplay playsinline style="width:100%; border-radius:var(--radius-md); background:#000; display:block;"></video>
+            <canvas id="batchCameraCanvas" style="display:none;"></canvas>
+            <div id="batchCameraPreview" style="display:none; text-align:center;">
+                <img id="batchCameraPreviewImg" style="width:100%; border-radius:var(--radius-md);">
+            </div>
+            <div style="display:flex; gap:var(--space-3); margin-top:var(--space-3); justify-content:center;">
+                <button type="button" id="batchCaptureBtn" onclick="batchCapturePhoto()" class="btn btn-primary"><i class="fas fa-camera mr-2"></i>Capturer</button>
+                <button type="button" id="batchRetakeBtn" onclick="batchRetakePhoto()" class="btn btn-secondary" style="display:none;"><i class="fas fa-redo mr-2"></i>Reprendre</button>
+                <button type="button" id="batchUsePhotoBtn" onclick="batchUsePhoto()" class="btn btn-primary" style="display:none;"><i class="fas fa-check mr-2"></i>Utiliser</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Library Modal (shared) -->
+    <div id="batchLibraryModal" class="lib-modal-overlay">
+        <div class="lib-modal">
+            <div class="lib-modal-header">
+                <div>
+                    <h3 style="margin:0; font-size:var(--text-lg); font-weight:600;">
+                        <i class="fas fa-images mr-2" style="color:var(--primary-500);"></i>Bibliothèque d'images
+                    </h3>
+                    <p style="margin:4px 0 0; font-size:var(--text-xs); color:var(--neutral-400);">Cliquez sur une image pour l'ajouter</p>
+                </div>
+                <button type="button" onclick="batchCloseLibrary()" class="lib-modal-close">&times;</button>
+            </div>
+            <div class="lib-search-wrap">
+                <i class="fas fa-search lib-search-icon"></i>
+                <input type="text" id="batchLibrarySearch" class="lib-search-input" placeholder="Rechercher par nom de fichier..." oninput="batchLibrarySearchDebounce()">
+            </div>
+            <div class="lib-grid-wrapper">
+                <div id="batchLibraryGrid" class="lib-grid">
+                    <div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--neutral-400);">
+                        <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="lib-footer">
+                <span id="batchLibraryInfo" style="font-size:var(--text-xs); color:var(--neutral-400);"></span>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" id="batchLibraryPrev" onclick="batchLoadLibrary(batchLibraryPage-1)" class="btn btn-ghost btn-sm" disabled><i class="fas fa-chevron-left"></i> Précédent</button>
+                    <button type="button" id="batchLibraryNext" onclick="batchLoadLibrary(batchLibraryPage+1)" class="btn btn-ghost btn-sm" disabled>Suivant <i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Help Section -->
     <div class="card mt-6 animate-slide-up" style="animation-delay: 100ms;">
@@ -599,6 +672,100 @@
             align-items: center;
             justify-content: center;
             border-radius: 50%;
+        }
+
+        .batch-img-action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            padding: var(--space-3);
+            border: 2px dashed var(--primary-300);
+            border-radius: var(--radius-md);
+            background: var(--primary-50);
+            color: var(--primary-600);
+            cursor: pointer;
+            font-size: var(--text-sm);
+            font-weight: 500;
+            transition: all .15s;
+            min-width: 110px;
+        }
+        .batch-img-action-btn:hover {
+            background: var(--primary-100);
+            border-color: var(--primary-400);
+        }
+        .batch-lib-btn,
+        .batch-lib-btn-mobile {
+            border-color: var(--accent-300, #d8b4fe);
+            background: var(--accent-50, #fdf4ff);
+            color: var(--accent-600, #9333ea);
+        }
+        .batch-lib-btn:hover,
+        .batch-lib-btn-mobile:hover {
+            background: var(--accent-100, #f3e8ff);
+        }
+
+        /* Library modal */
+        .lib-modal-overlay {
+            display:none; position:fixed; inset:0; z-index:9999;
+            background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+            align-items:center; justify-content:center;
+        }
+        .lib-modal {
+            background:white; border-radius:16px;
+            max-width:960px; width:95%; height:88vh;
+            display:flex; flex-direction:column;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+            overflow:hidden;
+        }
+        .lib-modal-header {
+            display:flex; justify-content:space-between; align-items:flex-start;
+            padding:20px 24px 16px; border-bottom:1px solid var(--neutral-100);
+        }
+        .lib-modal-close {
+            background:var(--neutral-100); border:none; width:36px; height:36px;
+            border-radius:50%; font-size:1.3rem; cursor:pointer;
+            color:var(--neutral-500); display:flex; align-items:center; justify-content:center;
+        }
+        .lib-modal-close:hover { background:var(--neutral-200); }
+        .lib-search-wrap { position:relative; padding:12px 24px; }
+        .lib-search-icon {
+            position:absolute; left:38px; top:50%; transform:translateY(-50%);
+            color:var(--neutral-400); font-size:14px;
+        }
+        .lib-search-input {
+            width:100%; padding:10px 14px 10px 36px;
+            border:1px solid var(--neutral-200); border-radius:10px;
+            font-size:14px; background:var(--neutral-50); outline:none;
+        }
+        .lib-grid-wrapper { flex:1 1 0; min-height:0; overflow-y:auto; padding:16px 24px; }
+        .lib-grid {
+            display:grid; grid-template-columns:repeat(5, 1fr); gap:12px;
+        }
+        .lib-img-card {
+            position:relative; border-radius:10px; overflow:hidden;
+            cursor:pointer; aspect-ratio:1;
+            border:2px solid var(--neutral-100);
+            background:var(--neutral-50);
+            transition:all .2s;
+        }
+        .lib-img-card:hover {
+            border-color:var(--primary-400);
+            box-shadow:0 4px 16px rgba(0,0,0,0.12);
+        }
+        .lib-img-card img { width:100%; height:100%; object-fit:cover; display:block; }
+        .lib-footer {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:12px 24px; border-top:1px solid var(--neutral-100);
+            background:var(--neutral-50);
+        }
+        @media (max-width: 768px) {
+            .lib-grid { grid-template-columns:repeat(3, 1fr); gap:8px; }
+            .lib-grid-wrapper { padding:12px 16px; }
+            .lib-modal-header, .lib-search-wrap, .lib-footer { padding-left:16px; padding-right:16px; }
+        }
+        @media (max-width: 480px) {
+            .lib-grid { grid-template-columns:repeat(2, 1fr); }
         }
 
         /* Mobile Responsive */
@@ -1122,6 +1289,195 @@
                 }
             });
         }
+
+        // ===== SHARED CAMERA + LIBRARY FOR BATCH ROWS =====
+        let batchCameraStream = null;
+        let batchCapturedBlob = null;
+        let batchTargetInput = null; // The .product_image[_mobile] input awaiting a photo/lib selection
+
+        function batchAssignFileToInput(input, file) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            input.dispatchEvent(new Event('change'));
+        }
+
+        // ----- Camera (desktop) -----
+        function batchOpenCamera(btn) {
+            const area = btn.closest('.image-upload-area');
+            batchTargetInput = area ? area.querySelector('.product_image') : null;
+            batchStartCamera();
+        }
+        function batchOpenCameraMobile(btn) {
+            const area = btn.closest('.image-upload-area-mobile');
+            batchTargetInput = area ? area.querySelector('.product_image_mobile') : null;
+            batchStartCamera();
+        }
+
+        function batchStartCamera() {
+            if (!batchTargetInput) return;
+            const modal = document.getElementById('batchCameraModal');
+            const video = document.getElementById('batchCameraVideo');
+            const preview = document.getElementById('batchCameraPreview');
+            modal.style.display = 'flex';
+            preview.style.display = 'none';
+            video.style.display = 'block';
+            document.getElementById('batchCaptureBtn').style.display = '';
+            document.getElementById('batchRetakeBtn').style.display = 'none';
+            document.getElementById('batchUsePhotoBtn').style.display = 'none';
+
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+            }).then(function(stream) {
+                batchCameraStream = stream;
+                video.srcObject = stream;
+            }).catch(function(err) {
+                alert('Impossible d\'acceder a la camera: ' + err.message);
+                batchCloseCamera();
+            });
+        }
+
+        function batchCloseCamera() {
+            document.getElementById('batchCameraModal').style.display = 'none';
+            if (batchCameraStream) {
+                batchCameraStream.getTracks().forEach(function(t) { t.stop(); });
+                batchCameraStream = null;
+            }
+        }
+
+        function batchCapturePhoto() {
+            const video = document.getElementById('batchCameraVideo');
+            const canvas = document.getElementById('batchCameraCanvas');
+            const preview = document.getElementById('batchCameraPreview');
+            const previewImg = document.getElementById('batchCameraPreviewImg');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            canvas.toBlob(function(blob) {
+                batchCapturedBlob = blob;
+                previewImg.src = URL.createObjectURL(blob);
+                video.style.display = 'none';
+                preview.style.display = 'block';
+                document.getElementById('batchCaptureBtn').style.display = 'none';
+                document.getElementById('batchRetakeBtn').style.display = '';
+                document.getElementById('batchUsePhotoBtn').style.display = '';
+            }, 'image/jpeg', 0.9);
+        }
+
+        function batchRetakePhoto() {
+            const video = document.getElementById('batchCameraVideo');
+            const preview = document.getElementById('batchCameraPreview');
+            preview.style.display = 'none';
+            video.style.display = 'block';
+            document.getElementById('batchCaptureBtn').style.display = '';
+            document.getElementById('batchRetakeBtn').style.display = 'none';
+            document.getElementById('batchUsePhotoBtn').style.display = 'none';
+        }
+
+        function batchUsePhoto() {
+            if (!batchCapturedBlob || !batchTargetInput) return;
+            const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const file = new File([batchCapturedBlob], 'photo-' + ts + '.jpg', { type: 'image/jpeg' });
+            batchAssignFileToInput(batchTargetInput, file);
+            batchCloseCamera();
+        }
+
+        // ----- Library -----
+        let batchLibraryPage = 1;
+        let batchLibrarySearchTimer = null;
+
+        function batchOpenLibrary(btn) {
+            const area = btn.closest('.image-upload-area');
+            batchTargetInput = area ? area.querySelector('.product_image') : null;
+            batchShowLibrary();
+        }
+        function batchOpenLibraryMobile(btn) {
+            const area = btn.closest('.image-upload-area-mobile');
+            batchTargetInput = area ? area.querySelector('.product_image_mobile') : null;
+            batchShowLibrary();
+        }
+
+        function batchShowLibrary() {
+            if (!batchTargetInput) return;
+            document.getElementById('batchLibraryModal').style.display = 'flex';
+            document.getElementById('batchLibrarySearch').value = '';
+            batchLibraryPage = 1;
+            batchLoadLibrary(1);
+        }
+
+        function batchCloseLibrary() {
+            document.getElementById('batchLibraryModal').style.display = 'none';
+        }
+
+        function batchLibrarySearchDebounce() {
+            clearTimeout(batchLibrarySearchTimer);
+            batchLibrarySearchTimer = setTimeout(function() {
+                batchLibraryPage = 1;
+                batchLoadLibrary(1);
+            }, 300);
+        }
+
+        function batchLoadLibrary(page) {
+            batchLibraryPage = page;
+            const search = document.getElementById('batchLibrarySearch').value.trim();
+            const grid = document.getElementById('batchLibraryGrid');
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--neutral-400);"><i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i></div>';
+            let url = '{% url "products:server_images_api" %}?page=' + page;
+            if (search) url += '&search=' + encodeURIComponent(search);
+
+            fetch(url)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    grid.innerHTML = '';
+                    if (!data.images || data.images.length === 0) {
+                        grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--neutral-400);"><i class="fas fa-images" style="font-size:2.5rem;"></i><p>Aucune image trouvée</p></div>';
+                    } else {
+                        data.images.forEach(function(img) {
+                            const div = document.createElement('div');
+                            div.className = 'lib-img-card';
+                            div.innerHTML = '<img src="' + img.url + '" loading="lazy" alt="' + img.filename + '">';
+                            div.onclick = function() { batchSelectLibraryImage(img.url, img.filename); };
+                            grid.appendChild(div);
+                        });
+                    }
+                    document.getElementById('batchLibraryInfo').textContent = data.total + ' image(s) — Page ' + data.page;
+                    document.getElementById('batchLibraryPrev').disabled = (page <= 1);
+                    document.getElementById('batchLibraryNext').disabled = !data.has_next;
+                })
+                .catch(function(err) {
+                    console.error(err);
+                    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--error-500);"><i class="fas fa-exclamation-circle"></i><p>Erreur de chargement</p></div>';
+                });
+        }
+
+        function batchSelectLibraryImage(url, filename) {
+            if (!batchTargetInput) return;
+            fetch(url)
+                .then(function(r) { return r.blob(); })
+                .then(function(blob) {
+                    const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+                    batchAssignFileToInput(batchTargetInput, file);
+                    batchCloseLibrary();
+                })
+                .catch(function(err) {
+                    console.error(err);
+                    alert('Erreur lors du chargement de l\'image');
+                });
+        }
+
+        // Close modals on escape / click outside
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                batchCloseLibrary();
+                batchCloseCamera();
+            }
+        });
+        document.getElementById('batchLibraryModal').addEventListener('click', function(e) {
+            if (e.target === this) batchCloseLibrary();
+        });
+        document.getElementById('batchCameraModal').addEventListener('click', function(e) {
+            if (e.target === this) batchCloseCamera();
+        });
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
