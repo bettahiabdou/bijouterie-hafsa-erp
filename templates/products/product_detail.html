@@ -62,6 +62,9 @@
                             <i class="fas fa-folder-open"></i> <span class="desktop-only">Fichier</span>
                             <input type="file" id="fileInput" accept="image/*" multiple style="display: none;" onchange="uploadImages(this.files)">
                         </label>
+                        <button type="button" class="btn btn-sm" onclick="openLibrary()" style="margin: 0; background:var(--accent-50, #fdf4ff); color:var(--accent-600, #9333ea); border:1px solid var(--accent-300, #d8b4fe);">
+                            <i class="fas fa-images"></i> <span class="desktop-only">Bibliothèque</span>
+                        </button>
                     </div>
                     {% endif %}
                 </div>
@@ -1332,15 +1335,155 @@
             document.body.style.overflow = '';
         }
 
+        // ===== IMAGE LIBRARY =====
+        let libraryPage = 1;
+        let librarySearchTimer = null;
+
+        function openLibrary() {
+            document.getElementById('libraryModal').style.display = 'flex';
+            document.getElementById('librarySearch').value = '';
+            libraryPage = 1;
+            loadLibrary(1);
+        }
+
+        function closeLibrary() {
+            document.getElementById('libraryModal').style.display = 'none';
+        }
+
+        function librarySearchDebounce() {
+            clearTimeout(librarySearchTimer);
+            librarySearchTimer = setTimeout(function() {
+                libraryPage = 1;
+                loadLibrary(1);
+            }, 300);
+        }
+
+        function loadLibrary(page) {
+            libraryPage = page;
+            const search = document.getElementById('librarySearch').value.trim();
+            const grid = document.getElementById('libraryGrid');
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--neutral-400);"><i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i></div>';
+            let url = '{% url "products:server_images_api" %}?page=' + page;
+            if (search) url += '&search=' + encodeURIComponent(search);
+
+            fetch(url)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    grid.innerHTML = '';
+                    if (!data.images || data.images.length === 0) {
+                        grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--neutral-400);"><i class="fas fa-images" style="font-size:2.5rem;"></i><p>Aucune image trouvée</p></div>';
+                    } else {
+                        data.images.forEach(function(img) {
+                            const div = document.createElement('div');
+                            div.className = 'lib-img-card';
+                            div.innerHTML = '<img src="' + img.url + '" loading="lazy" alt="' + img.filename + '">' +
+                                '<div class="lib-img-overlay"><span class="lib-img-name">' + img.filename + '</span></div>';
+                            div.onclick = function() { selectLibraryImage(img.url, img.filename); };
+                            grid.appendChild(div);
+                        });
+                    }
+                    document.getElementById('libraryInfo').textContent = data.total + ' image(s) — Page ' + data.page;
+                    document.getElementById('libraryPrev').disabled = (page <= 1);
+                    document.getElementById('libraryNext').disabled = !data.has_next;
+                })
+                .catch(function(err) {
+                    console.error(err);
+                    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--error-500);"><i class="fas fa-exclamation-circle"></i><p>Erreur de chargement</p></div>';
+                });
+        }
+
+        function selectLibraryImage(url, filename) {
+            fetch(url)
+                .then(function(r) { return r.blob(); })
+                .then(function(blob) {
+                    const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    closeLibrary();
+                    uploadImages(dt.files);
+                })
+                .catch(function(err) {
+                    console.error(err);
+                    showNotification('error', 'Erreur lors du chargement de l\'image');
+                });
+        }
+
         // Close modal on escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closePrintModal();
                 closeLightbox();
                 closeWebcam();
+                closeLibrary();
             }
         });
     </script>
+
+    <!-- Library Modal -->
+    <div id="libraryModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:16px; max-width:960px; width:95%; height:88vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.3); overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:20px 24px 16px; border-bottom:1px solid var(--neutral-100);">
+                <div>
+                    <h3 style="margin:0; font-size:var(--text-lg); font-weight:600;">
+                        <i class="fas fa-images mr-2" style="color:var(--primary-500);"></i>Bibliothèque d'images
+                    </h3>
+                    <p style="margin:4px 0 0; font-size:var(--text-xs); color:var(--neutral-400);">Cliquez sur une image pour l'ajouter au produit</p>
+                </div>
+                <button type="button" onclick="closeLibrary()" style="background:var(--neutral-100); border:none; width:36px; height:36px; border-radius:50%; font-size:1.3rem; cursor:pointer; color:var(--neutral-500); display:flex; align-items:center; justify-content:center;">&times;</button>
+            </div>
+            <div style="position:relative; padding:12px 24px;">
+                <i class="fas fa-search" style="position:absolute; left:38px; top:50%; transform:translateY(-50%); color:var(--neutral-400); font-size:14px;"></i>
+                <input type="text" id="librarySearch" placeholder="Rechercher par nom de fichier..." oninput="librarySearchDebounce()" style="width:100%; padding:10px 14px 10px 36px; border:1px solid var(--neutral-200); border-radius:10px; font-size:14px; background:var(--neutral-50); outline:none;">
+            </div>
+            <div style="flex:1 1 0; min-height:0; overflow-y:auto; padding:16px 24px;">
+                <div id="libraryGrid" style="display:grid; grid-template-columns:repeat(5, 1fr); gap:12px;">
+                    <div style="grid-column:1/-1; text-align:center; padding:48px 16px; color:var(--neutral-400);">
+                        <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 24px; border-top:1px solid var(--neutral-100); background:var(--neutral-50);">
+                <span id="libraryInfo" style="font-size:var(--text-xs); color:var(--neutral-400);"></span>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" id="libraryPrev" onclick="loadLibrary(libraryPage-1)" class="btn btn-ghost btn-sm" disabled><i class="fas fa-chevron-left"></i> Précédent</button>
+                    <button type="button" id="libraryNext" onclick="loadLibrary(libraryPage+1)" class="btn btn-ghost btn-sm" disabled>Suivant <i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <style>
+        .lib-img-card {
+            position:relative; border-radius:10px; overflow:hidden;
+            cursor:pointer; aspect-ratio:1;
+            border:2px solid var(--neutral-100);
+            background:var(--neutral-50);
+            transition:all .2s;
+        }
+        .lib-img-card:hover {
+            border-color:var(--primary-400);
+            box-shadow:0 4px 16px rgba(0,0,0,0.12);
+            transform:translateY(-2px);
+        }
+        .lib-img-card img { width:100%; height:100%; object-fit:cover; display:block; }
+        .lib-img-card .lib-img-overlay {
+            position:absolute; inset:0;
+            background:linear-gradient(to top, rgba(0,0,0,0.5), transparent 50%);
+            opacity:0; transition:opacity .2s;
+            display:flex; align-items:flex-end; padding:8px;
+        }
+        .lib-img-card:hover .lib-img-overlay { opacity:1; }
+        .lib-img-card .lib-img-name {
+            color:white; font-size:10px; font-weight:500;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+            width:100%;
+        }
+        @media (max-width: 768px) {
+            #libraryGrid { grid-template-columns:repeat(3, 1fr) !important; gap:8px !important; }
+        }
+        @media (max-width: 480px) {
+            #libraryGrid { grid-template-columns:repeat(2, 1fr) !important; }
+        }
+    </style>
 
     <!-- Enhance Image Modal -->
     <div id="enhanceModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; overflow-y:auto; padding:20px 0;">
