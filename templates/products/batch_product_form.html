@@ -707,6 +707,7 @@
             setupImageUpload(newDetailRow, newIndex);
             updateRemoveButtons();
             updateImageInputNames();
+            updateProductPlaceholders();
             calculatePreview();
         }
 
@@ -774,6 +775,7 @@
 
             updateRemoveButtons();
             updateImageInputNames();
+            updateProductPlaceholders();
             calculatePreview();
         }
 
@@ -783,6 +785,7 @@
             card.remove();
             updateMobileProductNumbers();
             updateRemoveButtons();
+            updateProductPlaceholders();
             calculatePreview();
         }
 
@@ -805,6 +808,7 @@
                 detailRow.remove();
             }
             updateRemoveButtons();
+            updateProductPlaceholders();
             calculatePreview();
         }
 
@@ -844,6 +848,22 @@
                     input.addEventListener('change', calculatePreview);
                 });
             }
+        }
+
+        // Renumber placeholder text "Produit N" on all product name inputs
+        function updateProductPlaceholders() {
+            // Desktop
+            document.querySelectorAll('.product_item').forEach((item, idx) => {
+                const nameInput = item.querySelector('.product_name');
+                if (nameInput) nameInput.placeholder = 'Produit ' + (idx + 1);
+            });
+            // Mobile
+            document.querySelectorAll('.product_item_mobile').forEach((card, idx) => {
+                const nameInput = card.querySelector('.product_name_mobile');
+                if (nameInput) nameInput.placeholder = 'Produit ' + (idx + 1);
+                const numberLabel = card.querySelector('.mobile-product-number');
+                if (numberLabel) numberLabel.textContent = 'Produit #' + (idx + 1);
+            });
         }
 
         // Update remove buttons visibility for both views
@@ -916,8 +936,8 @@
                     }
 
                     const productNameInput = card.querySelector('.product_name_mobile');
-                    if (productNameInput && (!productNameInput.value || productNameInput.value.trim() === '')) {
-                        productNameInput.value = `Produit ${rowNumber}`;
+                    if (productNameInput) {
+                        productNameInput.placeholder = `Produit ${rowNumber}`;
                     }
 
                     totalEstimated += totalCost;
@@ -961,8 +981,8 @@
                     }
 
                     const productNameInput = item.querySelector('.product_name');
-                    if (!productNameInput.value || productNameInput.value.trim() === '') {
-                        productNameInput.value = `Produit ${rowNumber}`;
+                    if (productNameInput) {
+                        productNameInput.placeholder = `Produit ${rowNumber}`;
                     }
 
                     totalEstimated += totalCost;
