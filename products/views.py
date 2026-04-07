@@ -1993,6 +1993,45 @@ def catalog_my_deliveries_api(request, token):
     })
 
 
+def catalog_delivery_images(request, token, delivery_id):
+    """Return the InvoicePhotos attached to the sale of a given delivery."""
+    from sales.models import Delivery
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        if isinstance(err, JsonResponse):
+            return err
+        return JsonResponse({'error': 'Authentification requise'}, status=401)
+
+    try:
+        delivery = Delivery.objects.select_related('invoice').get(
+            id=delivery_id,
+            invoice__seller=catalog_token.user,
+            invoice__is_deleted=False,
+        )
+    except Delivery.DoesNotExist:
+        return JsonResponse({'error': 'Livraison introuvable'}, status=404)
+
+    photos = delivery.invoice.photos.all().order_by('uploaded_at')
+    results = []
+    for ph in photos:
+        if not ph.image:
+            continue
+        results.append({
+            'id': ph.id,
+            'url': ph.image.url,
+            'type': ph.photo_type,
+            'type_display': ph.get_photo_type_display(),
+            'caption': ph.caption or '',
+            'uploaded_at': ph.uploaded_at.strftime('%Y-%m-%d %H:%M') if ph.uploaded_at else '',
+        })
+    return JsonResponse({
+        'delivery_reference': delivery.reference,
+        'invoice_reference': delivery.invoice.reference,
+        'photos': results,
+        'count': len(results),
+    })
+
+
 def catalog_update_delivery_status(request, token, delivery_id):
     """Allow catalog user to update status of one of their own deliveries."""
     from sales.models import Delivery

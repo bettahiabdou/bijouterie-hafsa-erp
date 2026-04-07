@@ -39,6 +39,28 @@
         .pager { display:flex; justify-content:center; gap:8px; padding:16px; }
         .pager button { padding:8px 14px; background:white; border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13px; }
         .pager button:disabled { opacity:.4; cursor:not-allowed; }
+        .deliv-card { cursor:pointer; transition:box-shadow .15s, transform .15s; }
+        .deliv-card:active { transform:scale(0.99); }
+        .deliv-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.12); }
+        .img-hint { font-size:11px; color:var(--gold); margin-top:8px; font-weight:600; }
+        /* Modal */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; align-items:center; justify-content:center; padding:12px; }
+        .modal-overlay.open { display:flex; }
+        .modal-box { background:white; border-radius:14px; max-width:560px; width:100%; max-height:90vh; overflow:hidden; display:flex; flex-direction:column; }
+        .modal-head { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+        .modal-head h3 { font-size:15px; font-weight:700; }
+        .modal-head button { background:transparent; border:none; font-size:22px; cursor:pointer; color:var(--muted); }
+        .modal-body { padding:14px 18px; overflow-y:auto; flex:1; }
+        .photo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; }
+        .photo-tile { position:relative; aspect-ratio:1; border-radius:8px; overflow:hidden; background:#f3f4f6; cursor:zoom-in; }
+        .photo-tile img { width:100%; height:100%; object-fit:cover; }
+        .photo-tile .ptype { position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); color:white; font-size:10px; padding:4px 6px; text-align:center; }
+        .photo-empty { text-align:center; padding:30px 10px; color:var(--muted); }
+        /* Lightbox */
+        .lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:2000; align-items:center; justify-content:center; padding:20px; }
+        .lightbox.open { display:flex; }
+        .lightbox img { max-width:100%; max-height:100%; object-fit:contain; }
+        .lightbox .close { position:absolute; top:14px; right:14px; background:rgba(255,255,255,0.15); border:none; color:white; width:40px; height:40px; border-radius:50%; cursor:pointer; font-size:18px; }
     </style>
 </head>
 <body>
@@ -68,6 +90,25 @@
     </div>
 
     <div class="pager" id="pager"></div>
+
+    <!-- Photos modal -->
+    <div class="modal-overlay" id="imgModal" onclick="if(event.target===this)closeImages()">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 id="imgModalTitle"><i class="fas fa-images"></i> Photos</h3>
+                <button onclick="closeImages()">&times;</button>
+            </div>
+            <div class="modal-body" id="imgModalBody">
+                <div class="photo-empty"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <button class="close" onclick="closeLightbox()"><i class="fas fa-times"></i></button>
+        <img id="lightboxImg" src="" alt="">
+    </div>
 
 <script>
 const TOKEN = "{{ token }}";
@@ -104,7 +145,7 @@ function renderList(items) {
     document.getElementById('list').innerHTML = items.map(d => {
         const optsHtml = STATUS_OPTS.map(o => `<option value="${o.value}" ${o.value === d.status ? 'selected' : ''}>${o.label}</option>`).join('');
         return `
-        <div class="deliv-card" id="d-${d.id}">
+        <div class="deliv-card" id="d-${d.id}" onclick="openImages(${d.id}, event)">
             <div class="row">
                 <div>
                     <div class="ref">${d.reference}</div>
@@ -121,7 +162,8 @@ function renderList(items) {
                 <div><i class="fas fa-money-bill-wave"></i> ${fmt(d.total_amount)}</div>
                 <div><i class="far fa-clock"></i> ${d.created_at}</div>
             </div>
-            <div class="actions">
+            <div class="img-hint"><i class="fas fa-images"></i> Toucher pour voir les photos de la vente</div>
+            <div class="actions" onclick="event.stopPropagation()">
                 <select id="sel-${d.id}">${optsHtml}</select>
                 <button onclick="updateStatus(${d.id})"><i class="fas fa-save"></i> Mettre à jour</button>
             </div>
@@ -155,6 +197,55 @@ function renderPager(data) {
         <button ${!data.has_next ? 'disabled' : ''} onclick="load(${data.page + 1})"><i class="fas fa-chevron-right"></i></button>
     `;
 }
+function openImages(deliveryId, ev) {
+    if (ev && ev.target.closest('.actions')) return;
+    const modal = document.getElementById('imgModal');
+    const body = document.getElementById('imgModalBody');
+    const title = document.getElementById('imgModalTitle');
+    title.innerHTML = '<i class="fas fa-images"></i> Photos';
+    body.innerHTML = '<div class="photo-empty"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>';
+    modal.classList.add('open');
+    fetch(`/products/catalog/${TOKEN}/api/deliveries/${deliveryId}/images/`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                body.innerHTML = `<div class="photo-empty">${data.error}</div>`;
+                return;
+            }
+            title.innerHTML = `<i class="fas fa-images"></i> ${data.invoice_reference} <span style="font-size:12px;color:var(--muted);font-weight:400;">(${data.count})</span>`;
+            if (!data.photos || !data.photos.length) {
+                body.innerHTML = '<div class="photo-empty"><i class="fas fa-image" style="font-size:32px;display:block;margin-bottom:10px;"></i>Aucune photo n\'a été envoyée pour cette vente.</div>';
+                return;
+            }
+            body.innerHTML = '<div class="photo-grid">' + data.photos.map(p => `
+                <div class="photo-tile" onclick="openLightbox('${p.url}')" title="${p.caption || ''}">
+                    <img src="${p.url}" alt="${p.type_display}" loading="lazy">
+                    <div class="ptype">${p.type_display}</div>
+                </div>
+            `).join('') + '</div>';
+        })
+        .catch(() => {
+            body.innerHTML = '<div class="photo-empty">Erreur de chargement.</div>';
+        });
+}
+function closeImages() {
+    document.getElementById('imgModal').classList.remove('open');
+}
+function openLightbox(url) {
+    document.getElementById('lightboxImg').src = url;
+    document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+    document.getElementById('lightboxImg').src = '';
+}
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeLightbox();
+        closeImages();
+    }
+});
+
 let timer;
 ['q','status'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
