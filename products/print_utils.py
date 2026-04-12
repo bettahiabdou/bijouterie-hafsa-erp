@@ -164,7 +164,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
 """
 
     # 70×48mm at 8 dpmm (203 DPI) = 560×384 dots
-    x = 144
+    x = 192
     if size:
         zpl = f"""^XA
 ^CI28
@@ -183,9 +183,9 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
 ^LH0,0^LT0
 ^PW560
 ^LL384
-{rfid_commands}^FO144,130^A0N,24,22^FD{weight}g {purity}^FS
-^FO144,158^A0N,26,24^FD{short_ref}^FS
-^FO144,186^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
+{rfid_commands}^FO{x},130^A0N,24,22^FD{weight}g {purity}^FS
+^FO{x},158^A0N,26,24^FD{short_ref}^FS
+^FO{x},186^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -201,7 +201,7 @@ def generate_price_tag_zpl(product, quantity=1):
     if product.metal_purity:
         purity = product.metal_purity.name
 
-    x = 144
+    x = 192
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
@@ -239,7 +239,7 @@ def print_test_label(encode_rfid=True):
 ^RFW,H,2,12,1^FD{rfid_hex}^FS
 """
 
-    x = 144
+    x = 192
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
