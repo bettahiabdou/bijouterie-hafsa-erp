@@ -179,24 +179,24 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
     if size:
         zpl = f"""^XA
 ^CI28
-^LH0,0^LT0
+^LH0,0^LT0^LS-96
 ^PW560
 ^LL384
-{rfid_commands}^FO{x},100^A0N,28,26^FD{weight}g {purity}^FS
-^FO{x},132^A0N,20,18^FDT: {size}cm^FS
-^FO{x},157^A0N,30,26^FD{short_ref}^FS
-^FO{x},210^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
+{rfid_commands}^FO{x},164^A0N,28,26^FD{weight}g {purity}^FS
+^FO{x},196^A0N,20,18^FDT: {size}cm^FS
+^FO{x},221^A0N,30,26^FD{short_ref}^FS
+^FO{x},274^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     else:
         zpl = f"""^XA
 ^CI28
-^LH0,0^LT0
+^LH0,0^LT0^LS-96
 ^PW560
 ^LL384
-{rfid_commands}^FO{x},100^A0N,30,28^FD{weight}g {purity}^FS
-^FO{x},138^A0N,34,30^FD{short_ref}^FS
-^FO{x},210^BY1^BCN,60,N,N,N^FD{barcode_data}^FS
+{rfid_commands}^FO{x},164^A0N,30,28^FD{weight}g {purity}^FS
+^FO{x},202^A0N,34,30^FD{short_ref}^FS
+^FO{x},274^BY1^BCN,60,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -215,11 +215,11 @@ def generate_price_tag_zpl(product, quantity=1):
     x = 24  # Right side tag head
     zpl = f"""^XA
 ^CI28
-^LH0,0^LT0
+^LH0,0^LT0^LS-96
 ^PW560
 ^LL384
-^FO{x},110^A0N,45,40^FD{purity}^FS
-^FO{x},165^A0N,70,60^FD{price}^FS
+^FO{x},174^A0N,45,40^FD{purity}^FS
+^FO{x},229^A0N,70,60^FD{price}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -253,11 +253,11 @@ def print_test_label(encode_rfid=False):
     x = 24  # Right side tag head
     zpl = f"""^XA
 ^CI28
-^LH0,0^LT0
+^LH0,0^LT0^LS-96
 ^PW560
 ^LL384
-{rfid_commands}^FO{x},100^A0N,30,28^FD5.2g 18K^FS
-^FO{x},138^A0N,34,30^FD20260210-0001^FS
-^FO{x},210^BY1^BCN,60,N,N,N^FD20260210-0001^FS
+{rfid_commands}^FO{x},164^A0N,30,28^FD5.2g 18K^FS
+^FO{x},202^A0N,34,30^FD20260210-0001^FS
+^FO{x},274^BY1^BCN,60,N,N,N^FD20260210-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
