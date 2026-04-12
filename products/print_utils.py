@@ -179,7 +179,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
     if size:
         zpl = f"""^XA
 ^CI28
-^LH0,0^LT0^LS-96
+^LH0,0^LT0^LS96
 ^PW560
 ^LL384
 {rfid_commands}^FO{x},164^A0N,28,26^FD{weight}g {purity}^FS
@@ -191,7 +191,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
     else:
         zpl = f"""^XA
 ^CI28
-^LH0,0^LT0^LS-96
+^LH0,0^LT0^LS96
 ^PW560
 ^LL384
 {rfid_commands}^FO{x},164^A0N,30,28^FD{weight}g {purity}^FS
@@ -215,7 +215,7 @@ def generate_price_tag_zpl(product, quantity=1):
     x = 24  # Right side tag head
     zpl = f"""^XA
 ^CI28
-^LH0,0^LT0^LS-96
+^LH0,0^LT0^LS96
 ^PW560
 ^LL384
 ^FO{x},174^A0N,45,40^FD{purity}^FS
@@ -253,7 +253,7 @@ def print_test_label(encode_rfid=False):
     x = 24  # Right side tag head
     zpl = f"""^XA
 ^CI28
-^LH0,0^LT0^LS-96
+^LH0,0^LT0^LS96
 ^PW560
 ^LL384
 {rfid_commands}^FO{x},164^A0N,30,28^FD5.2g 18K^FS
