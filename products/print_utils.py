@@ -129,7 +129,7 @@ def string_to_hex(text, max_bytes=12):
     return hex_str
 
 
-def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
+def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
     """
     Generate ZPL for RFID jewelry hang tag
     Total label: 70x48mm at 8 dpmm (203 DPI) = 560×384 dots
@@ -237,9 +237,9 @@ def print_price_tag(product, quantity=1):
     return send_to_printer(zpl)
 
 
-def print_test_label(encode_rfid=True):
+def print_test_label(encode_rfid=False):
     """Print a test label for RFID jewelry hang tag — 70x48mm
-    Also encodes RFID with test reference if encode_rfid=True
+    Also encodes RFID with test reference if encode_rfid=False
     """
     test_reference = "PRD-TEST-20260210-0001"
 
