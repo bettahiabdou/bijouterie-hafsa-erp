@@ -188,9 +188,9 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
 ^LH0,0^LT0
 ^PW840
 ^LL576
-{rfid_commands}^FO{x},186^A0N,24,22^FD{weight}g {purity}^FS
-^FO{x},216^A0N,26,24^FD{short_ref}^FS
-^FO{x},240^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
+{rfid_commands}^FO500,186^A0N,24,22^FD{weight}g {purity}^FS
+^FO500,216^A0N,26,24^FD{short_ref}^FS
+^FO500,240^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
