@@ -169,7 +169,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
     # X=0 = far left
     # Top text zone: Y ~200-310 (centered upper area)
     # Barcode zone: Y ~350-460 (centered lower area)
-    x = 120
+    x = 240
     if size:
         zpl = f"""^XA
 ^CI28
@@ -206,7 +206,7 @@ def generate_price_tag_zpl(product, quantity=1):
     if product.metal_purity:
         purity = product.metal_purity.name
 
-    x = 120
+    x = 240
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
@@ -244,7 +244,7 @@ def print_test_label(encode_rfid=False):
 ^RFW,H,1,12,1^FD{rfid_hex}^FS
 """
 
-    x = 120
+    x = 240
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
