@@ -646,12 +646,12 @@ class SystemConfig(models.Model):
     )
     zebra_label_width = models.PositiveIntegerField(
         _('Largeur étiquette (mm)'),
-        default=50,
+        default=70,
         help_text=_('Largeur des étiquettes en millimètres')
     )
     zebra_label_height = models.PositiveIntegerField(
         _('Hauteur étiquette (mm)'),
-        default=25,
+        default=48,
         help_text=_('Hauteur des étiquettes en millimètres')
     )
 
