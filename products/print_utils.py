@@ -129,7 +129,7 @@ def string_to_hex(text, max_bytes=12):
     return hex_str
 
 
-def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
+def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
     """
     Generate ZPL for RFID jewelry hang tag
     Total label: 70x48mm at 8 dpmm (203 DPI) ZD621R = 560×384 dots
@@ -159,13 +159,12 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
         if not product.rfid_tag or product.rfid_tag != rfid_hex:
             from .models import Product as ProductModel
             ProductModel.objects.filter(pk=product.pk).update(rfid_tag=rfid_hex)
-        rfid_commands = f"""^RS8,3,,,N,192
-^RFW,H,1,12,1^FD{rfid_hex}^FS
+        rfid_commands = f"""^RS8,,,5,N,240
+^RFW,H,2,12,1^FD{rfid_hex}^FS
 """
 
     # 70×48mm at 8 dpmm (203 DPI) = 560×384 dots
-    # 18mm from left = 144 dots, but content was at ~240 so push left: X=96 (12mm)
-    x = 96
+    x = 0
     if size:
         zpl = f"""^XA
 ^CI28
@@ -202,7 +201,7 @@ def generate_price_tag_zpl(product, quantity=1):
     if product.metal_purity:
         purity = product.metal_purity.name
 
-    x = 96
+    x = 0
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
@@ -227,7 +226,7 @@ def print_price_tag(product, quantity=1):
     return send_to_printer(zpl)
 
 
-def print_test_label(encode_rfid=False):
+def print_test_label(encode_rfid=True):
     """Print a test label for RFID jewelry hang tag — 70x48mm
     Also encodes RFID with test reference if encode_rfid=False
     """
@@ -236,11 +235,11 @@ def print_test_label(encode_rfid=False):
     rfid_commands = ""
     if encode_rfid:
         rfid_hex = string_to_hex(test_reference)
-        rfid_commands = f"""^RS8,3,,,N,192
-^RFW,H,1,12,1^FD{rfid_hex}^FS
+        rfid_commands = f"""^RS8,,,5,N,240
+^RFW,H,2,12,1^FD{rfid_hex}^FS
 """
 
-    x = 96
+    x = 0
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
