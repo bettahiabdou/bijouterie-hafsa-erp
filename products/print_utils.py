@@ -132,12 +132,9 @@ def string_to_hex(text, max_bytes=12):
 def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
     """
     Generate ZPL for RFID jewelry hang tag
-    Total label: 70x48mm at 8 dpmm (203 DPI) = 560×384 dots
-    Left side = loop/antenna (RFID chip here)
-    Right side = printable tag head (25mm wide = 200 dots)
-    Two writable zones on the right: top 13mm + bottom 13mm
-
-    RFID: ^RS8 with position ~192 dots (chip is ~24mm from top edge)
+    Total label: 70x48mm at 12 dpmm (300 DPI) ZD621R = 840×576 dots
+    Two writable zones: top 13mm + bottom 13mm, each 25mm wide
+    Content centered vertically on the label.
     """
     full_reference = product.reference or "UNKNOWN"
 
@@ -158,45 +155,42 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
 
     size = product.size.strip() if product.size else ""
 
-    # RFID encoding — position parameter tells printer where the chip is
-    # ^RS8,3,,,N,192 = UHF Gen2, 3 retries, print VOID on error, chip at 192 dots (24mm)
     rfid_commands = ""
     if encode_rfid:
         rfid_hex = string_to_hex(full_reference)
         if not product.rfid_tag or product.rfid_tag != rfid_hex:
             from .models import Product as ProductModel
             ProductModel.objects.filter(pk=product.pk).update(rfid_tag=rfid_hex)
-        rfid_commands = f"""^RS8,3,,,N,192
+        rfid_commands = f"""^RS8,3,,,N,288
 ^RFW,H,1,12,1^FD{rfid_hex}^FS
 """
 
-    # Print area: RIGHT side of label (tag head)
-    # Label is 560 dots wide, writable head is rightmost 25mm (200 dots)
-    # X offset = 560 - 200 = 360 dots from left
-    # Top zone: Y 5 to 104 (13mm for weight, purity, ref)
-    # Bottom zone: Y 280 to 384 (13mm for barcode)
+    # 70×48mm at 12 dpmm = 840×576 dots
+    # X=0 = far left
+    # Top text zone: Y ~200-310 (centered upper area)
+    # Barcode zone: Y ~350-460 (centered lower area)
     x = 0
     if size:
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-{rfid_commands}^FO{x},164^A0N,28,26^FD{weight}g {purity}^FS
-^FO{x},196^A0N,20,18^FDT: {size}cm^FS
-^FO{x},221^A0N,30,26^FD{short_ref}^FS
-^FO{x},274^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
+^PW840
+^LL576
+{rfid_commands}^FO{x},200^A0N,42,40^FD{weight}g {purity}^FS
+^FO{x},248^A0N,30,28^FDT: {size}cm^FS
+^FO{x},284^A0N,42,38^FD{short_ref}^FS
+^FO{x},360^BY2^BCN,80,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     else:
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-{rfid_commands}^FO{x},164^A0N,30,28^FD{weight}g {purity}^FS
-^FO{x},202^A0N,34,30^FD{short_ref}^FS
-^FO{x},274^BY1^BCN,60,N,N,N^FD{barcode_data}^FS
+^PW840
+^LL576
+{rfid_commands}^FO{x},210^A0N,46,42^FD{weight}g {purity}^FS
+^FO{x},264^A0N,50,44^FD{short_ref}^FS
+^FO{x},360^BY2^BCN,90,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -204,7 +198,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
 
 def generate_price_tag_zpl(product, quantity=1):
     """
-    Generate ZPL for jewelry price tag — 70x48mm label
+    Generate ZPL for jewelry price tag — 70x48mm at 12 dpmm (300 DPI)
     """
     price = f"{product.selling_price:.0f}" if product.selling_price else "0"
 
@@ -212,14 +206,14 @@ def generate_price_tag_zpl(product, quantity=1):
     if product.metal_purity:
         purity = product.metal_purity.name
 
-    x = 0  # Right side tag head
+    x = 0
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-^FO{x},174^A0N,45,40^FD{purity}^FS
-^FO{x},229^A0N,70,60^FD{price}^FS
+^PW840
+^LL576
+^FO{x},200^A0N,70,60^FD{purity}^FS
+^FO{x},300^A0N,100,90^FD{price}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -250,14 +244,14 @@ def print_test_label(encode_rfid=False):
 ^RFW,H,1,12,1^FD{rfid_hex}^FS
 """
 
-    x = 0  # Right side tag head
+    x = 0
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-{rfid_commands}^FO{x},164^A0N,30,28^FD5.2g 18K^FS
-^FO{x},202^A0N,34,30^FD20260210-0001^FS
-^FO{x},274^BY1^BCN,60,N,N,N^FD20260210-0001^FS
+^PW840
+^LL576
+{rfid_commands}^FO{x},210^A0N,46,42^FD5.2g 18K^FS
+^FO{x},264^A0N,50,44^FD20260210-0001^FS
+^FO{x},360^BY2^BCN,90,N,N,N^FD20260210-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
