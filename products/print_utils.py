@@ -132,9 +132,7 @@ def string_to_hex(text, max_bytes=12):
 def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
     """
     Generate ZPL for RFID jewelry hang tag
-    Total label: 70x48mm at 12 dpmm (300 DPI) ZD621R = 840×576 dots
-    Two writable zones: top 13mm + bottom 13mm, each 25mm wide
-    Content centered vertically on the label.
+    Total label: 70x48mm at 8 dpmm (203 DPI) ZD621R = 560×384 dots
     """
     full_reference = product.reference or "UNKNOWN"
 
@@ -161,36 +159,34 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
         if not product.rfid_tag or product.rfid_tag != rfid_hex:
             from .models import Product as ProductModel
             ProductModel.objects.filter(pk=product.pk).update(rfid_tag=rfid_hex)
-        rfid_commands = f"""^RS8,3,,,N,288
+        rfid_commands = f"""^RS8,3,,,N,192
 ^RFW,H,1,12,1^FD{rfid_hex}^FS
 """
 
-    # 70×48mm at 12 dpmm = 840×576 dots
-    # X=0 = far left
-    # Top text zone: Y ~200-310 (centered upper area)
-    # Barcode zone: Y ~350-460 (centered lower area)
-    x = 240
+    # 70×48mm at 8 dpmm (203 DPI) = 560×384 dots
+    # 18mm from left = 144 dots, but content was at ~240 so push left: X=96 (12mm)
+    x = 96
     if size:
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW840
-^LL576
-{rfid_commands}^FO{x},176^A0N,22,20^FD{weight}g {purity}^FS
-^FO{x},202^A0N,16,14^FDT: {size}cm^FS
-^FO{x},222^A0N,22,20^FD{short_ref}^FS
-^FO{x},240^BY1^BCN,50,N,N,N^FD{barcode_data}^FS
+^PW560
+^LL384
+{rfid_commands}^FO{x},120^A0N,22,20^FD{weight}g {purity}^FS
+^FO{x},146^A0N,16,14^FDT: {size}cm^FS
+^FO{x},166^A0N,22,20^FD{short_ref}^FS
+^FO{x},190^BY1^BCN,50,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     else:
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW840
-^LL576
-{rfid_commands}^FO500,186^A0N,24,22^FD{weight}g {purity}^FS
-^FO500,216^A0N,26,24^FD{short_ref}^FS
-^FO500,240^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
+^PW560
+^LL384
+{rfid_commands}^FO{x},130^A0N,24,22^FD{weight}g {purity}^FS
+^FO{x},158^A0N,26,24^FD{short_ref}^FS
+^FO{x},186^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -198,7 +194,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=False):
 
 def generate_price_tag_zpl(product, quantity=1):
     """
-    Generate ZPL for jewelry price tag — 70x48mm at 12 dpmm (300 DPI)
+    Generate ZPL for jewelry price tag — 70x48mm at 8 dpmm (203 DPI)
     """
     price = f"{product.selling_price:.0f}" if product.selling_price else "0"
 
@@ -206,14 +202,14 @@ def generate_price_tag_zpl(product, quantity=1):
     if product.metal_purity:
         purity = product.metal_purity.name
 
-    x = 240
+    x = 96
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW840
-^LL576
-^FO{x},176^A0N,36,30^FD{purity}^FS
-^FO{x},226^A0N,50,45^FD{price}^FS
+^PW560
+^LL384
+^FO{x},130^A0N,36,30^FD{purity}^FS
+^FO{x},174^A0N,50,45^FD{price}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -244,14 +240,14 @@ def print_test_label(encode_rfid=False):
 ^RFW,H,1,12,1^FD{rfid_hex}^FS
 """
 
-    x = 240
+    x = 96
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW840
-^LL576
-{rfid_commands}^FO{x},186^A0N,24,22^FD5.2g 18K^FS
-^FO{x},216^A0N,26,24^FD20260210-0001^FS
-^FO{x},240^BY1^BCN,55,N,N,N^FD20260210-0001^FS
+^PW560
+^LL384
+{rfid_commands}^FO{x},130^A0N,24,22^FD5.2g 18K^FS
+^FO{x},158^A0N,26,24^FD20260210-0001^FS
+^FO{x},186^BY1^BCN,55,N,N,N^FD20260210-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
