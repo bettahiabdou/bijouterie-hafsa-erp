@@ -235,6 +235,12 @@
                             <span class="info-label">Categorie</span>
                             <span class="info-value">{{ product.category.name }}</span>
                         </div>
+                        {% if product.jewelry_type %}
+                        <div class="info-item">
+                            <span class="info-label">Type de bijou</span>
+                            <span class="info-value">{{ product.jewelry_type.name }}</span>
+                        </div>
+                        {% endif %}
                         <div class="info-item">
                             <span class="info-label">Statut</span>
                             <span class="badge {% if product.status == 'available' %}badge-success{% elif product.status == 'sold' %}badge-neutral{% elif product.status == 'in_repair' %}badge-warning{% else %}badge-info{% endif %}">

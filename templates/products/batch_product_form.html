@@ -122,6 +122,7 @@
                                     <th style="width: 40px;"></th>
                                     <th>Produit</th>
                                     <th>Categorie <span class="required">*</span></th>
+                                    <th>Type bijou</th>
                                     <th>Type <span class="required">*</span></th>
                                     <th>Poids Net (g) <span class="required">*</span></th>
                                     <th>Prix Vente (DH)</th>
@@ -144,6 +145,14 @@
                                             <option value="">--Select--</option>
                                             {% for category in categories %}
                                                 <option value="{{ category.id }}">{{ category.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="product_jewelry_type" class="product_jewelry_type form-select">
+                                            <option value="">--</option>
+                                            {% for jt in jewelry_types %}
+                                                <option value="{{ jt.id }}">{{ jt.name }}</option>
                                             {% endfor %}
                                         </select>
                                     </td>
@@ -171,7 +180,7 @@
                                 </tr>
                                 <!-- Detail row template -->
                                 <tr class="detail-row" style="display: none;">
-                                    <td colspan="7" style="background: var(--neutral-50); padding: var(--space-4);">
+                                    <td colspan="8" style="background: var(--neutral-50); padding: var(--space-4);">
                                         <div class="grid" style="grid-template-columns: repeat(6, 1fr); gap: var(--space-4);">
                                             <div class="form-group" style="margin-bottom: 0;">
                                                 <label class="form-label">Metal</label>

@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from .models import (
     MetalType, MetalPurity, ProductCategory, StoneType, StoneClarity,
     StoneColor, StoneCut, PaymentMethod, BankAccount, StockLocation,
-    DeliveryMethod, DeliveryPerson, Carrier, RepairType
+    DeliveryMethod, DeliveryPerson, Carrier, RepairType, JewelryType
 )
 
 
@@ -116,6 +116,14 @@ class DeliveryPersonAdmin(admin.ModelAdmin):
     list_display = ('name', 'phone', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name', 'phone')
+
+
+@admin.register(JewelryType)
+class JewelryTypeAdmin(admin.ModelAdmin):
+    """Admin for jewelry types"""
+    list_display = ('name', 'code', 'is_active')
+    search_fields = ('name', 'code')
+    list_filter = ('is_active',)
 
 
 @admin.register(Carrier)

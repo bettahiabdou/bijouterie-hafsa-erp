@@ -34,7 +34,7 @@ from settings_app.models import (
     StoneClarity, StoneColor, StoneCut, PaymentMethod,
     BankAccount, StockLocation, DeliveryMethod,
     DeliveryPerson, RepairType, CertificateIssuer,
-    CompanySettings, Carrier
+    CompanySettings, Carrier, JewelryType
 )
 # SystemConfig is imported in the view function to avoid migration issues
 
@@ -177,6 +177,14 @@ class ConfigurationRegistry:
             'label': 'Émetteurs de certificats',
             'singular': 'Émetteur',
             'fields': ['name', 'website', 'is_active'],
+            'list_display': ['name', 'code', 'is_active'],
+            'search_fields': ['name', 'code'],
+        },
+        'jewelry-types': {
+            'model': JewelryType,
+            'label': 'Types de bijoux',
+            'singular': 'Type de bijou',
+            'fields': ['name', 'name_ar', 'is_active'],
             'list_display': ['name', 'code', 'is_active'],
             'search_fields': ['name', 'code'],
         },

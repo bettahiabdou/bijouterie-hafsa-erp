@@ -323,6 +323,18 @@
                     </div>
 
                     <div class="form-group">
+                        <label class="form-label">Type de bijou</label>
+                        <select name="jewelry_type" class="form-select">
+                            <option value="">Non spécifié</option>
+                            {% for jt in jewelry_types %}
+                                <option value="{{ jt.id }}" {% if product.jewelry_type_id == jt.id %}selected{% endif %}>{{ jt.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
                         <label class="form-label">Code-barres</label>
                         <input type="text" name="barcode" value="{% if product %}{{ product.barcode }}{% endif %}" class="form-input" placeholder="Optionnel">
                     </div>

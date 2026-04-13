@@ -516,6 +516,36 @@ class CertificateIssuer(models.Model):
         super().save(*args, **kwargs)
 
 
+class JewelryType(models.Model):
+    """
+    Jewelry sub-types (Bague mariage, Bracelet moderne, etc.)
+    """
+    name = models.CharField(_('Nom'), max_length=100, unique=True)
+    name_ar = models.CharField(_('Nom (Arabe)'), max_length=100, blank=True)
+    code = models.CharField(_('Code'), max_length=20, unique=True)
+    is_active = models.BooleanField(_('Actif'), default=True)
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('Type de bijou')
+        verbose_name_plural = _('Types de bijoux')
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            base = self.name[:3].upper().replace(' ', '')
+            code = f"JT-{base}"
+            counter = 1
+            while JewelryType.objects.filter(code=code).exclude(pk=self.pk).exists():
+                code = f"JT-{base}{counter}"
+                counter += 1
+            self.code = code
+        super().save(*args, **kwargs)
+
+
 class CompanySettings(models.Model):
     """
     Company-wide settings (singleton)

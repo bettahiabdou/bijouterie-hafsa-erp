@@ -71,6 +71,14 @@ class Product(models.Model):
         related_name='products',
         verbose_name=_('Catégorie')
     )
+    jewelry_type = models.ForeignKey(
+        'settings_app.JewelryType',
+        on_delete=models.PROTECT,
+        related_name='products',
+        verbose_name=_('Type de bijou'),
+        null=True,
+        blank=True
+    )
 
     # Metal details
     metal_type = models.ForeignKey(

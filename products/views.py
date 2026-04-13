@@ -11,7 +11,7 @@ from django.http import JsonResponse
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from .models import Product, ProductImage, ProductStone
 from .print_utils import print_product_label, print_price_tag, print_test_label, generate_product_label_zpl, generate_price_tag_zpl, queue_print_job, send_to_printer
-from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount
+from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount, JewelryType
 from suppliers.models import Supplier
 from users.models import ActivityLog
 from PIL import Image
@@ -126,7 +126,7 @@ def convert_image_to_jpeg(image_file):
 def product_list(request):
     """List all products with filtering and search"""
     products = Product.objects.select_related(
-        'category', 'metal_type', 'metal_purity'
+        'category', 'metal_type', 'metal_purity', 'jewelry_type'
     ).prefetch_related('images')
 
     # Search
@@ -196,7 +196,7 @@ def product_detail(request, reference):
     """Display product details"""
     product = get_object_or_404(
         Product.objects.select_related(
-            'category', 'metal_type', 'metal_purity'
+            'category', 'metal_type', 'metal_purity', 'jewelry_type'
         ).prefetch_related('images', 'stones'),
         reference=reference
     )
@@ -269,6 +269,7 @@ def batch_product_create(request):
             product_banks = request.POST.getlist('product_bank_account')
             product_suppliers = request.POST.getlist('product_supplier')
             product_sizes = request.POST.getlist('product_size')
+            product_jewelry_types = request.POST.getlist('product_jewelry_type')
 
             # Check if we should print labels
             print_labels = request.POST.get('print_labels') == '1'
@@ -308,12 +309,14 @@ def batch_product_create(request):
                     product_bank_id = product_banks[i] if i < len(product_banks) else None
                     product_supplier_id = product_suppliers[i] if i < len(product_suppliers) else None
                     product_size = product_sizes[i].strip() if i < len(product_sizes) else ''
+                    product_jewelry_type_id = product_jewelry_types[i] if i < len(product_jewelry_types) else None
 
                     # Create product instance (don't save yet)
                     product = Product(
                         name=product_name,
                         product_type=product_product_type,
                         category_id=product_category_id,
+                        jewelry_type_id=product_jewelry_type_id if product_jewelry_type_id else None,
                         metal_type_id=product_metal_id if product_metal_id else None,
                         metal_purity_id=product_purity_id if product_purity_id else None,
                         net_weight=weight_net,
@@ -430,6 +433,7 @@ def batch_product_create(request):
         'bank_accounts': BankAccount.objects.filter(is_active=True),
         'suppliers': Supplier.objects.filter(is_active=True),
         'product_types': Product.ProductType.choices,
+        'jewelry_types': JewelryType.objects.filter(is_active=True),
     }
 
     return render(request, 'products/batch_product_form.html', context)
@@ -468,6 +472,7 @@ def product_create(request):
                     'purities': MetalPurity.objects.filter(is_active=True),
                     'bank_accounts': BankAccount.objects.filter(is_active=True),
                     'product_types': Product.ProductType.choices,
+                    'jewelry_types': JewelryType.objects.filter(is_active=True),
                 })
 
             # Get size and length
@@ -482,6 +487,7 @@ def product_create(request):
                 description=request.POST.get('description', ''),
                 product_type=request.POST.get('product_type', 'finished'),
                 category_id=request.POST.get('category'),
+                jewelry_type_id=request.POST.get('jewelry_type') or None,
                 metal_type_id=request.POST.get('metal_type') or None,
                 metal_purity_id=request.POST.get('metal_purity') or None,
                 gross_weight=gross_weight,
@@ -549,6 +555,7 @@ def product_create(request):
         'purities': MetalPurity.objects.filter(is_active=True),
         'bank_accounts': BankAccount.objects.filter(is_active=True),
         'product_types': Product.ProductType.choices,
+        'jewelry_types': JewelryType.objects.filter(is_active=True),
     }
 
     return render(request, 'products/product_form.html', context)
@@ -603,6 +610,10 @@ def product_edit(request, reference):
             # Foreign keys
             if request.POST.get('category'):
                 product.category_id = request.POST.get('category')
+            if request.POST.get('jewelry_type'):
+                product.jewelry_type_id = request.POST.get('jewelry_type')
+            else:
+                product.jewelry_type_id = None
             if request.POST.get('metal_type'):
                 product.metal_type_id = request.POST.get('metal_type')
             else:
@@ -675,6 +686,7 @@ def product_edit(request, reference):
         'purities': MetalPurity.objects.filter(is_active=True),
         'bank_accounts': BankAccount.objects.filter(is_active=True),
         'product_types': Product.ProductType.choices,
+        'jewelry_types': JewelryType.objects.filter(is_active=True),
         'statuses': Product.Status.choices,
     }
 
@@ -1271,7 +1283,7 @@ def smart_search_api(request):
         Q(barcode__icontains=query) |
         Q(description__icontains=query) |
         Q(category__name__icontains=query)
-    ).select_related('category', 'metal_type', 'metal_purity')[:10]
+    ).select_related('category', 'metal_type', 'metal_purity', 'jewelry_type')[:10]
 
     # If keyword search found results, use those
     if keyword_results.exists():
@@ -1287,7 +1299,7 @@ def smart_search_api(request):
             product_ids = [r['product_id'] for r in semantic_results]
             products = Product.objects.filter(
                 id__in=product_ids
-            ).select_related('category', 'metal_type', 'metal_purity')
+            ).select_related('category', 'metal_type', 'metal_purity', 'jewelry_type')
 
             # Maintain score ordering
             products_dict = {p.id: p for p in products}
@@ -1570,7 +1582,7 @@ def public_catalog_api(request):
 
     qs = Product.objects.filter(
         status=Product.Status.AVAILABLE
-    ).select_related('category', 'metal_type', 'metal_purity').prefetch_related('images')
+    ).select_related('category', 'metal_type', 'metal_purity', 'jewelry_type').prefetch_related('images')
 
     if q:
         qs = qs.filter(
