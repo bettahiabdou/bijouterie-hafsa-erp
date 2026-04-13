@@ -159,7 +159,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
         if not product.rfid_tag or product.rfid_tag != rfid_hex:
             from .models import Product as ProductModel
             ProductModel.objects.filter(pk=product.pk).update(rfid_tag=rfid_hex)
-        rfid_commands = f"""^RS8,,,5,N,240
+        rfid_commands = f"""^RS8,,,10,N,240
 ^RFW,H,2,12,1^FD{rfid_hex}^FS
 """
 
@@ -235,7 +235,7 @@ def print_test_label(encode_rfid=True):
     rfid_commands = ""
     if encode_rfid:
         rfid_hex = string_to_hex(test_reference)
-        rfid_commands = f"""^RS8,,,5,N,240
+        rfid_commands = f"""^RS8,,,10,N,240
 ^RFW,H,2,12,1^FD{rfid_hex}^FS
 """
 
