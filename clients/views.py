@@ -296,7 +296,7 @@ def api_search_clients(request):
         Q(last_name__icontains=query) |
         Q(phone__icontains=query) |
         Q(code__icontains=query)
-    ).filter(is_active=True)[:10]
+    ).filter(is_active=True).order_by('first_name', 'last_name')[:50]
 
     results = []
     for client in clients:
