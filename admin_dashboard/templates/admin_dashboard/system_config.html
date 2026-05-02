@@ -123,6 +123,74 @@
                         <span class="checkbox-text">Activer l'imprimante Zebra</span>
                     </label>
                 </div>
+
+                <hr style="margin: var(--space-4) 0; border: 0; border-top: 1px solid var(--neutral-200);">
+                <h4 style="margin-bottom: var(--space-3); font-family: var(--font-display);">Position du contenu sur l'étiquette</h4>
+                <p class="config-description" style="margin-bottom: var(--space-3);">
+                    Ajustez la position du texte et du code-barres en millimètres depuis le coin haut-gauche de l'étiquette.
+                </p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Position X texte (mm)</label>
+                        <input type="number" name="zebra_label_x_mm" value="{{ form.zebra_label_x_mm.value|default:'32' }}"
+                            class="form-input" min="0" max="200">
+                        <small style="color: var(--neutral-500);">Décalage horizontal commun à tous les éléments</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Position Y poids (mm)</label>
+                        <input type="number" name="zebra_label_weight_y_mm" value="{{ form.zebra_label_weight_y_mm.value|default:'17' }}"
+                            class="form-input" min="0" max="200">
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Position Y taille (mm)</label>
+                        <input type="number" name="zebra_label_size_y_mm" value="{{ form.zebra_label_size_y_mm.value|default:'20' }}"
+                            class="form-input" min="0" max="200">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Position Y référence (mm)</label>
+                        <input type="number" name="zebra_label_ref_y_mm" value="{{ form.zebra_label_ref_y_mm.value|default:'23' }}"
+                            class="form-input" min="0" max="200">
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Position Y code-barres (mm)</label>
+                        <input type="number" name="zebra_label_barcode_y_mm" value="{{ form.zebra_label_barcode_y_mm.value|default:'31' }}"
+                            class="form-input" min="0" max="200">
+                    </div>
+                </div>
+
+                <hr style="margin: var(--space-4) 0; border: 0; border-top: 1px solid var(--neutral-200);">
+                <h4 style="margin-bottom: var(--space-3); font-family: var(--font-display);">Encodage RFID</h4>
+                <div class="form-group form-checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="zebra_rfid_enabled" {% if config.zebra_rfid_enabled %}checked{% endif %}>
+                        <span class="checkbox-text">Activer l'encodage RFID lors de l'impression</span>
+                    </label>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Position de programmation (dots)</label>
+                        <input type="number" name="zebra_rfid_position" value="{{ form.zebra_rfid_position.value|default:'240' }}"
+                            class="form-input" min="0" max="9999">
+                        <small style="color: var(--neutral-500);">PROG. POSITION sur la fiche imprimante</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tentatives</label>
+                        <input type="number" name="zebra_rfid_retries" value="{{ form.zebra_rfid_retries.value|default:'10' }}"
+                            class="form-input" min="1" max="50">
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Banque mémoire</label>
+                        <input type="number" name="zebra_rfid_bank" value="{{ form.zebra_rfid_bank.value|default:'2' }}"
+                            class="form-input" min="1" max="4">
+                        <small style="color: var(--neutral-500);">1=Reserved, 2=EPC, 3=TID, 4=User</small>
+                    </div>
+                </div>
             </div>
         </div>
 

@@ -985,6 +985,13 @@ def system_config_edit(request):
                 # Zebra Printer
                 'zebra_printer_ip', 'zebra_printer_port', 'zebra_printer_enabled',
                 'zebra_label_width', 'zebra_label_height',
+                # Label content positioning
+                'zebra_label_x_mm',
+                'zebra_label_weight_y_mm', 'zebra_label_size_y_mm',
+                'zebra_label_ref_y_mm', 'zebra_label_barcode_y_mm',
+                # RFID encoding
+                'zebra_rfid_enabled', 'zebra_rfid_position',
+                'zebra_rfid_retries', 'zebra_rfid_bank',
                 # Server
                 'server_base_url', 'debug_mode',
                 # SMTP
@@ -1004,6 +1011,15 @@ def system_config_edit(request):
                 'zebra_printer_enabled': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
                 'zebra_label_width': forms.NumberInput(attrs={'class': 'form-input', 'min': 10, 'max': 200}),
                 'zebra_label_height': forms.NumberInput(attrs={'class': 'form-input', 'min': 10, 'max': 200}),
+                'zebra_label_x_mm': forms.NumberInput(attrs={'class': 'form-input', 'min': 0, 'max': 200}),
+                'zebra_label_weight_y_mm': forms.NumberInput(attrs={'class': 'form-input', 'min': 0, 'max': 200}),
+                'zebra_label_size_y_mm': forms.NumberInput(attrs={'class': 'form-input', 'min': 0, 'max': 200}),
+                'zebra_label_ref_y_mm': forms.NumberInput(attrs={'class': 'form-input', 'min': 0, 'max': 200}),
+                'zebra_label_barcode_y_mm': forms.NumberInput(attrs={'class': 'form-input', 'min': 0, 'max': 200}),
+                'zebra_rfid_enabled': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+                'zebra_rfid_position': forms.NumberInput(attrs={'class': 'form-input', 'min': 0, 'max': 9999}),
+                'zebra_rfid_retries': forms.NumberInput(attrs={'class': 'form-input', 'min': 1, 'max': 50}),
+                'zebra_rfid_bank': forms.NumberInput(attrs={'class': 'form-input', 'min': 1, 'max': 4}),
                 'server_base_url': forms.URLInput(attrs={'class': 'form-input', 'placeholder': 'https://erp.example.com'}),
                 'debug_mode': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
                 'smtp_host': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'smtp.gmail.com'}),

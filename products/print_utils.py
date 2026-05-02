@@ -129,11 +129,62 @@ def string_to_hex(text, max_bytes=12):
     return hex_str
 
 
-def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
+DPMM = 8  # 203 DPI Zebra ZD621R = 8 dots per mm
+
+
+def get_label_config():
+    """Fetch label/RFID config from SystemConfig with fallback defaults."""
+    defaults = {
+        'width_mm': 70,
+        'height_mm': 48,
+        'x_mm': 32,
+        'weight_y_mm': 17,
+        'size_y_mm': 20,
+        'ref_y_mm': 23,
+        'barcode_y_mm': 31,
+        'rfid_enabled': True,
+        'rfid_position': 240,
+        'rfid_retries': 10,
+        'rfid_bank': 2,
+    }
+    try:
+        from settings_app.models import SystemConfig
+        cfg = SystemConfig.get_config()
+        return {
+            'width_mm': cfg.zebra_label_width or defaults['width_mm'],
+            'height_mm': cfg.zebra_label_height or defaults['height_mm'],
+            'x_mm': cfg.zebra_label_x_mm if cfg.zebra_label_x_mm is not None else defaults['x_mm'],
+            'weight_y_mm': cfg.zebra_label_weight_y_mm if cfg.zebra_label_weight_y_mm is not None else defaults['weight_y_mm'],
+            'size_y_mm': cfg.zebra_label_size_y_mm if cfg.zebra_label_size_y_mm is not None else defaults['size_y_mm'],
+            'ref_y_mm': cfg.zebra_label_ref_y_mm if cfg.zebra_label_ref_y_mm is not None else defaults['ref_y_mm'],
+            'barcode_y_mm': cfg.zebra_label_barcode_y_mm if cfg.zebra_label_barcode_y_mm is not None else defaults['barcode_y_mm'],
+            'rfid_enabled': cfg.zebra_rfid_enabled,
+            'rfid_position': cfg.zebra_rfid_position or defaults['rfid_position'],
+            'rfid_retries': cfg.zebra_rfid_retries or defaults['rfid_retries'],
+            'rfid_bank': cfg.zebra_rfid_bank or defaults['rfid_bank'],
+        }
+    except Exception:
+        return defaults
+
+
+def _build_rfid_commands(rfid_hex, cfg):
+    """Build the RFID write commands using config values."""
+    return (
+        f"^RS8,,,{cfg['rfid_retries']},N,{cfg['rfid_position']}\n"
+        f"^RFW,H,{cfg['rfid_bank']},12,1^FD{rfid_hex}^FS\n"
+    )
+
+
+def generate_product_label_zpl(product, quantity=1, encode_rfid=None):
     """
     Generate ZPL for RFID jewelry hang tag
-    Total label: 70x48mm at 8 dpmm (203 DPI) ZD621R = 560×384 dots
+    All dimensions/positions read from SystemConfig.
+    encode_rfid=None means use SystemConfig setting; True/False overrides it.
     """
+    cfg = get_label_config()
+    if encode_rfid is None:
+        encode_rfid = cfg['rfid_enabled']
+
     full_reference = product.reference or "UNKNOWN"
 
     ref_parts = full_reference.split("-")
@@ -159,56 +210,65 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
         if not product.rfid_tag or product.rfid_tag != rfid_hex:
             from .models import Product as ProductModel
             ProductModel.objects.filter(pk=product.pk).update(rfid_tag=rfid_hex)
-        rfid_commands = f"""^RS8,,,10,N,240
-^RFW,H,2,12,1^FD{rfid_hex}^FS
-"""
+        rfid_commands = _build_rfid_commands(rfid_hex, cfg)
 
-    # 70×48mm at 8 dpmm (203 DPI) = 560×384 dots
-    x = 256
+    pw = cfg['width_mm'] * DPMM
+    ll = cfg['height_mm'] * DPMM
+    x = cfg['x_mm'] * DPMM
+    weight_y = cfg['weight_y_mm'] * DPMM
+    size_y = cfg['size_y_mm'] * DPMM
+    ref_y = cfg['ref_y_mm'] * DPMM
+    barcode_y = cfg['barcode_y_mm'] * DPMM
+
     if size:
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-{rfid_commands}^FO{x},136^A0N,22,20^FD{weight}g {purity}^FS
-^FO{x},162^A0N,16,14^FDT: {size}cm^FS
-^FO{x},182^A0N,22,20^FD{short_ref}^FS
-^FO{x},246^BY1^BCN,50,N,N,N^FD{barcode_data}^FS
+^PW{pw}
+^LL{ll}
+{rfid_commands}^FO{x},{weight_y}^A0N,22,20^FD{weight}g {purity}^FS
+^FO{x},{size_y}^A0N,16,14^FDT: {size}cm^FS
+^FO{x},{ref_y}^A0N,22,20^FD{short_ref}^FS
+^FO{x},{barcode_y}^BY1^BCN,50,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     else:
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-{rfid_commands}^FO{x},146^A0N,24,22^FD{weight}g {purity}^FS
-^FO{x},174^A0N,26,24^FD{short_ref}^FS
-^FO{x},242^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
+^PW{pw}
+^LL{ll}
+{rfid_commands}^FO{x},{weight_y}^A0N,24,22^FD{weight}g {purity}^FS
+^FO{x},{ref_y}^A0N,26,24^FD{short_ref}^FS
+^FO{x},{barcode_y}^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
 
 
 def generate_price_tag_zpl(product, quantity=1):
-    """
-    Generate ZPL for jewelry price tag — 70x48mm at 8 dpmm (203 DPI)
-    """
+    """Generate ZPL for jewelry price tag - reads positions from SystemConfig."""
+    cfg = get_label_config()
+
     price = f"{product.selling_price:.0f}" if product.selling_price else "0"
 
     purity = ""
     if product.metal_purity:
         purity = product.metal_purity.name
 
-    x = 256
+    pw = cfg['width_mm'] * DPMM
+    ll = cfg['height_mm'] * DPMM
+    x = cfg['x_mm'] * DPMM
+    purity_y = cfg['weight_y_mm'] * DPMM
+    price_y = cfg['barcode_y_mm'] * DPMM
+
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-^FO{x},146^A0N,36,30^FD{purity}^FS
-^FO{x},190^A0N,50,45^FD{price}^FS
+^PW{pw}
+^LL{ll}
+^FO{x},{purity_y}^A0N,36,30^FD{purity}^FS
+^FO{x},{price_y}^A0N,50,45^FD{price}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -226,27 +286,33 @@ def print_price_tag(product, quantity=1):
     return send_to_printer(zpl)
 
 
-def print_test_label(encode_rfid=True):
-    """Print a test label for RFID jewelry hang tag — 70x48mm
-    Also encodes RFID with test reference if encode_rfid=False
-    """
+def print_test_label(encode_rfid=None):
+    """Print a test label for RFID jewelry hang tag - reads positions from SystemConfig."""
+    cfg = get_label_config()
+    if encode_rfid is None:
+        encode_rfid = cfg['rfid_enabled']
+
     test_reference = "PRD-TEST-20260210-0001"
 
     rfid_commands = ""
     if encode_rfid:
         rfid_hex = string_to_hex(test_reference)
-        rfid_commands = f"""^RS8,,,10,N,240
-^RFW,H,2,12,1^FD{rfid_hex}^FS
-"""
+        rfid_commands = _build_rfid_commands(rfid_hex, cfg)
 
-    x = 256
+    pw = cfg['width_mm'] * DPMM
+    ll = cfg['height_mm'] * DPMM
+    x = cfg['x_mm'] * DPMM
+    weight_y = cfg['weight_y_mm'] * DPMM
+    ref_y = cfg['ref_y_mm'] * DPMM
+    barcode_y = cfg['barcode_y_mm'] * DPMM
+
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-{rfid_commands}^FO{x},146^A0N,24,22^FD5.2g 18K^FS
-^FO{x},174^A0N,26,24^FD20260210-0001^FS
-^FO{x},202^BY1^BCN,55,N,N,N^FD20260210-0001^FS
+^PW{pw}
+^LL{ll}
+{rfid_commands}^FO{x},{weight_y}^A0N,24,22^FD5.2g 18K^FS
+^FO{x},{ref_y}^A0N,26,24^FD20260210-0001^FS
+^FO{x},{barcode_y}^BY1^BCN,55,N,N,N^FD20260210-0001^FS
 ^XZ"""
     return send_to_printer(zpl)

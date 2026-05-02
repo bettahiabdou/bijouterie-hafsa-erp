@@ -684,6 +684,53 @@ class SystemConfig(models.Model):
         default=48,
         help_text=_('Hauteur des étiquettes en millimètres')
     )
+    # Label content positioning (in mm, converted to dots at 8 dpmm)
+    zebra_label_x_mm = models.PositiveIntegerField(
+        _('Position X texte (mm)'),
+        default=32,
+        help_text=_('Décalage horizontal du texte depuis le bord gauche')
+    )
+    zebra_label_weight_y_mm = models.PositiveIntegerField(
+        _('Position Y poids (mm)'),
+        default=17,
+        help_text=_('Position verticale du poids et pureté')
+    )
+    zebra_label_size_y_mm = models.PositiveIntegerField(
+        _('Position Y taille (mm)'),
+        default=20,
+        help_text=_('Position verticale de la taille (T: XXcm)')
+    )
+    zebra_label_ref_y_mm = models.PositiveIntegerField(
+        _('Position Y référence (mm)'),
+        default=23,
+        help_text=_('Position verticale de la référence')
+    )
+    zebra_label_barcode_y_mm = models.PositiveIntegerField(
+        _('Position Y code-barres (mm)'),
+        default=31,
+        help_text=_('Position verticale du code-barres')
+    )
+    # RFID encoding settings
+    zebra_rfid_enabled = models.BooleanField(
+        _('Encodage RFID activé'),
+        default=True,
+        help_text=_('Encoder le tag RFID lors de l\'impression')
+    )
+    zebra_rfid_position = models.PositiveIntegerField(
+        _('Position RFID (dots)'),
+        default=240,
+        help_text=_('Position de programmation RFID en dots (PROG. POSITION)')
+    )
+    zebra_rfid_retries = models.PositiveIntegerField(
+        _('Tentatives RFID'),
+        default=10,
+        help_text=_('Nombre de tentatives en cas d\'échec d\'encodage')
+    )
+    zebra_rfid_bank = models.PositiveIntegerField(
+        _('Banque mémoire RFID'),
+        default=2,
+        help_text=_('Banque mémoire RFID (1=Reserved, 2=EPC, 3=TID, 4=User)')
+    )
 
     # Server Configuration
     server_base_url = models.URLField(
