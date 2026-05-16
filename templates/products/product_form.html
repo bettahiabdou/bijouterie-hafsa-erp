@@ -275,6 +275,149 @@
                 </div>
             </div>
 
+            {% if product %}
+            <!-- Videos Section (only on edit, requires saved product) -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">
+                    <i class="fas fa-video text-primary mr-2"></i>
+                    Vidéos du Produit
+                </h2>
+
+                <div id="videosGrid" class="videos-grid mb-4">
+                    {% for v in product.videos.all %}
+                        <div class="video-card" data-video-id="{{ v.id }}">
+                            <video controls preload="metadata" {% if v.poster %}poster="{{ v.poster.url }}"{% endif %}>
+                                <source src="{{ v.video.url }}" type="video/mp4">
+                                Votre navigateur ne supporte pas la lecture vidéo.
+                            </video>
+                            <div class="video-meta">
+                                {% if v.duration_seconds %}<span><i class="fas fa-clock"></i> {{ v.duration_seconds }}s</span>{% endif %}
+                                <button type="button" class="btn btn-ghost btn-sm video-delete" onclick="deleteVideo({{ v.id }})" title="Supprimer">
+                                    <i class="fas fa-trash" style="color: var(--error-500);"></i>
+                                </button>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-muted" id="noVideosMsg" style="grid-column:1/-1;">Aucune vidéo. Téléversez ou enregistrez depuis votre téléphone.</p>
+                    {% endfor %}
+                </div>
+
+                <div style="display:flex; gap:var(--space-3); flex-wrap:wrap; align-items:center;">
+                    <label for="videoFileInput" class="btn btn-secondary" style="cursor:pointer;">
+                        <i class="fas fa-upload mr-2"></i> Téléverser une vidéo
+                    </label>
+                    <input type="file" id="videoFileInput" accept="video/*" multiple style="display:none;" onchange="uploadVideos(this.files)">
+
+                    <label for="videoCaptureInput" class="btn btn-primary" style="cursor:pointer;">
+                        <i class="fas fa-video mr-2"></i> Enregistrer (mobile)
+                    </label>
+                    <input type="file" id="videoCaptureInput" accept="video/*" capture="environment" style="display:none;" onchange="uploadVideos(this.files)">
+
+                    <span id="videoUploadStatus" style="color:var(--neutral-500); font-size:var(--text-sm);"></span>
+                </div>
+                <div id="videoProgressWrap" style="display:none; margin-top:var(--space-3);">
+                    <div style="width:100%; background:var(--neutral-100); border-radius:8px; height:10px; overflow:hidden;">
+                        <div id="videoProgressBar" style="height:100%; width:0; background:var(--primary-500); transition:width .2s;"></div>
+                    </div>
+                </div>
+                <p class="form-help" style="margin-top:var(--space-2);">
+                    MP4, MOV (iPhone), 3GP, etc. — Conversion automatique en MP4 H.264. Max 200 MB par vidéo.
+                </p>
+            </div>
+
+            <style>
+                .videos-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+                    gap: var(--space-3);
+                }
+                .video-card {
+                    border: 1px solid var(--neutral-200);
+                    border-radius: var(--radius-lg);
+                    overflow: hidden;
+                    background: var(--neutral-50);
+                }
+                .video-card video {
+                    width: 100%;
+                    aspect-ratio: 16/9;
+                    object-fit: cover;
+                    background: #000;
+                    display: block;
+                }
+                .video-meta {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: var(--space-2) var(--space-3);
+                    font-size: var(--text-sm);
+                    color: var(--neutral-600);
+                }
+            </style>
+
+            <script>
+                function uploadVideos(files) {
+                    if (!files || files.length === 0) return;
+                    const formData = new FormData();
+                    for (const f of files) formData.append('videos', f);
+
+                    const wrap = document.getElementById('videoProgressWrap');
+                    const bar = document.getElementById('videoProgressBar');
+                    const status = document.getElementById('videoUploadStatus');
+                    wrap.style.display = 'block';
+                    bar.style.width = '10%';
+                    bar.style.background = 'var(--primary-500)';
+                    status.textContent = 'Téléversement & conversion en cours...';
+
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '{% url "products:product_video_upload_api" reference=product.reference %}');
+                    xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+                    xhr.upload.onprogress = function(e) {
+                        if (e.lengthComputable) {
+                            const pct = Math.round((e.loaded / e.total) * 80);
+                            bar.style.width = (10 + pct) + '%';
+                        }
+                    };
+                    xhr.onload = function() {
+                        bar.style.width = '100%';
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            if (data.success) {
+                                bar.style.background = 'var(--success-500)';
+                                status.textContent = data.message || 'Vidéo ajoutée';
+                                setTimeout(() => location.reload(), 600);
+                            } else {
+                                bar.style.background = 'var(--error-500)';
+                                status.textContent = data.message || 'Échec';
+                            }
+                        } catch (e) {
+                            bar.style.background = 'var(--error-500)';
+                            status.textContent = 'Erreur réseau';
+                        }
+                    };
+                    xhr.onerror = function() {
+                        bar.style.background = 'var(--error-500)';
+                        status.textContent = 'Erreur réseau';
+                    };
+                    xhr.send(formData);
+                }
+
+                function deleteVideo(id) {
+                    if (!confirm('Supprimer cette vidéo ?')) return;
+                    fetch('/products/api/videos/' + id + '/delete/', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                    }).then(r => r.json()).then(data => {
+                        if (data.success) {
+                            const card = document.querySelector('.video-card[data-video-id="' + id + '"]');
+                            if (card) card.remove();
+                        } else {
+                            alert(data.message || 'Échec de la suppression');
+                        }
+                    }).catch(() => alert('Erreur réseau'));
+                }
+            </script>
+            {% endif %}
+
             <!-- Basic Information -->
             <div class="mb-8">
                 <h2 class="text-lg font-semibold mb-4" style="font-family: var(--font-display);">

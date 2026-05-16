@@ -131,6 +131,55 @@
                 </div>
             </div>
 
+            <!-- Videos -->
+            {% if product.videos.all %}
+            <div class="card animate-slide-up">
+                <div class="card-header">
+                    <h3><i class="fas fa-video mr-2"></i> Vidéos</h3>
+                </div>
+                <div class="card-body">
+                    <div class="product-videos-grid">
+                        {% for v in product.videos.all %}
+                            <div class="product-video-item">
+                                <video controls preload="metadata" {% if v.poster %}poster="{{ v.poster.url }}"{% endif %}>
+                                    <source src="{{ v.video.url }}" type="video/mp4">
+                                    Votre navigateur ne supporte pas la lecture vidéo.
+                                </video>
+                                <div class="product-video-actions">
+                                    <a href="{{ v.video.url }}" download class="btn btn-ghost btn-sm" title="Télécharger">
+                                        <i class="fas fa-download"></i> Télécharger
+                                    </a>
+                                    {% if v.duration_seconds %}<span style="color:var(--neutral-500);"><i class="fas fa-clock"></i> {{ v.duration_seconds }}s</span>{% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <style>
+                .product-videos-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                    gap: var(--space-3);
+                }
+                .product-video-item video {
+                    width: 100%;
+                    aspect-ratio: 16/9;
+                    object-fit: cover;
+                    background: #000;
+                    border-radius: var(--radius-lg);
+                    display: block;
+                }
+                .product-video-actions {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-top: var(--space-2);
+                    font-size: var(--text-sm);
+                }
+            </style>
+            {% endif %}
+
             <!-- Description -->
             {% if product.description %}
             <div class="card animate-slide-up" style="animation-delay: 50ms;">

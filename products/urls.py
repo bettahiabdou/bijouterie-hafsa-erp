@@ -40,6 +40,8 @@ urlpatterns = [
     path('api/search/', views.product_search_api, name='product_search_api'),
     path('api/smart-search/', views.smart_search_api, name='smart_search_api'),
     path('api/upload-images/<str:reference>/', views.product_image_upload_api, name='product_image_upload_api'),
+    path('api/upload-videos/<str:reference>/', views.product_video_upload_api, name='product_video_upload_api'),
+    path('api/videos/<int:video_id>/delete/', views.product_video_delete_api, name='product_video_delete_api'),
     path('api/enhance-image/<str:reference>/', views.enhance_image_api, name='enhance_image_api'),
 
     # Catalog (token-based access for online team)

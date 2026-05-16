@@ -9,7 +9,8 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from .models import Product, ProductImage, ProductStone
+from .models import Product, ProductImage, ProductStone, ProductVideo
+from .video_utils import convert_video_to_mp4
 from .print_utils import print_product_label, print_price_tag, print_test_label, generate_product_label_zpl, generate_price_tag_zpl, queue_print_job, send_to_printer
 from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount, JewelryType
 from suppliers.models import Supplier
@@ -1172,6 +1173,105 @@ def product_image_upload_api(request, reference):
         'message': f'{len(uploaded)} image(s) ajoutée(s)',
         'images': uploaded
     })
+
+
+# Max video size in bytes (200 MB)
+MAX_VIDEO_SIZE = 200 * 1024 * 1024
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def product_video_upload_api(request, reference):
+    """Upload one or more videos for a product. Transcodes to MP4 H.264 via ffmpeg."""
+    product = get_object_or_404(Product, reference=reference)
+
+    if not request.user.is_staff:
+        return JsonResponse({'success': False, 'message': 'Permission refusée'}, status=403)
+
+    videos = request.FILES.getlist('videos')
+    if not videos:
+        return JsonResponse({'success': False, 'message': 'Aucune vidéo sélectionnée'})
+
+    uploaded = []
+    existing_count = product.videos.count()
+
+    for i, video_file in enumerate(videos):
+        if video_file.size > MAX_VIDEO_SIZE:
+            return JsonResponse({
+                'success': False,
+                'message': f'Vidéo trop volumineuse ({video_file.name}). Max 200 MB.'
+            }, status=400)
+        try:
+            result = convert_video_to_mp4(video_file)
+
+            product_video = ProductVideo(
+                product=product,
+                display_order=existing_count + i,
+                duration_seconds=result.get('duration'),
+                file_size_bytes=result.get('size'),
+                created_by=request.user,
+            )
+            product_video.video.save(result['video_name'], result['video'], save=False)
+            if result.get('poster'):
+                product_video.poster.save(result['poster_name'], result['poster'], save=False)
+            product_video.save()
+
+            uploaded.append({
+                'id': product_video.id,
+                'url': product_video.video.url,
+                'poster_url': product_video.poster.url if product_video.poster else None,
+                'duration': product_video.duration_seconds,
+                'converted': result.get('converted', False),
+            })
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception('Video upload failed')
+            return JsonResponse({'success': False, 'message': f'Erreur: {str(e)}'}, status=500)
+
+    try:
+        ActivityLog.objects.create(
+            user=request.user,
+            action='upload_video',
+            description=f"Ajout de {len(uploaded)} vidéo(s) au produit {product.reference}"
+        )
+    except Exception:
+        pass
+
+    return JsonResponse({
+        'success': True,
+        'message': f'{len(uploaded)} vidéo(s) ajoutée(s)',
+        'videos': uploaded,
+    })
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST", "DELETE"])
+def product_video_delete_api(request, video_id):
+    """Delete a ProductVideo by id. Staff only."""
+    if not request.user.is_staff:
+        return JsonResponse({'success': False, 'message': 'Permission refusée'}, status=403)
+
+    video = get_object_or_404(ProductVideo, pk=video_id)
+    reference = video.product.reference
+    try:
+        if video.video:
+            video.video.delete(save=False)
+        if video.poster:
+            video.poster.delete(save=False)
+        video.delete()
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Erreur: {str(e)}'}, status=500)
+
+    try:
+        ActivityLog.objects.create(
+            user=request.user,
+            action='delete_video',
+            description=f"Suppression d'une vidéo du produit {reference}"
+        )
+    except Exception:
+        pass
+
+    return JsonResponse({'success': True, 'message': 'Vidéo supprimée'})
 
 
 # =============================================================================

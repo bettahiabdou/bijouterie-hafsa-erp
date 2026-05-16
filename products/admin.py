@@ -1,13 +1,21 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
-from .models import Product, ProductImage, ProductStone, RawMaterial, RawMaterialMovement
+from .models import Product, ProductImage, ProductVideo, ProductStone, RawMaterial, RawMaterialMovement
 
 
 class ProductImageInline(admin.TabularInline):
     """Inline admin for product images"""
     model = ProductImage
     extra = 1
+
+
+class ProductVideoInline(admin.TabularInline):
+    """Inline admin for product videos"""
+    model = ProductVideo
+    extra = 0
+    fields = ('video', 'poster', 'duration_seconds', 'display_order')
+    readonly_fields = ('duration_seconds',)
 
 
 class ProductStoneInline(admin.TabularInline):
@@ -25,7 +33,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ('product_type', 'status', 'category', 'metal_type', 'created_at')
     search_fields = ('reference', 'name', 'barcode', 'rfid_tag', 'description')
     readonly_fields = ('created_at', 'updated_at')
-    inlines = (ProductImageInline, ProductStoneInline)
+    inlines = (ProductImageInline, ProductVideoInline, ProductStoneInline)
 
     fieldsets = (
         (_('Identification'), {
@@ -91,6 +99,14 @@ class ProductImageAdmin(admin.ModelAdmin):
             )
         return '-'
     image_preview.short_description = _('Aperçu')
+
+
+@admin.register(ProductVideo)
+class ProductVideoAdmin(admin.ModelAdmin):
+    """Admin for product videos"""
+    list_display = ('product', 'duration_seconds', 'file_size_bytes', 'created_at')
+    readonly_fields = ('duration_seconds', 'file_size_bytes', 'created_at')
+    search_fields = ('product__reference', 'product__name')
 
 
 @admin.register(ProductStone)

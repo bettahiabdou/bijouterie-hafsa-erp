@@ -422,6 +422,49 @@ class ProductImage(models.Model):
         return f"Image de {self.product.reference}"
 
 
+class ProductVideo(models.Model):
+    """
+    Videos showcasing products. Independent from ProductImage and
+    intentionally not part of the AI image generation pipeline.
+    """
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='videos',
+        verbose_name=_('Produit')
+    )
+    video = models.FileField(
+        _('Vidéo'),
+        upload_to='products/videos/'
+    )
+    poster = models.ImageField(
+        _('Image de couverture'),
+        upload_to='products/videos/posters/',
+        blank=True,
+        null=True
+    )
+    display_order = models.PositiveIntegerField(_('Ordre'), default=0)
+    duration_seconds = models.PositiveIntegerField(_('Durée (s)'), blank=True, null=True)
+    file_size_bytes = models.PositiveBigIntegerField(_('Taille (octets)'), blank=True, null=True)
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+    created_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        related_name='uploaded_product_videos',
+        verbose_name=_('Téléversé par'),
+        blank=True,
+        null=True
+    )
+
+    class Meta:
+        verbose_name = _('Vidéo produit')
+        verbose_name_plural = _('Vidéos produit')
+        ordering = ['display_order', 'created_at']
+
+    def __str__(self):
+        return f"Vidéo de {self.product.reference}"
+
+
 class ProductStone(models.Model):
     """
     Stones attached to a product
