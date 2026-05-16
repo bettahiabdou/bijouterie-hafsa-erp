@@ -108,6 +108,7 @@
                     <tr>
                         <th>Client</th>
                         <th>Téléphone</th>
+                        <th>Responsable</th>
                         <th>Solde</th>
                         <th>Transactions</th>
                         <th>Dernière Transaction</th>
@@ -125,6 +126,13 @@
                                 <br><small class="text-muted">{{ account.client.code }}</small>
                             </td>
                             <td>{{ account.client.phone }}</td>
+                            <td>
+                                {% if account.managed_by %}
+                                    <span class="badge badge-info">{{ account.managed_by.get_full_name|default:account.managed_by.username }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <span class="font-semibold {% if account.balance > 0 %}text-success{% elif account.balance < 0 %}text-error{% endif %}">
                                     {{ account.balance|floatformat:2 }} DH
@@ -158,7 +166,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="7">
+                            <td colspan="8">
                                 <div class="empty-state">
                                     <div class="empty-state-icon">
                                         <i class="fas fa-wallet"></i>

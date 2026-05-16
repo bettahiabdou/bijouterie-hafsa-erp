@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def deposit_list(request):
     """List all deposit accounts with search and filters"""
-    accounts = DepositAccount.objects.select_related('client').all()
+    accounts = DepositAccount.objects.select_related('client', 'managed_by').all()
 
     # Search
     search_query = request.GET.get('search', '')
