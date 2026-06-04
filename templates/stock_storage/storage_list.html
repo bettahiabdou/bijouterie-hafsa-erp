@@ -143,4 +143,32 @@
         </div>
         {% endif %}
     </div>
+
+    <style>
+        .filter-header {
+            padding: var(--space-4) var(--space-5);
+        }
+        .filter-form {
+            width: 100%;
+        }
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr auto;
+            gap: var(--space-4);
+            width: 100%;
+            align-items: end;
+        }
+        .filter-grid .btn {
+            height: 42px;
+            white-space: nowrap;
+        }
+        @media (max-width: 768px) {
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+            .filter-grid .btn {
+                width: 100%;
+            }
+        }
+    </style>
 {% endblock %}
