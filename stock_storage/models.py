@@ -84,6 +84,11 @@ class StockStorageItem(models.Model):
         WAITING = 'waiting', _('En attente')
         PICKED_UP = 'picked_up', _('Récupéré')
 
+    class PickupMethod(models.TextChoices):
+        MAGASIN = 'magasin', _('Magasin (Retrait)')
+        AMANA = 'amana', _('AMANA')
+        TRANSPORTEUR = 'transporteur', _('Autre Transporteur')
+
     account = models.ForeignKey(
         StockStorageAccount,
         on_delete=models.PROTECT,
@@ -130,6 +135,27 @@ class StockStorageItem(models.Model):
         related_name='stock_pickups',
         verbose_name=_('Récupéré par')
     )
+
+    # How the item left storage (in-store / shipped)
+    pickup_method = models.CharField(
+        _('Mode de récupération'),
+        max_length=20,
+        choices=PickupMethod.choices,
+        default=PickupMethod.MAGASIN
+    )
+    carrier = models.ForeignKey(
+        'settings_app.Carrier',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='stock_storage_items',
+        verbose_name=_('Transporteur')
+    )
+    tracking_number = models.CharField(
+        _('Numéro de suivi'),
+        max_length=100,
+        blank=True
+    )
+
     notes = models.TextField(_('Notes'), blank=True)
     created_by = models.ForeignKey(
         'users.User',
@@ -151,8 +177,24 @@ class StockStorageItem(models.Model):
     def __str__(self):
         return f"{self.product_reference} - {self.account.client.full_name} ({self.get_status_display()})"
 
-    def mark_picked_up(self, user):
+    @property
+    def tracking_url(self):
+        """Build a clickable tracking URL from the carrier template, if available."""
+        if self.carrier and self.carrier.tracking_url_template and self.tracking_number:
+            try:
+                return self.carrier.tracking_url_template.format(tracking_code=self.tracking_number)
+            except Exception:
+                return ''
+        return ''
+
+    def mark_picked_up(self, user, pickup_method=None, carrier=None, tracking_number=''):
         self.status = self.Status.PICKED_UP
         self.picked_up_at = timezone.now()
         self.picked_up_by = user
-        self.save(update_fields=['status', 'picked_up_at', 'picked_up_by'])
+        self.pickup_method = pickup_method or self.PickupMethod.MAGASIN
+        self.carrier = carrier
+        self.tracking_number = tracking_number or ''
+        self.save(update_fields=[
+            'status', 'picked_up_at', 'picked_up_by',
+            'pickup_method', 'carrier', 'tracking_number',
+        ])

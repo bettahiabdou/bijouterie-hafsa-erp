@@ -12,6 +12,7 @@ from django.utils import timezone
 from decimal import Decimal
 
 from .models import StockStorageAccount, StockStorageItem
+from settings_app.models import Carrier
 
 
 @login_required
@@ -82,26 +83,69 @@ def storage_detail(request, pk):
         'items': page_obj,
         'page_obj': page_obj,
         'status_filter': status_filter,
+        'carriers': Carrier.objects.filter(is_active=True),
     }
     return render(request, 'stock_storage/storage_detail.html', context)
 
 
 @login_required
 def pickup_item(request, pk):
-    """Mark a single item as picked up"""
+    """Mark a single item as picked up, with delivery method + tracking.
+
+    - magasin: just mark récupéré (in-store handover).
+    - amana / transporteur: mark récupéré AND create a Delivery record so it
+      appears in the central Livraisons page and is auto-tracked (AMANA).
+    """
     if request.method != 'POST':
         return redirect('stock_storage:detail', pk=pk)
 
     account = get_object_or_404(StockStorageAccount, pk=pk)
     item_id = request.POST.get('item_id')
 
+    pickup_method = request.POST.get('pickup_method', 'magasin')
+    if pickup_method not in dict(StockStorageItem.PickupMethod.choices):
+        pickup_method = 'magasin'
+    tracking_number = request.POST.get('tracking_number', '').strip()
+
+    carrier = None
+    carrier_id = request.POST.get('carrier_id', '')
+    if pickup_method == 'transporteur' and carrier_id:
+        carrier = Carrier.objects.filter(pk=carrier_id).first()
+
     try:
-        item = StockStorageItem.objects.get(pk=item_id, account=account, status=StockStorageItem.Status.WAITING)
-        item.mark_picked_up(request.user)
-        messages.success(request, f'Article {item.product_reference} marqué comme récupéré.')
+        item = StockStorageItem.objects.get(
+            pk=item_id, account=account, status=StockStorageItem.Status.WAITING
+        )
     except StockStorageItem.DoesNotExist:
         messages.error(request, 'Article non trouvé ou déjà récupéré.')
+        return redirect('stock_storage:detail', pk=pk)
 
+    with transaction.atomic():
+        item.mark_picked_up(
+            request.user,
+            pickup_method=pickup_method,
+            carrier=carrier,
+            tracking_number=tracking_number,
+        )
+
+        # For shipped pickups, create a Delivery so it lands in the central
+        # tracking system (same as a sale).
+        if pickup_method in ('amana', 'transporteur'):
+            from sales.models import Delivery
+            client = account.client
+            Delivery.objects.create(
+                invoice=None,
+                stock_storage_item=item,
+                client_name=client.full_name if client else '',
+                client_phone=client.phone if client else '',
+                total_amount=item.price or 0,
+                delivery_method_type=pickup_method,
+                carrier=carrier,
+                tracking_number=tracking_number,
+                status='pending',
+            )
+
+    messages.success(request, f'Article {item.product_reference} marqué comme récupéré.')
     return redirect('stock_storage:detail', pk=pk)
 
 

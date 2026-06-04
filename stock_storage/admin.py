@@ -28,8 +28,8 @@ class StockStorageAccountAdmin(admin.ModelAdmin):
 
 @admin.register(StockStorageItem)
 class StockStorageItemAdmin(admin.ModelAdmin):
-    list_display = ['product_reference', 'product_name', 'account', 'price', 'status', 'stored_at', 'picked_up_at']
-    list_filter = ['status', 'stored_at']
-    search_fields = ['product_reference', 'product_name', 'account__client__first_name', 'account__client__last_name']
+    list_display = ['product_reference', 'product_name', 'account', 'price', 'status', 'pickup_method', 'stored_at', 'picked_up_at']
+    list_filter = ['status', 'pickup_method', 'stored_at']
+    search_fields = ['product_reference', 'product_name', 'account__client__first_name', 'account__client__last_name', 'tracking_number']
     readonly_fields = ['stored_at', 'picked_up_at', 'picked_up_by', 'created_by']
-    raw_id_fields = ['account', 'invoice', 'product']
+    raw_id_fields = ['account', 'invoice', 'product', 'carrier']

@@ -136,17 +136,26 @@
                                                 {% if item.picked_up_at %}
                                                     <br><small class="text-muted">{{ item.picked_up_at|date:"d/m/Y H:i" }}</small>
                                                 {% endif %}
+                                                {% if item.pickup_method and item.pickup_method != 'magasin' %}
+                                                    <br><span class="badge badge-info" style="margin-top:4px;">{{ item.get_pickup_method_display }}</span>
+                                                    {% if item.tracking_number %}
+                                                        <br>
+                                                        {% if item.tracking_url %}
+                                                            <a href="{{ item.tracking_url }}" target="_blank" rel="noopener" class="text-primary"><small><i class="fas fa-truck"></i> {{ item.tracking_number }}</small></a>
+                                                        {% else %}
+                                                            <small class="text-muted"><i class="fas fa-truck"></i> {{ item.tracking_number }}</small>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
                                             {% endif %}
                                         </td>
                                         <td style="text-align: center;">
                                             {% if item.status == 'waiting' %}
-                                                <form method="post" action="{% url 'stock_storage:pickup_item' account.pk %}" style="display: inline;">
-                                                    {% csrf_token %}
-                                                    <input type="hidden" name="item_id" value="{{ item.pk }}">
-                                                    <button type="submit" class="btn btn-success btn-sm" title="Marquer récupéré">
-                                                        <i class="fas fa-check"></i>
-                                                    </button>
-                                                </form>
+                                                <button type="button" class="btn btn-success btn-sm"
+                                                        title="Marquer récupéré"
+                                                        onclick="openPickupModal('{{ item.pk }}', '{{ item.product_reference|escapejs }}')">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
                                             {% else %}
                                                 <span class="text-muted">-</span>
                                             {% endif %}
@@ -237,6 +246,71 @@
         </div>
     </div>
 
+    <!-- Pickup Modal -->
+    <div id="pickup-modal-overlay" class="pickup-modal-overlay">
+        <div class="pickup-modal">
+            <div class="pickup-modal-header">
+                <h3 style="margin:0;"><i class="fas fa-box-open mr-2"></i> Récupération d'article</h3>
+                <button type="button" class="pickup-modal-close" onclick="closePickupModal()">&times;</button>
+            </div>
+            <form method="post" action="{% url 'stock_storage:pickup_item' account.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="item_id" id="pickup-item-id" value="">
+                <div class="pickup-modal-body">
+                    <p style="margin:0 0 var(--space-2); color:var(--neutral-500); font-size:var(--text-sm);">
+                        Article : <strong id="pickup-item-ref"></strong>
+                    </p>
+
+                    <label class="form-label">Mode de récupération</label>
+                    <div class="pickup-options">
+                        <label class="pickup-option">
+                            <input type="radio" name="pickup_method" value="magasin" checked onchange="togglePickupFields()">
+                            <div class="pickup-option-content">
+                                <i class="fas fa-store"></i>
+                                <span>Magasin</span>
+                            </div>
+                        </label>
+                        <label class="pickup-option">
+                            <input type="radio" name="pickup_method" value="amana" onchange="togglePickupFields()">
+                            <div class="pickup-option-content">
+                                <i class="fas fa-box"></i>
+                                <span>AMANA</span>
+                            </div>
+                        </label>
+                        <label class="pickup-option">
+                            <input type="radio" name="pickup_method" value="transporteur" onchange="togglePickupFields()">
+                            <div class="pickup-option-content">
+                                <i class="fas fa-truck"></i>
+                                <span>Transporteur</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div id="pickup-carrier-group" class="form-group" style="display:none; margin-top:var(--space-4);">
+                        <label class="form-label">Transporteur</label>
+                        <select name="carrier_id" class="form-select">
+                            <option value="">-- Sélectionner --</option>
+                            {% for carrier in carriers %}
+                                <option value="{{ carrier.id }}">{{ carrier.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="pickup-tracking-group" class="form-group" style="display:none; margin-top:var(--space-3);">
+                        <label class="form-label">Numéro de suivi</label>
+                        <input type="text" name="tracking_number" class="form-input" placeholder="Code de suivi AMANA ou transporteur">
+                    </div>
+                </div>
+                <div class="pickup-modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closePickupModal()">Annuler</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check mr-1"></i> Confirmer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <style>
         .detail-layout {
             display: grid;
@@ -247,6 +321,41 @@
             .detail-layout {
                 grid-template-columns: 1fr;
             }
+        }
+        .pickup-modal-overlay {
+            display: none; position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
+            align-items: center; justify-content: center;
+        }
+        .pickup-modal-overlay.open { display: flex; }
+        .pickup-modal {
+            background: #fff; border-radius: 16px; width: 95%; max-width: 480px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.3); overflow: hidden;
+        }
+        .pickup-modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 18px 22px; border-bottom: 1px solid var(--neutral-100);
+        }
+        .pickup-modal-close {
+            background: var(--neutral-100); border: none; width: 34px; height: 34px;
+            border-radius: 50%; font-size: 1.3rem; cursor: pointer; color: var(--neutral-500);
+        }
+        .pickup-modal-body { padding: 20px 22px; }
+        .pickup-modal-footer {
+            display: flex; justify-content: flex-end; gap: var(--space-2);
+            padding: 16px 22px; border-top: 1px solid var(--neutral-100); background: var(--neutral-50);
+        }
+        .pickup-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin-top: var(--space-2); }
+        .pickup-option { cursor: pointer; }
+        .pickup-option input { position: absolute; opacity: 0; }
+        .pickup-option-content {
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            padding: 14px 8px; border: 2px solid var(--neutral-200); border-radius: 12px;
+            color: var(--neutral-600); transition: all .15s; text-align: center; font-size: var(--text-sm);
+        }
+        .pickup-option-content i { font-size: 1.3rem; }
+        .pickup-option input:checked + .pickup-option-content {
+            border-color: var(--primary-500); background: var(--primary-50); color: var(--primary-600);
         }
     </style>
 
@@ -268,5 +377,49 @@
                 bar.style.display = 'none';
             }
         }
+
+        function openPickupModal(itemId, itemRef) {
+            document.getElementById('pickup-item-id').value = itemId;
+            document.getElementById('pickup-item-ref').textContent = itemRef;
+            // Reset to magasin
+            var magasin = document.querySelector('input[name="pickup_method"][value="magasin"]');
+            if (magasin) magasin.checked = true;
+            var carrierSelect = document.querySelector('#pickup-carrier-group select');
+            if (carrierSelect) carrierSelect.value = '';
+            var trackingInput = document.querySelector('#pickup-tracking-group input');
+            if (trackingInput) trackingInput.value = '';
+            togglePickupFields();
+            document.getElementById('pickup-modal-overlay').classList.add('open');
+        }
+
+        function closePickupModal() {
+            document.getElementById('pickup-modal-overlay').classList.remove('open');
+        }
+
+        function togglePickupFields() {
+            var method = document.querySelector('input[name="pickup_method"]:checked').value;
+            var carrierGroup = document.getElementById('pickup-carrier-group');
+            var trackingGroup = document.getElementById('pickup-tracking-group');
+            if (method === 'magasin') {
+                carrierGroup.style.display = 'none';
+                trackingGroup.style.display = 'none';
+            } else if (method === 'amana') {
+                carrierGroup.style.display = 'none';
+                trackingGroup.style.display = 'block';
+            } else if (method === 'transporteur') {
+                carrierGroup.style.display = 'block';
+                trackingGroup.style.display = 'block';
+            }
+        }
+
+        // Close modal when clicking the overlay backdrop
+        document.addEventListener('DOMContentLoaded', function() {
+            var overlay = document.getElementById('pickup-modal-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', function(e) {
+                    if (e.target === overlay) closePickupModal();
+                });
+            }
+        });
     </script>
 {% endblock %}

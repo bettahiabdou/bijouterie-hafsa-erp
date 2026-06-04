@@ -930,12 +930,25 @@ class Delivery(models.Model):
         unique=True
     )
 
-    # Link to invoice (OneToOne - one delivery per invoice)
+    # Link to invoice (OneToOne - one delivery per invoice).
+    # Nullable: stock-storage pickups create deliveries without a new invoice.
     invoice = models.OneToOneField(
         SaleInvoice,
         on_delete=models.CASCADE,
         related_name='delivery',
-        verbose_name=_('Facture')
+        verbose_name=_('Facture'),
+        null=True,
+        blank=True
+    )
+
+    # Link to a client stock-storage item, when this delivery is a shipped pickup
+    stock_storage_item = models.ForeignKey(
+        'stock_storage.StockStorageItem',
+        on_delete=models.CASCADE,
+        related_name='deliveries',
+        verbose_name=_('Article en stock client'),
+        null=True,
+        blank=True
     )
 
     # Client info (copied from invoice for easy display)
