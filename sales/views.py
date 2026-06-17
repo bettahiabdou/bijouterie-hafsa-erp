@@ -4059,10 +4059,13 @@ def delivery_list(request):
         'delivered': Delivery.objects.filter(status='delivered').count(),
     }
 
-    # Total left to collect (COD) for the filtered, not-yet-delivered deliveries
-    cod_to_collect = deliveries.exclude(status='delivered').aggregate(
-        t=Sum('invoice__balance_due')
-    )['t'] or Decimal('0')
+    # Total left to collect (COD) = payments via carrier-collection methods on
+    # not-yet-delivered deliveries in the filtered set.
+    from payments.models import ClientPayment
+    cod_to_collect = ClientPayment.objects.filter(
+        sale_invoice__delivery__in=deliveries.exclude(status='delivered'),
+        payment_method__collected_by_carrier=True,
+    ).aggregate(t=Sum('amount'))['t'] or Decimal('0')
 
     # Sellers for the filter dropdown
     from django.contrib.auth import get_user_model
@@ -4073,6 +4076,16 @@ def delivery_list(request):
     paginator = Paginator(deliveries, 20)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
+
+    # Per-delivery COD amount (sum of carrier-collected payments on its invoice)
+    page_invoice_ids = [d.invoice_id for d in page_obj if d.invoice_id]
+    cod_rows = ClientPayment.objects.filter(
+        sale_invoice_id__in=page_invoice_ids,
+        payment_method__collected_by_carrier=True,
+    ).values('sale_invoice_id').annotate(t=Sum('amount'))
+    cod_by_invoice = {r['sale_invoice_id']: r['t'] for r in cod_rows}
+    for d in page_obj:
+        d.cod_amount = cod_by_invoice.get(d.invoice_id, Decimal('0'))
 
     context = {
         'deliveries': page_obj,
@@ -4099,9 +4112,20 @@ def delivery_detail(request, reference):
         reference=reference
     )
 
+    # COD = amount to be collected by the carrier (payments via carrier-collection methods)
+    cod_amount = Decimal('0')
+    if delivery.invoice_id:
+        from payments.models import ClientPayment
+        cod_amount = ClientPayment.objects.filter(
+            sale_invoice_id=delivery.invoice_id,
+            payment_method__collected_by_carrier=True,
+        ).aggregate(t=Sum('amount'))['t'] or Decimal('0')
+
     context = {
         'delivery': delivery,
         'timeline': delivery.timeline.all().order_by('-event_number'),
+        'cod_amount': cod_amount,
+        'cod_collected': delivery.status == 'delivered',
     }
 
     return render(request, 'sales/delivery_detail.html', context)

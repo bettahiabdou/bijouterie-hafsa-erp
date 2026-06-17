@@ -185,21 +185,25 @@
                                 <i class="fas fa-coins"></i> Total: {{ delivery.total_amount|floatformat:0 }} DH
                             </span>
                             {% endif %}
-                            {% if delivery.invoice %}
-                                {% if delivery.invoice.balance_due > 0 %}
-                                <span class="dlv-detail" style="color: var(--error-600); font-weight: 600;">
-                                    <i class="fas fa-hand-holding-usd"></i> À encaisser: {{ delivery.invoice.balance_due|floatformat:0 }} DH
+                            {% if delivery.cod_amount > 0 %}
+                                {% if delivery.status == 'delivered' %}
+                                <span class="dlv-detail" style="color: var(--success-600);">
+                                    <i class="fas fa-check-circle"></i> Encaissé par {{ delivery.get_delivery_method_type_display }}: {{ delivery.cod_amount|floatformat:0 }} DH
                                 </span>
                                 {% else %}
-                                <span class="dlv-detail" style="color: var(--success-600);">
-                                    <i class="fas fa-check"></i> Déjà payée
+                                <span class="dlv-detail" style="color: var(--error-600); font-weight: 600;">
+                                    <i class="fas fa-hand-holding-usd"></i> À encaisser ({{ delivery.get_delivery_method_type_display }}): {{ delivery.cod_amount|floatformat:0 }} DH
                                 </span>
                                 {% endif %}
-                                {% if delivery.invoice.seller %}
+                            {% else %}
+                                <span class="dlv-detail" style="color: var(--success-600);">
+                                    <i class="fas fa-check"></i> Déjà payée (caisse)
+                                </span>
+                            {% endif %}
+                            {% if delivery.invoice and delivery.invoice.seller %}
                                 <span class="dlv-detail">
                                     <i class="fas fa-user-tie"></i> {{ delivery.invoice.seller.get_full_name|default:delivery.invoice.seller.username }}
                                 </span>
-                                {% endif %}
                             {% endif %}
                         </div>
                     </div>

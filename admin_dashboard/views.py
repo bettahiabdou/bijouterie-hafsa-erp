@@ -120,8 +120,8 @@ class ConfigurationRegistry:
             'model': PaymentMethod,
             'label': 'Modes de paiement',
             'singular': 'Mode de paiement',
-            'fields': ['name', 'name_ar', 'requires_reference', 'requires_bank_account', 'is_active', 'display_order'],
-            'list_display': ['name', 'code', 'is_active'],
+            'fields': ['name', 'name_ar', 'requires_reference', 'requires_bank_account', 'collected_by_carrier', 'is_active', 'display_order'],
+            'list_display': ['name', 'code', 'collected_by_carrier', 'is_active'],
             'search_fields': ['name', 'code'],
         },
         'bank-accounts': {

@@ -248,6 +248,12 @@ class PaymentMethod(models.Model):
         _('Compte bancaire obligatoire'),
         default=False
     )
+    collected_by_carrier = models.BooleanField(
+        _('Encaissé par le transporteur / AMANA'),
+        default=False,
+        help_text=_('Le montant est à encaisser par le livreur (contre-remboursement), '
+                    'pas encore reçu en caisse')
+    )
     is_active = models.BooleanField(_('Actif'), default=True)
     display_order = models.PositiveIntegerField(_('Ordre d\'affichage'), default=0)
     created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
