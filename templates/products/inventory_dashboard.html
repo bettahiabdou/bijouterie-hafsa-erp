@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Tableau de Bord Inventaire - Bijouterie Hafsa ERP{% endblock %}
+{% block title %}Inventaire - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
     <span class="breadcrumb-separator">/</span>
@@ -13,196 +13,120 @@
     <div class="page-header">
         <div class="page-header-inner">
             <div>
-                <h1 class="page-title">Tableau de Bord Inventaire</h1>
-                <p class="page-subtitle">Vue d'ensemble du stock et des statistiques</p>
+                <h1 class="page-title">Inventaire (valeur au coût)</h1>
+                <p class="page-subtitle">Valeur matière = poids × prix payé par gramme, sans la marge — {{ scope_label }}</p>
             </div>
             <div class="page-actions">
-                <a href="{% url 'products:create' %}" class="btn btn-primary">
-                    <i class="fas fa-plus"></i>
-                    <span>Nouveau Produit</span>
+                <a href="{% url 'products:inventory_export' %}?report=full&scope={{ scope }}" class="btn btn-primary">
+                    <i class="fas fa-file-csv"></i>
+                    <span>Télécharger l'inventaire complet</span>
                 </a>
             </div>
         </div>
     </div>
+
+    <!-- Scope selector -->
+    <div class="flex gap-2 mb-6" style="flex-wrap: wrap;">
+        {% for key, label in scopes %}
+            <a href="?scope={{ key }}" class="btn btn-sm {% if scope == key %}btn-primary{% else %}btn-secondary{% endif %}">{{ label }}</a>
+        {% endfor %}
+    </div>
 {% endblock %}
 
 {% block content %}
-    <!-- KPI Stats Cards -->
-    <div class="grid grid-cols-4 gap-6 mb-8 animate-stagger">
-        <div class="stat-card">
-            <div class="stat-icon primary">
-                <i class="fas fa-gem"></i>
-            </div>
-            <div class="stat-content">
-                <div class="stat-label">Total Produits</div>
-                <div class="stat-value">{{ total_products|default:"0" }}</div>
-                <div class="stat-meta">Pieces en inventaire</div>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon success">
-                <i class="fas fa-check-circle"></i>
-            </div>
-            <div class="stat-content">
-                <div class="stat-label">Disponible</div>
-                <div class="stat-value">{{ available_products|default:"0" }}</div>
-                <div class="stat-meta">Pret a vendre</div>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon warning">
-                <i class="fas fa-wrench"></i>
-            </div>
-            <div class="stat-content">
-                <div class="stat-label">En Reparation</div>
-                <div class="stat-value">{{ in_repair_products|default:"0" }}</div>
-                <div class="stat-meta">En atelier</div>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon info">
-                <i class="fas fa-archive"></i>
-            </div>
-            <div class="stat-content">
-                <div class="stat-label">Vendu</div>
-                <div class="stat-value">{{ sold_products|default:"0" }}</div>
-                <div class="stat-meta">Archives</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Total Value Card -->
-    <div class="card mb-8 animate-slide-up">
-        <div class="card-body">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-muted mb-2">Valeur Total du Stock</p>
-                    <p class="text-4xl font-bold" style="color: var(--primary-600); font-family: var(--font-display);">
-                        {{ total_value|floatformat:0|default:"0" }} DH
-                    </p>
-                    <p class="text-sm text-muted mt-2">Prix de vente estime de tous les produits disponibles</p>
-                </div>
-                <div class="p-4 rounded-full" style="background: var(--primary-100);">
-                    <i class="fas fa-coins text-3xl" style="color: var(--primary-600);"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Charts Row -->
-    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-bottom: var(--space-8);">
-        <!-- Status Breakdown -->
-        <div class="card animate-slide-up">
-            <div class="card-header">
-                <h3><i class="fas fa-chart-pie mr-2"></i> Repartition par Statut</h3>
-            </div>
+    <!-- Hero: material value at cost -->
+    <div class="grid grid-cols-3 gap-6 mb-6 animate-stagger">
+        <div class="card" style="grid-column: span 1; background: linear-gradient(135deg, var(--primary-600), var(--primary-700)); color: white;">
             <div class="card-body">
-                <div class="flex flex-col gap-4">
-                    {% for item in status_breakdown %}
-                        <div class="flex items-center justify-between">
-                            <span class="font-medium">{{ item.status|title }}</span>
-                            <div class="flex items-center gap-3">
-                                <div style="width: 150px; height: 8px; background: var(--neutral-200); border-radius: var(--radius-full); overflow: hidden;">
-                                    <div style="width: {% widthratio item.count total_products 100 %}%; height: 100%; background: var(--primary-500); border-radius: var(--radius-full);"></div>
-                                </div>
-                                <span class="font-bold" style="min-width: 40px; text-align: right;">{{ item.count }}</span>
-                            </div>
-                        </div>
-                    {% empty %}
-                        <p class="text-muted text-center py-4">Aucune donnee disponible</p>
-                    {% endfor %}
-                </div>
+                <div style="font-size: var(--text-sm); opacity: 0.85;"><i class="fas fa-coins mr-1"></i> Valeur matière (poids × prix/g)</div>
+                <div style="font-size: 2rem; font-weight: 800; font-family: var(--font-display); margin-top: 6px;">{{ material_value|floatformat:2 }} DH</div>
+                <div style="font-size: var(--text-xs); opacity: 0.8; margin-top: 4px;">Sans la marge de vente</div>
             </div>
         </div>
-
-        <!-- Metal Breakdown -->
-        <div class="card animate-slide-up" style="animation-delay: 100ms;">
-            <div class="card-header">
-                <h3><i class="fas fa-ring mr-2"></i> Top 10 Metaux</h3>
+        <div class="card">
+            <div class="card-body">
+                <div class="text-muted" style="font-size: var(--text-sm);"><i class="fas fa-receipt mr-1"></i> Coût total (matière + façon + pierres)</div>
+                <div style="font-size: 1.6rem; font-weight: 700; font-family: var(--font-display); margin-top: 6px;">{{ total_cost|floatformat:2 }} DH</div>
             </div>
-            <div class="card-body" style="padding: 0;">
-                <div class="flex flex-col">
-                    {% for item in metal_breakdown %}
-                        <div class="flex justify-between items-center p-4" style="border-bottom: 1px solid var(--neutral-100);">
-                            <span class="font-medium">{{ item.metal_type__name|default:"Non specifie" }}</span>
-                            <div class="text-right">
-                                <p class="font-bold">{{ item.count }} pcs</p>
-                                <p class="text-sm text-muted">{{ item.total_weight|floatformat:1 }} g</p>
-                            </div>
-                        </div>
-                    {% empty %}
-                        <div class="empty-state" style="padding: var(--space-8);">
-                            <div class="empty-state-icon">
-                                <i class="fas fa-ring"></i>
-                            </div>
-                            <h4 class="empty-state-title">Aucune donnee</h4>
-                            <p class="empty-state-text">Pas de donnees sur les metaux</p>
-                        </div>
-                    {% endfor %}
-                </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="text-muted" style="font-size: var(--text-sm);"><i class="fas fa-tags mr-1"></i> Valeur de vente (avec marge)</div>
+                <div style="font-size: 1.6rem; font-weight: 700; font-family: var(--font-display); margin-top: 6px;">{{ selling_value|floatformat:2 }} DH</div>
+                <div style="font-size: var(--text-xs); color: var(--success-600); margin-top: 4px;">Marge potentielle: {{ potential_margin|floatformat:2 }} DH</div>
             </div>
         </div>
     </div>
 
-    <!-- Low Stock Items -->
-    <div class="card animate-slide-up" style="animation-delay: 150ms;">
-        <div class="card-header">
-            <h3><i class="fas fa-feather mr-2"></i> Articles Legers (20 premiers)</h3>
-            <a href="{% url 'products:list' %}" class="btn btn-ghost btn-sm">
-                Voir tout <i class="fas fa-arrow-right ml-2"></i>
+    <!-- Secondary KPIs -->
+    <div class="grid grid-cols-3 gap-6 mb-8 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary"><i class="fas fa-gem"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Articles en stock</div>
+                <div class="stat-value">{{ stock_count }}</div>
+                <div class="stat-meta">{{ scope_label }}</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon accent"><i class="fas fa-weight-hanging"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Poids brut total</div>
+                <div class="stat-value">{{ gross_weight|floatformat:2 }}</div>
+                <div class="stat-meta">grammes</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success"><i class="fas fa-balance-scale"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Poids net total</div>
+                <div class="stat-value">{{ net_weight|floatformat:2 }}</div>
+                <div class="stat-meta">grammes</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Breakdowns -->
+    {% include 'products/_inventory_breakdown.html' with title="Par métal" icon="fa-ring" rows=metal_breakdown report="metal" scope=scope %}
+    {% include 'products/_inventory_breakdown.html' with title="Par pureté / carat" icon="fa-certificate" rows=purity_breakdown report="purity" scope=scope %}
+    {% include 'products/_inventory_breakdown.html' with title="Par catégorie" icon="fa-layer-group" rows=category_breakdown report="category" scope=scope %}
+    {% include 'products/_inventory_breakdown.html' with title="Par type de bijou" icon="fa-gem" rows=jewelry_breakdown report="jewelry" scope=scope %}
+
+    <!-- Status overview (all products) -->
+    <div class="card animate-slide-up mb-6">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3><i class="fas fa-list-check mr-2"></i> Par statut (tous les produits)</h3>
+            <a href="{% url 'products:inventory_export' %}?report=status&scope={{ scope }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-download"></i> <span class="desktop-only">CSV</span>
             </a>
         </div>
-        <div class="card-body" style="padding: 0;">
-            <div class="table-wrapper" style="border: none; border-radius: 0;">
-                <table class="table">
-                    <thead>
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Statut</th>
+                        <th style="text-align: right;">Nb</th>
+                        <th style="text-align: right;">Poids brut (g)</th>
+                        <th style="text-align: right;">Valeur matière (DH)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in status_breakdown %}
                         <tr>
-                            <th>Reference</th>
-                            <th>Nom</th>
-                            <th>Categorie</th>
-                            <th>Poids</th>
-                            <th>Prix</th>
-                            <th style="text-align: center;">Actions</th>
+                            <td class="font-semibold">{{ row.status_label }}</td>
+                            <td style="text-align: right;">{{ row.count }}</td>
+                            <td style="text-align: right;">{{ row.gross|default:0|floatformat:2 }}</td>
+                            <td style="text-align: right;" class="text-primary font-semibold">{{ row.material_value|default:0|floatformat:2 }}</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in low_stock_items %}
-                            <tr style="cursor: pointer;" onclick="window.location='{% url 'products:detail' item.reference %}'">
-                                <td>
-                                    <span class="font-semibold text-primary">{{ item.reference }}</span>
-                                </td>
-                                <td class="font-medium">{{ item.name }}</td>
-                                <td class="text-muted">{{ item.category.name }}</td>
-                                <td>{{ item.gross_weight }} g</td>
-                                <td class="font-semibold">{{ item.selling_price }} DH</td>
-                                <td style="text-align: center;">
-                                    <a href="{% url 'products:detail' item.reference %}" class="btn btn-ghost btn-sm" onclick="event.stopPropagation();">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="6">
-                                    <div class="empty-state">
-                                        <div class="empty-state-icon">
-                                            <i class="fas fa-inbox"></i>
-                                        </div>
-                                        <h4 class="empty-state-title">Aucun article</h4>
-                                        <p class="empty-state-text">Aucun article trouve dans l'inventaire.</p>
-                                        <a href="{% url 'products:create' %}" class="btn btn-primary">
-                                            <i class="fas fa-plus"></i> Nouveau Produit
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                    {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted" style="padding: var(--space-6);">Aucune donnée</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
+
+    <p class="text-muted" style="font-size: var(--text-xs);">
+        <i class="fas fa-info-circle"></i> « Valeur matière » = poids net × prix d'achat par gramme (ou poids brut si le net n'est pas renseigné), sans la façon, les pierres ni la marge.
+    </p>
 {% endblock %}

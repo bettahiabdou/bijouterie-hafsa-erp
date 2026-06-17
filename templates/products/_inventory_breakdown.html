@@ -1,0 +1,35 @@
+{# Reusable inventory breakdown card. Expects: title, icon, rows, report, scope #}
+<div class="card animate-slide-up mb-6">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h3><i class="fas {{ icon }} mr-2"></i> {{ title }}</h3>
+        <a href="{% url 'products:inventory_export' %}?report={{ report }}&scope={{ scope }}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-download"></i> <span class="desktop-only">CSV</span>
+        </a>
+    </div>
+    <div class="table-wrapper">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>{{ title }}</th>
+                    <th style="text-align: right;">Nb</th>
+                    <th style="text-align: right;">Poids brut (g)</th>
+                    <th style="text-align: right;">Valeur matière (DH)</th>
+                    <th style="text-align: right;">Coût total (DH)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td class="font-semibold">{{ row.label }}</td>
+                        <td style="text-align: right;">{{ row.count }}</td>
+                        <td style="text-align: right;">{{ row.gross|default:0|floatformat:2 }}</td>
+                        <td style="text-align: right;" class="text-primary font-semibold">{{ row.material_value|default:0|floatformat:2 }}</td>
+                        <td style="text-align: right;">{{ row.total_cost|default:0|floatformat:2 }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="text-center text-muted" style="padding: var(--space-6);">Aucune donnée</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

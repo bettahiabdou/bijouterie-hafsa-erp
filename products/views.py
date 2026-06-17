@@ -4,10 +4,13 @@ Product management views for Bijouterie Hafsa ERP
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
-from django.db.models import Q, Count, Sum, F
+from django.db.models import Q, Count, Sum, F, DecimalField
+from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from decimal import Decimal
+import csv
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from .models import Product, ProductImage, ProductStone, ProductVideo
 from .video_utils import convert_video_to_mp4
@@ -743,50 +746,189 @@ def product_delete(request, reference):
     return render(request, 'products/product_delete.html', context)
 
 
+# Statuses considered physically in stock (owned, unsold)
+INSTOCK_STATUSES = ['available', 'reserved', 'in_repair', 'custom_order']
+
+INVENTORY_SCOPES = {
+    'available': (['available'], 'Disponible'),
+    'instock': (INSTOCK_STATUSES, 'En boutique (dispo + réservé + réparation)'),
+    'all': (None, 'Tous les produits'),
+}
+
+# Per-product material value = net weight × purchase price/gram (the cost we paid
+# per gram, WITHOUT the selling margin). Falls back to gross weight if net is 0.
+_DEC = DecimalField(max_digits=18, decimal_places=2)
+_MATERIAL_VALUE_EXPR = Coalesce(
+    F('metal_cost'), Coalesce(F('net_weight'), F('gross_weight')) * F('purchase_price_per_gram'),
+    output_field=_DEC,
+)
+
+
+def _inventory_scope_qs(scope):
+    """Return the Product queryset for the requested inventory scope."""
+    statuses, _label = INVENTORY_SCOPES.get(scope, INVENTORY_SCOPES['available'])
+    qs = Product.objects.all()
+    if statuses is not None:
+        qs = qs.filter(status__in=statuses)
+    return qs
+
+
+def _inventory_breakdown(qs, group_field):
+    """Aggregate a queryset by a grouping field, valued at material cost."""
+    rows = list(
+        qs.values(group_field).annotate(
+            count=Count('id'),
+            gross=Sum('gross_weight'),
+            net=Sum('net_weight'),
+            material_value=Sum(_MATERIAL_VALUE_EXPR),
+            total_cost=Sum('total_cost'),
+            selling=Sum('selling_price'),
+        ).order_by('-material_value')
+    )
+    for r in rows:
+        r['label'] = r.get(group_field) or '(Non défini)'
+    return rows
+
+
 @login_required(login_url='login')
 def inventory_dashboard(request):
-    """Display inventory statistics and alerts"""
-    if not request.user.is_staff and not request.user.is_staff:
+    """Cost-based inventory dashboard (material value = poids × prix/g, sans marge)."""
+    if not request.user.is_staff:
         messages.error(request, 'Vous n\'avez pas accès à ce tableau de bord.')
         return redirect('dashboard')
 
-    # Overall statistics
-    total_products = Product.objects.count()
-    available_products = Product.objects.filter(status='available').count()
-    sold_products = Product.objects.filter(status='sold').count()
-    in_repair_products = Product.objects.filter(status='in_repair').count()
+    scope = request.GET.get('scope', 'available')
+    if scope not in INVENTORY_SCOPES:
+        scope = 'available'
+    qs = _inventory_scope_qs(scope)
 
-    # Value calculations - only count available products
-    total_value = Product.objects.filter(status='available').aggregate(
-        total=Sum(F('selling_price'))
-    )['total'] or 0
-
-    # Status breakdown
-    status_breakdown = Product.objects.values('status').annotate(count=Count('id')).order_by('status')
-
-    # Metal breakdown
-    metal_breakdown = Product.objects.values('metal_type__name').annotate(
+    # Headline KPIs valued at COST (no margin)
+    kpis = qs.aggregate(
         count=Count('id'),
-        total_weight=Sum('gross_weight')
-    ).order_by('-count')[:10]
+        gross=Sum('gross_weight'),
+        net=Sum('net_weight'),
+        material_value=Sum(_MATERIAL_VALUE_EXPR),
+        total_cost=Sum('total_cost'),
+        selling=Sum('selling_price'),
+    )
+    material_value = kpis['material_value'] or Decimal('0')
+    total_cost = kpis['total_cost'] or Decimal('0')
+    selling = kpis['selling'] or Decimal('0')
 
-    # Low stock items (minimum price below selling price indicates low stock)
-    low_stock_items = Product.objects.filter(
-        status='available'
-    ).order_by('gross_weight')[:20]
+    # Status breakdown across ALL products (overview)
+    status_map = dict(Product.Status.choices)
+    status_rows = list(
+        Product.objects.values('status').annotate(
+            count=Count('id'),
+            gross=Sum('gross_weight'),
+            material_value=Sum(_MATERIAL_VALUE_EXPR),
+        ).order_by('-count')
+    )
+    for r in status_rows:
+        r['status_label'] = status_map.get(r['status'], r['status'])
 
     context = {
-        'total_products': total_products,
-        'available_products': available_products,
-        'sold_products': sold_products,
-        'in_repair_products': in_repair_products,
-        'total_value': total_value,
-        'status_breakdown': list(status_breakdown),
-        'metal_breakdown': list(metal_breakdown),
-        'low_stock_items': low_stock_items,
+        'scope': scope,
+        'scope_label': INVENTORY_SCOPES[scope][1],
+        'scopes': [(k, v[1]) for k, v in INVENTORY_SCOPES.items()],
+        # KPIs
+        'stock_count': kpis['count'] or 0,
+        'gross_weight': kpis['gross'] or Decimal('0'),
+        'net_weight': kpis['net'] or Decimal('0'),
+        'material_value': material_value,     # poids × prix/g (sans marge)
+        'total_cost': total_cost,             # coût total (matière + façon + pierres)
+        'selling_value': selling,             # valeur de vente (avec marge)
+        'potential_margin': selling - total_cost,
+        # Breakdowns (each downloadable)
+        'metal_breakdown': _inventory_breakdown(qs, 'metal_type__name'),
+        'purity_breakdown': _inventory_breakdown(qs, 'metal_purity__name'),
+        'category_breakdown': _inventory_breakdown(qs, 'category__name'),
+        'jewelry_breakdown': _inventory_breakdown(qs, 'jewelry_type__name'),
+        'status_breakdown': status_rows,
     }
-
     return render(request, 'products/inventory_dashboard.html', context)
+
+
+@login_required(login_url='login')
+def inventory_export(request):
+    """Download inventory reports as CSV (full item list or any breakdown)."""
+    if not request.user.is_staff:
+        messages.error(request, 'Accès refusé.')
+        return redirect('dashboard')
+
+    scope = request.GET.get('scope', 'available')
+    if scope not in INVENTORY_SCOPES:
+        scope = 'available'
+    report = request.GET.get('report', 'full')
+    qs = _inventory_scope_qs(scope)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response.write('﻿')  # UTF-8 BOM so Excel reads accents correctly
+    response['Content-Disposition'] = f'attachment; filename="inventaire_{report}_{scope}.csv"'
+    writer = csv.writer(response)
+
+    def _num(v):
+        return f"{(v or 0):.2f}"
+
+    if report == 'full':
+        writer.writerow([
+            'Référence', 'Nom', 'Statut', 'Catégorie', 'Type bijou', 'Métal', 'Pureté',
+            'Poids brut (g)', 'Poids net (g)', 'Prix/g (DH)',
+            'Valeur matière (DH)', 'Coût total (DH)', 'Prix de vente (DH)',
+        ])
+        items = qs.select_related(
+            'category', 'jewelry_type', 'metal_type', 'metal_purity'
+        ).order_by('category__name', 'reference')
+        for p in items:
+            net = p.net_weight or p.gross_weight or Decimal('0')
+            material = p.metal_cost if p.metal_cost else (net * (p.purchase_price_per_gram or Decimal('0')))
+            writer.writerow([
+                p.reference, p.name, p.get_status_display(),
+                p.category.name if p.category else '',
+                p.jewelry_type.name if p.jewelry_type else '',
+                p.metal_type.name if p.metal_type else '',
+                p.metal_purity.name if p.metal_purity else '',
+                _num(p.gross_weight), _num(p.net_weight), _num(p.purchase_price_per_gram),
+                _num(material), _num(p.total_cost), _num(p.selling_price),
+            ])
+        return response
+
+    # Breakdown reports
+    group_fields = {
+        'metal': ('metal_type__name', 'Métal'),
+        'purity': ('metal_purity__name', 'Pureté'),
+        'category': ('category__name', 'Catégorie'),
+        'jewelry': ('jewelry_type__name', 'Type bijou'),
+    }
+    if report == 'status':
+        status_map = dict(Product.Status.choices)
+        rows = list(Product.objects.values('status').annotate(
+            count=Count('id'), gross=Sum('gross_weight'), net=Sum('net_weight'),
+            material_value=Sum(_MATERIAL_VALUE_EXPR), total_cost=Sum('total_cost'),
+            selling=Sum('selling_price'),
+        ).order_by('-count'))
+        writer.writerow(['Statut', 'Nb', 'Poids brut (g)', 'Poids net (g)', 'Valeur matière (DH)', 'Coût total (DH)', 'Valeur vente (DH)'])
+        for r in rows:
+            writer.writerow([
+                status_map.get(r['status'], r['status']), r['count'],
+                _num(r['gross']), _num(r['net']), _num(r['material_value']), _num(r['total_cost']), _num(r['selling']),
+            ])
+        return response
+
+    if report in group_fields:
+        field, label = group_fields[report]
+        rows = _inventory_breakdown(qs, field)
+        writer.writerow([label, 'Nb', 'Poids brut (g)', 'Poids net (g)', 'Valeur matière (DH)', 'Coût total (DH)', 'Valeur vente (DH)'])
+        for r in rows:
+            writer.writerow([
+                r[field] or '(Non défini)', r['count'],
+                _num(r['gross']), _num(r['net']), _num(r['material_value']), _num(r['total_cost']), _num(r['selling']),
+            ])
+        return response
+
+    # Unknown report
+    writer.writerow(['Rapport inconnu'])
+    return response
 
 
 def get_client_ip(request):

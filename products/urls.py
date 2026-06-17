@@ -15,6 +15,7 @@ urlpatterns = [
 
     # Inventory
     path('inventory/dashboard/', views.inventory_dashboard, name='inventory_dashboard'),
+    path('inventory/export/', views.inventory_export, name='inventory_export'),
 
     # Print (must be before <str:reference> catch-all)
     path('print/test/', views.print_test, name='print_test'),
