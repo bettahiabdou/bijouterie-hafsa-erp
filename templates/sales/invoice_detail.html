@@ -1559,13 +1559,96 @@
             if (action === 'return') {
                 document.querySelector('.re-return-btn').classList.add('selected');
                 document.getElementById('exchangeProductSection').classList.remove('visible');
+                document.getElementById('returnRefundSection').style.display = 'block';
+                // Default to full refund
+                var fullRadio = document.querySelector('input[name="refund_type"][value="full"]');
+                if (fullRadio) fullRadio.checked = true;
+                updateRefundFields();
                 document.getElementById('confirmReturnExchangeBtn').disabled = false;
             } else if (action === 'exchange') {
                 document.querySelector('.re-exchange-btn').classList.add('selected');
                 document.getElementById('exchangeProductSection').classList.add('visible');
+                document.getElementById('returnRefundSection').style.display = 'none';
                 updateExchangeTotals();
                 document.getElementById('confirmReturnExchangeBtn').disabled = selectedExchangeProducts.length === 0;
             }
+        }
+
+        // ===== Return refund options =====
+        let refundSelectedClientId = null;
+        let refundClientTimer = null;
+
+        function updateRefundFields() {
+            const typeEl = document.querySelector('input[name="refund_type"]:checked');
+            const type = typeEl ? typeEl.value : 'full';
+            const amountGroup = document.getElementById('refundAmountGroup');
+            const depositGroup = document.getElementById('refundDepositClientGroup');
+            const amountInput = document.getElementById('refundAmountInput');
+
+            if (type === 'full') {
+                amountGroup.style.display = 'none';
+                depositGroup.style.display = 'none';
+                amountInput.value = originalItemPrice.toFixed(2);
+            } else if (type === 'partial') {
+                amountGroup.style.display = 'block';
+                depositGroup.style.display = 'none';
+                if (!amountInput.value || parseNumber(amountInput.value) > originalItemPrice) {
+                    amountInput.value = '';
+                }
+            } else if (type === 'deposit') {
+                amountGroup.style.display = 'block';
+                depositGroup.style.display = 'block';
+                if (!amountInput.value) amountInput.value = originalItemPrice.toFixed(2);
+            }
+            updateRefundHint();
+        }
+
+        function updateRefundHint() {
+            const hint = document.getElementById('refundAmountHint');
+            if (hint) hint.textContent = 'Maximum: ' + originalItemPrice.toFixed(2) + ' DH';
+        }
+
+        function searchRefundClients() {
+            const q = document.getElementById('refundClientSearch').value.trim();
+            const resultsDiv = document.getElementById('refundClientResults');
+            if (q.length < 2) { resultsDiv.style.display = 'none'; return; }
+            if (refundClientTimer) clearTimeout(refundClientTimer);
+            refundClientTimer = setTimeout(function() {
+                fetch('{% url "clients:api_search" %}?q=' + encodeURIComponent(q))
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.results && data.results.length) {
+                            let html = '';
+                            data.results.forEach(function(c) {
+                                const safeName = (c.name || '').replace(/'/g, "\\'");
+                                html += '<div class="refund-search-item" onclick="selectRefundClient(' + c.id + ', \'' + safeName + '\')">' +
+                                    '<strong>' + c.name + '</strong>' +
+                                    (c.phone ? ' <span style="color:var(--neutral-500);">' + c.phone + '</span>' : '') +
+                                    (c.has_deposit ? ' <span style="color:var(--success-600);">• Dépôt: ' + c.deposit_balance.toFixed(2) + ' DH</span>' : '') +
+                                    '</div>';
+                            });
+                            resultsDiv.innerHTML = html;
+                            resultsDiv.style.display = 'block';
+                        } else {
+                            resultsDiv.innerHTML = '<div class="refund-search-no-results">Aucun client trouvé</div>';
+                            resultsDiv.style.display = 'block';
+                        }
+                    })
+                    .catch(() => { resultsDiv.style.display = 'none'; });
+            }, 300);
+        }
+
+        function selectRefundClient(id, name) {
+            refundSelectedClientId = id;
+            document.getElementById('refundSelectedClientName').textContent = name;
+            document.getElementById('refundSelectedClient').style.display = 'flex';
+            document.getElementById('refundClientResults').style.display = 'none';
+            document.getElementById('refundClientSearch').value = '';
+        }
+
+        function clearRefundClient() {
+            refundSelectedClientId = null;
+            document.getElementById('refundSelectedClient').style.display = 'none';
         }
 
         function addExchangeProduct(productId, productRef, price, name) {
@@ -1859,8 +1942,31 @@
             const notes = document.getElementById('returnExchangeNotes').value;
 
             if (currentAction === 'return') {
+                const typeEl = document.querySelector('input[name="refund_type"]:checked');
+                const type = typeEl ? typeEl.value : 'full';
+                let refundAmount, refundMethod;
+
+                if (type === 'full') {
+                    refundAmount = originalItemPrice;
+                    refundMethod = 'cash';
+                } else if (type === 'partial') {
+                    refundAmount = parseNumber(document.getElementById('refundAmountInput').value);
+                    refundMethod = 'cash';
+                    if (!(refundAmount > 0)) { alert('Veuillez saisir un montant à rembourser.'); return; }
+                    if (refundAmount > originalItemPrice + 0.001) { alert('Le montant ne peut pas dépasser ' + originalItemPrice.toFixed(2) + ' DH.'); return; }
+                } else { // deposit
+                    refundAmount = parseNumber(document.getElementById('refundAmountInput').value);
+                    refundMethod = 'deposit';
+                    if (!(refundAmount > 0)) { alert('Veuillez saisir un montant à créditer.'); return; }
+                    if (refundAmount > originalItemPrice + 0.001) { alert('Le montant ne peut pas dépasser ' + originalItemPrice.toFixed(2) + ' DH.'); return; }
+                    if (!refundSelectedClientId) { alert('Veuillez sélectionner le client à créditer.'); return; }
+                }
+
                 document.getElementById('returnItemId').value = currentItemId;
                 document.getElementById('returnNotes').value = notes;
+                document.getElementById('returnRefundMethod').value = refundMethod;
+                document.getElementById('returnRefundAmount').value = refundAmount.toFixed(2);
+                document.getElementById('returnDepositClientId').value = (refundMethod === 'deposit' && refundSelectedClientId) ? refundSelectedClientId : '';
                 document.getElementById('returnForm').submit();
             } else if (currentAction === 'exchange' && selectedExchangeProducts.length > 0) {
                 // Prepare products data with their prices
@@ -1926,6 +2032,46 @@
                         <i class="fas fa-exchange-alt"></i>
                         <strong>Échange</strong>
                         <small style="color: var(--neutral-500);">Échanger contre d'autres produits</small>
+                    </div>
+                </div>
+
+                <!-- Return Refund Options (shown when 'Retour' is selected) -->
+                <div id="returnRefundSection" style="display: none; margin-top: var(--space-4); padding: var(--space-4); border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); background: var(--neutral-50);">
+                    <label class="form-label" style="font-weight: 600;">Type de remboursement</label>
+                    <div class="refund-type-options">
+                        <label class="refund-type-opt">
+                            <input type="radio" name="refund_type" value="full" checked onchange="updateRefundFields()">
+                            <span><i class="fas fa-money-bill-wave"></i> Remboursement complet</span>
+                        </label>
+                        <label class="refund-type-opt">
+                            <input type="radio" name="refund_type" value="partial" onchange="updateRefundFields()">
+                            <span><i class="fas fa-coins"></i> Remboursement partiel</span>
+                        </label>
+                        <label class="refund-type-opt">
+                            <input type="radio" name="refund_type" value="deposit" onchange="updateRefundFields()">
+                            <span><i class="fas fa-piggy-bank"></i> Crédit dépôt client</span>
+                        </label>
+                    </div>
+
+                    <div class="form-group" id="refundAmountGroup" style="display: none; margin-top: var(--space-3);">
+                        <label class="form-label">Montant remboursé (DH)</label>
+                        <input type="number" id="refundAmountInput" class="form-input" step="0.01" min="0" placeholder="0.00" oninput="updateRefundHint()">
+                        <small class="text-muted" id="refundAmountHint"></small>
+                    </div>
+
+                    <div class="form-group" id="refundDepositClientGroup" style="display: none; margin-top: var(--space-3);">
+                        <label class="form-label">Client à créditer</label>
+                        <div style="position: relative;">
+                            <input type="text" id="refundClientSearch" class="form-input" placeholder="Chercher par nom, téléphone, code..." autocomplete="off" oninput="searchRefundClients()">
+                            <div id="refundClientResults" class="refund-search-results" style="display: none;"></div>
+                        </div>
+                        <div id="refundSelectedClient" style="display: none; margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: #f0fdf4; border-radius: var(--radius); align-items: center; justify-content: space-between;">
+                            <span id="refundSelectedClientName" class="font-semibold"></span>
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="clearRefundClient()" title="Retirer"><i class="fas fa-times"></i></button>
+                        </div>
+                        <a href="{% url 'clients:create' %}" target="_blank" class="text-primary" style="font-size: var(--text-sm); display: inline-block; margin-top: var(--space-2);">
+                            <i class="fas fa-plus"></i> Ajouter un nouveau client
+                        </a>
                     </div>
                 </div>
 
@@ -2111,6 +2257,9 @@
         <input type="hidden" name="action" value="return_item">
         <input type="hidden" name="item_id" id="returnItemId" value="">
         <input type="hidden" name="notes" id="returnNotes" value="">
+        <input type="hidden" name="refund_method" id="returnRefundMethod" value="cash">
+        <input type="hidden" name="refund_amount" id="returnRefundAmount" value="">
+        <input type="hidden" name="deposit_client_id" id="returnDepositClientId" value="">
     </form>
 
     <form method="post" id="exchangeForm" style="display: none;">
@@ -2198,6 +2347,46 @@
             gap: var(--space-4);
             margin-bottom: var(--space-4);
         }
+
+        /* Return refund options */
+        .refund-type-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-2);
+            margin: var(--space-2) 0;
+        }
+        .refund-type-opt {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border: 1px solid var(--neutral-300);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: var(--text-sm);
+        }
+        .refund-type-opt input { margin: 0; }
+        .refund-search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            max-height: 240px;
+            overflow-y: auto;
+            z-index: 50;
+        }
+        .refund-search-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--neutral-100);
+            font-size: var(--text-sm);
+        }
+        .refund-search-item:hover { background: var(--primary-50); }
+        .refund-search-no-results { padding: 10px 12px; color: var(--neutral-400); font-size: var(--text-sm); }
 
         .re-action-choice-btn {
             flex: 1;

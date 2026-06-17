@@ -1085,6 +1085,11 @@ class SaleInvoiceAction(models.Model):
         RETURN = 'return', _('Retour')
         EXCHANGE = 'exchange', _('Échange')
 
+    class RefundMethod(models.TextChoices):
+        NONE = 'none', _('Aucun')
+        CASH = 'cash', _('Espèce / Remboursement')
+        DEPOSIT = 'deposit', _('Crédit dépôt client')
+
     # The original invoice being returned/exchanged
     original_invoice = models.ForeignKey(
         SaleInvoice,
@@ -1139,6 +1144,23 @@ class SaleInvoiceAction(models.Model):
         max_digits=12,
         decimal_places=2,
         default=0
+    )
+
+    # How the refund was issued (cash refund vs credited to a client deposit)
+    refund_method = models.CharField(
+        _('Mode de remboursement'),
+        max_length=10,
+        choices=RefundMethod.choices,
+        default=RefundMethod.CASH
+    )
+    # When refund_method == deposit: the client whose deposit account was credited
+    deposit_client = models.ForeignKey(
+        'clients.Client',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='return_deposit_credits',
+        verbose_name=_('Client crédité (dépôt)')
     )
 
     # Tracking

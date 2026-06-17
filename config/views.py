@@ -73,6 +73,11 @@ def dashboard(request):
     this_month_start = today.replace(day=1)
     this_year_start = today.replace(month=1, day=1)
 
+    # Refund subtraction: returns on still-active invoices reduce revenue by the
+    # refunded amount (fully-returned invoices are already excluded by status).
+    from sales.models import SaleInvoiceAction
+    _excluded_statuses = ['returned', 'cancelled', 'exchanged', 'draft']
+
     # Get today's sales (exclude soft-deleted and fully returned invoices)
     today_sales = SaleInvoice.objects.filter(
         date=today,
@@ -80,6 +85,12 @@ def dashboard(request):
     ).exclude(status='returned')
     today_sales_amount = today_sales.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
     today_sales_count = today_sales.count()
+    today_refunds = SaleInvoiceAction.objects.filter(
+        action_type=SaleInvoiceAction.ActionType.RETURN,
+        original_invoice__date=today,
+        original_invoice__is_deleted=False,
+    ).exclude(original_invoice__status__in=_excluded_statuses).aggregate(t=Sum('refund_amount'))['t'] or Decimal('0')
+    today_sales_amount = today_sales_amount - today_refunds
 
     # Get this month's revenue (exclude soft-deleted and fully returned invoices)
     month_sales = SaleInvoice.objects.filter(
@@ -87,6 +98,12 @@ def dashboard(request):
         is_deleted=False
     ).exclude(status='returned')
     month_revenue = month_sales.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+    month_refunds = SaleInvoiceAction.objects.filter(
+        action_type=SaleInvoiceAction.ActionType.RETURN,
+        original_invoice__date__gte=this_month_start,
+        original_invoice__is_deleted=False,
+    ).exclude(original_invoice__status__in=_excluded_statuses).aggregate(t=Sum('refund_amount'))['t'] or Decimal('0')
+    month_revenue = month_revenue - month_refunds
 
     # Get stock data - only count available products
     total_products = Product.objects.filter(status='available').count()

@@ -177,6 +177,19 @@ def sales_dashboard(request):
     )['weight']
     filtered_invoice_ids = list(base_qs.values_list('id', flat=True))
 
+    # ============ REFUNDS (returns) IN PERIOD ============
+    # Returns on invoices still in the active set reduce revenue (any refund method)
+    # and encaissement (cash refunds only). Fully-returned invoices are already
+    # excluded from base_qs, so their refunds are NOT double-counted here.
+    _period_returns = SaleInvoiceAction.objects.filter(
+        action_type=SaleInvoiceAction.ActionType.RETURN,
+        original_invoice__in=base_qs,
+    )
+    period_refund_total = _period_returns.aggregate(t=Sum('refund_amount'))['t'] or Decimal('0')
+    period_cash_refund_total = _period_returns.filter(
+        refund_method='cash'
+    ).aggregate(t=Sum('refund_amount'))['t'] or Decimal('0')
+
     # ============ DELIVERY TYPE BREAKDOWN ============
     magasin_qs = base_qs.filter(Q(delivery_method_type='magasin') | Q(delivery_method_type__isnull=True) | Q(delivery_method_type=''))
     amana_qs = base_qs.filter(delivery_method_type='amana')
@@ -236,7 +249,8 @@ def sales_dashboard(request):
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
     total_delivery_pending = amana_not_received + transporteur_not_received
-    real_encaisse = all_payments_total - total_delivery_pending
+    # Cash refunds reduce real cash collected; deposit-credit refunds do not.
+    real_encaisse = all_payments_total - total_delivery_pending - period_cash_refund_total
 
     # ============ DETAILED PAYMENT BREAKDOWN: Method + Bank ============
     # Group by payment_method AND bank_account for full detail
@@ -454,6 +468,16 @@ def sales_dashboard(request):
     )['weight']
     today_invoice_ids = list(today_base.values_list('id', flat=True))
 
+    # Today's refunds on still-active invoices
+    _today_returns = SaleInvoiceAction.objects.filter(
+        action_type=SaleInvoiceAction.ActionType.RETURN,
+        original_invoice__in=today_base,
+    )
+    today_refund_total = _today_returns.aggregate(t=Sum('refund_amount'))['t'] or Decimal('0')
+    today_cash_refund_total = _today_returns.filter(
+        refund_method='cash'
+    ).aggregate(t=Sum('refund_amount'))['t'] or Decimal('0')
+
     # Today payments: filter by PAYMENT DATE only (not invoice date)
     today_payments_base = ClientPayment.objects.filter(
         date=today,
@@ -479,7 +503,7 @@ def sales_dashboard(request):
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
     today_delivery_pending = today_amana_pending + today_transporteur_pending
-    today_encaisse = today_all_payments - today_delivery_pending
+    today_encaisse = today_all_payments - today_delivery_pending - today_cash_refund_total
 
     # Today payment method breakdown
     today_payment_methods = list(
@@ -800,7 +824,8 @@ def sales_dashboard(request):
         date=today,
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    filter_revenue = filtered_stats['revenue'] or Decimal('0')
+    # Revenue (CA) is reduced by the refunded amount (any method) for returns in period
+    filter_revenue = (filtered_stats['revenue'] or Decimal('0')) - period_refund_total
     filter_weight = filtered_stats['weight'] or Decimal('0')
 
     context = {
@@ -812,7 +837,7 @@ def sales_dashboard(request):
         'sellers': sellers,
         # Today
         'today_stats': {
-            'revenue': today_stats_raw['revenue'] or Decimal('0'),
+            'revenue': (today_stats_raw['revenue'] or Decimal('0')) - today_refund_total,
             'encaisse': today_encaisse,
             'amana_pending': today_amana_pending,
             'transporteur_pending': today_transporteur_pending,
@@ -980,13 +1005,27 @@ def invoice_list(request):
         total_revenue=Sum('total_amount')
     )
 
+    # Subtract refunds (returns on still-active invoices) from these revenue figures
+    def _refunds_for(invoice_date_filter):
+        return SaleInvoiceAction.objects.filter(
+            action_type=SaleInvoiceAction.ActionType.RETURN,
+            original_invoice__is_deleted=False,
+            **invoice_date_filter,
+        ).exclude(
+            original_invoice__status__in=excluded_statuses
+        ).aggregate(t=Sum('refund_amount'))['t'] or Decimal('0')
+
+    today_refunds = _refunds_for({'original_invoice__date': today})
+    month_refunds = _refunds_for({'original_invoice__date__year': today.year, 'original_invoice__date__month': today.month})
+    total_refunds = _refunds_for({})
+
     stats = {
-        'today': today_stats['today_total'] or Decimal('0'),
+        'today': (today_stats['today_total'] or Decimal('0')) - today_refunds,
         'today_count': today_stats['today_count'] or 0,
-        'month': month_stats['month_total'] or Decimal('0'),
+        'month': (month_stats['month_total'] or Decimal('0')) - month_refunds,
         'month_count': month_stats['month_count'] or 0,
         'total_invoices': total_stats['total_invoices'] or 0,
-        'total_revenue': total_stats['total_revenue'] or Decimal('0'),
+        'total_revenue': (total_stats['total_revenue'] or Decimal('0')) - total_refunds,
     }
 
     from django.contrib.auth import get_user_model
@@ -1039,6 +1078,12 @@ def invoice_detail(request, reference):
         if action == 'return_item':
             item_id = request.POST.get('item_id')
             notes = request.POST.get('notes', '')
+            refund_method = request.POST.get('refund_method', 'cash')
+            refund_amount_str = request.POST.get('refund_amount', '')
+            deposit_client_id = request.POST.get('deposit_client_id', '')
+
+            if refund_method not in ('cash', 'deposit', 'none'):
+                refund_method = 'cash'
 
             if item_id:
                 try:
@@ -1046,21 +1091,58 @@ def invoice_detail(request, reference):
                     product = item.product
                     product_ref = product.reference
 
+                    # Resolve refund amount (default = full item amount), capped at item total
+                    item_total = item.total_amount or Decimal('0')
+                    try:
+                        refund_amount = Decimal(refund_amount_str) if refund_amount_str != '' else item_total
+                    except (InvalidOperation, ValueError):
+                        refund_amount = item_total
+                    if refund_amount < 0:
+                        refund_amount = Decimal('0')
+                    if refund_amount > item_total:
+                        refund_amount = item_total
+
+                    # For deposit credit, resolve the client to credit
+                    deposit_client = None
+                    if refund_method == 'deposit':
+                        from clients.models import Client
+                        deposit_client = Client.objects.filter(pk=deposit_client_id).first() if deposit_client_id else None
+                        if not deposit_client:
+                            messages.error(request, 'Veuillez sélectionner un client pour le crédit dépôt.')
+                            return redirect('sales:invoice_detail', reference=reference)
+
                     # Mark item as returned
                     item.is_returned = True
                     item.returned_at = timezone.now()
                     item.save(update_fields=['is_returned', 'returned_at'])
 
-                    # Create action record
+                    # Create action record (stores refund method/amount/deposit client)
                     SaleInvoiceAction.objects.create(
                         original_invoice=invoice,
                         action_type=SaleInvoiceAction.ActionType.RETURN,
                         original_product=product,
                         original_product_ref=product_ref,
-                        refund_amount=item.total_amount,
+                        refund_amount=refund_amount,
+                        refund_method=refund_method,
+                        deposit_client=deposit_client,
                         notes=notes,
                         created_by=request.user
                     )
+
+                    # If crediting a client deposit, create the deposit transaction
+                    if refund_method == 'deposit' and deposit_client and refund_amount > 0:
+                        from deposits.models import DepositAccount, DepositTransaction
+                        dep_account, _ = DepositAccount.objects.get_or_create(
+                            client=deposit_client,
+                            defaults={'created_by': request.user}
+                        )
+                        DepositTransaction.objects.create(
+                            account=dep_account,
+                            transaction_type=DepositTransaction.TransactionType.REFUND,
+                            amount=refund_amount,  # positive: credit into deposit
+                            description=f'Remboursement retour facture {invoice.reference} ({product_ref})',
+                            created_by=request.user
+                        )
 
                     # Update product status to available
                     product.status = 'available'
@@ -1070,23 +1152,30 @@ def invoice_detail(request, reference):
                     total_items = invoice.items.count()
                     returned_items = invoice.items.filter(is_returned=True).count()
 
-                    if returned_items >= total_items:
-                        # All items returned - mark invoice as fully returned
+                    # Total refunded across all return actions on this invoice
+                    total_refunded = invoice.actions.filter(
+                        action_type=SaleInvoiceAction.ActionType.RETURN
+                    ).aggregate(t=Sum('refund_amount'))['t'] or Decimal('0')
+
+                    if returned_items >= total_items and total_refunded >= (invoice.total_amount or Decimal('0')):
+                        # All items returned AND fully refunded -> mark invoice as returned
                         invoice.status = SaleInvoice.Status.RETURNED
                         invoice.save(update_fields=['status'])
-                        messages.success(request, f'Produit {product_ref} retourné. Tous les articles ont été retournés - facture marquée comme retournée.')
+                        messages.success(request, f'Produit {product_ref} retourné. Tous les articles retournés et remboursés - facture marquée comme retournée.')
                     else:
-                        # Partial return - keep invoice status but show message about remaining items
+                        # Partial return or partial refund - keep invoice active (refund is subtracted in stats)
                         remaining_items = total_items - returned_items
-                        messages.success(request, f'Produit {product_ref} retourné. Il reste {remaining_items} article(s) non retourné(s) dans cette facture.')
-                        messages.info(request, 'Vous pouvez créer une nouvelle facture avec les articles restants en cliquant sur "Créer facture avec articles restants".')
+                        method_label = {'cash': 'espèce', 'deposit': 'crédit dépôt', 'none': 'sans remboursement'}.get(refund_method, refund_method)
+                        messages.success(request, f'Produit {product_ref} retourné. Remboursé: {refund_amount} DH ({method_label}).')
+                        if remaining_items > 0:
+                            messages.info(request, f'Il reste {remaining_items} article(s) non retourné(s) dans cette facture.')
 
                     ActivityLog.objects.create(
                         user=request.user,
                         action=ActivityLog.ActionType.UPDATE,
                         model_name='SaleInvoice',
                         object_id=str(invoice.id),
-                        object_repr=f'Returned product {product_ref} from invoice {invoice.reference}',
+                        object_repr=f'Returned product {product_ref} from invoice {invoice.reference} (refund {refund_amount} {refund_method})',
                         ip_address=get_client_ip(request)
                     )
 
