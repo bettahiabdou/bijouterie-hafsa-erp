@@ -3141,7 +3141,10 @@ def invoice_payment(request, reference):
                 for n, row in enumerate(payment_rows, start=1):
                     pm = PaymentMethod.objects.get(id=row['method_id'])
                     ClientPayment.objects.create(
-                        reference=row['ref'] or f"PAY-{invoice.reference}-{row['index']}",
+                        # Use the typed reference, else leave blank so the model
+                        # auto-generates a unique one (avoids PAY-<inv>-N collisions
+                        # when adding payments across multiple sessions).
+                        reference=row['ref'] or '',
                         date=row['date'],
                         payment_type=ClientPayment.PaymentType.INVOICE,
                         client=invoice.client,
