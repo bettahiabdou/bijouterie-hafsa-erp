@@ -71,6 +71,7 @@
 {% endblock %}
 
 {% block content %}
+    {% csrf_token %}
     <!-- Filters Card -->
     <div class="card mb-6 animate-slide-up">
         <div class="card-body filter-section">
@@ -176,6 +177,9 @@
                     <div class="product-footer">
                         <span class="product-price">{{ product.selling_price|floatformat:2 }} DH</span>
                         <div class="product-actions" onclick="event.stopPropagation();">
+                            <button type="button" class="btn btn-ghost btn-sm btn-icon" title="Imprimer étiquette" style="color: var(--success-600, #16a34a);" onclick="printCardLabel('{{ product.reference }}', this)">
+                                <i class="fas fa-print"></i>
+                            </button>
                             <a href="{% url 'products:detail' product.reference %}" class="btn btn-ghost btn-sm btn-icon" title="Voir">
                                 <i class="fas fa-eye"></i>
                             </a>
@@ -578,5 +582,79 @@
                 font-size: 2rem;
             }
         }
+
+        /* Toast for label printing */
+        #print-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--neutral-900, #111827);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            opacity: 0;
+            pointer-events: none;
+            transition: all .25s ease;
+            z-index: 10000;
+            max-width: 90%;
+        }
+        #print-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        #print-toast.success { background: #16a34a; }
+        #print-toast.error { background: #dc2626; }
     </style>
+
+    <div id="print-toast"></div>
+
+    <script>
+        function showPrintToast(message, type) {
+            var toast = document.getElementById('print-toast');
+            toast.textContent = message;
+            toast.className = '';
+            toast.classList.add(type || 'success', 'show');
+            clearTimeout(window._printToastTimer);
+            window._printToastTimer = setTimeout(function() {
+                toast.classList.remove('show');
+            }, 3500);
+        }
+
+        function printCardLabel(reference, btn) {
+            if (btn.dataset.busy === '1') return;
+            btn.dataset.busy = '1';
+            var icon = btn.querySelector('i');
+            var oldClass = icon.className;
+            icon.className = 'fas fa-spinner fa-spin';
+
+            var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            fetch('/products/' + encodeURIComponent(reference) + '/print/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrf,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'label_type=product&quantity=1',
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    showPrintToast(data.message || ('Étiquette imprimée pour ' + reference), 'success');
+                } else {
+                    showPrintToast(data.message || 'Erreur d\'impression', 'error');
+                }
+            })
+            .catch(function() {
+                showPrintToast('Erreur de connexion à l\'imprimante', 'error');
+            })
+            .finally(function() {
+                icon.className = oldClass;
+                btn.dataset.busy = '0';
+            });
+        }
+    </script>
 {% endblock %}
