@@ -198,6 +198,14 @@ class DepositTransaction(models.Model):
         blank=True
     )
 
+    # Receipt / proof of payment image
+    receipt_image = models.ImageField(
+        _('Reçu (preuve de paiement)'),
+        upload_to='deposits/receipts/',
+        blank=True,
+        null=True
+    )
+
     # Balance after this transaction (for quick reference)
     balance_after = models.DecimalField(
         _('Solde après'),

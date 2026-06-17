@@ -281,6 +281,7 @@ def add_fund(request, pk):
             payment_reference=payment_reference,
             description=description or 'Dépôt de fonds',
             notes=notes,
+            receipt_image=request.FILES.get('receipt_image'),
             created_by=request.user
         )
 
@@ -341,6 +342,7 @@ def withdrawal(request, pk):
             description=final_description,
             notes=notes,
             bank_account=bank_account,
+            receipt_image=request.FILES.get('receipt_image'),
             created_by=request.user
         )
 
@@ -619,6 +621,7 @@ def adjustment(request, pk):
             amount=amount,
             description=description or 'Ajustement manuel',
             notes=notes,
+            receipt_image=request.FILES.get('receipt_image'),
             created_by=request.user
         )
 
@@ -928,12 +931,17 @@ def update_deposit_transaction(request):
         if new_ref is not None:
             trans.payment_reference = new_ref
 
+        # Attach/replace receipt image if a new one is uploaded
+        if request.FILES.get('receipt_image'):
+            trans.receipt_image = request.FILES['receipt_image']
+
         # Save without triggering balance_after recalc (only for new transactions)
         trans.save()
 
         return JsonResponse({
             'success': True,
             'message': 'Transaction mise à jour',
+            'receipt_url': trans.receipt_image.url if trans.receipt_image else '',
         })
 
     except Exception as e:
