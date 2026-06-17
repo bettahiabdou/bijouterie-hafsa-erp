@@ -1182,3 +1182,33 @@ class SaleInvoiceAction(models.Model):
         if self.action_type == self.ActionType.EXCHANGE:
             return f"Échange: {self.original_product_ref} → {self.replacement_product.reference if self.replacement_product else '?'}"
         return f"Retour: {self.original_product_ref}"
+
+
+class DataExportJob(models.Model):
+    """A background full-data export (ZIP of CSVs) prepared off-request."""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', _('En attente')
+        RUNNING = 'running', _('En cours')
+        DONE = 'done', _('Terminé')
+        FAILED = 'failed', _('Échoué')
+
+    status = models.CharField(
+        _('Statut'), max_length=10, choices=Status.choices, default=Status.PENDING
+    )
+    file = models.FileField(_('Fichier'), upload_to='exports/', blank=True, null=True)
+    error = models.TextField(_('Erreur'), blank=True)
+    created_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='data_export_jobs', verbose_name=_('Créé par')
+    )
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+    finished_at = models.DateTimeField(_('Terminé le'), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _('Export de données')
+        verbose_name_plural = _('Exports de données')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Export #{self.pk} ({self.get_status_display()})"

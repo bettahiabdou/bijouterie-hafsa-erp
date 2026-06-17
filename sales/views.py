@@ -2,7 +2,7 @@
 Sales management views for Bijouterie Hafsa ERP
 """
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -827,6 +827,32 @@ def sales_dashboard(request):
     filter_revenue = (filtered_stats['revenue'] or Decimal('0')) - period_refund_total
     filter_weight = filtered_stats['weight'] or Decimal('0')
 
+    # ============ RETURNS / REFUNDS VISIBILITY (by return date) ============
+    returns_period_qs = SaleInvoiceAction.objects.filter(
+        action_type=SaleInvoiceAction.ActionType.RETURN
+    )
+    if date_from:
+        returns_period_qs = returns_period_qs.filter(created_at__date__gte=date_from)
+    elif period_filter == 'today':
+        returns_period_qs = returns_period_qs.filter(created_at__date=today)
+    elif period_filter == 'month':
+        returns_period_qs = returns_period_qs.filter(created_at__date__gte=current_month_start)
+    if date_to:
+        returns_period_qs = returns_period_qs.filter(created_at__date__lte=date_to)
+    if seller_filter:
+        returns_period_qs = returns_period_qs.filter(original_invoice__seller_id=seller_filter)
+
+    returns_agg = returns_period_qs.aggregate(
+        count=Count('id'),
+        total=Sum('refund_amount'),
+        cash=Sum('refund_amount', filter=Q(refund_method='cash')),
+        deposit=Sum('refund_amount', filter=Q(refund_method='deposit')),
+    )
+    recent_returns = list(
+        returns_period_qs.select_related('original_invoice', 'deposit_client', 'created_by')
+        .order_by('-created_at')[:20]
+    )
+
     context = {
         'today': today,
         'date_from': date_from,
@@ -846,6 +872,14 @@ def sales_dashboard(request):
         },
         'today_metal_prix_g': today_metal_prix_g,
         'today_payment_methods': today_payment_methods,
+        # Returns / refunds
+        'returns_stats': {
+            'count': returns_agg['count'] or 0,
+            'total': returns_agg['total'] or Decimal('0'),
+            'cash': returns_agg['cash'] or Decimal('0'),
+            'deposit': returns_agg['deposit'] or Decimal('0'),
+        },
+        'recent_returns': recent_returns,
         # Period
         'period_stats': {
             'revenue': filter_revenue,
@@ -4330,3 +4364,282 @@ def ai_extract_sales_photo(request):
         logger = logging.getLogger(__name__)
         logger.exception(f'AI extract sales error: {str(e)}')
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# =============================================================================
+# DATA EXPORTS (per-section CSV + background full ZIP)
+# =============================================================================
+import csv as _csv
+import io as _io
+
+
+def _csv_text(header, rows):
+    buf = _io.StringIO()
+    writer = _csv.writer(buf)
+    writer.writerow(header)
+    for r in rows:
+        writer.writerow(r)
+    return buf.getvalue()
+
+
+def _x(v):
+    """Format a Decimal/number for CSV."""
+    try:
+        return f"{(v or 0):.2f}"
+    except Exception:
+        return '0.00'
+
+
+def _ds_invoices(qs):
+    header = ['Référence', 'Date', 'Statut', 'Client', 'Téléphone', 'Type livraison',
+              'Total', 'Payé', 'Solde', 'Méthode', 'Vendeur']
+    rows = []
+    for inv in qs.select_related('client', 'payment_method', 'seller'):
+        seller = ''
+        if inv.seller:
+            seller = inv.seller.get_full_name() or inv.seller.username
+        rows.append([
+            inv.reference,
+            inv.date.strftime('%Y-%m-%d') if inv.date else '',
+            inv.get_status_display(),
+            inv.client.full_name if inv.client else 'Anonyme',
+            inv.client.phone if inv.client else '',
+            inv.get_delivery_method_type_display(),
+            _x(inv.total_amount), _x(inv.amount_paid), _x(inv.balance_due),
+            inv.payment_method.name if inv.payment_method else '',
+            seller,
+        ])
+    return _csv_text(header, rows)
+
+
+def _ds_payments(qs):
+    header = ['Référence', 'Date', 'Facture', 'Client', 'Méthode', 'Banque', 'Montant']
+    rows = []
+    for p in qs.select_related('sale_invoice', 'sale_invoice__client', 'payment_method', 'bank_account'):
+        rows.append([
+            p.reference,
+            p.date.strftime('%Y-%m-%d') if p.date else '',
+            p.sale_invoice.reference if p.sale_invoice else '',
+            (p.sale_invoice.client.full_name if p.sale_invoice and p.sale_invoice.client else 'Anonyme'),
+            p.payment_method.name if p.payment_method else '',
+            p.bank_account.bank_name if p.bank_account else '',
+            _x(p.amount),
+        ])
+    return _csv_text(header, rows)
+
+
+def _ds_returns(qs):
+    header = ['Date', 'Facture', 'Produit', 'Montant remboursé', 'Mode remboursement',
+              'Client crédité (dépôt)', 'Notes', 'Par']
+    method_map = dict(SaleInvoiceAction.RefundMethod.choices)
+    rows = []
+    for a in qs.select_related('original_invoice', 'deposit_client', 'created_by'):
+        by = ''
+        if a.created_by:
+            by = a.created_by.get_full_name() or a.created_by.username
+        rows.append([
+            a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '',
+            a.original_invoice.reference if a.original_invoice else '',
+            a.original_product_ref,
+            _x(a.refund_amount),
+            method_map.get(a.refund_method, a.refund_method),
+            a.deposit_client.full_name if a.deposit_client else '',
+            (a.notes or '').replace('\n', ' '),
+            by,
+        ])
+    return _csv_text(header, rows)
+
+
+def _ds_inventory():
+    from products.models import Product
+    header = ['Référence', 'Nom', 'Statut', 'Catégorie', 'Métal', 'Pureté',
+              'Poids brut (g)', 'Poids net (g)', 'Prix/g', 'Valeur matière', 'Coût total', 'Prix vente']
+    rows = []
+    for p in Product.objects.select_related('category', 'metal_type', 'metal_purity').iterator():
+        net = p.net_weight or p.gross_weight or Decimal('0')
+        material = p.metal_cost if p.metal_cost else (net * (p.purchase_price_per_gram or Decimal('0')))
+        rows.append([
+            p.reference, p.name, p.get_status_display(),
+            p.category.name if p.category else '',
+            p.metal_type.name if p.metal_type else '',
+            p.metal_purity.name if p.metal_purity else '',
+            _x(p.gross_weight), _x(p.net_weight), _x(p.purchase_price_per_gram),
+            _x(material), _x(p.total_cost), _x(p.selling_price),
+        ])
+    return _csv_text(header, rows)
+
+
+def _ds_clients():
+    from clients.models import Client
+    header = ['Code', 'Nom', 'Téléphone', 'Email', 'Créé le']
+    rows = []
+    for c in Client.objects.iterator():
+        rows.append([
+            c.code or '', c.full_name, c.phone or '', getattr(c, 'email', '') or '',
+            c.created_at.strftime('%Y-%m-%d') if getattr(c, 'created_at', None) else '',
+        ])
+    return _csv_text(header, rows)
+
+
+def _ds_deposits():
+    from deposits.models import DepositTransaction
+    header = ['Date', 'Client', 'Type', 'Montant', 'Solde après', 'Méthode', 'Description']
+    rows = []
+    for t in DepositTransaction.objects.select_related('account__client', 'payment_method').iterator():
+        rows.append([
+            (t.date.strftime('%Y-%m-%d') if t.date else (t.created_at.strftime('%Y-%m-%d') if t.created_at else '')),
+            t.account.client.full_name if t.account and t.account.client else '',
+            t.get_transaction_type_display(),
+            _x(t.amount), _x(t.balance_after),
+            t.payment_method.name if t.payment_method else '',
+            (t.description or '').replace('\n', ' '),
+        ])
+    return _csv_text(header, rows)
+
+
+def _period_filtered(request, qs, date_field='date'):
+    """Apply the dashboard's period/date filters to a queryset."""
+    from django.utils import timezone
+    today = timezone.now().date()
+    month_start = today.replace(day=1)
+    df = request.GET.get('date_from', '')
+    dt = request.GET.get('date_to', '')
+    period = request.GET.get('period', 'month')
+    if df:
+        qs = qs.filter(**{f'{date_field}__gte': df})
+    elif period == 'today':
+        qs = qs.filter(**{date_field: today})
+    elif period == 'month':
+        qs = qs.filter(**{f'{date_field}__gte': month_start})
+    if dt:
+        qs = qs.filter(**{f'{date_field}__lte': dt})
+    return qs
+
+
+@login_required(login_url='login')
+def sales_export(request):
+    """Download a single dashboard dataset as CSV, honoring period/seller filters."""
+    if not request.user.is_staff:
+        messages.error(request, 'Accès refusé.')
+        return redirect('dashboard')
+
+    report = request.GET.get('report', 'invoices')
+    seller = request.GET.get('seller', '')
+
+    if report == 'payments':
+        from payments.models import ClientPayment
+        qs = ClientPayment.objects.filter(sale_invoice__is_deleted=False)
+        qs = _period_filtered(request, qs, 'date')
+        if seller:
+            qs = qs.filter(sale_invoice__seller_id=seller)
+        text = _ds_payments(qs.order_by('-date'))
+    elif report == 'returns':
+        qs = SaleInvoiceAction.objects.filter(action_type=SaleInvoiceAction.ActionType.RETURN)
+        qs = _period_filtered(request, qs, 'created_at__date')
+        if seller:
+            qs = qs.filter(original_invoice__seller_id=seller)
+        text = _ds_returns(qs.order_by('-created_at'))
+    else:  # invoices
+        report = 'invoices'
+        qs = SaleInvoice.objects.filter(is_deleted=False)
+        qs = _period_filtered(request, qs, 'date')
+        if seller:
+            qs = qs.filter(seller_id=seller)
+        text = _ds_invoices(qs.order_by('-date'))
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response.write('﻿')
+    response['Content-Disposition'] = f'attachment; filename="{report}.csv"'
+    response.write(text)
+    return response
+
+
+def _run_full_export(job_id):
+    """Background worker: build a ZIP of all datasets (all-time) into the job file."""
+    import zipfile
+    from django.db import connection
+    from django.core.files.base import ContentFile
+    from django.utils import timezone
+    from .models import DataExportJob
+    try:
+        job = DataExportJob.objects.get(id=job_id)
+        job.status = DataExportJob.Status.RUNNING
+        job.save(update_fields=['status'])
+
+        datasets = [
+            ('factures.csv', _ds_invoices(SaleInvoice.objects.filter(is_deleted=False).order_by('-date'))),
+            ('retours.csv', _ds_returns(SaleInvoiceAction.objects.filter(action_type=SaleInvoiceAction.ActionType.RETURN).order_by('-created_at'))),
+            ('inventaire.csv', _ds_inventory()),
+            ('clients.csv', _ds_clients()),
+            ('depots.csv', _ds_deposits()),
+        ]
+        # Payments separately (import here)
+        from payments.models import ClientPayment
+        datasets.insert(1, ('paiements.csv', _ds_payments(ClientPayment.objects.all().order_by('-date'))))
+
+        buf = _io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for fname, text in datasets:
+                zf.writestr(fname, '﻿' + text)
+        buf.seek(0)
+
+        job.file.save(f'export_complet_{job.id}.zip', ContentFile(buf.read()), save=False)
+        job.status = DataExportJob.Status.DONE
+        job.finished_at = timezone.now()
+        job.save()
+    except Exception as e:
+        try:
+            job = DataExportJob.objects.get(id=job_id)
+            job.status = DataExportJob.Status.FAILED
+            job.error = str(e)[:2000]
+            job.save(update_fields=['status', 'error'])
+        except Exception:
+            pass
+    finally:
+        connection.close()
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def full_export_start(request):
+    """Kick off a background full-data export; returns the job id."""
+    if not request.user.is_staff:
+        return JsonResponse({'success': False, 'error': 'Accès refusé'}, status=403)
+    import threading
+    from .models import DataExportJob
+    job = DataExportJob.objects.create(created_by=request.user, status=DataExportJob.Status.PENDING)
+    t = threading.Thread(target=_run_full_export, args=(job.id,), daemon=True)
+    t.start()
+    return JsonResponse({'success': True, 'job_id': job.id, 'status': job.status})
+
+
+@login_required(login_url='login')
+def full_export_status(request, job_id):
+    """Poll a background export job."""
+    if not request.user.is_staff:
+        return JsonResponse({'success': False, 'error': 'Accès refusé'}, status=403)
+    from .models import DataExportJob
+    try:
+        job = DataExportJob.objects.get(id=job_id)
+    except DataExportJob.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Introuvable'}, status=404)
+    data = {'success': True, 'status': job.status, 'error': job.error}
+    if job.status == DataExportJob.Status.DONE and job.file:
+        from django.urls import reverse
+        data['download_url'] = reverse('sales:full_export_download', args=[job.id])
+    return JsonResponse(data)
+
+
+@login_required(login_url='login')
+def full_export_download(request, job_id):
+    """Serve a finished full-data export ZIP."""
+    if not request.user.is_staff:
+        messages.error(request, 'Accès refusé.')
+        return redirect('dashboard')
+    from django.http import FileResponse
+    from .models import DataExportJob
+    job = get_object_or_404(DataExportJob, id=job_id)
+    if job.status != DataExportJob.Status.DONE or not job.file:
+        messages.error(request, "L'export n'est pas encore prêt.")
+        return redirect('sales:sales_dashboard')
+    return FileResponse(job.file.open('rb'), as_attachment=True, filename='export_complet.zip')

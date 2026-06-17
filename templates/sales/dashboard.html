@@ -14,7 +14,19 @@
                 <h1 class="page-title">Tableau de Bord Ventes</h1>
                 <p class="page-subtitle">{{ today|date:"l d F Y" }}</p>
             </div>
-            <div class="page-actions">
+            <div class="page-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <a href="{% url 'sales:sales_export' %}?report=invoices&period={{ period_filter }}&seller={{ seller_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-secondary btn-sm" title="Factures de la période (CSV)">
+                    <i class="fas fa-file-csv"></i> <span class="desktop-only">Factures</span>
+                </a>
+                <a href="{% url 'sales:sales_export' %}?report=payments&period={{ period_filter }}&seller={{ seller_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-secondary btn-sm" title="Paiements de la période (CSV)">
+                    <i class="fas fa-file-csv"></i> <span class="desktop-only">Paiements</span>
+                </a>
+                <a href="{% url 'sales:sales_export' %}?report=returns&period={{ period_filter }}&seller={{ seller_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-secondary btn-sm" title="Retours de la période (CSV)">
+                    <i class="fas fa-file-csv"></i> <span class="desktop-only">Retours</span>
+                </a>
+                <button type="button" id="fullExportBtn" class="btn btn-secondary btn-sm" onclick="startFullExport()" title="Toutes les données (ZIP)">
+                    <i class="fas fa-database"></i> <span id="fullExportLabel">Tout télécharger</span>
+                </button>
                 <a href="{% url 'sales:invoice_create' %}" class="btn btn-primary">
                     <i class="fas fa-plus"></i>
                     <span>Nouvelle Vente</span>
@@ -25,6 +37,7 @@
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="db">
 
     <!-- ============ FILTERS ============ -->
@@ -475,6 +488,95 @@
         {% empty %}
         <div class="card"><div class="card-body"><div class="db-empty"><i class="fas fa-wallet"></i> Aucun paiement pour cette periode</div></div></div>
         {% endfor %}
+    </div>
+
+    <!-- ============ RETURNS / REFUNDS ============ -->
+    <div class="db-section">
+        <div class="db-section__head" style="display:flex; justify-content:space-between; align-items:center;">
+            <h2 class="db-section__title"><i class="fas fa-rotate-left mr-2"></i> Retours &amp; Remboursements</h2>
+            <a href="{% url 'sales:sales_export' %}?report=returns&period={{ period_filter }}&seller={{ seller_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-download"></i> <span class="desktop-only">CSV</span>
+            </a>
+        </div>
+        <div class="grid grid-cols-4 gap-6 mb-4 animate-stagger" style="margin-top: var(--space-3);">
+            <div class="stat-card">
+                <div class="stat-icon warning"><i class="fas fa-rotate-left"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Retours</div>
+                    <div class="stat-value">{{ returns_stats.count }}</div>
+                    <div class="stat-meta">articles retournés</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon error"><i class="fas fa-money-bill-wave"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Total remboursé</div>
+                    <div class="stat-value">{{ returns_stats.total|floatformat:0 }}</div>
+                    <div class="stat-meta">DH</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-coins"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Dont espèce</div>
+                    <div class="stat-value">{{ returns_stats.cash|floatformat:0 }}</div>
+                    <div class="stat-meta">DH (sortie de caisse)</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon primary"><i class="fas fa-piggy-bank"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Dont crédit dépôt</div>
+                    <div class="stat-value">{{ returns_stats.deposit|floatformat:0 }}</div>
+                    <div class="stat-meta">DH (vers dépôt client)</div>
+                </div>
+            </div>
+        </div>
+
+        {% if recent_returns %}
+        <div class="card">
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Facture</th>
+                            <th>Produit</th>
+                            <th style="text-align:right;">Remboursé (DH)</th>
+                            <th>Mode</th>
+                            <th>Client crédité</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in recent_returns %}
+                            <tr>
+                                <td>{{ r.created_at|date:"d/m/Y" }}</td>
+                                <td>
+                                    {% if r.original_invoice %}
+                                        <a href="{% url 'sales:invoice_detail' r.original_invoice.reference %}" class="text-primary">{{ r.original_invoice.reference }}</a>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td>{{ r.original_product_ref }}</td>
+                                <td style="text-align:right;" class="font-semibold">{{ r.refund_amount|floatformat:2 }}</td>
+                                <td>
+                                    {% if r.refund_method == 'deposit' %}
+                                        <span class="badge badge-info">Crédit dépôt</span>
+                                    {% elif r.refund_method == 'cash' %}
+                                        <span class="badge badge-warning">Espèce</span>
+                                    {% else %}
+                                        <span class="badge badge-neutral">{{ r.get_refund_method_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{% if r.deposit_client %}{{ r.deposit_client.full_name }}{% else %}—{% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="card"><div class="card-body text-center text-muted" style="padding: var(--space-6);">Aucun retour sur cette période.</div></div>
+        {% endif %}
     </div>
 
     <!-- ============ BANK ACCOUNTS DETAIL ============ -->
@@ -1229,5 +1331,60 @@
             });
         }
     });
+
+    // ===== Background full-data export (ZIP) =====
+    let fullExportPoll = null;
+    function startFullExport() {
+        const btn = document.getElementById('fullExportBtn');
+        const label = document.getElementById('fullExportLabel');
+        if (btn.dataset.busy === '1') return;
+        btn.dataset.busy = '1';
+        const original = label.textContent;
+        label.textContent = 'Préparation...';
+        btn.querySelector('i').className = 'fas fa-spinner fa-spin';
+
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]')
+            ? document.querySelector('[name=csrfmiddlewaretoken]').value
+            : (document.cookie.match(/csrftoken=([^;]+)/) || [,''])[1];
+
+        fetch('{% url "sales:full_export_start" %}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) { throw new Error(data.error || 'Erreur'); }
+            const jobId = data.job_id;
+            fullExportPoll = setInterval(function() {
+                fetch('/sales/dashboard/export-all/' + jobId + '/status/')
+                    .then(r => r.json())
+                    .then(s => {
+                        if (s.status === 'done' && s.download_url) {
+                            clearInterval(fullExportPoll);
+                            label.textContent = 'Téléchargement...';
+                            window.location = s.download_url;
+                            setTimeout(function() {
+                                label.textContent = original;
+                                btn.querySelector('i').className = 'fas fa-database';
+                                btn.dataset.busy = '0';
+                            }, 1500);
+                        } else if (s.status === 'failed') {
+                            clearInterval(fullExportPoll);
+                            alert('Échec de l\'export: ' + (s.error || ''));
+                            label.textContent = original;
+                            btn.querySelector('i').className = 'fas fa-database';
+                            btn.dataset.busy = '0';
+                        }
+                    })
+                    .catch(() => {});
+            }, 2000);
+        })
+        .catch(err => {
+            alert('Erreur: ' + err.message);
+            label.textContent = original;
+            btn.querySelector('i').className = 'fas fa-database';
+            btn.dataset.busy = '0';
+        });
+    }
 </script>
 {% endblock %}

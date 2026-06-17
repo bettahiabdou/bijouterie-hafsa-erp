@@ -9,6 +9,10 @@ app_name = 'sales'
 urlpatterns = [
     # Dashboard & Insights
     path('dashboard/', views.sales_dashboard, name='sales_dashboard'),
+    path('dashboard/export/', views.sales_export, name='sales_export'),
+    path('dashboard/export-all/start/', views.full_export_start, name='full_export_start'),
+    path('dashboard/export-all/<int:job_id>/status/', views.full_export_status, name='full_export_status'),
+    path('dashboard/export-all/<int:job_id>/download/', views.full_export_download, name='full_export_download'),
     path('insights/', views.sales_insights, name='sales_insights'),
     path('api/insights-ai/', views.sales_insights_ai, name='sales_insights_ai'),
 
