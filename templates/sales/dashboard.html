@@ -390,7 +390,9 @@
             <div class="db-pay-card__header" onclick="togglePaySection('pay-{{ forloop.counter }}')">
                 <div class="db-pay-card__left">
                     <span class="db-pay-card__icon">
-                        {% if 'espece' in section.method|lower or 'cash' in section.method|lower %}
+                        {% if section.is_deposit %}
+                            <i class="fas fa-piggy-bank" style="color:#2563eb;"></i>
+                        {% elif 'espece' in section.method|lower or 'cash' in section.method|lower %}
                             <i class="fas fa-money-bill-wave" style="color:var(--success-600);"></i>
                         {% elif 'virement' in section.method|lower %}
                             <i class="fas fa-university" style="color:#2563eb;"></i>
@@ -409,6 +411,9 @@
                     <div>
                         <strong class="db-pay-card__method">{{ section.method }}</strong>
                         <span class="db-pay-card__count">{{ section.count }} paiement{{ section.count|pluralize }}</span>
+                        {% if section.is_deposit %}
+                            <span class="db-pay-card__count" style="color: var(--neutral-400); display:block;">Déjà encaissé au dépôt — hors encaissement réel</span>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="db-pay-card__right">

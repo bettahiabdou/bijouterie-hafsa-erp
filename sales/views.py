@@ -263,11 +263,10 @@ def sales_dashboard(request):
         ).order_by('-total')
     )
 
-    # Payment by method + bank (for virements, cheques, etc.)
+    # Payment by method + bank (every method, including Dépôt Client which gets
+    # its own card in the detail — it stays out of the encaissement total above).
     payment_by_method_bank = list(
-        period_payments_qs.exclude(
-            payment_method__name='Dépôt Client'
-        ).values(
+        period_payments_qs.values(
             'payment_method__name',
             'bank_account__bank_name',
             'bank_account__id',
@@ -300,9 +299,7 @@ def sales_dashboard(request):
     # ============ PER-INVOICE DETAIL FOR EACH PAYMENT METHOD ============
     # Get all individual payments with their invoice info
     payment_invoices_raw = list(
-        period_payments_qs.exclude(
-            payment_method__name='Dépôt Client'
-        ).select_related(
+        period_payments_qs.select_related(
             'sale_invoice', 'sale_invoice__client', 'payment_method', 'bank_account'
         ).order_by('payment_method__name', '-date', '-amount')
     )
@@ -327,12 +324,14 @@ def sales_dashboard(request):
     # Combine payment_detail with invoices
     payment_sections = []
     for method_name, detail in payment_detail_sorted:
+        is_deposit = (method_name or '').strip().lower() in ('dépôt client', 'depot client', 'dépôt')
         section = {
             'method': method_name,
             'total': detail['total'],
             'count': detail['count'],
             'banks': detail['banks'],
             'invoices': payment_invoices_by_method.get(method_name, []),
+            'is_deposit': is_deposit,
         }
         payment_sections.append(section)
 
