@@ -263,6 +263,48 @@
             color: var(--neutral-900);
         }
 
+        /* Desktop retractable sidebar */
+        .sidebar-collapse-toggle {
+            display: none;
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-lg);
+            border: none;
+            background: transparent;
+            color: var(--neutral-600);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            align-items: center;
+            justify-content: center;
+        }
+        .sidebar-collapse-toggle:hover {
+            background: var(--neutral-100);
+            color: var(--neutral-900);
+        }
+        @media (min-width: 1400px) {
+            .sidebar-collapse-toggle { display: flex; }
+
+            /* Collapsed (icon-rail) state */
+            body.sidebar-collapsed .sidebar { width: var(--sidebar-collapsed-width); }
+            body.sidebar-collapsed .sidebar .sidebar-brand-text,
+            body.sidebar-collapsed .sidebar .nav-text,
+            body.sidebar-collapsed .sidebar .nav-section-title,
+            body.sidebar-collapsed .sidebar .nav-chevron { opacity: 0; transition: opacity var(--transition-fast); }
+            body.sidebar-collapsed .sidebar .nav-link,
+            body.sidebar-collapsed .sidebar .sidebar-brand { justify-content: center; }
+            body.sidebar-collapsed .sidebar .nav-submenu { display: none !important; }
+
+            /* Hover to peek: temporarily expand over the content */
+            body.sidebar-collapsed .sidebar:hover { width: var(--sidebar-width); box-shadow: var(--shadow-2xl); }
+            body.sidebar-collapsed .sidebar:hover .sidebar-brand-text,
+            body.sidebar-collapsed .sidebar:hover .nav-text,
+            body.sidebar-collapsed .sidebar:hover .nav-section-title,
+            body.sidebar-collapsed .sidebar:hover .nav-chevron { opacity: 1; }
+            body.sidebar-collapsed .sidebar:hover .nav-link,
+            body.sidebar-collapsed .sidebar:hover .sidebar-brand { justify-content: flex-start; }
+            body.sidebar-collapsed .sidebar:hover .nav-item.open > .nav-submenu { display: block !important; }
+        }
+
         /* Sidebar close button for mobile */
         .sidebar-close {
             display: none;
@@ -434,6 +476,10 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <script>
+        // Restore collapsed sidebar state ASAP to avoid a flash
+        try { if (localStorage.getItem('sidebarCollapsed') === '1') document.body.classList.add('sidebar-collapsed'); } catch (e) {}
+    </script>
     <!-- Sidebar Overlay (mobile) -->
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
@@ -715,6 +761,10 @@
                     <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
                         <i class="fas fa-bars"></i>
                     </button>
+                    <!-- Desktop Collapse Toggle (retractable sidebar) -->
+                    <button class="sidebar-collapse-toggle" id="sidebarCollapseToggle" onclick="toggleSidebarCollapse()" title="Réduire / agrandir le menu">
+                        <i class="fas fa-bars"></i>
+                    </button>
 
                     <!-- Search Bar -->
                     <div class="search-wrapper">
@@ -892,6 +942,12 @@
             sidebar.classList.remove('open');
             overlay.classList.remove('show');
             document.body.style.overflow = '';
+        }
+
+        // Desktop retractable sidebar (collapse to icon rail, persisted)
+        function toggleSidebarCollapse() {
+            const collapsed = document.body.classList.toggle('sidebar-collapsed');
+            try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch (e) {}
         }
 
         // No collapse needed - sidebar is now slide-in on tablet
