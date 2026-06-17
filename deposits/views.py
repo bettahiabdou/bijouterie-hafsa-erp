@@ -299,6 +299,8 @@ def withdrawal(request, pk):
         amount = request.POST.get('amount', '0')
         description = request.POST.get('description', '')
         notes = request.POST.get('notes', '')
+        withdrawal_method = request.POST.get('withdrawal_method', 'espece')
+        bank_account_id = request.POST.get('bank_account_id', '')
 
         try:
             amount = Decimal(amount)
@@ -313,12 +315,32 @@ def withdrawal(request, pk):
             messages.error(request, f'Solde insuffisant. Solde actuel: {account.balance} DH')
             return redirect('deposits:detail', pk=pk)
 
+        # Resolve withdrawal method (cash vs bank account)
+        bank_account = None
+        if withdrawal_method == 'compte':
+            if not bank_account_id:
+                messages.error(request, 'Veuillez sélectionner un compte bancaire pour un retrait par compte.')
+                return redirect('deposits:detail', pk=pk)
+            bank_account = BankAccount.objects.filter(pk=bank_account_id, is_active=True).first()
+            if not bank_account:
+                messages.error(request, 'Compte bancaire introuvable.')
+                return redirect('deposits:detail', pk=pk)
+
+        # Reflect the method in the description so it shows in the history
+        if bank_account:
+            method_label = f'Compte: {bank_account.bank_name}'
+        else:
+            method_label = 'Espèce'
+        final_description = description or 'Retrait de fonds'
+        final_description = f'{final_description} ({method_label})'
+
         DepositTransaction.objects.create(
             account=account,
             transaction_type=DepositTransaction.TransactionType.WITHDRAWAL,
             amount=-amount,  # Negative for withdrawal
-            description=description or 'Retrait de fonds',
+            description=final_description,
             notes=notes,
+            bank_account=bank_account,
             created_by=request.user
         )
 

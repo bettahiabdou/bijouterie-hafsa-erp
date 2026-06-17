@@ -361,6 +361,22 @@
                         <input type="text" name="description" class="form-input" placeholder="Ex: Remboursement client">
                     </div>
                     <div class="form-group">
+                        <label class="form-label required">Mode de retrait</label>
+                        <select name="withdrawal_method" id="withdrawal-method" class="form-input" onchange="toggleWithdrawalBank()">
+                            <option value="espece">Espèce</option>
+                            <option value="compte">Compte bancaire</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="withdrawal-bank-group" style="display: none;">
+                        <label class="form-label required">Compte bancaire</label>
+                        <select name="bank_account_id" id="withdrawal-bank-account" class="form-input">
+                            <option value="">-- Sélectionner --</option>
+                            {% for ba in bank_accounts %}
+                                <option value="{{ ba.id }}">{{ ba.bank_name }}{% if ba.account_name %} - {{ ba.account_name }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label">Notes</label>
                         <textarea name="notes" class="form-input" rows="2"></textarea>
                     </div>
@@ -631,6 +647,20 @@
 
         function closeWithdrawalModal() {
             document.getElementById('withdrawalModal').style.display = 'none';
+        }
+
+        function toggleWithdrawalBank() {
+            var method = document.getElementById('withdrawal-method').value;
+            var group = document.getElementById('withdrawal-bank-group');
+            var bankSelect = document.getElementById('withdrawal-bank-account');
+            if (method === 'compte') {
+                group.style.display = 'block';
+                bankSelect.setAttribute('required', 'required');
+            } else {
+                group.style.display = 'none';
+                bankSelect.removeAttribute('required');
+                bankSelect.value = '';
+            }
         }
 
         function openAdjustmentModal() {
