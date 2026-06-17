@@ -115,11 +115,19 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="dlv-filter-group">
+                        <label class="form-label">Paiement</label>
+                        <select name="paid" class="form-select">
+                            <option value="">Tous</option>
+                            <option value="cod" {% if paid_filter == 'cod' %}selected{% endif %}>À encaisser (transporteur)</option>
+                            <option value="paid" {% if paid_filter == 'paid' %}selected{% endif %}>Déjà payée (caisse)</option>
+                        </select>
+                    </div>
                     <div class="dlv-filter-actions">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-search"></i> Filtrer
                         </button>
-                        {% if search_query or status_filter or method_filter or seller_filter %}
+                        {% if search_query or status_filter or method_filter or seller_filter or paid_filter %}
                         <a href="{% url 'sales:delivery_list' %}" class="btn btn-secondary">
                             <i class="fas fa-times"></i>
                         </a>
@@ -242,7 +250,7 @@
         {% if page_obj.has_other_pages %}
         <div class="dlv-pagination">
             {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}{% if seller_filter %}&seller={{ seller_filter }}{% endif %}" class="btn btn-secondary btn-sm">
+            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}{% if seller_filter %}&seller={{ seller_filter }}{% endif %}{% if paid_filter %}&paid={{ paid_filter }}{% endif %}" class="btn btn-secondary btn-sm">
                 <i class="fas fa-chevron-left"></i> Precedent
             </a>
             {% endif %}
@@ -250,7 +258,7 @@
                 Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
             </span>
             {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}{% if seller_filter %}&seller={{ seller_filter }}{% endif %}" class="btn btn-secondary btn-sm">
+            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}{% if seller_filter %}&seller={{ seller_filter }}{% endif %}{% if paid_filter %}&paid={{ paid_filter }}{% endif %}" class="btn btn-secondary btn-sm">
                 Suivant <i class="fas fa-chevron-right"></i>
             </a>
             {% endif %}

@@ -4051,6 +4051,19 @@ def delivery_list(request):
     if seller_filter:
         deliveries = deliveries.filter(invoice__seller_id=seller_filter)
 
+    # Filter by payment state: 'cod' = à encaisser (has carrier-collected payment),
+    # 'paid' = déjà payée en caisse (no carrier-collected payment)
+    from payments.models import ClientPayment as _CP
+    paid_filter = request.GET.get('paid', '')
+    if paid_filter in ('cod', 'paid'):
+        cod_invoice_ids = _CP.objects.filter(
+            payment_method__collected_by_carrier=True
+        ).values_list('sale_invoice_id', flat=True)
+        if paid_filter == 'cod':
+            deliveries = deliveries.filter(invoice_id__in=cod_invoice_ids)
+        else:
+            deliveries = deliveries.exclude(invoice_id__in=cod_invoice_ids)
+
     # Stats
     stats = {
         'total': Delivery.objects.count(),
@@ -4095,6 +4108,7 @@ def delivery_list(request):
         'status_filter': status_filter,
         'method_filter': method_filter,
         'seller_filter': seller_filter,
+        'paid_filter': paid_filter,
         'sellers': sellers,
         'cod_to_collect': cod_to_collect,
     }
