@@ -404,7 +404,7 @@
                                         <select name="payment_method_1" class="form-select payment-method-select" data-index="1" onchange="updatePaymentFieldsFor(1)">
                                             <option value="" data-name="">-- Sélectionner --</option>
                                             {% for pm in payment_methods %}
-                                                <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                                <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}" data-requires-reference="{{ pm.requires_reference|yesno:'1,0' }}" data-requires-bank="{{ pm.requires_bank_account|yesno:'1,0' }}">{{ pm.name }}</option>
                                             {% endfor %}
                                         </select>
                                     </div>
@@ -1426,7 +1426,7 @@
             document.getElementById('payment-count').value = paymentCount;
             const index = paymentCount;
 
-            const paymentMethodOptions = `<option value="" data-name="">-- Sélectionner --</option>{% for pm in payment_methods %}<option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>{% endfor %}`;
+            const paymentMethodOptions = `<option value="" data-name="">-- Sélectionner --</option>{% for pm in payment_methods %}<option value="{{ pm.id }}" data-name="{{ pm.name|lower }}" data-requires-reference="{{ pm.requires_reference|yesno:'1,0' }}" data-requires-bank="{{ pm.requires_bank_account|yesno:'1,0' }}">{{ pm.name }}</option>{% endfor %}`;
             const bankAccountOptions = `<option value="">-- Sélectionner --</option>{% for ba in bank_accounts %}<option value="{{ ba.id }}">{{ ba.bank_name }}</option>{% endfor %}`;
 
             const today = new Date().toISOString().split('T')[0];
@@ -1548,6 +1548,8 @@
 
             const selectedOption = select.options[select.selectedIndex];
             const paymentName = selectedOption.getAttribute('data-name') || '';
+            const requiresReference = selectedOption.getAttribute('data-requires-reference') === '1';
+            const requiresBank = selectedOption.getAttribute('data-requires-bank') === '1';
 
             const referenceGroup = document.getElementById(`reference-group-${index}`);
             const bankAccountGroup = document.getElementById(`bank-account-group-${index}`);
@@ -1562,20 +1564,30 @@
 
             if (!paymentName) return;
 
-            const isEspeces = paymentName.includes('espèce') || paymentName.includes('espece') || paymentName === 'cash';
-            const isVirement = paymentName.includes('virement');
+            // Dépôt Client keeps its dedicated client-search UI (special case, no flag for it)
             const isDepot = paymentName.includes('dépôt') || paymentName.includes('depot');
-
             if (isDepot) {
-                // Deposit Client - show client search
                 if (depositSection) depositSection.style.display = 'block';
-            } else if (isEspeces) {
-                // Cash - no reference, no bank account
-            } else if (isVirement) {
-                referenceGroup.style.display = 'block';
-                bankAccountGroup.style.display = 'block';
-            } else {
-                referenceGroup.style.display = 'block';
+                return;
+            }
+
+            // Config-driven: honor the PaymentMethod flags from Configuration.
+            if (requiresReference) referenceGroup.style.display = 'block';
+            if (requiresBank) bankAccountGroup.style.display = 'block';
+
+            // Fallback for methods with no flags configured: preserve the old
+            // name-based behavior so existing methods don't regress.
+            if (!requiresReference && !requiresBank) {
+                const isEspeces = paymentName.includes('espèce') || paymentName.includes('espece') || paymentName === 'cash';
+                const isVirement = paymentName.includes('virement');
+                if (isVirement) {
+                    referenceGroup.style.display = 'block';
+                    bankAccountGroup.style.display = 'block';
+                } else if (isEspeces) {
+                    // Cash - no reference, no bank account
+                } else {
+                    referenceGroup.style.display = 'block';
+                }
             }
         }
 
