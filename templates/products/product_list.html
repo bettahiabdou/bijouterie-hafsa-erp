@@ -177,7 +177,7 @@
                     <div class="product-footer">
                         <span class="product-price">{{ product.selling_price|floatformat:2 }} DH</span>
                         <div class="product-actions" onclick="event.stopPropagation();">
-                            <button type="button" class="btn btn-ghost btn-sm btn-icon" title="Imprimer étiquette" style="color: var(--success-600, #16a34a);" onclick="printCardLabel('{{ product.reference }}', this)">
+                            <button type="button" class="btn btn-ghost btn-sm btn-icon product-print-btn" title="Imprimer étiquette" onclick="printCardLabel('{{ product.reference }}', this)">
                                 <i class="fas fa-print"></i>
                             </button>
                             <a href="{% url 'products:detail' product.reference %}" class="btn btn-ghost btn-sm btn-icon" title="Voir">
@@ -429,12 +429,31 @@
             font-size: var(--text-lg);
             font-weight: var(--font-bold);
             color: var(--primary-600);
+            white-space: nowrap;
         }
 
         .product-actions {
             display: flex;
-            gap: var(--space-1);
+            gap: 2px;
+            flex-shrink: 0;
+            align-items: center;
         }
+
+        /* Print button: flatten the native <button> so it matches the <a> icons */
+        .product-print-btn {
+            background: transparent !important;
+            border: none;
+            box-shadow: none;
+            -webkit-appearance: none;
+            appearance: none;
+            color: var(--success-600, #16a34a);
+            cursor: pointer;
+        }
+        .product-print-btn:hover {
+            background: var(--success-50, #f0fdf4) !important;
+            color: var(--success-700, #15803d);
+        }
+        .product-print-btn:focus { outline: none; }
 
         /* Empty State */
         .empty-state-container {
