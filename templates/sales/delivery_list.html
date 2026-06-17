@@ -66,6 +66,15 @@
                 <span class="dlv-stat-label">Livres</span>
             </div>
         </div>
+        <div class="dlv-stat-card">
+            <div class="dlv-stat-icon" style="background: var(--error-100, #fee2e2); color: var(--error-600);">
+                <i class="fas fa-hand-holding-usd"></i>
+            </div>
+            <div class="dlv-stat-content">
+                <span class="dlv-stat-value">{{ cod_to_collect|floatformat:0 }} DH</span>
+                <span class="dlv-stat-label">À encaisser (non livrées)</span>
+            </div>
+        </div>
     </div>
 
     <!-- Filters -->
@@ -97,11 +106,20 @@
                             <option value="transporteur" {% if method_filter == 'transporteur' %}selected{% endif %}>Transporteur</option>
                         </select>
                     </div>
+                    <div class="dlv-filter-group">
+                        <label class="form-label">Vendeur</label>
+                        <select name="seller" class="form-select">
+                            <option value="">Tous</option>
+                            {% for s in sellers %}
+                                <option value="{{ s.id }}" {% if seller_filter == s.id|stringformat:'s' %}selected{% endif %}>{{ s.get_full_name|default:s.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <div class="dlv-filter-actions">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-search"></i> Filtrer
                         </button>
-                        {% if search_query or status_filter or method_filter %}
+                        {% if search_query or status_filter or method_filter or seller_filter %}
                         <a href="{% url 'sales:delivery_list' %}" class="btn btn-secondary">
                             <i class="fas fa-times"></i>
                         </a>
@@ -164,8 +182,24 @@
                             {% endif %}
                             {% if delivery.total_amount %}
                             <span class="dlv-detail">
-                                <i class="fas fa-coins"></i> {{ delivery.total_amount|floatformat:0 }} DH
+                                <i class="fas fa-coins"></i> Total: {{ delivery.total_amount|floatformat:0 }} DH
                             </span>
+                            {% endif %}
+                            {% if delivery.invoice %}
+                                {% if delivery.invoice.balance_due > 0 %}
+                                <span class="dlv-detail" style="color: var(--error-600); font-weight: 600;">
+                                    <i class="fas fa-hand-holding-usd"></i> À encaisser: {{ delivery.invoice.balance_due|floatformat:0 }} DH
+                                </span>
+                                {% else %}
+                                <span class="dlv-detail" style="color: var(--success-600);">
+                                    <i class="fas fa-check"></i> Déjà payée
+                                </span>
+                                {% endif %}
+                                {% if delivery.invoice.seller %}
+                                <span class="dlv-detail">
+                                    <i class="fas fa-user-tie"></i> {{ delivery.invoice.seller.get_full_name|default:delivery.invoice.seller.username }}
+                                </span>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>
@@ -204,7 +238,7 @@
         {% if page_obj.has_other_pages %}
         <div class="dlv-pagination">
             {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}" class="btn btn-secondary btn-sm">
+            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}{% if seller_filter %}&seller={{ seller_filter }}{% endif %}" class="btn btn-secondary btn-sm">
                 <i class="fas fa-chevron-left"></i> Precedent
             </a>
             {% endif %}
@@ -212,7 +246,7 @@
                 Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
             </span>
             {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}" class="btn btn-secondary btn-sm">
+            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if method_filter %}&method={{ method_filter }}{% endif %}{% if seller_filter %}&seller={{ seller_filter }}{% endif %}" class="btn btn-secondary btn-sm">
                 Suivant <i class="fas fa-chevron-right"></i>
             </a>
             {% endif %}

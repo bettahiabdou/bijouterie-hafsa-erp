@@ -4023,7 +4023,7 @@ def delivery_list(request):
     from .models import Delivery
 
     deliveries = Delivery.objects.select_related(
-        'invoice', 'carrier'
+        'invoice', 'invoice__seller', 'carrier'
     ).prefetch_related('timeline').order_by('-created_at')
 
     # Search
@@ -4046,6 +4046,11 @@ def delivery_list(request):
     if method_filter:
         deliveries = deliveries.filter(delivery_method_type=method_filter)
 
+    # Filter by seller (of the linked invoice)
+    seller_filter = request.GET.get('seller', '')
+    if seller_filter:
+        deliveries = deliveries.filter(invoice__seller_id=seller_filter)
+
     # Stats
     stats = {
         'total': Delivery.objects.count(),
@@ -4053,6 +4058,16 @@ def delivery_list(request):
         'in_transit': Delivery.objects.filter(status='in_transit').count(),
         'delivered': Delivery.objects.filter(status='delivered').count(),
     }
+
+    # Total left to collect (COD) for the filtered, not-yet-delivered deliveries
+    cod_to_collect = deliveries.exclude(status='delivered').aggregate(
+        t=Sum('invoice__balance_due')
+    )['t'] or Decimal('0')
+
+    # Sellers for the filter dropdown
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    sellers = User.objects.filter(sales__isnull=False).distinct().order_by('first_name', 'last_name')
 
     # Pagination
     paginator = Paginator(deliveries, 20)
@@ -4066,6 +4081,9 @@ def delivery_list(request):
         'search_query': search_query,
         'status_filter': status_filter,
         'method_filter': method_filter,
+        'seller_filter': seller_filter,
+        'sellers': sellers,
+        'cod_to_collect': cod_to_collect,
     }
 
     return render(request, 'sales/delivery_list.html', context)
@@ -4077,7 +4095,7 @@ def delivery_detail(request, reference):
     from .models import Delivery
 
     delivery = get_object_or_404(
-        Delivery.objects.select_related('invoice', 'carrier').prefetch_related('timeline'),
+        Delivery.objects.select_related('invoice', 'invoice__seller', 'carrier').prefetch_related('timeline'),
         reference=reference
     )
 

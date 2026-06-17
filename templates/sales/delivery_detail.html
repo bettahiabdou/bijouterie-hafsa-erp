@@ -164,6 +164,25 @@
                                 Voir Facture
                             </a>
                         </div>
+
+                        <div style="margin-top: var(--space-3); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                            <div style="padding: var(--space-3); border-radius: var(--radius-md); background: var(--neutral-50);">
+                                <div class="text-muted" style="font-size: var(--text-xs);">Montant total</div>
+                                <div style="font-weight: 700; font-size: var(--text-lg);">{{ delivery.invoice.total_amount|floatformat:2 }} DH</div>
+                            </div>
+                            <div style="padding: var(--space-3); border-radius: var(--radius-md); {% if delivery.invoice.balance_due > 0 %}background: #fef2f2;{% else %}background: #f0fdf4;{% endif %}">
+                                <div class="text-muted" style="font-size: var(--text-xs);">À encaisser par {{ delivery.get_delivery_method_type_display }}</div>
+                                <div style="font-weight: 700; font-size: var(--text-lg); {% if delivery.invoice.balance_due > 0 %}color: var(--error-600);{% else %}color: var(--success-600);{% endif %}">
+                                    {{ delivery.invoice.balance_due|floatformat:2 }} DH
+                                </div>
+                            </div>
+                        </div>
+                        {% if delivery.invoice.seller %}
+                        <div style="margin-top: var(--space-3);">
+                            <span class="text-muted" style="font-size: var(--text-sm);"><i class="fas fa-user-tie mr-1"></i> Vendeur :</span>
+                            <strong>{{ delivery.invoice.seller.get_full_name|default:delivery.invoice.seller.username }}</strong>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             {% elif delivery.stock_storage_item %}
