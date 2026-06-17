@@ -2995,37 +2995,33 @@ def invoice_payment(request, reference):
 
     if request.method == 'POST':
         try:
-            # Payment 1
-            amount_1 = Decimal(request.POST.get('amount', '0') or '0')
-            payment_method_id_1 = request.POST.get('payment_method', '')
-            payment_ref_1 = request.POST.get('payment_reference', '').strip()
-            bank_account_id_1 = request.POST.get('bank_account', '')
-            # Payment 1 date
-            payment_date_1_str = request.POST.get('payment_date', '')
-            if payment_date_1_str:
-                payment_date_1 = datetime.strptime(payment_date_1_str, '%Y-%m-%d').date()
-            else:
-                payment_date_1 = timezone.now().date()
-
-            # Payment 2 (optional hybrid)
-            amount_2 = Decimal(request.POST.get('amount_2', '0') or '0')
-            payment_method_id_2 = request.POST.get('payment_method_2', '')
-            payment_ref_2 = request.POST.get('payment_reference_2', '').strip()
-            bank_account_id_2 = request.POST.get('bank_account_2', '')
-            # Payment 2 date
-            payment_date_2_str = request.POST.get('payment_date_2', '')
-            if payment_date_2_str:
-                payment_date_2 = datetime.strptime(payment_date_2_str, '%Y-%m-%d').date()
-            else:
-                payment_date_2 = timezone.now().date()
-
             notes = request.POST.get('notes', '').strip()
 
-            # Deposit client IDs (when paying with "Dépôt Client", can be any client)
-            deposit_client_id_1 = request.POST.get('deposit_client_id_1', '')
-            deposit_client_id_2 = request.POST.get('deposit_client_id_2', '')
+            # Collect any number of payment rows (indices 1..N)
+            payment_rows = []
+            for idx in range(1, 51):
+                method_id = request.POST.get(f'payment_method_{idx}', '')
+                try:
+                    amount = Decimal(request.POST.get(f'amount_{idx}', '0') or '0')
+                except (InvalidOperation, ValueError):
+                    amount = Decimal('0')
+                if amount > 0 and method_id:
+                    date_str = request.POST.get(f'payment_date_{idx}', '')
+                    try:
+                        pay_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
+                    except ValueError:
+                        pay_date = timezone.now().date()
+                    payment_rows.append({
+                        'index': idx,
+                        'amount': amount,
+                        'method_id': method_id,
+                        'ref': request.POST.get(f'payment_reference_{idx}', '').strip(),
+                        'bank_id': request.POST.get(f'bank_account_{idx}', ''),
+                        'date': pay_date,
+                        'dep_client_id': request.POST.get(f'deposit_client_id_{idx}', ''),
+                    })
 
-            total_payment = amount_1 + amount_2
+            total_payment = sum((r['amount'] for r in payment_rows), Decimal('0'))
 
             if total_payment <= 0:
                 messages.error(request, 'Le montant du paiement doit être supérieur à 0.')
@@ -3108,50 +3104,32 @@ def invoice_payment(request, reference):
                                 f'Le paiement a été enregistré sans déduction.'
                             )
 
-                # Create Payment 1
-                if amount_1 > 0 and payment_method_id_1:
-                    pm1 = PaymentMethod.objects.get(id=payment_method_id_1)
+                # Create all payment rows
+                for n, row in enumerate(payment_rows, start=1):
+                    pm = PaymentMethod.objects.get(id=row['method_id'])
                     ClientPayment.objects.create(
-                        reference=payment_ref_1 or f"PAY-{invoice.reference}-1",
-                        date=payment_date_1,
+                        reference=row['ref'] or f"PAY-{invoice.reference}-{row['index']}",
+                        date=row['date'],
                         payment_type=ClientPayment.PaymentType.INVOICE,
                         client=invoice.client,
-                        amount=amount_1,
-                        payment_method=pm1,
-                        bank_account_id=bank_account_id_1 if bank_account_id_1 else None,
+                        amount=row['amount'],
+                        payment_method=pm,
+                        bank_account_id=row['bank_id'] if row['bank_id'] else None,
                         sale_invoice=invoice,
                         notes=notes,
                         created_by=request.user
                     )
 
                     # Deduct from deposit if applicable
-                    handle_deposit_deduction(pm1, amount_1, payment_date_1, deposit_client_id_1)
+                    handle_deposit_deduction(pm, row['amount'], row['date'], row['dep_client_id'])
 
-                    # Update invoice with payment 1 method
-                    invoice.payment_method = pm1
-                    if payment_ref_1:
-                        invoice.payment_reference = payment_ref_1
-                    if bank_account_id_1:
-                        invoice.bank_account_id = bank_account_id_1
-
-                # Create Payment 2 (hybrid)
-                if amount_2 > 0 and payment_method_id_2:
-                    pm2 = PaymentMethod.objects.get(id=payment_method_id_2)
-                    ClientPayment.objects.create(
-                        reference=payment_ref_2 or f"PAY-{invoice.reference}-2",
-                        date=payment_date_2,
-                        payment_type=ClientPayment.PaymentType.INVOICE,
-                        client=invoice.client,
-                        amount=amount_2,
-                        payment_method=pm2,
-                        bank_account_id=bank_account_id_2 if bank_account_id_2 else None,
-                        sale_invoice=invoice,
-                        notes=notes,
-                        created_by=request.user
-                    )
-
-                    # Deduct from deposit if applicable
-                    handle_deposit_deduction(pm2, amount_2, payment_date_2, deposit_client_id_2)
+                    # Use the first payment's method as the invoice's primary method
+                    if n == 1:
+                        invoice.payment_method = pm
+                        if row['ref']:
+                            invoice.payment_reference = row['ref']
+                        if row['bank_id']:
+                            invoice.bank_account_id = row['bank_id']
 
                 # Recalculate invoice payment totals from actual DB records
                 # (ClientPayment.save() already incremented amount_paid via update_payment(),

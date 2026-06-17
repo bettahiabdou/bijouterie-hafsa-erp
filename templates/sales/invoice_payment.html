@@ -40,170 +40,159 @@
                 <form method="POST" novalidate>
                     {% csrf_token %}
 
-                    <!-- Payment 1 -->
-                    <div class="payment-section" style="border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4);">
-                        <h4 style="font-size: var(--text-sm); color: var(--primary-600); margin-bottom: var(--space-3);">
-                            <i class="fas fa-credit-card"></i> Paiement 1
-                        </h4>
+                    <!-- Payments container (dynamic) -->
+                    <div id="paymentsContainer">
+                        <!-- Payment 1 -->
+                        <div class="payment-section" data-index="1" style="border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                                <h4 style="font-size: var(--text-sm); color: var(--primary-600); margin: 0;">
+                                    <i class="fas fa-credit-card"></i> Paiement <span class="payment-num">1</span>
+                                </h4>
+                            </div>
 
-                        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
-                            <div class="form-group">
-                                <label for="payment_method" class="form-label">
-                                    Mode de paiement <span class="required">*</span>
-                                </label>
-                                <select name="payment_method" id="payment_method" class="form-select">
-                                    <option value="" data-name="">-- Selectionner --</option>
-                                    {% for pm in payment_methods %}
-                                        <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                                <div class="form-group">
+                                    <label class="form-label">Mode de paiement <span class="required">*</span></label>
+                                    <select name="payment_method_1" id="payment_method_1" class="form-select payment-method-select" data-index="1">
+                                        <option value="" data-name="">-- Selectionner --</option>
+                                        {% for pm in payment_methods %}
+                                            <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Date <span class="required">*</span></label>
+                                    <input type="date" name="payment_date_1" id="payment_date_1" class="form-input" value="{{ today|date:'Y-m-d' }}">
+                                </div>
+                            </div>
+
+                            <div class="form-group" id="referenceGroup1" style="display: none;">
+                                <label class="form-label">Reference de paiement</label>
+                                <input type="text" name="payment_reference_1" id="payment_reference_1" class="form-input" placeholder="N de cheque, reference virement...">
+                            </div>
+
+                            <div class="form-group" id="bankAccountGroup1" style="display: none;">
+                                <label class="form-label">Compte bancaire</label>
+                                <select name="bank_account_1" id="bank_account_1" class="form-select">
+                                    <option value="">-- Selectionner --</option>
+                                    {% for ba in bank_accounts %}
+                                        <option value="{{ ba.id }}">{{ ba.bank_name }} - {{ ba.account_name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
 
-                            <div class="form-group">
-                                <label for="payment_date" class="form-label">
-                                    Date <span class="required">*</span>
-                                </label>
-                                <input type="date" name="payment_date" id="payment_date" class="form-input"
-                                       value="{{ today|date:'Y-m-d' }}" required>
-                            </div>
-                        </div>
-
-                        <div class="form-group" id="referenceGroup1" style="display: none;">
-                            <label for="payment_reference" class="form-label">
-                                Reference de paiement
-                            </label>
-                            <input type="text" name="payment_reference" id="payment_reference" class="form-input"
-                                   placeholder="N de cheque, reference virement...">
-                        </div>
-
-                        <div class="form-group" id="bankAccountGroup1" style="display: none;">
-                            <label for="bank_account" class="form-label">
-                                Compte bancaire
-                            </label>
-                            <select name="bank_account" id="bank_account" class="form-select">
-                                <option value="">-- Selectionner --</option>
-                                {% for ba in bank_accounts %}
-                                    <option value="{{ ba.id }}">{{ ba.bank_name }} - {{ ba.account_name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <!-- Deposit Client Search (shown when Dépôt Client selected) -->
-                        <div class="form-group" id="depositSection1" style="display: none;">
-                            <input type="hidden" name="deposit_client_id_1" id="deposit_client_id_1" value="">
-                            <label class="form-label"><i class="fas fa-piggy-bank mr-1"></i> Client Dépôt</label>
-                            <div style="position: relative;">
-                                <input type="text" id="depositClientSearch1" class="form-input"
-                                       placeholder="Chercher par nom, téléphone..."
-                                       autocomplete="off">
-                                <div id="depositClientResults1" class="dep-search-results" style="display: none;"></div>
-                            </div>
-                            <div id="depositClientSelected1" style="display: none; margin-top: var(--space-2);">
-                                <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: var(--space-3);">
-                                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                                        <div>
-                                            <strong id="depositClientName1" style="color: var(--primary-800);"></strong>
-                                            <span id="depositClientPhone1" class="text-sm text-muted" style="margin-left: var(--space-2);"></span>
+                            <div class="form-group" id="depositSection1" style="display: none;">
+                                <input type="hidden" name="deposit_client_id_1" id="deposit_client_id_1" value="">
+                                <label class="form-label"><i class="fas fa-piggy-bank mr-1"></i> Client Dépôt</label>
+                                <div style="position: relative;">
+                                    <input type="text" id="depositClientSearch1" class="form-input deposit-search" data-index="1" placeholder="Chercher par nom, téléphone..." autocomplete="off">
+                                    <div id="depositClientResults1" class="dep-search-results" style="display: none;"></div>
+                                </div>
+                                <div id="depositClientSelected1" style="display: none; margin-top: var(--space-2);">
+                                    <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: var(--space-3);">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <strong id="depositClientName1" style="color: var(--primary-800);"></strong>
+                                                <span id="depositClientPhone1" class="text-sm text-muted" style="margin-left: var(--space-2);"></span>
+                                            </div>
+                                            <button type="button" class="btn btn-sm" onclick="clearDepositClient(1)" style="padding: 2px 8px; font-size: 12px; background: var(--error-50); color: var(--error-600); border: 1px solid var(--error-200);">
+                                                <i class="fas fa-times"></i>
+                                            </button>
                                         </div>
-                                        <button type="button" class="btn btn-sm" onclick="clearDepositClient(1)"
-                                                style="padding: 2px 8px; font-size: 12px; background: var(--error-50); color: var(--error-600); border: 1px solid var(--error-200);">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--primary-200);">
-                                        <span class="text-sm">Solde dépôt:</span>
-                                        <strong id="depositBalanceDisplay1" style="font-size: var(--text-lg); color: var(--primary-700);">0.00 DH</strong>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--primary-200);">
+                                            <span class="text-sm">Solde dépôt:</span>
+                                            <strong id="depositBalanceDisplay1" style="font-size: var(--text-lg); color: var(--primary-700);">0.00 DH</strong>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="form-group">
-                            <label for="amount" class="form-label">
-                                Montant (DH) <span class="required">*</span>
-                            </label>
-                            <input type="number" name="amount" id="amount" class="form-input"
-                                   step="0.01" min="0.01" max="{{ remaining }}"
-                                   value="{{ remaining|floatformat:2 }}" required>
+                            <div class="form-group">
+                                <label class="form-label">Montant (DH) <span class="required">*</span></label>
+                                <input type="number" name="amount_1" id="amount_1" class="form-input amount-input" step="0.01" min="0" max="{{ remaining }}" value="{{ remaining|floatformat:2 }}">
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Payment 2 (Optional - Hybrid) -->
-                    <div class="payment-section" style="border: 1px dashed var(--neutral-300); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4);">
-                        <h4 style="font-size: var(--text-sm); color: var(--neutral-500); margin-bottom: var(--space-3);">
-                            <i class="fas fa-plus-circle"></i> Paiement 2 (optionnel)
-                        </h4>
+                    <button type="button" class="btn btn-secondary" id="addPaymentBtn" style="margin-bottom: var(--space-4);">
+                        <i class="fas fa-plus"></i> Ajouter un paiement
+                    </button>
 
-                        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
-                            <div class="form-group">
-                                <label for="payment_method_2" class="form-label">Mode de paiement 2</label>
-                                <select name="payment_method_2" id="payment_method_2" class="form-select">
-                                    <option value="" data-name="">-- Aucun --</option>
-                                    {% for pm in payment_methods %}
-                                        <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                    <!-- Template for additional payment rows (cloned by JS, __N__ replaced) -->
+                    <template id="paymentRowTemplate">
+                        <div class="payment-section" data-index="__N__" style="border: 1px dashed var(--neutral-300); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                                <h4 style="font-size: var(--text-sm); color: var(--neutral-500); margin: 0;">
+                                    <i class="fas fa-plus-circle"></i> Paiement <span class="payment-num">__N__</span>
+                                </h4>
+                                <button type="button" class="btn btn-sm" onclick="removePaymentRow(__N__)" style="padding: 2px 8px; font-size: 12px; background: var(--error-50); color: var(--error-600); border: 1px solid var(--error-200);">
+                                    <i class="fas fa-trash"></i> Retirer
+                                </button>
+                            </div>
+
+                            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                                <div class="form-group">
+                                    <label class="form-label">Mode de paiement</label>
+                                    <select name="payment_method___N__" id="payment_method___N__" class="form-select payment-method-select" data-index="__N__">
+                                        <option value="" data-name="">-- Aucun --</option>
+                                        {% for pm in payment_methods %}
+                                            <option value="{{ pm.id }}" data-name="{{ pm.name|lower }}">{{ pm.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Date</label>
+                                    <input type="date" name="payment_date___N__" id="payment_date___N__" class="form-input" value="{{ today|date:'Y-m-d' }}">
+                                </div>
+                            </div>
+
+                            <div class="form-group" id="referenceGroup__N__" style="display: none;">
+                                <label class="form-label">Reference de paiement</label>
+                                <input type="text" name="payment_reference___N__" id="payment_reference___N__" class="form-input" placeholder="Reference...">
+                            </div>
+
+                            <div class="form-group" id="bankAccountGroup__N__" style="display: none;">
+                                <label class="form-label">Compte bancaire</label>
+                                <select name="bank_account___N__" id="bank_account___N__" class="form-select">
+                                    <option value="">-- Selectionner --</option>
+                                    {% for ba in bank_accounts %}
+                                        <option value="{{ ba.id }}">{{ ba.bank_name }} - {{ ba.account_name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
 
-                            <div class="form-group">
-                                <label for="payment_date_2" class="form-label">Date 2</label>
-                                <input type="date" name="payment_date_2" id="payment_date_2" class="form-input"
-                                       value="{{ today|date:'Y-m-d' }}">
-                            </div>
-                        </div>
-
-                        <div class="form-group" id="referenceGroup2" style="display: none;">
-                            <label for="payment_reference_2" class="form-label">Reference 2</label>
-                            <input type="text" name="payment_reference_2" id="payment_reference_2" class="form-input"
-                                   placeholder="Reference...">
-                        </div>
-
-                        <div class="form-group" id="bankAccountGroup2" style="display: none;">
-                            <label for="bank_account_2" class="form-label">Compte bancaire 2</label>
-                            <select name="bank_account_2" id="bank_account_2" class="form-select">
-                                <option value="">-- Selectionner --</option>
-                                {% for ba in bank_accounts %}
-                                    <option value="{{ ba.id }}">{{ ba.bank_name }} - {{ ba.account_name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <!-- Deposit Client Search for Payment 2 -->
-                        <div class="form-group" id="depositSection2" style="display: none;">
-                            <input type="hidden" name="deposit_client_id_2" id="deposit_client_id_2" value="">
-                            <label class="form-label"><i class="fas fa-piggy-bank mr-1"></i> Client Dépôt</label>
-                            <div style="position: relative;">
-                                <input type="text" id="depositClientSearch2" class="form-input"
-                                       placeholder="Chercher par nom, téléphone..."
-                                       autocomplete="off">
-                                <div id="depositClientResults2" class="dep-search-results" style="display: none;"></div>
-                            </div>
-                            <div id="depositClientSelected2" style="display: none; margin-top: var(--space-2);">
-                                <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: var(--space-3);">
-                                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                                        <div>
-                                            <strong id="depositClientName2" style="color: var(--primary-800);"></strong>
-                                            <span id="depositClientPhone2" class="text-sm text-muted" style="margin-left: var(--space-2);"></span>
+                            <div class="form-group" id="depositSection__N__" style="display: none;">
+                                <input type="hidden" name="deposit_client_id___N__" id="deposit_client_id___N__" value="">
+                                <label class="form-label"><i class="fas fa-piggy-bank mr-1"></i> Client Dépôt</label>
+                                <div style="position: relative;">
+                                    <input type="text" id="depositClientSearch__N__" class="form-input deposit-search" data-index="__N__" placeholder="Chercher par nom, téléphone..." autocomplete="off">
+                                    <div id="depositClientResults__N__" class="dep-search-results" style="display: none;"></div>
+                                </div>
+                                <div id="depositClientSelected__N__" style="display: none; margin-top: var(--space-2);">
+                                    <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: var(--space-3);">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <strong id="depositClientName__N__" style="color: var(--primary-800);"></strong>
+                                                <span id="depositClientPhone__N__" class="text-sm text-muted" style="margin-left: var(--space-2);"></span>
+                                            </div>
+                                            <button type="button" class="btn btn-sm" onclick="clearDepositClient(__N__)" style="padding: 2px 8px; font-size: 12px; background: var(--error-50); color: var(--error-600); border: 1px solid var(--error-200);">
+                                                <i class="fas fa-times"></i>
+                                            </button>
                                         </div>
-                                        <button type="button" class="btn btn-sm" onclick="clearDepositClient(2)"
-                                                style="padding: 2px 8px; font-size: 12px; background: var(--error-50); color: var(--error-600); border: 1px solid var(--error-200);">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--primary-200);">
-                                        <span class="text-sm">Solde dépôt:</span>
-                                        <strong id="depositBalanceDisplay2" style="font-size: var(--text-lg); color: var(--primary-700);">0.00 DH</strong>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--primary-200);">
+                                            <span class="text-sm">Solde dépôt:</span>
+                                            <strong id="depositBalanceDisplay__N__" style="font-size: var(--text-lg); color: var(--primary-700);">0.00 DH</strong>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="form-group">
-                            <label for="amount_2" class="form-label">Montant 2 (DH)</label>
-                            <input type="number" name="amount_2" id="amount_2" class="form-input"
-                                   step="0.01" min="0" placeholder="0.00">
+                            <div class="form-group">
+                                <label class="form-label">Montant (DH)</label>
+                                <input type="number" name="amount___N__" id="amount___N__" class="form-input amount-input" step="0.01" min="0" placeholder="0.00">
+                            </div>
                         </div>
-                    </div>
+                    </template>
 
                     <!-- Payment Summary -->
                     <div class="form-group" style="background: var(--neutral-50); padding: var(--space-4); border-radius: var(--radius-md);">
@@ -382,42 +371,42 @@
 {% block extra_js %}
 <script>
     // Track selected deposit client balances per payment section
-    const depositBalances = { 1: 0, 2: 0 };
-    let searchTimers = { 1: null, 2: null };
+    const depositBalances = {};
+    let searchTimers = {};
+    let paymentCounter = 1;  // highest payment index used
 
     // Default: use invoice client deposit balance if available
     const INVOICE_CLIENT_ID = "{{ invoice.client.id|default:'' }}";
     const INVOICE_DEPOSIT_BALANCE = parseFloat("{{ deposit_balance }}".replace(',', '.')) || 0;
+    const REMAINING = parseFloat("{{ remaining }}".replace(',', '.').replace(/\s/g, '')) || 0;
 
     function updatePaymentFields(paymentNum) {
-        const select = document.getElementById(paymentNum === 1 ? 'payment_method' : 'payment_method_2');
+        const select = document.getElementById('payment_method_' + paymentNum);
+        if (!select) return;
         const selectedOption = select.options[select.selectedIndex];
         const paymentName = (selectedOption.getAttribute('data-name') || '').toLowerCase();
 
         const referenceGroup = document.getElementById('referenceGroup' + paymentNum);
         const bankAccountGroup = document.getElementById('bankAccountGroup' + paymentNum);
         const depositSection = document.getElementById('depositSection' + paymentNum);
-        const amountInput = document.getElementById(paymentNum === 1 ? 'amount' : 'amount_2');
+        const amountInput = document.getElementById('amount_' + paymentNum);
 
         // Hide all by default
-        referenceGroup.style.display = 'none';
-        bankAccountGroup.style.display = 'none';
+        if (referenceGroup) referenceGroup.style.display = 'none';
+        if (bankAccountGroup) bankAccountGroup.style.display = 'none';
         if (depositSection) depositSection.style.display = 'none';
 
         // No payment method selected
-        if (!paymentName || !select.value) return;
+        if (!paymentName || !select.value) { updatePaymentSummary(); return; }
 
-        // Check payment method type
         const isVirement = paymentName.includes('virement') || paymentName.includes('bank');
         const isEspece = paymentName.includes('espece') || paymentName.includes('especes') || paymentName.includes('espèce') || paymentName === 'cash';
         const isDepot = paymentName.includes('dépôt') || paymentName.includes('depot');
 
         if (isDepot) {
-            // Dépôt Client - show client search
             if (depositSection) depositSection.style.display = 'block';
-
-            // Auto-select invoice client if they have a deposit
-            if (INVOICE_CLIENT_ID && INVOICE_DEPOSIT_BALANCE > 0 && !document.getElementById('deposit_client_id_' + paymentNum).value) {
+            const hidden = document.getElementById('deposit_client_id_' + paymentNum);
+            if (INVOICE_CLIENT_ID && INVOICE_DEPOSIT_BALANCE > 0 && hidden && !hidden.value) {
                 selectDepositClient(paymentNum, {
                     id: INVOICE_CLIENT_ID,
                     name: "{{ invoice.client.full_name|escapejs }}",
@@ -425,32 +414,22 @@
                     deposit_balance: INVOICE_DEPOSIT_BALANCE
                 });
             }
-
-            // Cap amount to selected deposit balance
             updateDepositAmountCap(paymentNum);
-        } else if (isEspece) {
-            // Cash - no reference, no bank account
-            if (amountInput && paymentNum === 1) amountInput.max = "{{ remaining }}";
         } else if (isVirement) {
-            // Bank transfer - show reference AND bank account
-            referenceGroup.style.display = 'block';
-            bankAccountGroup.style.display = 'block';
-            if (amountInput && paymentNum === 1) amountInput.max = "{{ remaining }}";
-        } else {
+            if (referenceGroup) referenceGroup.style.display = 'block';
+            if (bankAccountGroup) bankAccountGroup.style.display = 'block';
+        } else if (!isEspece) {
             // Other (cheque, card, etc.) - show only reference
-            referenceGroup.style.display = 'block';
-            if (amountInput && paymentNum === 1) amountInput.max = "{{ remaining }}";
+            if (referenceGroup) referenceGroup.style.display = 'block';
         }
 
         updatePaymentSummary();
     }
 
     function updateDepositAmountCap(paymentNum) {
-        const amountInput = document.getElementById(paymentNum === 1 ? 'amount' : 'amount_2');
+        const amountInput = document.getElementById('amount_' + paymentNum);
         const balance = depositBalances[paymentNum] || 0;
-        const remaining = parseFloat("{{ remaining }}".replace(',', '.')) || 0;
-        const maxAmount = Math.min(balance, remaining);
-
+        const maxAmount = Math.min(balance, REMAINING);
         if (amountInput) {
             amountInput.max = maxAmount;
             if (parseFloat(amountInput.value) > maxAmount) {
@@ -530,11 +509,8 @@
         document.getElementById('depositClientSearch' + paymentNum).value = '';
         depositBalances[paymentNum] = 0;
 
-        // Reset amount max
-        const amountInput = document.getElementById(paymentNum === 1 ? 'amount' : 'amount_2');
-        if (amountInput) {
-            amountInput.max = "{{ remaining }}";
-        }
+        const amountInput = document.getElementById('amount_' + paymentNum);
+        if (amountInput) amountInput.max = REMAINING;
         updatePaymentSummary();
     }
 
@@ -545,55 +521,69 @@
     }
 
     function updatePaymentSummary() {
-        const amount1 = parseFloat(document.getElementById('amount').value) || 0;
-        const amount2 = parseFloat(document.getElementById('amount_2').value) || 0;
-        const total = amount1 + amount2;
-        const remaining = parseFloat("{{ remaining }}".replace(',', '.').replace(/\s/g, '')) || 0;
+        let total = 0;
+        document.querySelectorAll('.amount-input').forEach(function(inp) {
+            total += parseFloat(inp.value) || 0;
+        });
 
         document.getElementById('total-payments').textContent = total.toFixed(2) + ' DH';
 
         const hint = document.getElementById('payment-status-hint');
-        if (total < remaining) {
-            hint.innerHTML = '<span style="color: var(--warning-600);">Paiement partiel - Reste: ' + (remaining - total).toFixed(2) + ' DH</span>';
-        } else if (total > remaining) {
-            hint.innerHTML = '<span style="color: var(--error-600);">Attention: depasse le solde de ' + (total - remaining).toFixed(2) + ' DH</span>';
+        if (total < REMAINING) {
+            hint.innerHTML = '<span style="color: var(--warning-600);">Paiement partiel - Reste: ' + (REMAINING - total).toFixed(2) + ' DH</span>';
+        } else if (total > REMAINING) {
+            hint.innerHTML = '<span style="color: var(--error-600);">Attention: depasse le solde de ' + (total - REMAINING).toFixed(2) + ' DH</span>';
         } else {
             hint.innerHTML = '<span style="color: var(--success-600);">Paiement complet</span>';
         }
     }
 
+    // Wire listeners for a payment section (by index)
+    function attachRowListeners(num) {
+        const methodSelect = document.getElementById('payment_method_' + num);
+        if (methodSelect) methodSelect.addEventListener('change', function() { updatePaymentFields(num); });
+        const amountInput = document.getElementById('amount_' + num);
+        if (amountInput) amountInput.addEventListener('input', updatePaymentSummary);
+        const search = document.getElementById('depositClientSearch' + num);
+        if (search) search.addEventListener('input', function() { searchDepositClients(num); });
+    }
+
+    function addPaymentRow() {
+        paymentCounter += 1;
+        const num = paymentCounter;
+        const tpl = document.getElementById('paymentRowTemplate').innerHTML;
+        const html = tpl.replace(/__N__/g, num);
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html.trim();
+        const node = wrapper.firstElementChild;
+        document.getElementById('paymentsContainer').appendChild(node);
+        attachRowListeners(num);
+        updatePaymentSummary();
+    }
+
+    function removePaymentRow(num) {
+        const section = document.querySelector('.payment-section[data-index="' + num + '"]');
+        if (section) section.remove();
+        delete depositBalances[num];
+        updatePaymentSummary();
+    }
+
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
-        // Attach event handlers for payment method changes
-        document.getElementById('payment_method').addEventListener('change', function() {
-            updatePaymentFields(1);
-        });
-        document.getElementById('payment_method_2').addEventListener('change', function() {
-            updatePaymentFields(2);
-        });
-        document.getElementById('amount').addEventListener('input', updatePaymentSummary);
-        document.getElementById('amount_2').addEventListener('input', updatePaymentSummary);
+        attachRowListeners(1);
+        document.getElementById('addPaymentBtn').addEventListener('click', addPaymentRow);
 
-        // Deposit client search handlers
-        document.getElementById('depositClientSearch1').addEventListener('input', function() {
-            searchDepositClients(1);
-        });
-        document.getElementById('depositClientSearch2').addEventListener('input', function() {
-            searchDepositClients(2);
-        });
-
-        // Close search results when clicking outside
+        // Close any open deposit search results when clicking outside
         document.addEventListener('click', function(e) {
-            [1, 2].forEach(function(num) {
-                const results = document.getElementById('depositClientResults' + num);
-                const search = document.getElementById('depositClientSearch' + num);
-                if (results && !results.contains(e.target) && e.target !== search) {
+            document.querySelectorAll('.dep-search-results').forEach(function(results) {
+                const section = results.closest('.payment-section');
+                const search = section ? section.querySelector('.deposit-search') : null;
+                if (!results.contains(e.target) && e.target !== search) {
                     results.style.display = 'none';
                 }
             });
         });
 
-        // Initialize
         updatePaymentSummary();
     });
 </script>
