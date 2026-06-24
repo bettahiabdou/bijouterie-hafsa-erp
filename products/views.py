@@ -196,6 +196,94 @@ def product_list(request):
 
 
 @login_required(login_url='login')
+def sold_products(request):
+    """List sold products (sale line items) with filters: seller, invoice,
+    sale-date range, product type, category."""
+    from sales.models import SaleInvoiceItem
+    from django.contrib.auth import get_user_model
+    from django.db.models import Sum as _Sum
+
+    items = SaleInvoiceItem.objects.select_related(
+        'product', 'product__category', 'product__metal_type', 'product__metal_purity',
+        'invoice', 'invoice__seller', 'invoice__client',
+    ).filter(
+        invoice__is_deleted=False,
+        is_returned=False,
+    ).exclude(
+        invoice__status__in=['cancelled', 'draft', 'exchanged', 'returned']
+    )
+
+    # Search (product ref / name)
+    search_query = request.GET.get('search', '')
+    if search_query:
+        items = items.filter(
+            Q(product__reference__icontains=search_query) |
+            Q(product__name__icontains=search_query)
+        )
+
+    # Seller (of the invoice)
+    seller_filter = request.GET.get('seller', '')
+    if seller_filter:
+        items = items.filter(invoice__seller_id=seller_filter)
+
+    # Linked invoice reference
+    invoice_filter = request.GET.get('invoice', '')
+    if invoice_filter:
+        items = items.filter(invoice__reference__icontains=invoice_filter)
+
+    # Sale date range (invoice date)
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    if date_from:
+        items = items.filter(invoice__date__gte=date_from)
+    if date_to:
+        items = items.filter(invoice__date__lte=date_to)
+
+    # Product type
+    product_type_filter = request.GET.get('product_type', '')
+    if product_type_filter:
+        items = items.filter(product__product_type=product_type_filter)
+
+    # Category
+    category_filter = request.GET.get('category', '')
+    if category_filter:
+        items = items.filter(product__category_id=category_filter)
+
+    items = items.order_by('-invoice__date', '-id')
+
+    # Stats over the filtered set
+    agg = items.aggregate(
+        total_amount=_Sum('total_amount'),
+        total_weight=_Sum('product__gross_weight'),
+    )
+
+    paginator = Paginator(items, 24)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    context = {
+        'page_obj': page_obj,
+        'items': page_obj.object_list,
+        'search_query': search_query,
+        'seller_filter': seller_filter,
+        'invoice_filter': invoice_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+        'product_type_filter': product_type_filter,
+        'category_filter': category_filter,
+        'sellers': User.objects.filter(sales__isnull=False).distinct().order_by('first_name', 'last_name'),
+        'categories': ProductCategory.objects.all(),
+        'product_types': Product.ProductType.choices,
+        'total_count': paginator.count,
+        'total_amount': agg['total_amount'] or 0,
+        'total_weight': agg['total_weight'] or 0,
+    }
+    return render(request, 'products/sold_products.html', context)
+
+
+@login_required(login_url='login')
 def product_detail(request, reference):
     """Display product details"""
     product = get_object_or_404(

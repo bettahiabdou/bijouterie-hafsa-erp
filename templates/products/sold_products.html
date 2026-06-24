@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+
+{% block title %}Produits Vendus - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:list' %}" class="breadcrumb-item">Produits</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Produits Vendus</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">Produits Vendus</h1>
+                <p class="page-subtitle">Articles vendus — vendeur, facture, date et type</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-6 mb-6 animate-stagger">
+        <div class="stat-card">
+            <div class="stat-icon primary"><i class="fas fa-gem"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Articles vendus</div>
+                <div class="stat-value">{{ total_count }}</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success"><i class="fas fa-coins"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Total ventes</div>
+                <div class="stat-value">{{ total_amount|floatformat:0 }} DH</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon accent"><i class="fas fa-balance-scale"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Poids total</div>
+                <div class="stat-value">{{ total_weight|floatformat:2 }} g</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- Filters -->
+    <div class="card mb-6 animate-slide-up">
+        <div class="card-body">
+            <form method="get">
+                <div class="sold-filter-grid">
+                    <div class="form-group">
+                        <label class="form-label">Recherche</label>
+                        <input type="text" name="search" value="{{ search_query }}" placeholder="Réf, nom..." class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Vendeur</label>
+                        <select name="seller" class="form-select">
+                            <option value="">Tous</option>
+                            {% for s in sellers %}
+                                <option value="{{ s.id }}" {% if seller_filter == s.id|stringformat:'s' %}selected{% endif %}>{{ s.get_full_name|default:s.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Facture</label>
+                        <input type="text" name="invoice" value="{{ invoice_filter }}" placeholder="N° facture" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select name="product_type" class="form-select">
+                            <option value="">Tous</option>
+                            {% for value, label in product_types %}
+                                <option value="{{ value }}" {% if product_type_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Catégorie</label>
+                        <select name="category" class="form-select">
+                            <option value="">Toutes</option>
+                            {% for c in categories %}
+                                <option value="{{ c.id }}" {% if category_filter == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Du</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Au</label>
+                        <input type="date" name="date_to" value="{{ date_to }}" class="form-input">
+                    </div>
+                    <div class="form-group" style="display:flex; align-items:flex-end; gap:8px;">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Filtrer</button>
+                        <a href="{% url 'products:sold_list' %}" class="btn btn-secondary"><i class="fas fa-times"></i></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sold products grid -->
+    <div class="sold-grid">
+        {% for item in items %}
+            <div class="sold-card">
+                <div class="sold-card-img" onclick="window.location='{% url 'products:detail' item.product.reference %}'">
+                    {% if item.product.main_image %}
+                        <img src="{{ item.product.main_image.url }}" alt="{{ item.product.name }}">
+                    {% elif item.product.images.first %}
+                        <img src="{{ item.product.images.first.image.url }}" alt="{{ item.product.name }}">
+                    {% else %}
+                        <div class="sold-card-img-ph"><i class="fas fa-gem"></i></div>
+                    {% endif %}
+                    <span class="sold-badge">Vendu</span>
+                </div>
+                <div class="sold-card-body">
+                    <a href="{% url 'products:detail' item.product.reference %}" class="sold-ref">{{ item.product.reference }}</a>
+                    <div class="sold-name">{{ item.product.name }}</div>
+                    <div class="sold-chips">
+                        <span><i class="fas fa-tag"></i> {{ item.product.category.name|default:'-' }}</span>
+                        <span><i class="fas fa-ring"></i> {{ item.product.metal_type.name|default:'-' }}</span>
+                        <span><i class="fas fa-balance-scale"></i> {{ item.product.gross_weight|floatformat:2 }} g</span>
+                    </div>
+                    <div class="sold-price">{{ item.total_amount|floatformat:2 }} DH</div>
+
+                    <div class="sold-sale-info">
+                        <div><i class="fas fa-file-invoice"></i>
+                            {% if item.invoice %}
+                                <a href="{% url 'sales:invoice_detail' item.invoice.reference %}" class="text-primary">{{ item.invoice.reference }}</a>
+                            {% else %}—{% endif %}
+                        </div>
+                        <div><i class="fas fa-user-tie"></i> {% if item.invoice.seller %}{{ item.invoice.seller.get_full_name|default:item.invoice.seller.username }}{% else %}—{% endif %}</div>
+                        <div><i class="fas fa-calendar"></i> {% if item.invoice %}{{ item.invoice.date|date:'d/m/Y' }}{% else %}—{% endif %}</div>
+                        {% if item.invoice.client %}
+                        <div><i class="fas fa-user"></i> {{ item.invoice.client.full_name }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="empty-state" style="grid-column: 1 / -1; padding: var(--space-8);">
+                <div class="empty-state-icon"><i class="fas fa-gem"></i></div>
+                <h4 class="empty-state-title">Aucun produit vendu trouvé</h4>
+                <p class="empty-state-text">Ajustez les filtres pour voir les ventes.</p>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-container mt-6" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+        <div class="pagination-info">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} ventes)</div>
+        <div style="display:flex; gap:8px;">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if seller_filter %}&seller={{ seller_filter }}{% endif %}{% if invoice_filter %}&invoice={{ invoice_filter }}{% endif %}{% if product_type_filter %}&product_type={{ product_type_filter }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-secondary btn-sm"><i class="fas fa-chevron-left"></i> Précédent</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if seller_filter %}&seller={{ seller_filter }}{% endif %}{% if invoice_filter %}&invoice={{ invoice_filter }}{% endif %}{% if product_type_filter %}&product_type={{ product_type_filter }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-secondary btn-sm">Suivant <i class="fas fa-chevron-right"></i></a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <style>
+        .sold-filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+        }
+        @media (max-width: 1100px) { .sold-filter-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px) { .sold-filter-grid { grid-template-columns: 1fr; } }
+
+        .sold-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: var(--space-5);
+        }
+        .sold-card {
+            background: white;
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            transition: box-shadow .15s, transform .15s;
+        }
+        .sold-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+        .sold-card-img { position: relative; aspect-ratio: 1; background: var(--neutral-100); cursor: pointer; }
+        .sold-card-img img { width: 100%; height: 100%; object-fit: cover; }
+        .sold-card-img-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--neutral-300); font-size: 2.5rem; }
+        .sold-badge {
+            position: absolute; top: 8px; right: 8px;
+            background: var(--neutral-700); color: #fff;
+            font-size: var(--text-xs); font-weight: 600;
+            padding: 3px 10px; border-radius: 999px;
+        }
+        .sold-card-body { padding: var(--space-4); }
+        .sold-ref { color: var(--primary-600); font-weight: 700; font-size: var(--text-sm); text-decoration: none; }
+        .sold-name { font-weight: 600; margin: 2px 0 8px; }
+        .sold-chips { display: flex; flex-wrap: wrap; gap: 8px; font-size: var(--text-xs); color: var(--neutral-500); }
+        .sold-chips i { margin-right: 3px; }
+        .sold-price { margin-top: 10px; font-size: var(--text-lg); font-weight: 700; color: var(--primary-600); }
+        .sold-sale-info {
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--neutral-100);
+            display: flex; flex-direction: column; gap: 4px;
+            font-size: var(--text-sm); color: var(--neutral-600);
+        }
+        .sold-sale-info i { width: 16px; color: var(--neutral-400); margin-right: 4px; }
+    </style>
+{% endblock %}
