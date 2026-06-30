@@ -349,18 +349,76 @@
 
                         <div class="form-group">
                             <label class="form-label">Client (optionnel)</label>
-                            <div style="display: flex; gap: var(--space-2); align-items: center;">
-                                <select name="client_id" id="client-select" class="form-select" style="flex: 1;">
-                                    <option value="">-- Vente anonyme --</option>
-                                    {% for client in clients %}
-                                        <option value="{{ client.id }}">{{ client.full_name }} — {{ client.phone }}</option>
-                                    {% endfor %}
-                                </select>
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleQuickClient()" title="Ajout rapide">
-                                    <i class="fas fa-user-plus"></i>
-                                </button>
+                            <input type="hidden" name="client_id" id="client-select" value="">
+                            <div class="cli-ac" id="cli-ac">
+                                <div style="display: flex; gap: var(--space-2); align-items: center;">
+                                    <div class="cli-ac-box">
+                                        <i class="fas fa-search cli-ac-search-icon"></i>
+                                        <input type="text" id="cli-ac-input" class="form-input cli-ac-input"
+                                               autocomplete="off" placeholder="Vente anonyme — taper un nom, téléphone ou code…"
+                                               oninput="cliAcSearch()" onkeydown="cliAcKey(event)" onfocus="cliAcFocus()">
+                                        <button type="button" id="cli-ac-clear" class="cli-ac-clear" onclick="cliAcClear()"
+                                                title="Effacer" style="display: none;">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleQuickClient()" title="Ajout rapide">
+                                        <i class="fas fa-user-plus"></i>
+                                    </button>
+                                </div>
+                                <div id="cli-ac-results" class="cli-ac-results" style="display: none;"></div>
                             </div>
                         </div>
+
+                        <style>
+                            .cli-ac { position: relative; }
+                            .cli-ac-box { position: relative; flex: 1; }
+                            .cli-ac-search-icon {
+                                position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+                                color: var(--gray-400); font-size: 13px; pointer-events: none;
+                            }
+                            .cli-ac-input { padding-left: 34px !important; padding-right: 34px !important; }
+                            .cli-ac-input.has-client {
+                                background: var(--success-50, #ecfdf5);
+                                border-color: var(--success-300, #6ee7b7);
+                                font-weight: 600; color: var(--success-700, #047857);
+                            }
+                            .cli-ac-clear {
+                                position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+                                background: var(--gray-200); border: none; border-radius: 50%;
+                                width: 22px; height: 22px; cursor: pointer; color: var(--gray-600);
+                                display: flex; align-items: center; justify-content: center; font-size: 11px;
+                            }
+                            .cli-ac-clear:hover { background: var(--gray-300); }
+                            .cli-ac-results {
+                                position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 1000;
+                                background: var(--white, #fff); border: 1px solid var(--gray-200);
+                                border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+                                max-height: 320px; overflow-y: auto;
+                            }
+                            .cli-ac-item {
+                                display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+                                cursor: pointer; border-bottom: 1px solid var(--gray-100);
+                            }
+                            .cli-ac-item:last-child { border-bottom: none; }
+                            .cli-ac-item:hover, .cli-ac-item.active { background: var(--primary-50); }
+                            .cli-ac-avatar {
+                                flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+                                background: var(--primary-100); color: var(--primary-600);
+                                display: flex; align-items: center; justify-content: center;
+                                font-weight: 700; font-size: 13px;
+                            }
+                            .cli-ac-info { flex: 1; min-width: 0; }
+                            .cli-ac-name { font-weight: 600; color: var(--gray-800); font-size: 14px; }
+                            .cli-ac-name mark { background: var(--warning-100, #fef3c7); padding: 0 1px; border-radius: 2px; }
+                            .cli-ac-meta { font-size: 12px; color: var(--gray-500); display: flex; gap: 10px; margin-top: 2px; }
+                            .cli-ac-badge {
+                                flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 2px 8px;
+                                border-radius: 999px; background: var(--success-100, #d1fae5); color: var(--success-700, #047857);
+                            }
+                            .cli-ac-empty { padding: 14px 12px; color: var(--gray-500); font-size: 13px; text-align: center; }
+                            .cli-ac-hint { padding: 8px 12px; color: var(--gray-400); font-size: 12px; border-top: 1px dashed var(--gray-200); }
+                        </style>
 
                         <!-- Quick Add Client -->
                         <div id="quick-client-section" style="display: none; border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3); background: var(--primary-50);">
@@ -1923,27 +1981,11 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    const select = document.getElementById('client-select');
+                    // Select the created/existing client in the autocomplete
+                    cliAcSelect(data.id, data.full_name, data.phone);
 
                     if (data.existing) {
-                        // Client already exists — select them in dropdown
-                        let found = false;
-                        for (let opt of select.options) {
-                            if (opt.value == data.id) {
-                                opt.selected = true;
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (!found) {
-                            const option = new Option(data.full_name + ' — ' + data.phone, data.id, true, true);
-                            select.add(option);
-                        }
                         alert('⚠️ Ce numéro existe déjà: ' + data.full_name + ' (' + data.phone + ')\nClient sélectionné automatiquement.');
-                    } else {
-                        // New client created — add to dropdown
-                        const option = new Option(data.full_name + ' — ' + data.phone, data.id, true, true);
-                        select.add(option);
                     }
 
                     // Close quick add section and clear fields
@@ -1960,6 +2002,178 @@
                 console.error(err);
             });
         }
+
+        // ===== Advanced Client Autocomplete =====
+        let cliAcTimer = null;
+        let cliAcRows = [];
+        let cliAcActive = -1;
+        let cliAcLastQuery = '';
+
+        function cliAcEsc(s) {
+            return (s || '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        function cliAcHighlight(text, q) {
+            text = cliAcEsc(text);
+            if (!q) return text;
+            const terms = q.trim().split(/\s+/).filter(Boolean).map(t =>
+                t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+            if (!terms.length) return text;
+            try {
+                return text.replace(new RegExp('(' + terms.join('|') + ')', 'gi'), '<mark>$1</mark>');
+            } catch (e) { return text; }
+        }
+
+        function cliAcInitials(name) {
+            const parts = (name || '?').trim().split(/\s+/);
+            return ((parts[0] || '?')[0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+        }
+
+        function cliAcFocus() {
+            const input = document.getElementById('cli-ac-input');
+            if (input.value.trim().length >= 2) cliAcSearch();
+        }
+
+        function cliAcSearch() {
+            const input = document.getElementById('cli-ac-input');
+            // Typing a new query clears any previous selection
+            if (document.getElementById('client-select').value) {
+                document.getElementById('client-select').value = '';
+                input.classList.remove('has-client');
+                document.getElementById('cli-ac-clear').style.display = input.value ? 'flex' : 'none';
+            }
+            const q = input.value.trim();
+            document.getElementById('cli-ac-clear').style.display = input.value ? 'flex' : 'none';
+
+            if (q.length < 2) {
+                cliAcClose();
+                return;
+            }
+            clearTimeout(cliAcTimer);
+            cliAcTimer = setTimeout(() => cliAcFetch(q), 220);
+        }
+
+        function cliAcFetch(q) {
+            cliAcLastQuery = q;
+            const box = document.getElementById('cli-ac-results');
+            box.style.display = 'block';
+            box.innerHTML = '<div class="cli-ac-empty"><i class="fas fa-spinner fa-spin"></i> Recherche…</div>';
+            fetch('{% url "clients:api_search" %}?q=' + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(data => {
+                    if (q !== cliAcLastQuery) return; // stale response
+                    cliAcRender(data.results || [], q);
+                })
+                .catch(() => {
+                    box.innerHTML = '<div class="cli-ac-empty">Erreur de recherche.</div>';
+                });
+        }
+
+        function cliAcRender(results, q) {
+            const box = document.getElementById('cli-ac-results');
+            cliAcRows = results;
+            cliAcActive = -1;
+            if (!results.length) {
+                box.innerHTML = '<div class="cli-ac-empty">Aucun client trouvé pour « ' + cliAcEsc(q) + ' »</div>'
+                    + '<div class="cli-ac-hint"><i class="fas fa-user-plus"></i> Utilisez le bouton + pour créer un nouveau client.</div>';
+                box.style.display = 'block';
+                return;
+            }
+            box.innerHTML = results.map((c, i) => {
+                const meta = [];
+                if (c.phone) meta.push('<span><i class="fas fa-phone" style="font-size:10px;"></i> ' + cliAcEsc(c.phone) + '</span>');
+                if (c.code) meta.push('<span><i class="fas fa-hashtag" style="font-size:10px;"></i> ' + cliAcEsc(c.code) + '</span>');
+                const badge = c.has_deposit
+                    ? '<span class="cli-ac-badge" title="Solde dépôt">Dépôt ' + cliAcEsc(String(c.deposit_balance)) + ' DH</span>'
+                    : '';
+                return '<div class="cli-ac-item" data-i="' + i + '" '
+                    + 'onmousedown="event.preventDefault()" '
+                    + 'onclick="cliAcPick(' + i + ')" '
+                    + 'onmouseenter="cliAcSetActive(' + i + ')">'
+                    + '<div class="cli-ac-avatar">' + cliAcEsc(cliAcInitials(c.name)) + '</div>'
+                    + '<div class="cli-ac-info">'
+                    + '<div class="cli-ac-name">' + cliAcHighlight(c.name, q) + '</div>'
+                    + (meta.length ? '<div class="cli-ac-meta">' + meta.join('') + '</div>' : '')
+                    + '</div>' + badge + '</div>';
+            }).join('');
+            box.style.display = 'block';
+        }
+
+        function cliAcSetActive(i) {
+            cliAcActive = i;
+            document.querySelectorAll('#cli-ac-results .cli-ac-item').forEach(el => {
+                el.classList.toggle('active', parseInt(el.dataset.i) === i);
+            });
+        }
+
+        function cliAcPick(i) {
+            const c = cliAcRows[i];
+            if (!c) return;
+            cliAcSelect(c.id, c.name, c.phone);
+        }
+
+        function cliAcSelect(id, name, phone) {
+            document.getElementById('client-select').value = id;
+            const input = document.getElementById('cli-ac-input');
+            input.value = name + (phone ? ' — ' + phone : '');
+            input.classList.add('has-client');
+            document.getElementById('cli-ac-clear').style.display = 'flex';
+            cliAcClose();
+        }
+
+        function cliAcClear() {
+            document.getElementById('client-select').value = '';
+            const input = document.getElementById('cli-ac-input');
+            input.value = '';
+            input.classList.remove('has-client');
+            document.getElementById('cli-ac-clear').style.display = 'none';
+            cliAcClose();
+            input.focus();
+        }
+
+        function cliAcClose() {
+            const box = document.getElementById('cli-ac-results');
+            box.style.display = 'none';
+            box.innerHTML = '';
+            cliAcRows = [];
+            cliAcActive = -1;
+        }
+
+        function cliAcKey(e) {
+            const box = document.getElementById('cli-ac-results');
+            const open = box.style.display === 'block' && cliAcRows.length;
+            if (e.key === 'ArrowDown') {
+                if (!open) { cliAcSearch(); return; }
+                e.preventDefault();
+                cliAcSetActive(Math.min(cliAcActive + 1, cliAcRows.length - 1));
+                cliAcScrollIntoView();
+            } else if (e.key === 'ArrowUp') {
+                if (!open) return;
+                e.preventDefault();
+                cliAcSetActive(Math.max(cliAcActive - 1, 0));
+                cliAcScrollIntoView();
+            } else if (e.key === 'Enter') {
+                if (open && cliAcActive >= 0) {
+                    e.preventDefault();
+                    cliAcPick(cliAcActive);
+                }
+            } else if (e.key === 'Escape') {
+                cliAcClose();
+            }
+        }
+
+        function cliAcScrollIntoView() {
+            const el = document.querySelector('#cli-ac-results .cli-ac-item.active');
+            if (el) el.scrollIntoView({ block: 'nearest' });
+        }
+
+        // Close the dropdown when clicking outside the widget
+        document.addEventListener('click', function(e) {
+            const widget = document.getElementById('cli-ac');
+            if (widget && !widget.contains(e.target)) cliAcClose();
+        });
 
         // ===== AI Photo Extraction =====
         const photoIds = [{% for photo in photos %}{{ photo.id }}{% if not forloop.last %}, {% endif %}{% endfor %}];
