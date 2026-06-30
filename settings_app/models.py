@@ -552,6 +552,39 @@ class JewelryType(models.Model):
         super().save(*args, **kwargs)
 
 
+class ProductNature(models.Model):
+    """
+    Nature/finition d'un produit (Rafinity, Beldi, Laser, etc.)
+
+    Transversale aux types et fournisseurs : sert au profilage et à
+    l'analyse des ventes par nature de produit.
+    """
+    name = models.CharField(_('Nom'), max_length=100, unique=True)
+    name_ar = models.CharField(_('Nom (Arabe)'), max_length=100, blank=True)
+    code = models.CharField(_('Code'), max_length=20, unique=True, blank=True)
+    is_active = models.BooleanField(_('Actif'), default=True)
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('Nature de produit')
+        verbose_name_plural = _('Natures de produits')
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            base = self.name[:3].upper().replace(' ', '')
+            code = f"NAT-{base}"
+            counter = 1
+            while ProductNature.objects.filter(code=code).exclude(pk=self.pk).exists():
+                code = f"NAT-{base}{counter}"
+                counter += 1
+            self.code = code
+        super().save(*args, **kwargs)
+
+
 class CompanySettings(models.Model):
     """
     Company-wide settings (singleton)

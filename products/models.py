@@ -79,6 +79,14 @@ class Product(models.Model):
         null=True,
         blank=True
     )
+    nature = models.ForeignKey(
+        'settings_app.ProductNature',
+        on_delete=models.PROTECT,
+        related_name='products',
+        verbose_name=_('Nature produit'),
+        null=True,
+        blank=True
+    )
 
     # Metal details
     metal_type = models.ForeignKey(

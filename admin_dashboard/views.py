@@ -34,7 +34,7 @@ from settings_app.models import (
     StoneClarity, StoneColor, StoneCut, PaymentMethod,
     BankAccount, StockLocation, DeliveryMethod,
     DeliveryPerson, RepairType, CertificateIssuer,
-    CompanySettings, Carrier, JewelryType
+    CompanySettings, Carrier, JewelryType, ProductNature
 )
 # SystemConfig is imported in the view function to avoid migration issues
 
@@ -184,6 +184,14 @@ class ConfigurationRegistry:
             'model': JewelryType,
             'label': 'Types de bijoux',
             'singular': 'Type de bijou',
+            'fields': ['name', 'name_ar', 'is_active'],
+            'list_display': ['name', 'code', 'is_active'],
+            'search_fields': ['name', 'code'],
+        },
+        'product-natures': {
+            'model': ProductNature,
+            'label': 'Natures de produits',
+            'singular': 'Nature de produit',
             'fields': ['name', 'name_ar', 'is_active'],
             'list_display': ['name', 'code', 'is_active'],
             'search_fields': ['name', 'code'],

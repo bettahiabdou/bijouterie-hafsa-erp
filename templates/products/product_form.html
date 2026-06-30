@@ -474,6 +474,17 @@
                             {% endfor %}
                         </select>
                     </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Nature produit</label>
+                        <select name="nature" class="form-select">
+                            <option value="">Non spécifié</option>
+                            {% for n in natures %}
+                                <option value="{{ n.id }}" {% if product.nature_id == n.id %}selected{% endif %}>{{ n.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small style="color: var(--gray-500); font-size: var(--text-xs);">Rafinity, Beldi, Laser… (configurable dans Paramètres)</small>
+                    </div>
                 </div>
 
                 <div class="form-row">

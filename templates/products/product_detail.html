@@ -298,6 +298,12 @@
                             <span class="info-value">{{ product.jewelry_type.name }}</span>
                         </div>
                         {% endif %}
+                        {% if product.nature %}
+                        <div class="info-item">
+                            <span class="info-label">Nature produit</span>
+                            <span class="info-value">{{ product.nature.name }}</span>
+                        </div>
+                        {% endif %}
                         <div class="info-item">
                             <span class="info-label">Statut</span>
                             <span class="badge {% if product.status == 'available' %}badge-success{% elif product.status == 'sold' %}badge-neutral{% elif product.status == 'in_repair' %}badge-warning{% else %}badge-info{% endif %}">

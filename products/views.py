@@ -15,7 +15,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from .models import Product, ProductImage, ProductStone, ProductVideo
 from .video_utils import convert_video_to_mp4
 from .print_utils import print_product_label, print_price_tag, print_test_label, generate_product_label_zpl, generate_price_tag_zpl, queue_print_job, send_to_printer
-from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount, JewelryType
+from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount, JewelryType, ProductNature
 from suppliers.models import Supplier
 from users.models import ActivityLog
 from PIL import Image
@@ -288,7 +288,7 @@ def product_detail(request, reference):
     """Display product details"""
     product = get_object_or_404(
         Product.objects.select_related(
-            'category', 'metal_type', 'metal_purity', 'jewelry_type'
+            'category', 'metal_type', 'metal_purity', 'jewelry_type', 'nature'
         ).prefetch_related('images', 'stones'),
         reference=reference
     )
@@ -362,6 +362,7 @@ def batch_product_create(request):
             product_suppliers = request.POST.getlist('product_supplier')
             product_sizes = request.POST.getlist('product_size')
             product_jewelry_types = request.POST.getlist('product_jewelry_type')
+            product_natures = request.POST.getlist('product_nature')
 
             # Check if we should print labels
             print_labels = request.POST.get('print_labels') == '1'
@@ -402,6 +403,7 @@ def batch_product_create(request):
                     product_supplier_id = product_suppliers[i] if i < len(product_suppliers) else None
                     product_size = product_sizes[i].strip() if i < len(product_sizes) else ''
                     product_jewelry_type_id = product_jewelry_types[i] if i < len(product_jewelry_types) else None
+                    product_nature_id = product_natures[i] if i < len(product_natures) else None
 
                     # Create product instance (don't save yet)
                     product = Product(
@@ -409,6 +411,7 @@ def batch_product_create(request):
                         product_type=product_product_type,
                         category_id=product_category_id,
                         jewelry_type_id=product_jewelry_type_id if product_jewelry_type_id else None,
+                        nature_id=product_nature_id if product_nature_id else None,
                         metal_type_id=product_metal_id if product_metal_id else None,
                         metal_purity_id=product_purity_id if product_purity_id else None,
                         net_weight=weight_net,
@@ -526,6 +529,7 @@ def batch_product_create(request):
         'suppliers': Supplier.objects.filter(is_active=True),
         'product_types': Product.ProductType.choices,
         'jewelry_types': JewelryType.objects.filter(is_active=True),
+        'natures': ProductNature.objects.filter(is_active=True),
     }
 
     return render(request, 'products/batch_product_form.html', context)
@@ -565,6 +569,7 @@ def product_create(request):
                     'bank_accounts': BankAccount.objects.filter(is_active=True),
                     'product_types': Product.ProductType.choices,
                     'jewelry_types': JewelryType.objects.filter(is_active=True),
+                    'natures': ProductNature.objects.filter(is_active=True),
                 })
 
             # Get size and length
@@ -580,6 +585,7 @@ def product_create(request):
                 product_type=request.POST.get('product_type', 'finished'),
                 category_id=request.POST.get('category'),
                 jewelry_type_id=request.POST.get('jewelry_type') or None,
+                nature_id=request.POST.get('nature') or None,
                 metal_type_id=request.POST.get('metal_type') or None,
                 metal_purity_id=request.POST.get('metal_purity') or None,
                 gross_weight=gross_weight,
@@ -648,6 +654,7 @@ def product_create(request):
         'bank_accounts': BankAccount.objects.filter(is_active=True),
         'product_types': Product.ProductType.choices,
         'jewelry_types': JewelryType.objects.filter(is_active=True),
+        'natures': ProductNature.objects.filter(is_active=True),
     }
 
     return render(request, 'products/product_form.html', context)
@@ -706,6 +713,10 @@ def product_edit(request, reference):
                 product.jewelry_type_id = request.POST.get('jewelry_type')
             else:
                 product.jewelry_type_id = None
+            if request.POST.get('nature'):
+                product.nature_id = request.POST.get('nature')
+            else:
+                product.nature_id = None
             if request.POST.get('metal_type'):
                 product.metal_type_id = request.POST.get('metal_type')
             else:
@@ -779,6 +790,7 @@ def product_edit(request, reference):
         'bank_accounts': BankAccount.objects.filter(is_active=True),
         'product_types': Product.ProductType.choices,
         'jewelry_types': JewelryType.objects.filter(is_active=True),
+        'natures': ProductNature.objects.filter(is_active=True),
         'statuses': Product.Status.choices,
     }
 
