@@ -182,10 +182,10 @@ def repair_detail(request, reference):
     # Log view
     ActivityLog.objects.create(
         user=request.user,
-        action_type=ActivityLog.ActionType.VIEW,
-        object_type='Repair',
-        object_id=repair.id,
-        description=f'Viewed repair {repair.reference}',
+        action=ActivityLog.ActionType.VIEW,
+        model_name='Repair',
+        object_id=str(repair.id),
+        object_repr=f'Réparation {repair.reference}',
         ip_address=get_client_ip(request)
     )
 
@@ -209,21 +209,23 @@ def repair_detail(request, reference):
 
             ActivityLog.objects.create(
                 user=request.user,
-                action_type=ActivityLog.ActionType.UPDATE,
-                object_type='Repair',
-                object_id=repair.id,
-                description=f'Updated repair {repair.reference} status to {repair.get_status_display()}',
+                action=ActivityLog.ActionType.UPDATE,
+                model_name='Repair',
+                object_id=str(repair.id),
+                object_repr=f'Réparation {repair.reference} → {repair.get_status_display()}',
                 ip_address=get_client_ip(request)
             )
 
-    # Calculate days overdue
+    # Calculate days overdue (estimated date is optional)
     today = now().date()
-    days_overdue = (today - repair.estimated_completion_date).days if repair.estimated_completion_date < today else 0
+    est = repair.estimated_completion_date
+    is_overdue = bool(est) and est < today and repair.status not in ['completed', 'delivered', 'cancelled']
+    days_overdue = (today - est).days if est and est < today else 0
 
     context = {
         'repair': repair,
         'days_overdue': max(0, days_overdue),
-        'is_overdue': repair.estimated_completion_date < today and repair.status not in ['completed', 'delivered', 'cancelled'],
+        'is_overdue': is_overdue,
     }
     return render(request, 'repairs/repair_detail.html', context)
 
