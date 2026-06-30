@@ -9,6 +9,7 @@ from django.utils.timezone import now
 from django.db.models import Q, Sum, Count, F, DecimalField, Value
 from django.db.models.functions import Coalesce
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 
 from .models import Repair
 from users.models import ActivityLog
@@ -114,25 +115,42 @@ def repair_create(request):
 
         reference = f'REP-{today_str}-{seq:04d}'
 
+        # Only treat 'product' as a Product FK if it's a real numeric id
+        product_raw = (request.POST.get('product') or '').strip()
+        product_id = product_raw if product_raw.isdigit() else None
+
+        # Optional weight
+        weight_raw = (request.POST.get('weight_grams') or '').strip()
+        try:
+            weight_grams = Decimal(weight_raw) if weight_raw else None
+        except (InvalidOperation, ValueError):
+            weight_grams = None
+
+        # Optional estimated completion date
+        est_date = (request.POST.get('estimated_completion_date') or '').strip() or None
+
         repair = Repair.objects.create(
             reference=reference,
             client_id=request.POST.get('client'),
-            product_id=request.POST.get('product') or None,
+            product_id=product_id,
             item_description=request.POST.get('item_description', ''),
             repair_type_id=request.POST.get('repair_type'),
             issue_description=request.POST.get('issue_description', ''),
-            estimated_completion_date=request.POST.get('estimated_completion_date'),
+            weight_grams=weight_grams,
+            photo=request.FILES.get('photo'),
+            estimated_completion_date=est_date,
             priority=request.POST.get('priority', 'medium'),
             assigned_to_id=request.POST.get('assigned_to') or None,
+            repair_notes=request.POST.get('repair_notes', ''),
         )
 
         # Log activity
         ActivityLog.objects.create(
             user=request.user,
-            action_type=ActivityLog.ActionType.CREATE,
-            object_type='Repair',
-            object_id=repair.id,
-            description=f'Created repair {repair.reference}',
+            action=ActivityLog.ActionType.CREATE,
+            model_name='Repair',
+            object_id=str(repair.id),
+            object_repr=f'Réparation {repair.reference}',
             ip_address=get_client_ip(request)
         )
 

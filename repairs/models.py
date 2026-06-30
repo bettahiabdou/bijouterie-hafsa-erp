@@ -64,6 +64,21 @@ class Repair(models.Model):
         blank=True
     )
 
+    # Physical details of the item to repair
+    weight_grams = models.DecimalField(
+        _('Poids (g)'),
+        max_digits=10,
+        decimal_places=3,
+        null=True,
+        blank=True
+    )
+    photo = models.ImageField(
+        _('Photo du produit'),
+        upload_to='repairs/',
+        null=True,
+        blank=True
+    )
+
     # Costs
     assessment_cost_dh = models.DecimalField(
         _('Coût d\'évaluation (DH)'),
@@ -112,7 +127,9 @@ class Repair(models.Model):
         auto_now_add=True
     )
     estimated_completion_date = models.DateField(
-        _('Date d\'achèvement estimée')
+        _('Date d\'achèvement estimée'),
+        null=True,
+        blank=True
     )
     completion_date = models.DateField(
         _('Date d\'achèvement'),
