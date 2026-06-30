@@ -142,6 +142,7 @@ def repair_create(request):
             priority=request.POST.get('priority', 'medium'),
             assigned_to_id=request.POST.get('assigned_to') or None,
             repair_notes=request.POST.get('repair_notes', ''),
+            status=Repair.Status.IN_PROGRESS,  # started immediately on creation
         )
 
         # Log activity
@@ -194,27 +195,48 @@ def repair_detail(request, reference):
         if request.user.has_perm('repairs.change_repair'):
             action = request.POST.get('action')
 
-            if action == 'approve':
-                repair.status = 'approved'
-            elif action == 'start':
-                repair.status = 'in_progress'
-            elif action == 'complete':
+            if action == 'complete':
                 repair.status = 'completed'
                 repair.completion_date = now().date()
+                repair.save()
             elif action == 'deliver':
+                # Delivery method: 'pickup' (retrait) or 'amana' (shipped + tracked)
+                method = request.POST.get('delivery_method', 'pickup')
+                tracking = (request.POST.get('tracking_number') or '').strip()
+
                 repair.status = 'delivered'
                 repair.delivery_date = now().date()
+                repair.save()
 
-            repair.save()
+                if method == 'amana':
+                    # Create a tracked delivery for the repair. It carries NO amount
+                    # so it is never counted as a financial entry / encaissement.
+                    from .models import Repair as _R  # noqa (ensure module loaded)
+                    from sales.models import Delivery as _Delivery
+                    client = repair.client
+                    _Delivery.objects.create(
+                        invoice=None,
+                        repair=repair,
+                        client_name=client.full_name if client else '',
+                        client_phone=(client.phone or '') if client else '',
+                        total_amount=Decimal('0'),
+                        delivery_method_type='amana',
+                        tracking_number=tracking,
+                        status='pending',
+                    )
+            else:
+                # Unknown action — ignore
+                action = None
 
-            ActivityLog.objects.create(
-                user=request.user,
-                action=ActivityLog.ActionType.UPDATE,
-                model_name='Repair',
-                object_id=str(repair.id),
-                object_repr=f'Réparation {repair.reference} → {repair.get_status_display()}',
-                ip_address=get_client_ip(request)
-            )
+            if action:
+                ActivityLog.objects.create(
+                    user=request.user,
+                    action=ActivityLog.ActionType.UPDATE,
+                    model_name='Repair',
+                    object_id=str(repair.id),
+                    object_repr=f'Réparation {repair.reference} → {repair.get_status_display()}',
+                    ip_address=get_client_ip(request)
+                )
 
     # Calculate days overdue (estimated date is optional)
     today = now().date()

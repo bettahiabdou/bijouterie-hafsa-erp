@@ -951,6 +951,16 @@ class Delivery(models.Model):
         blank=True
     )
 
+    # Link to a repair, when this delivery ships a repaired item back (non-financial)
+    repair = models.ForeignKey(
+        'repairs.Repair',
+        on_delete=models.CASCADE,
+        related_name='deliveries',
+        verbose_name=_('Réparation'),
+        null=True,
+        blank=True
+    )
+
     # Client info (copied from invoice for easy display)
     client_name = models.CharField(_('Nom client'), max_length=200, blank=True)
     client_phone = models.CharField(_('Téléphone client'), max_length=20, blank=True)

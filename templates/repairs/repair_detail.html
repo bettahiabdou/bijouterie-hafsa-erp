@@ -214,33 +214,22 @@
             {% endif %}
 
             <!-- Actions -->
-            {% if repair.status in 'pending,received,assessing,approved,in_progress,completed' %}
+            {% if repair.status == 'in_progress' or repair.status == 'completed' %}
                 <div class="card animate-slide-up" style="animation-delay: 400ms;">
-                    <div class="card-body">
-                        <form method="post" class="action-buttons">
-                            {% csrf_token %}
-                            {% if repair.status == 'received' %}
-                                <button type="submit" name="action" value="approve" class="btn btn-info btn-block">
-                                    <i class="fas fa-check"></i>
-                                    <span>Approuver</span>
-                                </button>
-                            {% elif repair.status == 'approved' %}
-                                <button type="submit" name="action" value="start" class="btn btn-warning btn-block">
-                                    <i class="fas fa-play"></i>
-                                    <span>Commencer</span>
-                                </button>
-                            {% elif repair.status == 'in_progress' %}
+                    <div class="card-body" style="display:flex; flex-direction:column; gap:var(--space-3);">
+                        {% if repair.status == 'in_progress' %}
+                            <form method="post">
+                                {% csrf_token %}
                                 <button type="submit" name="action" value="complete" class="btn btn-success btn-block">
                                     <i class="fas fa-check-double"></i>
-                                    <span>Terminer</span>
+                                    <span>Marquer terminé</span>
                                 </button>
-                            {% elif repair.status == 'completed' %}
-                                <button type="submit" name="action" value="deliver" class="btn btn-accent btn-block">
-                                    <i class="fas fa-truck"></i>
-                                    <span>Livrer</span>
-                                </button>
-                            {% endif %}
-                        </form>
+                            </form>
+                        {% endif %}
+                        <button type="button" class="btn btn-accent btn-block" onclick="openDeliverModal()">
+                            <i class="fas fa-truck"></i>
+                            <span>Livrer</span>
+                        </button>
                     </div>
                 </div>
             {% endif %}
@@ -425,4 +414,52 @@
             }
         }
     </style>
+
+    <!-- Deliver Modal -->
+    <div id="deliverModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:16px; width:95%; max-width:460px; box-shadow:0 25px 60px rgba(0,0,0,0.3); overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid var(--neutral-100);">
+                <h3 style="margin:0;"><i class="fas fa-truck mr-2"></i> Livrer la réparation</h3>
+                <button type="button" onclick="closeDeliverModal()" style="background:var(--neutral-100); border:none; width:34px; height:34px; border-radius:50%; font-size:1.3rem; cursor:pointer; color:var(--neutral-500);">&times;</button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="deliver">
+                <div style="padding:20px 22px;">
+                    <label class="form-label" style="font-weight:600;">Mode de remise</label>
+                    <div style="display:flex; gap:var(--space-2); margin:var(--space-2) 0;">
+                        <label style="flex:1; display:flex; align-items:center; gap:8px; padding:12px; border:2px solid var(--neutral-200); border-radius:12px; cursor:pointer;">
+                            <input type="radio" name="delivery_method" value="pickup" checked onchange="toggleDeliverTracking()">
+                            <span><i class="fas fa-store"></i> Récupéré (retrait)</span>
+                        </label>
+                        <label style="flex:1; display:flex; align-items:center; gap:8px; padding:12px; border:2px solid var(--neutral-200); border-radius:12px; cursor:pointer;">
+                            <input type="radio" name="delivery_method" value="amana" onchange="toggleDeliverTracking()">
+                            <span><i class="fas fa-box"></i> AMANA</span>
+                        </label>
+                    </div>
+                    <div class="form-group" id="deliverTrackingGroup" style="display:none; margin-top:var(--space-3);">
+                        <label class="form-label">Numéro de suivi AMANA</label>
+                        <input type="text" name="tracking_number" class="form-input" placeholder="Code de suivi AMANA">
+                        <small class="text-muted">Le colis sera suivi automatiquement. Aucun montant n'est compté en caisse.</small>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:var(--space-2); padding:16px 22px; border-top:1px solid var(--neutral-100); background:var(--neutral-50);">
+                    <button type="button" class="btn btn-secondary" onclick="closeDeliverModal()">Annuler</button>
+                    <button type="submit" class="btn btn-accent"><i class="fas fa-check mr-1"></i> Confirmer la livraison</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openDeliverModal() { document.getElementById('deliverModal').style.display = 'flex'; }
+        function closeDeliverModal() { document.getElementById('deliverModal').style.display = 'none'; }
+        function toggleDeliverTracking() {
+            var m = document.querySelector('input[name="delivery_method"]:checked').value;
+            var g = document.getElementById('deliverTrackingGroup');
+            var inp = g.querySelector('input');
+            if (m === 'amana') { g.style.display = 'block'; inp.setAttribute('required','required'); }
+            else { g.style.display = 'none'; inp.removeAttribute('required'); }
+        }
+    </script>
 {% endblock %}

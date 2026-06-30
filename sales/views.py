@@ -4026,7 +4026,7 @@ def delivery_list(request):
     from .models import Delivery
 
     deliveries = Delivery.objects.select_related(
-        'invoice', 'invoice__seller', 'carrier'
+        'invoice', 'invoice__seller', 'carrier', 'repair'
     ).prefetch_related('timeline').order_by('-created_at')
 
     # Search
@@ -4125,7 +4125,7 @@ def delivery_detail(request, reference):
     from .models import Delivery
 
     delivery = get_object_or_404(
-        Delivery.objects.select_related('invoice', 'invoice__seller', 'carrier').prefetch_related('timeline'),
+        Delivery.objects.select_related('invoice', 'invoice__seller', 'carrier', 'repair').prefetch_related('timeline'),
         reference=reference
     )
 
