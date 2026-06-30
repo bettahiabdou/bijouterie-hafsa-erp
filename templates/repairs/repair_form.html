@@ -45,12 +45,22 @@
 
                         <div class="form-group">
                             <label class="form-label">Client <span class="required">*</span></label>
-                            <select name="client" required class="form-select">
-                                <option value="">Selectionner un client</option>
-                                {% for client in clients %}
-                                    <option value="{{ client.id }}">{{ client.first_name }} {{ client.last_name }}</option>
-                                {% endfor %}
-                            </select>
+                            <input type="hidden" name="client" id="repairClientId" required>
+                            <div style="display:flex; gap:8px; align-items:stretch;">
+                                <div style="position:relative; flex:1;">
+                                    <input type="text" id="repairClientSearch" class="form-input" autocomplete="off"
+                                           placeholder="Chercher par nom, téléphone, code..." oninput="searchRepairClients()">
+                                    <div id="repairClientResults" class="rc-results" style="display:none;"></div>
+                                </div>
+                                <a href="{% url 'clients:create' %}" target="_blank" rel="noopener" class="btn btn-secondary" title="Ajouter un nouveau client" style="flex:0 0 auto;">
+                                    <i class="fas fa-plus"></i>
+                                </a>
+                            </div>
+                            <div id="repairClientSelected" style="display:none; margin-top:8px; padding:8px 12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; align-items:center; justify-content:space-between;">
+                                <span id="repairClientName" class="font-semibold"></span>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="clearRepairClient()" title="Retirer"><i class="fas fa-times"></i></button>
+                            </div>
+                            <p class="form-hint">Tapez pour rechercher, ou cliquez sur « + » pour créer un nouveau client.</p>
                         </div>
 
                         <div class="form-group">
@@ -331,5 +341,79 @@
                 justify-content: center;
             }
         }
+
+        /* Client search dropdown */
+        .rc-results {
+            position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+            background: #fff; border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+            max-height: 240px; overflow-y: auto;
+        }
+        .rc-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--neutral-100); font-size: var(--text-sm); }
+        .rc-item:hover { background: var(--primary-50); }
+        .rc-item:last-child { border-bottom: none; }
+        .rc-none { padding: 10px 12px; color: var(--neutral-400); font-size: var(--text-sm); }
     </style>
+
+    <script>
+        let rcTimer = null;
+        function searchRepairClients() {
+            const q = document.getElementById('repairClientSearch').value.trim();
+            const box = document.getElementById('repairClientResults');
+            // Typing clears the previously chosen client until a new one is picked
+            document.getElementById('repairClientId').value = '';
+            document.getElementById('repairClientSelected').style.display = 'none';
+            if (q.length < 2) { box.style.display = 'none'; return; }
+            if (rcTimer) clearTimeout(rcTimer);
+            rcTimer = setTimeout(function() {
+                fetch('{% url "clients:api_search" %}?q=' + encodeURIComponent(q))
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.results && data.results.length) {
+                            let html = '';
+                            data.results.forEach(function(c) {
+                                const safe = (c.name || '').replace(/'/g, "\\'");
+                                html += '<div class="rc-item" onclick="selectRepairClient(' + c.id + ', \'' + safe + '\')">' +
+                                    '<strong>' + c.name + '</strong>' +
+                                    (c.phone ? ' <span style="color:var(--neutral-500);">' + c.phone + '</span>' : '') +
+                                    (c.code ? ' <span style="color:var(--neutral-400);">' + c.code + '</span>' : '') +
+                                    '</div>';
+                            });
+                            box.innerHTML = html;
+                        } else {
+                            box.innerHTML = '<div class="rc-none">Aucun client trouvé — cliquez sur « + » pour en créer un</div>';
+                        }
+                        box.style.display = 'block';
+                    })
+                    .catch(() => { box.style.display = 'none'; });
+            }, 300);
+        }
+        function selectRepairClient(id, name) {
+            document.getElementById('repairClientId').value = id;
+            document.getElementById('repairClientName').textContent = name;
+            document.getElementById('repairClientSelected').style.display = 'flex';
+            document.getElementById('repairClientResults').style.display = 'none';
+            document.getElementById('repairClientSearch').value = name;
+        }
+        function clearRepairClient() {
+            document.getElementById('repairClientId').value = '';
+            document.getElementById('repairClientSelected').style.display = 'none';
+            document.getElementById('repairClientSearch').value = '';
+            document.getElementById('repairClientSearch').focus();
+        }
+        document.addEventListener('click', function(e) {
+            const box = document.getElementById('repairClientResults');
+            const inp = document.getElementById('repairClientSearch');
+            if (box && !box.contains(e.target) && e.target !== inp) box.style.display = 'none';
+        });
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form[enctype="multipart/form-data"]');
+            if (form) form.addEventListener('submit', function(e) {
+                if (!document.getElementById('repairClientId').value) {
+                    e.preventDefault();
+                    alert('Veuillez sélectionner un client (recherchez, ou créez-en un avec « + »).');
+                }
+            });
+        });
+    </script>
 {% endblock %}

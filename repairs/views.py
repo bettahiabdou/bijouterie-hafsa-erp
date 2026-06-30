@@ -100,6 +100,13 @@ def repair_list(request):
 def repair_create(request):
     """Create new repair"""
     if request.method == 'POST':
+        from django.contrib import messages
+        # A valid client is required (the form posts a numeric client id)
+        client_raw = (request.POST.get('client') or '').strip()
+        if not client_raw.isdigit():
+            messages.error(request, 'Veuillez sélectionner un client.')
+            return redirect('repairs:repair_create')
+
         # Generate reference
         from django.utils import timezone
         today = timezone.now().date()
@@ -131,7 +138,7 @@ def repair_create(request):
 
         repair = Repair.objects.create(
             reference=reference,
-            client_id=request.POST.get('client'),
+            client_id=client_raw,
             product_id=product_id,
             item_description=request.POST.get('item_description', ''),
             repair_type_id=request.POST.get('repair_type'),
