@@ -101,6 +101,7 @@
                                     <th style="text-align: right;">Poids (g)</th>
                                     <th style="text-align: right;">Prix (DH)</th>
                                     <th>Facture</th>
+                                    <th style="text-align: center;">Paiement</th>
                                     <th>Date Stockage</th>
                                     <th style="text-align: center;">Statut</th>
                                     <th style="text-align: center;">Actions</th>
@@ -126,6 +127,22 @@
                                             <a href="{% url 'sales:invoice_detail' item.invoice.reference %}" class="text-primary">
                                                 {{ item.invoice.reference }}
                                             </a>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            {% if item.invoice %}
+                                                {% if item.invoice.status == 'paid' %}
+                                                    <span class="badge badge-success">Payée</span>
+                                                {% elif item.invoice.status == 'partial' %}
+                                                    <span class="badge badge-warning">Partiellement payée</span>
+                                                    <br><small class="text-muted">Reste {{ item.invoice.balance_due|floatformat:2 }} DH</small>
+                                                {% elif item.invoice.status == 'unpaid' %}
+                                                    <span class="badge badge-danger">Non payée</span>
+                                                {% else %}
+                                                    <span class="badge badge-neutral">{{ item.invoice.get_status_display }}</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
                                         </td>
                                         <td>{{ item.stored_at|date:"d/m/Y H:i" }}</td>
                                         <td style="text-align: center;">
@@ -163,7 +180,7 @@
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="9" class="text-center text-muted" style="padding: var(--space-8);">
+                                        <td colspan="10" class="text-center text-muted" style="padding: var(--space-8);">
                                             Aucun article
                                         </td>
                                     </tr>
