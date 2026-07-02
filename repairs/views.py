@@ -207,7 +207,8 @@ def repair_detail(request, reference):
                 repair.completion_date = now().date()
                 repair.save()
             elif action == 'deliver':
-                # Delivery method: 'pickup' (retrait) or 'amana' (shipped + tracked)
+                # Delivery method: 'pickup' (retrait), 'amana' (auto-tracked),
+                # or 'transporteur' (autre transporteur, with a chosen carrier)
                 method = request.POST.get('delivery_method', 'pickup')
                 tracking = (request.POST.get('tracking_number') or '').strip()
 
@@ -215,19 +216,20 @@ def repair_detail(request, reference):
                 repair.delivery_date = now().date()
                 repair.save()
 
-                if method == 'amana':
+                if method in ('amana', 'transporteur'):
                     # Create a tracked delivery for the repair. It carries NO amount
                     # so it is never counted as a financial entry / encaissement.
-                    from .models import Repair as _R  # noqa (ensure module loaded)
                     from sales.models import Delivery as _Delivery
                     client = repair.client
+                    carrier_raw = (request.POST.get('carrier_id') or '').strip()
                     _Delivery.objects.create(
                         invoice=None,
                         repair=repair,
                         client_name=client.full_name if client else '',
                         client_phone=(client.phone or '') if client else '',
                         total_amount=Decimal('0'),
-                        delivery_method_type='amana',
+                        delivery_method_type=method,
+                        carrier_id=carrier_raw if (method == 'transporteur' and carrier_raw.isdigit()) else None,
                         tracking_number=tracking,
                         status='pending',
                     )
@@ -251,10 +253,12 @@ def repair_detail(request, reference):
     is_overdue = bool(est) and est < today and repair.status not in ['completed', 'delivered', 'cancelled']
     days_overdue = (today - est).days if est and est < today else 0
 
+    from settings_app.models import Carrier
     context = {
         'repair': repair,
         'days_overdue': max(0, days_overdue),
         'is_overdue': is_overdue,
+        'carriers': Carrier.objects.filter(is_active=True),
     }
     return render(request, 'repairs/repair_detail.html', context)
 

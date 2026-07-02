@@ -59,6 +59,12 @@
                     <h3><i class="fas fa-gem mr-2"></i> Article</h3>
                 </div>
                 <div class="card-body">
+                    {% if repair.photo %}
+                        <a href="{{ repair.photo.url }}" target="_blank" rel="noopener" style="display:block; margin-bottom: var(--space-4);">
+                            <img src="{{ repair.photo.url }}" alt="Photo du produit à réparer"
+                                 style="width:100%; max-height:320px; object-fit:contain; border-radius:var(--radius-md); background:var(--neutral-50); border:1px solid var(--neutral-200);">
+                        </a>
+                    {% endif %}
                     {% if repair.product %}
                         <div class="info-grid">
                             <div class="info-item">
@@ -72,8 +78,14 @@
                         </div>
                     {% elif repair.item_description %}
                         <p class="text-muted">{{ repair.item_description }}</p>
-                    {% else %}
+                    {% elif not repair.photo %}
                         <p class="text-muted" style="font-style: italic;">Non specifie</p>
+                    {% endif %}
+                    {% if repair.weight_grams %}
+                        <div class="info-item" style="margin-top: var(--space-3);">
+                            <span class="info-label">Poids</span>
+                            <span class="info-value font-semibold">{{ repair.weight_grams|floatformat:3 }} g</span>
+                        </div>
                     {% endif %}
                 </div>
             </div>
@@ -427,20 +439,33 @@
                 <input type="hidden" name="action" value="deliver">
                 <div style="padding:20px 22px;">
                     <label class="form-label" style="font-weight:600;">Mode de remise</label>
-                    <div style="display:flex; gap:var(--space-2); margin:var(--space-2) 0;">
-                        <label style="flex:1; display:flex; align-items:center; gap:8px; padding:12px; border:2px solid var(--neutral-200); border-radius:12px; cursor:pointer;">
+                    <div style="display:flex; gap:var(--space-2); margin:var(--space-2) 0; flex-wrap:wrap;">
+                        <label style="flex:1; min-width:120px; display:flex; align-items:center; gap:8px; padding:12px; border:2px solid var(--neutral-200); border-radius:12px; cursor:pointer;">
                             <input type="radio" name="delivery_method" value="pickup" checked onchange="toggleDeliverTracking()">
                             <span><i class="fas fa-store"></i> Récupéré (retrait)</span>
                         </label>
-                        <label style="flex:1; display:flex; align-items:center; gap:8px; padding:12px; border:2px solid var(--neutral-200); border-radius:12px; cursor:pointer;">
+                        <label style="flex:1; min-width:120px; display:flex; align-items:center; gap:8px; padding:12px; border:2px solid var(--neutral-200); border-radius:12px; cursor:pointer;">
                             <input type="radio" name="delivery_method" value="amana" onchange="toggleDeliverTracking()">
                             <span><i class="fas fa-box"></i> AMANA</span>
                         </label>
+                        <label style="flex:1; min-width:120px; display:flex; align-items:center; gap:8px; padding:12px; border:2px solid var(--neutral-200); border-radius:12px; cursor:pointer;">
+                            <input type="radio" name="delivery_method" value="transporteur" onchange="toggleDeliverTracking()">
+                            <span><i class="fas fa-truck"></i> Autre transporteur</span>
+                        </label>
+                    </div>
+                    <div class="form-group" id="deliverCarrierGroup" style="display:none; margin-top:var(--space-3);">
+                        <label class="form-label">Transporteur</label>
+                        <select name="carrier_id" class="form-select">
+                            <option value="">-- Choisir un transporteur --</option>
+                            {% for c in carriers %}
+                                <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="form-group" id="deliverTrackingGroup" style="display:none; margin-top:var(--space-3);">
-                        <label class="form-label">Numéro de suivi AMANA</label>
-                        <input type="text" name="tracking_number" class="form-input" placeholder="Code de suivi AMANA">
-                        <small class="text-muted">Le colis sera suivi automatiquement. Aucun montant n'est compté en caisse.</small>
+                        <label class="form-label" id="deliverTrackingLabel">Numéro de suivi</label>
+                        <input type="text" name="tracking_number" class="form-input" placeholder="Code de suivi">
+                        <small class="text-muted" id="deliverTrackingHint">Aucun montant n'est compté en caisse.</small>
                     </div>
                 </div>
                 <div style="display:flex; justify-content:flex-end; gap:var(--space-2); padding:16px 22px; border-top:1px solid var(--neutral-100); background:var(--neutral-50);">
@@ -456,10 +481,33 @@
         function closeDeliverModal() { document.getElementById('deliverModal').style.display = 'none'; }
         function toggleDeliverTracking() {
             var m = document.querySelector('input[name="delivery_method"]:checked').value;
-            var g = document.getElementById('deliverTrackingGroup');
-            var inp = g.querySelector('input');
-            if (m === 'amana') { g.style.display = 'block'; inp.setAttribute('required','required'); }
-            else { g.style.display = 'none'; inp.removeAttribute('required'); }
+            var trackGroup = document.getElementById('deliverTrackingGroup');
+            var trackInp = trackGroup.querySelector('input');
+            var carrierGroup = document.getElementById('deliverCarrierGroup');
+            var carrierSel = carrierGroup.querySelector('select');
+            var label = document.getElementById('deliverTrackingLabel');
+            var hint = document.getElementById('deliverTrackingHint');
+
+            if (m === 'amana') {
+                trackGroup.style.display = 'block';
+                trackInp.setAttribute('required', 'required');
+                carrierGroup.style.display = 'none';
+                carrierSel.removeAttribute('required');
+                label.textContent = 'Numéro de suivi AMANA';
+                hint.textContent = 'Le colis sera suivi automatiquement. Aucun montant n\'est compté en caisse.';
+            } else if (m === 'transporteur') {
+                trackGroup.style.display = 'block';
+                trackInp.removeAttribute('required');
+                carrierGroup.style.display = 'block';
+                carrierSel.setAttribute('required', 'required');
+                label.textContent = 'Numéro de suivi (optionnel)';
+                hint.textContent = 'Aucun montant n\'est compté en caisse.';
+            } else {
+                trackGroup.style.display = 'none';
+                trackInp.removeAttribute('required');
+                carrierGroup.style.display = 'none';
+                carrierSel.removeAttribute('required');
+            }
         }
     </script>
 {% endblock %}
