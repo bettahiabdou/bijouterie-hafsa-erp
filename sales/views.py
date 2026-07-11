@@ -3476,41 +3476,72 @@ def pending_invoice_complete(request, reference):
                 # Calculate totals first
                 invoice.calculate_totals()
 
-                # Handle exchange (reprise facture) — supports partial item selection
+                # Handle exchange (reprise facture) — supports multiple invoices,
+                # each with partial item selection.
+                import json as _json
                 exchange_credit = Decimal('0')
-                exchange_invoice_id = request.POST.get('exchange_invoice_id', '')
-                exchange_inv = None
-                exchange_selected_items = []  # list of {item_id, reprise_value}
-                if exchange_invoice_id:
+                # Each entry: {'invoice': SaleInvoice, 'selected': [{item_id, reprise_value}], 'credit': Decimal}
+                exchange_entries = []
+                _ex_status = [SaleInvoice.Status.PAID, SaleInvoice.Status.PARTIAL_PAID, SaleInvoice.Status.UNPAID]
+
+                def _load_exchange_invoice(inv_id):
                     try:
-                        exchange_inv = SaleInvoice.objects.prefetch_related('items__product').get(
-                            id=int(exchange_invoice_id),
-                            is_deleted=False,
-                            status__in=[SaleInvoice.Status.PAID, SaleInvoice.Status.PARTIAL_PAID, SaleInvoice.Status.UNPAID]
+                        return SaleInvoice.objects.prefetch_related('items__product').get(
+                            id=int(inv_id), is_deleted=False, status__in=_ex_status
                         )
-                        # Parse selected items JSON
-                        import json as _json
-                        items_json = request.POST.get('exchange_items_json', '')
-                        if items_json:
+                    except (SaleInvoice.DoesNotExist, ValueError, TypeError):
+                        return None
+
+                data_json = request.POST.get('exchange_data_json', '')
+                if data_json:
+                    # New multi-invoice format: [{invoice_id, items:[{item_id, reprise_value}]}]
+                    try:
+                        parsed = _json.loads(data_json)
+                    except _json.JSONDecodeError:
+                        parsed = []
+                    for entry in parsed:
+                        inv = _load_exchange_invoice(entry.get('invoice_id'))
+                        if not inv:
+                            continue
+                        valid_ids = set(inv.items.values_list('id', flat=True))
+                        selected = []
+                        for si in entry.get('items', []):
                             try:
-                                exchange_selected_items = _json.loads(items_json)
-                                # Validate items belong to this invoice
-                                valid_item_ids = set(exchange_inv.items.values_list('id', flat=True))
-                                exchange_selected_items = [
-                                    si for si in exchange_selected_items
-                                    if int(si['item_id']) in valid_item_ids
-                                ]
-                                exchange_credit = sum(
-                                    Decimal(str(si['reprise_value'])) for si in exchange_selected_items
-                                )
-                            except (ValueError, KeyError, _json.JSONDecodeError):
-                                exchange_credit = exchange_inv.total_amount or Decimal('0')
-                                exchange_selected_items = []
-                        else:
-                            # Fallback: no items JSON means old behavior (full invoice)
-                            exchange_credit = exchange_inv.total_amount or Decimal('0')
-                    except (SaleInvoice.DoesNotExist, ValueError):
-                        exchange_inv = None
+                                if int(si['item_id']) in valid_ids:
+                                    selected.append({'item_id': int(si['item_id']),
+                                                     'reprise_value': Decimal(str(si['reprise_value']))})
+                            except (KeyError, ValueError, TypeError):
+                                continue
+                        if not selected:
+                            continue
+                        credit = sum((si['reprise_value'] for si in selected), Decimal('0'))
+                        exchange_credit += credit
+                        exchange_entries.append({'invoice': inv, 'selected': selected, 'credit': credit})
+                else:
+                    # Backward compatibility: old single-invoice fields
+                    exchange_invoice_id = request.POST.get('exchange_invoice_id', '')
+                    if exchange_invoice_id:
+                        inv = _load_exchange_invoice(exchange_invoice_id)
+                        if inv:
+                            valid_ids = set(inv.items.values_list('id', flat=True))
+                            selected = []
+                            items_json = request.POST.get('exchange_items_json', '')
+                            if items_json:
+                                try:
+                                    for si in _json.loads(items_json):
+                                        if int(si['item_id']) in valid_ids:
+                                            selected.append({'item_id': int(si['item_id']),
+                                                             'reprise_value': Decimal(str(si['reprise_value']))})
+                                except (ValueError, KeyError, TypeError, _json.JSONDecodeError):
+                                    selected = []
+                            if not selected:
+                                # No usable item selection -> whole invoice
+                                selected = [{'item_id': it.id,
+                                             'reprise_value': it.total_amount or Decimal('0')}
+                                            for it in inv.items.all()]
+                            credit = sum((si['reprise_value'] for si in selected), Decimal('0'))
+                            exchange_credit += credit
+                            exchange_entries.append({'invoice': inv, 'selected': selected, 'credit': credit})
 
                 # Handle dynamic payments (N payments)
                 from payments.models import ClientPayment
@@ -3518,8 +3549,11 @@ def pending_invoice_complete(request, reference):
 
                 total_amount_paid = exchange_credit
                 payment_details = []
-                if exchange_inv:
-                    payment_details.append({'method': f'Échange ({exchange_inv.reference})', 'amount': exchange_credit})
+                for _entry in exchange_entries:
+                    payment_details.append({
+                        'method': f"Échange ({_entry['invoice'].reference})",
+                        'amount': _entry['credit'],
+                    })
 
                 # Find all payment sections by scanning POST keys
                 # Payment fields are named: payment_method_1, payment_method_2, etc.
@@ -3685,38 +3719,40 @@ def pending_invoice_complete(request, reference):
                         item.product.status = 'sold'
                         item.product.save(update_fields=['status'])
 
-                # Finalize exchange: mark selected items as returned, return their products
-                if exchange_inv:
+                # Finalize exchange: for each exchanged invoice, mark ONLY the
+                # selected items as returned and return their products.
+                if exchange_entries:
                     from sales.models import SaleInvoiceAction
-                    selected_item_ids = {int(si['item_id']) for si in exchange_selected_items} if exchange_selected_items else None
-                    reprise_values = {int(si['item_id']): Decimal(str(si['reprise_value'])) for si in exchange_selected_items} if exchange_selected_items else {}
+                    for _entry in exchange_entries:
+                        ex_inv = _entry['invoice']
+                        selected_item_ids = {si['item_id'] for si in _entry['selected']}
+                        reprise_values = {si['item_id']: si['reprise_value'] for si in _entry['selected']}
 
-                    for ex_item in exchange_inv.items.all():
-                        # If we have selected items, only process those; otherwise process all (backwards compat)
-                        if selected_item_ids is not None and ex_item.id not in selected_item_ids:
-                            continue
-                        ex_item.is_returned = True
-                        ex_item.returned_at = timezone.now()
-                        ex_item.save(update_fields=['is_returned', 'returned_at'])
-                        if ex_item.product:
-                            ex_item.product.status = 'available'
-                            ex_item.product.save(update_fields=['status'])
-                        # Per-item action record
-                        SaleInvoiceAction.objects.create(
-                            original_invoice=exchange_inv,
-                            action_type=SaleInvoiceAction.ActionType.EXCHANGE,
-                            original_product=ex_item.product,
-                            original_product_ref=ex_item.product.reference if ex_item.product else '',
-                            new_invoice=invoice,
-                            refund_amount=reprise_values.get(ex_item.id, ex_item.total_amount),
-                            created_by=request.user,
-                        )
+                        for ex_item in ex_inv.items.all():
+                            if ex_item.id not in selected_item_ids:
+                                continue
+                            ex_item.is_returned = True
+                            ex_item.returned_at = timezone.now()
+                            ex_item.save(update_fields=['is_returned', 'returned_at'])
+                            if ex_item.product:
+                                ex_item.product.status = 'available'
+                                ex_item.product.save(update_fields=['status'])
+                            # Per-item action record
+                            SaleInvoiceAction.objects.create(
+                                original_invoice=ex_inv,
+                                action_type=SaleInvoiceAction.ActionType.EXCHANGE,
+                                original_product=ex_item.product,
+                                original_product_ref=ex_item.product.reference if ex_item.product else '',
+                                new_invoice=invoice,
+                                refund_amount=reprise_values.get(ex_item.id, ex_item.total_amount),
+                                created_by=request.user,
+                            )
 
-                    # Check if ALL items in old invoice are now returned
-                    all_returned = not exchange_inv.items.filter(is_returned=False).exists()
-                    if all_returned:
-                        exchange_inv.status = SaleInvoice.Status.EXCHANGED
-                        exchange_inv.save(update_fields=['status'])
+                        # Mark the old invoice EXCHANGED only if ALL its items are now returned
+                        all_returned = not ex_inv.items.filter(is_returned=False).exists()
+                        if all_returned:
+                            ex_inv.status = SaleInvoice.Status.EXCHANGED
+                            ex_inv.save(update_fields=['status'])
 
                 # Log activity
                 payment_summary = ', '.join([f"{p['method']}: {p['amount']} DH" for p in payment_details]) if payment_details else 'Aucun paiement'
