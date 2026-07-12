@@ -1578,6 +1578,18 @@ def invoice_detail(request, reference):
     # Get all payments associated with this invoice
     invoice_payments = invoice.payments.select_related('payment_method', 'bank_account').all()
 
+    # Exchange credit (reprise) applied TO this invoice — this is how it was "paid"
+    # when the customer traded in items instead of paying cash.
+    exchange_credits = list(
+        invoice.exchange_from.filter(action_type='exchange')
+        .select_related('original_invoice', 'original_product')
+    )
+    exchange_credit_total = sum((a.refund_amount or Decimal('0')) for a in exchange_credits)
+    # Surplus handed back to the customer when the trade-in exceeded the invoice total
+    exchange_surplus = exchange_credit_total - invoice.total_amount
+    if exchange_surplus < 0:
+        exchange_surplus = Decimal('0')
+
     # Get remaining (non-returned) items for partial return handling
     all_items = list(invoice.items.select_related('product__metal_type').all())
     # Compute per-item prix/g and invoice-level total weight + prix/g
@@ -1604,6 +1616,9 @@ def invoice_detail(request, reference):
         'payment_methods': payment_methods,
         'bank_accounts': bank_accounts,
         'invoice_payments': invoice_payments,
+        'exchange_credits': exchange_credits,
+        'exchange_credit_total': exchange_credit_total,
+        'exchange_surplus': exchange_surplus,
         'remaining_items': remaining_items if has_remaining_items else [],
         'remaining_items_count': remaining_items.count() if has_remaining_items else 0,
         'remaining_items_total': remaining_items_total,
@@ -2184,9 +2199,10 @@ def invoice_create(request):
                         pass
 
                 if total_amount_paid > 0:
-                    # SET the amount_paid (not add to it)
-                    invoice.amount_paid = total_amount_paid
-                    invoice.balance_due = invoice.total_amount - total_amount_paid
+                    # SET the amount_paid (capped at total — any trade-in surplus is
+                    # handed back to the customer, not owed to the shop)
+                    invoice.amount_paid = min(total_amount_paid, invoice.total_amount)
+                    invoice.balance_due = invoice.total_amount - invoice.amount_paid
                     invoice.update_status()
                     invoice.save(update_fields=['amount_paid', 'balance_due', 'status'])
 
@@ -2578,7 +2594,8 @@ def bulk_invoice_create(request):
 
                     # Update invoice with total payments
                     if total_amount_paid > 0:
-                        invoice.amount_paid = total_amount_paid
+                        # Cap at total — trade-in surplus is handed back, not owed to the shop
+                        invoice.amount_paid = min(total_amount_paid, invoice.total_amount)
 
                         # Call update_status() to properly set status AND balance_due
                         # This ensures balance_due = 0 when PAID, and correct balance otherwise
@@ -3648,9 +3665,14 @@ def pending_invoice_complete(request, reference):
                             messages.error(request, str(e))
                             return redirect('sales:pending_invoice_complete', reference=reference)
 
-                # Set payment amounts and determine status based on total amount paid
-                invoice.amount_paid = total_amount_paid
-                invoice.balance_due = invoice.total_amount - total_amount_paid
+                # Set payment amounts and determine status based on total amount paid.
+                # Record amount_paid capped at the invoice total: if a trade-in (reprise)
+                # is worth more than the new item, the surplus is handed back to the
+                # customer (cash/virement), so it must NOT inflate the invoice — otherwise
+                # "Total payé" would exceed "Total".
+                recorded_paid = min(total_amount_paid, invoice.total_amount)
+                invoice.amount_paid = recorded_paid
+                invoice.balance_due = invoice.total_amount - recorded_paid
 
                 if total_amount_paid >= invoice.total_amount:
                     invoice.status = SaleInvoice.Status.PAID
