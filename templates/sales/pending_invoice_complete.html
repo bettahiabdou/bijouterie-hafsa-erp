@@ -317,6 +317,11 @@
                         <span style="font-weight: 700; color: var(--warning-700);">Crédit échange total:</span>
                         <strong id="exchange-grand-total" style="font-size: var(--text-lg); color: var(--warning-700);">0.00 DH</strong>
                     </div>
+                    <div id="exchange-surplus-warning" style="display:none; margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--error-50, #fef2f2); border:1px solid var(--error-300, #fca5a5); border-radius: var(--radius-md); color: var(--error-700, #b91c1c); font-size: var(--text-sm);">
+                        <i class="fas fa-triangle-exclamation"></i>
+                        La reprise dépasse le total de la facture de <strong id="exchange-surplus-amount">0.00 DH</strong>.
+                        Cette différence devra être <strong>rendue au client</strong> (espèce / virement) — elle ne sera pas comptée sur la facture.
+                    </div>
                     <input type="hidden" name="exchange_data_json" id="exchange-data-json" value="" form="complete-form">
                 </div>
             </div>
@@ -1453,6 +1458,17 @@
             document.getElementById('exchange-grand-total').textContent = grandTotal.toFixed(2) + ' DH';
             gtRow.style.display = blocks.length ? 'flex' : 'none';
 
+            // Warn when the trade-in is worth more than the new item: the surplus
+            // is handed back to the customer and is NOT recorded on the invoice.
+            var surplusWarn = document.getElementById('exchange-surplus-warning');
+            var surplus = grandTotal - getInvoiceTotal();
+            if (blocks.length && surplus > 0.009) {
+                document.getElementById('exchange-surplus-amount').textContent = surplus.toFixed(2) + ' DH';
+                surplusWarn.style.display = 'block';
+            } else {
+                surplusWarn.style.display = 'none';
+            }
+
             // Payment summary credit line
             if (grandTotal > 0) {
                 document.getElementById('exchange-credit-row').style.display = 'flex';
@@ -1961,6 +1977,20 @@
                 if (!clientSelect || !clientSelect.value) {
                     e.preventDefault();
                     alert('Un client est requis pour le mode "En Stock (Garde)".');
+                    return false;
+                }
+            }
+
+            // Trade-in worth more than the invoice: make the change-given explicit
+            var exSurplus = exchangeAmount - getInvoiceTotal();
+            if (exSurplus > 0.009) {
+                if (!confirm(
+                    'La reprise (' + exchangeAmount.toFixed(2) + ' DH) dépasse le total de la facture ('
+                    + getInvoiceTotal().toFixed(2) + ' DH) de ' + exSurplus.toFixed(2) + ' DH.\n\n'
+                    + 'Cette différence doit être rendue au client (espèce / virement). '
+                    + 'Elle ne sera pas enregistrée sur la facture.\n\nConfirmer ?'
+                )) {
+                    e.preventDefault();
                     return false;
                 }
             }
