@@ -36,6 +36,8 @@ class Command(BaseCommand):
         parser.add_argument('--queue', action='store_true',
                             help="Queue the job for the shop's print agent instead of "
                                  "sending over TCP (use when the printer is on another network)")
+        parser.add_argument('--media', choices=['gap', 'mark', 'continuous'], default='gap',
+                            help="Media sensing for --calibrate (default: gap / die-cut)")
         # Geometry setters (all in mm)
         for opt in ('width', 'height', 'x', 'weight-y', 'size-y', 'ref-y', 'barcode-y'):
             parser.add_argument(f'--{opt}', type=int, help=f"Set {opt} (mm)")
@@ -135,8 +137,10 @@ class Command(BaseCommand):
                 self.stdout.write(extra)
 
         if options['calibrate']:
-            run("Calibration", calibration_zpl, calibrate_printer,
-                "L'imprimante avance le papier pour mesurer l'étiquette et l'espacement.")
+            media = options['media']
+            run("Calibration", lambda: calibration_zpl(media), lambda: calibrate_printer(media),
+                f"Mode média : {media}. L'imprimante avance le papier pour mesurer "
+                "l'étiquette et l'espacement (arrêt à chaque découpe).")
 
         if options['ruler']:
             run("Règle", geometry_ruler_zpl, print_geometry_ruler,

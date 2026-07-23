@@ -312,21 +312,35 @@ def print_test_label(encode_rfid=True):
     return send_to_printer(test_label_zpl(encode_rfid))
 
 
-def calibration_zpl():
+MEDIA_MODES = {
+    'gap': '^MNY',         # die-cut / web gap sensing (default for these labels)
+    'mark': '^MNM',        # black-mark sensing
+    'continuous': '^MNN',  # no gaps
+}
+
+
+def calibration_zpl(media='gap'):
     """
-    ZPL that re-runs the printer's media calibration.
+    ZPL that fixes media registration and re-calibrates.
 
-    Required after changing label stock: the printer must re-learn the label
-    length and gap position, otherwise it keeps using the previous pitch and
-    prints across the gap onto the liner / VOID section.
+    After a label-stock change the printer must (1) be in the right media
+    sensing mode and (2) re-learn the label length + gap, otherwise it feeds a
+    fixed distance and drifts onto the liner / VOID section.
+
+    Steps:
+      ^MNY   set gap (web) sensing so the printer stops at each die-cut gap
+      ^LL    tell it the new label length
+      ^JUS   persist the settings
+      ~JC    run media calibration on the next feed
     """
-    # ~JC = force media calibration on next feed; ^JUS saves settings
-    return "^XA^JUS^XZ\n~JC\n"
+    mn = MEDIA_MODES.get(media, '^MNY')
+    g = get_label_geometry()
+    return f"^XA{mn}^LL{g['ll']}^JUS^XZ\n~JC\n"
 
 
-def calibrate_printer():
+def calibrate_printer(media='gap'):
     """Send a media calibration to the printer (direct TCP)."""
-    return send_to_printer(calibration_zpl())
+    return send_to_printer(calibration_zpl(media))
 
 
 def geometry_ruler_zpl():
