@@ -249,10 +249,19 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=None):
     ref_parts = full_reference.split("-")
     if len(ref_parts) >= 2:
         short_ref = f"{ref_parts[-2]}-{ref_parts[-1]}"
-        barcode_data = short_ref
     else:
         short_ref = ref_parts[-1] if ref_parts else "0000"
-        barcode_data = short_ref
+
+    # The BARCODE encodes the digits only (no hyphen): an all-digit Code128 packs
+    # 2 digits per symbol (subset C), making the barcode ~half as wide as the
+    # hyphenated text. The human-readable line still shows the hyphenated ref.
+    barcode_data = short_ref.replace("-", "")
+
+    # Keep the product's barcode field in sync with the printed value so a scan
+    # (which matches the barcode field exactly) finds the product.
+    if product.barcode != barcode_data:
+        from .models import Product as ProductModel
+        ProductModel.objects.filter(pk=product.pk).update(barcode=barcode_data)
 
     weight_value = product.net_weight or product.gross_weight
     weight = f"{weight_value:.2f}" if weight_value else ""
@@ -289,7 +298,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=None):
 {rfid_commands}^FO{x},{g['weight_y']}^A0N,{f},{fw}^FD{weight}g {purity}^FS
 ^FO{x},{g['size_y']}^A0N,{sf},{sfw}^FDT: {size}cm^FS
 ^FO{x},{g['ref_y']}^A0N,{f},{fw}^FD{short_ref}^FS
-^FO{x},{g['barcode_y']}^BY1^BCN,{bc},N,N,N^FD{barcode_data}^FS
+^FO{x},{g['barcode_y']}^BY1^BCN,{bc},N,N,N,A^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     else:
@@ -300,7 +309,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=None):
 ^LL{g['ll']}
 {rfid_commands}^FO{x},{g['weight_y']}^A0N,{f},{fw}^FD{weight}g {purity}^FS
 ^FO{x},{g['ref_y']}^A0N,{f},{fw}^FD{short_ref}^FS
-^FO{x},{g['barcode_y']}^BY1^BCN,{bc},N,N,N^FD{barcode_data}^FS
+^FO{x},{g['barcode_y']}^BY1^BCN,{bc},N,N,N,A^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
