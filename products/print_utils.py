@@ -184,7 +184,16 @@ def string_to_hex(text, max_bytes=12):
     return hex_str
 
 
-def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
+def rfid_enabled():
+    """Whether to write RFID (from SystemConfig). Off for plain (non-RFID) labels."""
+    try:
+        from settings_app.models import SystemConfig
+        return bool(SystemConfig.get_config().zebra_rfid_enabled)
+    except Exception:
+        return True
+
+
+def generate_product_label_zpl(product, quantity=1, encode_rfid=None):
     """
     Generate ZPL for RFID jewelry hang tag
     Total label: 70x48mm at 8 dpmm (203 DPI) ZD621R = 560×384 dots
@@ -207,6 +216,9 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
         purity = product.metal_purity.name
 
     size = product.size.strip() if product.size else ""
+
+    if encode_rfid is None:
+        encode_rfid = rfid_enabled()
 
     rfid_commands = ""
     if encode_rfid:
@@ -283,9 +295,12 @@ def print_price_tag(product, quantity=1):
     return send_to_printer(zpl)
 
 
-def test_label_zpl(encode_rfid=True):
+def test_label_zpl(encode_rfid=None):
     """Build the ZPL for a sample hang tag (uses the configured geometry)."""
     test_reference = "PRD-TEST-20260210-0001"
+
+    if encode_rfid is None:
+        encode_rfid = rfid_enabled()
 
     rfid_commands = ""
     if encode_rfid:
@@ -307,7 +322,7 @@ def test_label_zpl(encode_rfid=True):
 ^XZ"""
 
 
-def print_test_label(encode_rfid=True):
+def print_test_label(encode_rfid=None):
     """Print a test label for RFID jewelry hang tag (direct TCP)."""
     return send_to_printer(test_label_zpl(encode_rfid))
 

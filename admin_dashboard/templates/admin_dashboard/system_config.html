@@ -162,6 +162,16 @@
                         <span class="checkbox-text">Activer l'imprimante Zebra</span>
                     </label>
                 </div>
+                <div class="form-group form-checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="zebra_rfid_enabled" {% if config.zebra_rfid_enabled %}checked{% endif %}>
+                        <span class="checkbox-text">Encodage RFID</span>
+                    </label>
+                    <p style="font-size: var(--text-xs); color: var(--neutral-500); margin-top: 4px;">
+                        Décochez pour les étiquettes papier simples (sans puce RFID), sinon
+                        l'imprimante RFID marque chaque étiquette « VOID ».
+                    </p>
+                </div>
             </div>
         </div>
 

@@ -42,6 +42,9 @@ class Command(BaseCommand):
                             help="Show how many print jobs are waiting in the queue")
         parser.add_argument('--flush-queue', action='store_true',
                             help="Cancel ALL waiting/stuck print jobs (clears a backlog)")
+        parser.add_argument('--rfid', choices=['on', 'off'],
+                            help="Enable/disable RFID encoding. Turn OFF for plain "
+                                 "(non-RFID) labels, otherwise the printer voids each tag.")
         # Geometry setters (all in mm)
         for opt in ('width', 'height', 'x', 'weight-y', 'size-y', 'ref-y', 'barcode-y'):
             parser.add_argument(f'--{opt}', type=int, help=f"Set {opt} (mm)")
@@ -51,6 +54,18 @@ class Command(BaseCommand):
             get_label_geometry, calibrate_printer, print_geometry_ruler,
             print_test_label, get_printer_settings,
         )
+
+        # --- RFID toggle ---
+        if options.get('rfid'):
+            from settings_app.models import SystemConfig
+            c = SystemConfig.get_config()
+            c.zebra_rfid_enabled = (options['rfid'] == 'on')
+            c.save(update_fields=['zebra_rfid_enabled'])
+            state = "ACTIVÉ" if c.zebra_rfid_enabled else "DÉSACTIVÉ"
+            self.stdout.write(self.style.SUCCESS(f"Encodage RFID {state}."))
+            if not c.zebra_rfid_enabled:
+                self.stdout.write("Les étiquettes ne seront plus 'VOID' sur du support non-RFID.")
+            options['show'] = True
 
         # --- Apply any geometry values passed on the command line ---
         updates = {field: options[key] for key, field in self.SETTERS.items()
@@ -102,7 +117,9 @@ class Command(BaseCommand):
         host, port = get_printer_settings()
 
         if options['show']:
+            from products.print_utils import rfid_enabled
             self.stdout.write("Imprimante : " + (f"{host}:{port}" if host else "non configurée"))
+            self.stdout.write("Encodage RFID : " + ("ACTIVÉ" if rfid_enabled() else "désactivé"))
             self.stdout.write("Géométrie actuelle (Paramètres > Configuration Système) :")
             self.stdout.write(f"   Étiquette     : {mm['width_mm']} x {mm['height_mm']} mm "
                               f"({g['pw']} x {g['ll']} dots @8/mm)")
