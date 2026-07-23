@@ -45,6 +45,12 @@ class Command(BaseCommand):
         parser.add_argument('--rfid', choices=['on', 'off'],
                             help="Enable/disable RFID encoding. Turn OFF for plain "
                                  "(non-RFID) labels, otherwise the printer voids each tag.")
+        parser.add_argument('--rfid-calibrate', action='store_true',
+                            help="Run RFID tag calibration (finds the chip position for "
+                                 "the loaded label — do this after changing RFID stock)")
+        parser.add_argument('--rfid-retries', type=int,
+                            help="Max encode attempts before giving up (lower = fewer "
+                                 "voided labels on failure)")
         # Geometry setters (all in mm)
         for opt in ('width', 'height', 'x', 'weight-y', 'size-y', 'ref-y', 'barcode-y'):
             parser.add_argument(f'--{opt}', type=int, help=f"Set {opt} (mm)")
@@ -55,16 +61,23 @@ class Command(BaseCommand):
             print_test_label, get_printer_settings,
         )
 
-        # --- RFID toggle ---
-        if options.get('rfid'):
+        # --- RFID settings ---
+        if options.get('rfid') or options.get('rfid_retries') is not None:
             from settings_app.models import SystemConfig
             c = SystemConfig.get_config()
-            c.zebra_rfid_enabled = (options['rfid'] == 'on')
-            c.save(update_fields=['zebra_rfid_enabled'])
-            state = "ACTIVÉ" if c.zebra_rfid_enabled else "DÉSACTIVÉ"
-            self.stdout.write(self.style.SUCCESS(f"Encodage RFID {state}."))
-            if not c.zebra_rfid_enabled:
-                self.stdout.write("Les étiquettes ne seront plus 'VOID' sur du support non-RFID.")
+            fields = []
+            if options.get('rfid'):
+                c.zebra_rfid_enabled = (options['rfid'] == 'on')
+                fields.append('zebra_rfid_enabled')
+            if options.get('rfid_retries') is not None:
+                c.zebra_rfid_retries = max(0, options['rfid_retries'])
+                fields.append('zebra_rfid_retries')
+            c.save(update_fields=fields)
+            if 'zebra_rfid_enabled' in fields:
+                state = "ACTIVÉ" if c.zebra_rfid_enabled else "DÉSACTIVÉ"
+                self.stdout.write(self.style.SUCCESS(f"Encodage RFID {state}."))
+            if 'zebra_rfid_retries' in fields:
+                self.stdout.write(self.style.SUCCESS(f"Tentatives RFID : {c.zebra_rfid_retries}."))
             options['show'] = True
 
         # --- Apply any geometry values passed on the command line ---
@@ -106,10 +119,11 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"{n} travail(aux) en attente annulé(s). File vidée."))
             return
 
-        if not any([options['show'], options['calibrate'], options['ruler'], options['test']]):
+        if not any([options['show'], options['calibrate'], options['ruler'],
+                    options['test'], options['rfid_calibrate']]):
             raise CommandError(
-                "Choisir une action : --show, --calibrate, --ruler, --test, "
-                "--queue-status, --flush-queue, ou passer des mesures."
+                "Choisir une action : --show, --calibrate, --rfid-calibrate, --ruler, "
+                "--test, --queue-status, --flush-queue, ou passer des mesures."
             )
 
         g = get_label_geometry()
@@ -163,6 +177,7 @@ class Command(BaseCommand):
 
         from products.print_utils import (
             calibration_zpl, geometry_ruler_zpl, test_label_zpl, queue_zpl,
+            rfid_calibrate_command, send_to_printer,
         )
 
         def run(action_label, zpl_builder, sender, extra=None):
@@ -187,6 +202,12 @@ class Command(BaseCommand):
             run("Calibration", lambda: calibration_zpl(media), lambda: calibrate_printer(media),
                 f"Mode média : {media}. L'imprimante avance le papier pour mesurer "
                 "l'étiquette et l'espacement (arrêt à chaque découpe).")
+
+        if options['rfid_calibrate']:
+            run("Calibration RFID", rfid_calibrate_command,
+                lambda: send_to_printer(rfid_calibrate_command()),
+                "L'imprimante teste plusieurs positions pour localiser la puce du tag "
+                "chargé, puis enregistre la position optimale.")
 
         if options['ruler']:
             run("Règle", geometry_ruler_zpl, print_geometry_ruler,

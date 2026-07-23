@@ -193,6 +193,41 @@ def rfid_enabled():
         return True
 
 
+def rfid_settings():
+    """RFID encoding parameters from SystemConfig."""
+    s = {'retries': 3, 'bank': 2}
+    try:
+        from settings_app.models import SystemConfig
+        c = SystemConfig.get_config()
+        if c.zebra_rfid_retries is not None:
+            s['retries'] = c.zebra_rfid_retries
+        s['bank'] = c.zebra_rfid_bank or 2
+    except Exception:
+        pass
+    return s
+
+
+def rfid_command_block(rfid_hex):
+    """
+    RFID setup + write commands.
+
+    Program position is intentionally NOT forced here: it is set by running
+    RFID tag calibration on the printer (which finds where the chip sits for the
+    loaded label). Forcing a fixed position — e.g. the old 240 dots, which is
+    past the end of a 28 mm / 224-dot label — makes every encode fail and void.
+    """
+    s = rfid_settings()
+    return (
+        f"^RS8,,,{s['retries']},N\n"
+        f"^RFW,H,{s['bank']},12,1^FD{rfid_hex}^FS\n"
+    )
+
+
+def rfid_calibrate_command():
+    """SGD command that runs RFID transponder calibration for the loaded tag."""
+    return '! U1 setvar "rfid.tag.calibrate" "run"\r\n'
+
+
 def generate_product_label_zpl(product, quantity=1, encode_rfid=None):
     """
     Generate ZPL for RFID jewelry hang tag
@@ -226,9 +261,7 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=None):
         if not product.rfid_tag or product.rfid_tag != rfid_hex:
             from .models import Product as ProductModel
             ProductModel.objects.filter(pk=product.pk).update(rfid_tag=rfid_hex)
-        rfid_commands = f"""^RS8,,,10,N,240
-^RFW,H,2,12,1^FD{rfid_hex}^FS
-"""
+        rfid_commands = rfid_command_block(rfid_hex)
 
     # Geometry comes from SystemConfig (mm -> dots), adjustable without code changes
     g = get_label_geometry()
@@ -305,9 +338,7 @@ def test_label_zpl(encode_rfid=None):
     rfid_commands = ""
     if encode_rfid:
         rfid_hex = string_to_hex(test_reference)
-        rfid_commands = f"""^RS8,,,10,N,240
-^RFW,H,2,12,1^FD{rfid_hex}^FS
-"""
+        rfid_commands = rfid_command_block(rfid_hex)
 
     g = get_label_geometry()
     x = g['x']
