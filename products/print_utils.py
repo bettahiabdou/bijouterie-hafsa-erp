@@ -36,6 +36,61 @@ def get_printer_settings():
     return host, port
 
 
+DPMM = 8  # 203 DPI = 8 dots per mm
+
+# Fallback geometry (mm) if SystemConfig is unavailable
+_GEOMETRY_DEFAULTS = {
+    'width_mm': 70,
+    'height_mm': 48,
+    'x_mm': 29,
+    'weight_y_mm': 6,
+    'size_y_mm': 9,
+    'ref_y_mm': 12,
+    'barcode_y_mm': 20,
+}
+
+
+def get_label_geometry():
+    """
+    Label geometry from SystemConfig, in printer dots (8 dpmm).
+
+    Everything is stored in millimetres so the shop can adjust label size and
+    element positions from Settings > Configuration Système when the label
+    stock changes — no code edit needed.
+    """
+    g = dict(_GEOMETRY_DEFAULTS)
+    try:
+        from settings_app.models import SystemConfig
+        c = SystemConfig.get_config()
+        mapping = {
+            'width_mm': 'zebra_label_width',
+            'height_mm': 'zebra_label_height',
+            'x_mm': 'zebra_label_x_mm',
+            'weight_y_mm': 'zebra_label_weight_y_mm',
+            'size_y_mm': 'zebra_label_size_y_mm',
+            'ref_y_mm': 'zebra_label_ref_y_mm',
+            'barcode_y_mm': 'zebra_label_barcode_y_mm',
+        }
+        for key, field in mapping.items():
+            val = getattr(c, field, None)
+            if val:
+                g[key] = val
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning("Label geometry: falling back to defaults")
+
+    return {
+        'pw': int(g['width_mm'] * DPMM),
+        'll': int(g['height_mm'] * DPMM),
+        'x': int(g['x_mm'] * DPMM),
+        'weight_y': int(g['weight_y_mm'] * DPMM),
+        'size_y': int(g['size_y_mm'] * DPMM),
+        'ref_y': int(g['ref_y_mm'] * DPMM),
+        'barcode_y': int(g['barcode_y_mm'] * DPMM),
+        'mm': g,
+    }
+
+
 def send_to_printer(zpl_data):
     """
     Send ZPL data to Zebra printer via TCP
@@ -163,29 +218,30 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=True):
 ^RFW,H,2,12,1^FD{rfid_hex}^FS
 """
 
-    # 70×48mm at 8 dpmm (203 DPI) = 560×384 dots
-    x = 232
+    # Geometry comes from SystemConfig (mm -> dots), adjustable without code changes
+    g = get_label_geometry()
+    x = g['x']
     if size:
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-{rfid_commands}^FO{x},48^A0N,22,20^FD{weight}g {purity}^FS
-^FO{x},74^A0N,16,14^FDT: {size}cm^FS
-^FO{x},94^A0N,22,20^FD{short_ref}^FS
-^FO{x},158^BY1^BCN,50,N,N,N^FD{barcode_data}^FS
+^PW{g['pw']}
+^LL{g['ll']}
+{rfid_commands}^FO{x},{g['weight_y']}^A0N,22,20^FD{weight}g {purity}^FS
+^FO{x},{g['size_y']}^A0N,16,14^FDT: {size}cm^FS
+^FO{x},{g['ref_y']}^A0N,22,20^FD{short_ref}^FS
+^FO{x},{g['barcode_y']}^BY1^BCN,50,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     else:
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-{rfid_commands}^FO{x},58^A0N,24,22^FD{weight}g {purity}^FS
-^FO{x},86^A0N,26,24^FD{short_ref}^FS
-^FO{x},154^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
+^PW{g['pw']}
+^LL{g['ll']}
+{rfid_commands}^FO{x},{g['weight_y']}^A0N,24,22^FD{weight}g {purity}^FS
+^FO{x},{g['ref_y']}^A0N,26,24^FD{short_ref}^FS
+^FO{x},{g['barcode_y']}^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -201,14 +257,15 @@ def generate_price_tag_zpl(product, quantity=1):
     if product.metal_purity:
         purity = product.metal_purity.name
 
-    x = 232
+    g = get_label_geometry()
+    x = g['x']
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-^FO{x},58^A0N,36,30^FD{purity}^FS
-^FO{x},102^A0N,50,45^FD{price}^FS
+^PW{g['pw']}
+^LL{g['ll']}
+^FO{x},{g['weight_y']}^A0N,36,30^FD{purity}^FS
+^FO{x},{g['ref_y']}^A0N,50,45^FD{price}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl
@@ -239,14 +296,47 @@ def print_test_label(encode_rfid=True):
 ^RFW,H,2,12,1^FD{rfid_hex}^FS
 """
 
-    x = 232
+    g = get_label_geometry()
+    x = g['x']
     zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
-^PW560
-^LL384
-{rfid_commands}^FO{x},58^A0N,24,22^FD5.2g 18K^FS
-^FO{x},86^A0N,26,24^FD20260210-0001^FS
-^FO{x},114^BY1^BCN,55,N,N,N^FD20260210-0001^FS
+^PW{g['pw']}
+^LL{g['ll']}
+{rfid_commands}^FO{x},{g['weight_y']}^A0N,24,22^FD5.2g 18K^FS
+^FO{x},{g['ref_y']}^A0N,26,24^FD20260210-0001^FS
+^FO{x},{g['barcode_y']}^BY1^BCN,55,N,N,N^FD20260210-0001^FS
 ^XZ"""
     return send_to_printer(zpl)
+
+
+def calibrate_printer():
+    """
+    Re-run the printer's media calibration.
+
+    Required after changing label stock: the printer must re-learn the label
+    length and gap position, otherwise it keeps using the previous pitch and
+    prints across the gap onto the liner / VOID section.
+    """
+    # ~JC = force media calibration on next feed; ^JUS saves settings
+    return send_to_printer("^XA^JUS^XZ\n~JC\n")
+
+
+def print_geometry_ruler():
+    """
+    Print a diagnostic label with corner marks and a box at the configured
+    label size, so the printed area can be measured against the real stock.
+    """
+    g = get_label_geometry()
+    pw, ll = g['pw'], g['ll']
+    mm = g['mm']
+    return send_to_printer(f"""^XA
+^CI28
+^LH0,0^LT0
+^PW{pw}
+^LL{ll}
+^FO0,0^GB{pw},{ll},2^FS
+^FO8,8^A0N,18,16^FD{mm['width_mm']}x{mm['height_mm']}mm^FS
+^FO{g['x']},{g['weight_y']}^GB60,2,2^FS
+^FO{g['x']},{g['ref_y']}^A0N,18,16^FDX{mm['x_mm']} Y{mm['ref_y_mm']}^FS
+^XZ""")
