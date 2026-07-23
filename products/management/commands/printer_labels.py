@@ -38,6 +38,10 @@ class Command(BaseCommand):
                                  "sending over TCP (use when the printer is on another network)")
         parser.add_argument('--media', choices=['gap', 'mark', 'continuous'], default='gap',
                             help="Media sensing for --calibrate (default: gap / die-cut)")
+        parser.add_argument('--queue-status', action='store_true',
+                            help="Show how many print jobs are waiting in the queue")
+        parser.add_argument('--flush-queue', action='store_true',
+                            help="Cancel ALL waiting/stuck print jobs (clears a backlog)")
         # Geometry setters (all in mm)
         for opt in ('width', 'height', 'x', 'weight-y', 'size-y', 'ref-y', 'barcode-y'):
             parser.add_argument(f'--{opt}', type=int, help=f"Set {opt} (mm)")
@@ -62,10 +66,35 @@ class Command(BaseCommand):
             ))
             options['show'] = True  # always confirm what is now stored
 
+        # --- Queue maintenance (do these first; they don't need a printer) ---
+        from products.models import PrintQueue
+        WAITING = [PrintQueue.Status.PENDING, PrintQueue.Status.PRINTING]
+
+        if options['queue_status']:
+            from django.db.models import Count
+            counts = dict(PrintQueue.objects.values_list('status').annotate(n=Count('id')))
+            self.stdout.write("File d'impression :")
+            for st, label in PrintQueue.Status.choices:
+                self.stdout.write(f"   {label:<12} : {counts.get(st, 0)}")
+            waiting = PrintQueue.objects.filter(status__in=WAITING).count()
+            if waiting:
+                self.stdout.write(self.style.WARNING(
+                    f"\n⚠ {waiting} travail(aux) en attente — ils s'imprimeront tous dès que "
+                    "l'agent interroge la file. Utilisez --flush-queue pour les annuler."))
+            return
+
+        if options['flush_queue']:
+            n = PrintQueue.objects.filter(status__in=WAITING).update(
+                status=PrintQueue.Status.CANCELLED,
+                error_message='Annulé via --flush-queue',
+            )
+            self.stdout.write(self.style.SUCCESS(f"{n} travail(aux) en attente annulé(s). File vidée."))
+            return
+
         if not any([options['show'], options['calibrate'], options['ruler'], options['test']]):
             raise CommandError(
                 "Choisir une action : --show, --calibrate, --ruler, --test, "
-                "ou passer des mesures (--width/--height/--x/--weight-y/...)."
+                "--queue-status, --flush-queue, ou passer des mesures."
             )
 
         g = get_label_geometry()
