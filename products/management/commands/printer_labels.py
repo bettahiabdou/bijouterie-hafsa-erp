@@ -18,11 +18,24 @@ from django.core.management.base import BaseCommand, CommandError
 class Command(BaseCommand):
     help = "Show label geometry, recalibrate the printer, or print a ruler/test label."
 
+    SETTERS = {
+        'width': 'zebra_label_width',
+        'height': 'zebra_label_height',
+        'x': 'zebra_label_x_mm',
+        'weight_y': 'zebra_label_weight_y_mm',
+        'size_y': 'zebra_label_size_y_mm',
+        'ref_y': 'zebra_label_ref_y_mm',
+        'barcode_y': 'zebra_label_barcode_y_mm',
+    }
+
     def add_arguments(self, parser):
         parser.add_argument('--show', action='store_true', help="Show configured geometry")
         parser.add_argument('--calibrate', action='store_true', help="Recalibrate media (after stock change)")
         parser.add_argument('--ruler', action='store_true', help="Print a box at the configured label size")
         parser.add_argument('--test', action='store_true', help="Print a sample label")
+        # Geometry setters (all in mm)
+        for opt in ('width', 'height', 'x', 'weight-y', 'size-y', 'ref-y', 'barcode-y'):
+            parser.add_argument(f'--{opt}', type=int, help=f"Set {opt} (mm)")
 
     def handle(self, *args, **options):
         from products.print_utils import (
@@ -30,8 +43,25 @@ class Command(BaseCommand):
             print_test_label, get_printer_settings,
         )
 
+        # --- Apply any geometry values passed on the command line ---
+        updates = {field: options[key] for key, field in self.SETTERS.items()
+                   if options.get(key) is not None}
+        if updates:
+            from settings_app.models import SystemConfig
+            c = SystemConfig.get_config()
+            for field, value in updates.items():
+                setattr(c, field, value)
+            c.save(update_fields=list(updates.keys()))
+            self.stdout.write(self.style.SUCCESS(
+                "Géométrie enregistrée : " + ", ".join(f"{f}={v}mm" for f, v in updates.items())
+            ))
+            options['show'] = True  # always confirm what is now stored
+
         if not any([options['show'], options['calibrate'], options['ruler'], options['test']]):
-            raise CommandError("Choisir une action : --show, --calibrate, --ruler ou --test.")
+            raise CommandError(
+                "Choisir une action : --show, --calibrate, --ruler, --test, "
+                "ou passer des mesures (--width/--height/--x/--weight-y/...)."
+            )
 
         g = get_label_geometry()
         mm = g['mm']
@@ -47,6 +77,29 @@ class Command(BaseCommand):
             self.stdout.write(f"   Y taille      : {mm['size_y_mm']} mm ({g['size_y']} dots)")
             self.stdout.write(f"   Y référence   : {mm['ref_y_mm']} mm ({g['ref_y']} dots)")
             self.stdout.write(f"   Y code-barres : {mm['barcode_y_mm']} mm ({g['barcode_y']} dots)")
+
+            # Warn about content that falls outside the physical label — this is what
+            # makes the printer spill onto the liner / VOID area.
+            problems = []
+            BARCODE_MM = 7  # ~50-55 dots tall
+            for label, y, extra in (
+                ('poids', mm['weight_y_mm'], 3),
+                ('taille', mm['size_y_mm'], 3),
+                ('référence', mm['ref_y_mm'], 4),
+                ('code-barres', mm['barcode_y_mm'], BARCODE_MM),
+            ):
+                if y + extra > mm['height_mm']:
+                    problems.append(f"{label} finit à ~{y + extra}mm > hauteur {mm['height_mm']}mm")
+            if mm['x_mm'] >= mm['width_mm']:
+                problems.append(f"X {mm['x_mm']}mm >= largeur {mm['width_mm']}mm")
+            if problems:
+                self.stdout.write(self.style.ERROR(
+                    "\n⚠ Contenu hors étiquette — l'impression débordera sur le VOID :"))
+                for p in problems:
+                    self.stdout.write(self.style.ERROR(f"     - {p}"))
+                self.stdout.write("   Corrigez avec --barcode-y / --ref-y / --height, puis --calibrate.")
+            else:
+                self.stdout.write(self.style.SUCCESS("\n✓ Tout le contenu tient dans l'étiquette."))
             return
 
         if not host:
