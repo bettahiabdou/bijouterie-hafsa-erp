@@ -283,10 +283,8 @@ def print_price_tag(product, quantity=1):
     return send_to_printer(zpl)
 
 
-def print_test_label(encode_rfid=True):
-    """Print a test label for RFID jewelry hang tag — 70x48mm
-    Also encodes RFID with test reference if encode_rfid=False
-    """
+def test_label_zpl(encode_rfid=True):
+    """Build the ZPL for a sample hang tag (uses the configured geometry)."""
     test_reference = "PRD-TEST-20260210-0001"
 
     rfid_commands = ""
@@ -298,7 +296,7 @@ def print_test_label(encode_rfid=True):
 
     g = get_label_geometry()
     x = g['x']
-    zpl = f"""^XA
+    return f"""^XA
 ^CI28
 ^LH0,0^LT0
 ^PW{g['pw']}
@@ -307,30 +305,39 @@ def print_test_label(encode_rfid=True):
 ^FO{x},{g['ref_y']}^A0N,26,24^FD20260210-0001^FS
 ^FO{x},{g['barcode_y']}^BY1^BCN,55,N,N,N^FD20260210-0001^FS
 ^XZ"""
-    return send_to_printer(zpl)
 
 
-def calibrate_printer():
+def print_test_label(encode_rfid=True):
+    """Print a test label for RFID jewelry hang tag (direct TCP)."""
+    return send_to_printer(test_label_zpl(encode_rfid))
+
+
+def calibration_zpl():
     """
-    Re-run the printer's media calibration.
+    ZPL that re-runs the printer's media calibration.
 
     Required after changing label stock: the printer must re-learn the label
     length and gap position, otherwise it keeps using the previous pitch and
     prints across the gap onto the liner / VOID section.
     """
     # ~JC = force media calibration on next feed; ^JUS saves settings
-    return send_to_printer("^XA^JUS^XZ\n~JC\n")
+    return "^XA^JUS^XZ\n~JC\n"
 
 
-def print_geometry_ruler():
+def calibrate_printer():
+    """Send a media calibration to the printer (direct TCP)."""
+    return send_to_printer(calibration_zpl())
+
+
+def geometry_ruler_zpl():
     """
-    Print a diagnostic label with corner marks and a box at the configured
-    label size, so the printed area can be measured against the real stock.
+    ZPL for a diagnostic label: a box at the configured label size, so the
+    printed area can be measured against the real stock.
     """
     g = get_label_geometry()
     pw, ll = g['pw'], g['ll']
     mm = g['mm']
-    return send_to_printer(f"""^XA
+    return f"""^XA
 ^CI28
 ^LH0,0^LT0
 ^PW{pw}
@@ -339,4 +346,27 @@ def print_geometry_ruler():
 ^FO8,8^A0N,18,16^FD{mm['width_mm']}x{mm['height_mm']}mm^FS
 ^FO{g['x']},{g['weight_y']}^GB60,2,2^FS
 ^FO{g['x']},{g['ref_y']}^A0N,18,16^FDX{mm['x_mm']} Y{mm['ref_y_mm']}^FS
-^XZ""")
+^XZ"""
+
+
+def print_geometry_ruler():
+    """Print the geometry ruler label (direct TCP)."""
+    return send_to_printer(geometry_ruler_zpl())
+
+
+def queue_zpl(zpl, label_type='test', quantity=1, user=None):
+    """
+    Put raw ZPL into the print queue instead of sending it over TCP.
+
+    Used when the printer is on a different network from the server: the local
+    print agent in the shop polls the queue and forwards jobs to the printer.
+    """
+    from .models import PrintQueue
+    job = PrintQueue.objects.create(
+        label_type=label_type,
+        quantity=quantity,
+        zpl_data=zpl,
+        status=PrintQueue.Status.PENDING,
+        created_by=user,
+    )
+    return job

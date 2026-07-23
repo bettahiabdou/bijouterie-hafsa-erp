@@ -33,6 +33,9 @@ class Command(BaseCommand):
         parser.add_argument('--calibrate', action='store_true', help="Recalibrate media (after stock change)")
         parser.add_argument('--ruler', action='store_true', help="Print a box at the configured label size")
         parser.add_argument('--test', action='store_true', help="Print a sample label")
+        parser.add_argument('--queue', action='store_true',
+                            help="Queue the job for the shop's print agent instead of "
+                                 "sending over TCP (use when the printer is on another network)")
         # Geometry setters (all in mm)
         for opt in ('width', 'height', 'x', 'weight-y', 'size-y', 'ref-y', 'barcode-y'):
             parser.add_argument(f'--{opt}', type=int, help=f"Set {opt} (mm)")
@@ -102,22 +105,49 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS("\n✓ Tout le contenu tient dans l'étiquette."))
             return
 
-        if not host:
-            raise CommandError("Aucune imprimante configurée (Paramètres > Configuration Système).")
+        use_queue = options['queue']
+
+        if not host and not use_queue:
+            raise CommandError(
+                "Aucune imprimante configurée (Paramètres > Configuration Système).\n"
+                "Si l'imprimante est sur un autre réseau, utilisez --queue."
+            )
+
+        from products.print_utils import (
+            calibration_zpl, geometry_ruler_zpl, test_label_zpl, queue_zpl,
+        )
+
+        def run(action_label, zpl_builder, sender, extra=None):
+            if use_queue:
+                job = queue_zpl(zpl_builder())
+                self.stdout.write(self.style.SUCCESS(
+                    f"{action_label} : mis en file d'attente (job #{job.id})."))
+            else:
+                ok, msg = sender()
+                style = self.style.SUCCESS if ok else self.style.ERROR
+                self.stdout.write(style(f"{action_label} : {msg}"))
+                if not ok:
+                    self.stdout.write(self.style.WARNING(
+                        "  L'imprimante n'est pas joignable depuis le serveur. "
+                        "Relancez avec --queue pour passer par l'agent de la boutique."))
+                    return
+            if extra:
+                self.stdout.write(extra)
 
         if options['calibrate']:
-            ok, msg = calibrate_printer()
-            style = self.style.SUCCESS if ok else self.style.ERROR
-            self.stdout.write(style(f"Calibration : {msg}"))
-            self.stdout.write("L'imprimante avance le papier pour mesurer l'étiquette et l'espacement.")
+            run("Calibration", calibration_zpl, calibrate_printer,
+                "L'imprimante avance le papier pour mesurer l'étiquette et l'espacement.")
 
         if options['ruler']:
-            ok, msg = print_geometry_ruler()
-            style = self.style.SUCCESS if ok else self.style.ERROR
-            self.stdout.write(style(f"Règle imprimée : {msg}"))
-            self.stdout.write(f"Mesurez le cadre : il doit faire {mm['width_mm']} x {mm['height_mm']} mm.")
+            run("Règle", geometry_ruler_zpl, print_geometry_ruler,
+                f"Mesurez le cadre : il doit faire {mm['width_mm']} x {mm['height_mm']} mm.")
 
         if options['test']:
-            ok, msg = print_test_label()
-            style = self.style.SUCCESS if ok else self.style.ERROR
-            self.stdout.write(style(f"Étiquette test : {msg}"))
+            run("Étiquette test", test_label_zpl, print_test_label)
+
+        if use_queue:
+            self.stdout.write(
+                "\nLes travaux seront envoyés à l'imprimante dès que l'agent "
+                "d'impression de la boutique interrogera la file "
+                "(page File d'impression / /products/print-queue/)."
+            )
