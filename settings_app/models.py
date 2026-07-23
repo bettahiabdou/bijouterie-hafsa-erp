@@ -749,6 +749,17 @@ class SystemConfig(models.Model):
         default=31,
         help_text=_('Position verticale du code-barres')
     )
+    # Font / barcode sizing (in dots)
+    zebra_label_font_size = models.PositiveIntegerField(
+        _('Taille police (dots)'),
+        default=24,
+        help_text=_('Hauteur de la police du texte (poids, référence) en dots')
+    )
+    zebra_label_barcode_height = models.PositiveIntegerField(
+        _('Hauteur code-barres (dots)'),
+        default=55,
+        help_text=_('Hauteur du code-barres en dots')
+    )
     # RFID encoding settings
     zebra_rfid_enabled = models.BooleanField(
         _('Encodage RFID activé'),

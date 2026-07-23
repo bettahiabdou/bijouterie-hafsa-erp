@@ -47,6 +47,8 @@ _GEOMETRY_DEFAULTS = {
     'size_y_mm': 9,
     'ref_y_mm': 12,
     'barcode_y_mm': 20,
+    'font_size': 24,       # dots
+    'barcode_height': 55,  # dots
 }
 
 
@@ -70,6 +72,8 @@ def get_label_geometry():
             'size_y_mm': 'zebra_label_size_y_mm',
             'ref_y_mm': 'zebra_label_ref_y_mm',
             'barcode_y_mm': 'zebra_label_barcode_y_mm',
+            'font_size': 'zebra_label_font_size',
+            'barcode_height': 'zebra_label_barcode_height',
         }
         for key, field in mapping.items():
             val = getattr(c, field, None)
@@ -79,6 +83,8 @@ def get_label_geometry():
         import logging
         logging.getLogger(__name__).warning("Label geometry: falling back to defaults")
 
+    font = int(g['font_size'])
+    small = max(12, font - 8)  # the smaller "T: size" line
     return {
         'pw': int(g['width_mm'] * DPMM),
         'll': int(g['height_mm'] * DPMM),
@@ -87,6 +93,11 @@ def get_label_geometry():
         'size_y': int(g['size_y_mm'] * DPMM),
         'ref_y': int(g['ref_y_mm'] * DPMM),
         'barcode_y': int(g['barcode_y_mm'] * DPMM),
+        'font': font,
+        'font_w': max(1, font - 2),
+        'font_small': small,
+        'font_small_w': max(1, small - 2),
+        'barcode_h': int(g['barcode_height']),
         'mm': g,
     }
 
@@ -266,16 +277,19 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=None):
     # Geometry comes from SystemConfig (mm -> dots), adjustable without code changes
     g = get_label_geometry()
     x = g['x']
+    f, fw = g['font'], g['font_w']
+    sf, sfw = g['font_small'], g['font_small_w']
+    bc = g['barcode_h']
     if size:
         zpl = f"""^XA
 ^CI28
 ^LH0,0^LT0
 ^PW{g['pw']}
 ^LL{g['ll']}
-{rfid_commands}^FO{x},{g['weight_y']}^A0N,22,20^FD{weight}g {purity}^FS
-^FO{x},{g['size_y']}^A0N,16,14^FDT: {size}cm^FS
-^FO{x},{g['ref_y']}^A0N,22,20^FD{short_ref}^FS
-^FO{x},{g['barcode_y']}^BY1^BCN,50,N,N,N^FD{barcode_data}^FS
+{rfid_commands}^FO{x},{g['weight_y']}^A0N,{f},{fw}^FD{weight}g {purity}^FS
+^FO{x},{g['size_y']}^A0N,{sf},{sfw}^FDT: {size}cm^FS
+^FO{x},{g['ref_y']}^A0N,{f},{fw}^FD{short_ref}^FS
+^FO{x},{g['barcode_y']}^BY1^BCN,{bc},N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     else:
@@ -284,9 +298,9 @@ def generate_product_label_zpl(product, quantity=1, encode_rfid=None):
 ^LH0,0^LT0
 ^PW{g['pw']}
 ^LL{g['ll']}
-{rfid_commands}^FO{x},{g['weight_y']}^A0N,24,22^FD{weight}g {purity}^FS
-^FO{x},{g['ref_y']}^A0N,26,24^FD{short_ref}^FS
-^FO{x},{g['barcode_y']}^BY1^BCN,55,N,N,N^FD{barcode_data}^FS
+{rfid_commands}^FO{x},{g['weight_y']}^A0N,{f},{fw}^FD{weight}g {purity}^FS
+^FO{x},{g['ref_y']}^A0N,{f},{fw}^FD{short_ref}^FS
+^FO{x},{g['barcode_y']}^BY1^BCN,{bc},N,N,N^FD{barcode_data}^FS
 ^PQ{quantity}
 ^XZ"""
     return zpl

@@ -26,6 +26,8 @@ class Command(BaseCommand):
         'size_y': 'zebra_label_size_y_mm',
         'ref_y': 'zebra_label_ref_y_mm',
         'barcode_y': 'zebra_label_barcode_y_mm',
+        'font_size': 'zebra_label_font_size',
+        'barcode_height': 'zebra_label_barcode_height',
     }
 
     def add_arguments(self, parser):
@@ -51,9 +53,12 @@ class Command(BaseCommand):
         parser.add_argument('--rfid-retries', type=int,
                             help="Max encode attempts before giving up (lower = fewer "
                                  "voided labels on failure)")
-        # Geometry setters (all in mm)
+        # Geometry setters (positions in mm)
         for opt in ('width', 'height', 'x', 'weight-y', 'size-y', 'ref-y', 'barcode-y'):
             parser.add_argument(f'--{opt}', type=int, help=f"Set {opt} (mm)")
+        # Sizing setters (in dots)
+        parser.add_argument('--font-size', type=int, help="Text height in dots (smaller = smaller font)")
+        parser.add_argument('--barcode-height', type=int, help="Barcode height in dots")
 
     def handle(self, *args, **options):
         from products.print_utils import (
@@ -89,8 +94,10 @@ class Command(BaseCommand):
             for field, value in updates.items():
                 setattr(c, field, value)
             c.save(update_fields=list(updates.keys()))
+            def _unit(field):
+                return ' dots' if field in ('zebra_label_font_size', 'zebra_label_barcode_height') else 'mm'
             self.stdout.write(self.style.SUCCESS(
-                "Géométrie enregistrée : " + ", ".join(f"{f}={v}mm" for f, v in updates.items())
+                "Géométrie enregistrée : " + ", ".join(f"{f}={v}{_unit(f)}" for f, v in updates.items())
             ))
             options['show'] = True  # always confirm what is now stored
 
@@ -142,11 +149,13 @@ class Command(BaseCommand):
             self.stdout.write(f"   Y taille      : {mm['size_y_mm']} mm ({g['size_y']} dots)")
             self.stdout.write(f"   Y référence   : {mm['ref_y_mm']} mm ({g['ref_y']} dots)")
             self.stdout.write(f"   Y code-barres : {mm['barcode_y_mm']} mm ({g['barcode_y']} dots)")
+            self.stdout.write(f"   Police texte  : {g['font']} dots")
+            self.stdout.write(f"   Hauteur c-b   : {g['barcode_h']} dots")
 
             # Warn about content that falls outside the physical label — this is what
             # makes the printer spill onto the liner / VOID area.
             problems = []
-            BARCODE_MM = 7  # ~50-55 dots tall
+            BARCODE_MM = max(3, round(g['barcode_h'] / 8))  # dots -> mm
             for label, y, extra in (
                 ('poids', mm['weight_y_mm'], 3),
                 ('taille', mm['size_y_mm'], 3),
