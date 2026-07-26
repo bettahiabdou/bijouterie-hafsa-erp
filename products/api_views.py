@@ -175,9 +175,12 @@ def rfid_batch_check(request):
         LIST_CAP = 500
         missing_count = missing_qs.count()
         missing_serializer = ProductRFIDLiteSerializer(missing_qs[:LIST_CAP], many=True)
+        found_products = [found_map[e] for e in found][:LIST_CAP]
+        found_serializer = ProductRFIDLiteSerializer(found_products, many=True)
 
         return Response({
-            'found': [],  # details omitted to keep the response small — see found_count
+            'found': found_serializer.data,
+            'found_truncated': len(found) > LIST_CAP,
             'missing': missing_serializer.data,
             'missing_truncated': missing_count > LIST_CAP,
             'unknown_epcs': unknown[:LIST_CAP],
