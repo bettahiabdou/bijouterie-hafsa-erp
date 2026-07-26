@@ -463,6 +463,8 @@ def purchase_invoice_detail(request, reference):
             metal_types = request.POST.getlist('product_metal_type')
             purities_list = request.POST.getlist('product_purity')
             sizes = request.POST.getlist('product_size')
+            jewelry_type_ids = request.POST.getlist('product_jewelry_type')
+            nature_ids = request.POST.getlist('product_nature')
 
             created_count = 0
             errors = []
@@ -481,6 +483,8 @@ def purchase_invoice_detail(request, reference):
                     metal_type_id = metal_types[i] if i < len(metal_types) else ''
                     purity_id = purities_list[i] if i < len(purities_list) else ''
                     size = sizes[i] if i < len(sizes) else ''
+                    jewelry_type_id = jewelry_type_ids[i] if i < len(jewelry_type_ids) else ''
+                    nature_id = nature_ids[i] if i < len(nature_ids) else ''
 
                     # Get related objects
                     category = ProductCategory.objects.filter(pk=category_id).first() if category_id else None
@@ -516,6 +520,8 @@ def purchase_invoice_detail(request, reference):
                         name=name or f'Produit {invoice.reference}',
                         category=category,
                         product_type=product_type,
+                        jewelry_type_id=jewelry_type_id if jewelry_type_id else None,
+                        nature_id=nature_id if nature_id else None,
                         metal_type=metal_type,
                         metal_purity=metal_purity,
                         gross_weight=net_weight,
@@ -848,10 +854,15 @@ def purchase_invoice_detail(request, reference):
     ).all()
 
     # Get data for bulk product creation modal
-    from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount, PaymentMethod
+    from settings_app.models import (
+        ProductCategory, MetalType, MetalPurity, BankAccount, PaymentMethod,
+        JewelryType, ProductNature,
+    )
     categories = ProductCategory.objects.filter(is_active=True)
     metals = MetalType.objects.all()
     purities = MetalPurity.objects.all()
+    jewelry_types = JewelryType.objects.filter(is_active=True)
+    natures = ProductNature.objects.filter(is_active=True)
     bank_accounts = BankAccount.objects.filter(is_active=True)
     product_types = Product.ProductType.choices
     payment_methods = PaymentMethod.objects.filter(is_active=True)
@@ -883,6 +894,8 @@ def purchase_invoice_detail(request, reference):
         'categories': categories,
         'metals': metals,
         'purities': purities,
+        'jewelry_types': jewelry_types,
+        'natures': natures,
         'bank_accounts': bank_accounts,
         'product_types': product_types,
     }

@@ -1629,6 +1629,8 @@
                                         <th>Catégorie *</th>
                                         <th>Métal *</th>
                                         <th>Pureté *</th>
+                                        <th>Type bijou</th>
+                                        <th>Nature</th>
                                         <th>Poids (g) *</th>
                                         <th>Coût</th>
                                         <th>Prix Vente</th>
@@ -1661,6 +1663,22 @@
                                                 <option value="">--</option>
                                                 {% for purity in purities %}
                                                     <option value="{{ purity.id }}">{{ purity.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select name="product_jewelry_type" class="form-select" style="min-width: 100px;">
+                                                <option value="">--</option>
+                                                {% for jt in jewelry_types %}
+                                                    <option value="{{ jt.id }}">{{ jt.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select name="product_nature" class="form-select" style="min-width: 100px;">
+                                                <option value="">--</option>
+                                                {% for n in natures %}
+                                                    <option value="{{ n.id }}">{{ n.name }}</option>
                                                 {% endfor %}
                                             </select>
                                         </td>
@@ -1733,6 +1751,22 @@
                     <option value="">--</option>
                     {% for purity in purities %}
                         <option value="{{ purity.id }}">{{ purity.name }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select name="product_jewelry_type" class="form-select" style="min-width: 100px;">
+                    <option value="">--</option>
+                    {% for jt in jewelry_types %}
+                        <option value="{{ jt.id }}">{{ jt.name }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select name="product_nature" class="form-select" style="min-width: 100px;">
+                    <option value="">--</option>
+                    {% for n in natures %}
+                        <option value="{{ n.id }}">{{ n.name }}</option>
                     {% endfor %}
                 </select>
             </td>
