@@ -16,6 +16,7 @@ import logging
 from .models import Product, RFIDInventorySession
 from .api_serializers import (
     ProductRFIDSerializer,
+    ProductRFIDLiteSerializer,
     RFIDInventorySessionSerializer,
     RFIDInventorySessionDetailSerializer,
 )
@@ -159,28 +160,22 @@ def rfid_batch_check(request):
             else:
                 unknown.append(epc)
 
-        found_serializer = ProductRFIDSerializer(
-            [found_map[e] for e in found],
-            many=True,
-            context={'request': request},
-        )
-
         # Missing = available products with RFID tags that were NOT scanned
         found_ids = [p.id for p in found_map.values()]
         expected_qs = Product.objects.filter(
             status='available',
             rfid_tag__isnull=False,
-        ).exclude(rfid_tag='').select_related('category', 'metal_purity')
+        ).exclude(rfid_tag='')
         missing_qs = expected_qs.exclude(id__in=found_ids)
 
-        missing_serializer = ProductRFIDSerializer(
-            missing_qs,
-            many=True,
-            context={'request': request},
-        )
+        # Lightweight payload only: the handheld cannot move a multi-MB response
+        # across its Binder boundary. The 'found' items (everything present) are
+        # not actionable for a stock check, so we send only their count; the
+        # actionable data (missing + unknown) is sent lightweight.
+        missing_serializer = ProductRFIDLiteSerializer(missing_qs, many=True)
 
         return Response({
-            'found': found_serializer.data,
+            'found': [],  # details omitted to keep the response small — see found_count
             'missing': missing_serializer.data,
             'unknown_epcs': unknown,
             'expected_count': expected_qs.count(),

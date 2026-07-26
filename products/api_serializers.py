@@ -32,6 +32,20 @@ class ProductRFIDSerializer(serializers.ModelSerializer):
         return None
 
 
+class ProductRFIDLiteSerializer(serializers.ModelSerializer):
+    """
+    Minimal product fields for RFID inventory results.
+
+    The full serializer (with image URLs, weights, prices, category/purity) makes
+    a batch-check response several MB; the Chainway handheld then fails to move it
+    across its Binder boundary (~1 MB limit) and shows "Failure from system".
+    This keeps only what's needed to identify an item on a shelf.
+    """
+    class Meta:
+        model = Product
+        fields = ['id', 'reference', 'name', 'rfid_tag', 'barcode', 'status']
+
+
 class RFIDInventorySessionSerializer(serializers.ModelSerializer):
     started_by_name = serializers.CharField(source='started_by.get_full_name', read_only=True, default='')
     location_name = serializers.CharField(source='location.name', read_only=True, default='')
@@ -48,8 +62,10 @@ class RFIDInventorySessionSerializer(serializers.ModelSerializer):
 
 
 class RFIDInventorySessionDetailSerializer(RFIDInventorySessionSerializer):
-    found_products = ProductRFIDSerializer(many=True, read_only=True)
-    missing_products = ProductRFIDSerializer(many=True, read_only=True)
+    # Lite serializers: a full session with thousands of products would exceed
+    # the handheld's Binder transaction limit (same crash as batch-check).
+    found_products = ProductRFIDLiteSerializer(many=True, read_only=True)
+    missing_products = ProductRFIDLiteSerializer(many=True, read_only=True)
 
     class Meta(RFIDInventorySessionSerializer.Meta):
         fields = RFIDInventorySessionSerializer.Meta.fields + [
