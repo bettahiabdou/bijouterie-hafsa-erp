@@ -56,13 +56,32 @@ def generate_reference(prefix, model_class=None, date_based=True):
 
 def generate_client_code(first_name='', last_name=''):
     """
-    Generate a unique client code
-    Format: CLI-YYYYMMDD-####
+    Generate a unique client code. Format: CLI-YYYYMMDD-####
+
+    Uses the highest existing sequence for today's prefix (not a count, which
+    reuses numbers when a client was deleted) and then bumps past any code that
+    already exists, so it never collides with clients_client_code_key.
     """
     from clients.models import Client
     today = timezone.now().date()
-    count = Client.objects.filter(created_at__date=today).count() + 1
-    return f'CLI-{today.strftime("%Y%m%d")}-{count:04d}'
+    prefix = f'CLI-{today.strftime("%Y%m%d")}-'
+
+    max_seq = 0
+    for code in Client.objects.filter(code__startswith=prefix).values_list('code', flat=True):
+        try:
+            n = int(code.rsplit('-', 1)[-1])
+        except (ValueError, IndexError):
+            continue
+        if n > max_seq:
+            max_seq = n
+
+    seq = max_seq + 1
+    candidate = f'{prefix}{seq:04d}'
+    # Guard against gaps / races: never return a code that already exists
+    while Client.objects.filter(code=candidate).exists():
+        seq += 1
+        candidate = f'{prefix}{seq:04d}'
+    return candidate
 
 
 def generate_supplier_code():

@@ -175,10 +175,22 @@ class Client(models.Model):
         return False
 
     def save(self, *args, **kwargs):
+        from utils import generate_client_code
         # Auto-generate client code if not present
         if not self.code:
-            from utils import generate_client_code
             self.code = generate_client_code(self.first_name, self.last_name)
+        # Retry on the rare concurrent-create collision on the unique code
+        if not self.pk:
+            from django.db import IntegrityError, transaction
+            for _ in range(5):
+                try:
+                    with transaction.atomic():
+                        super().save(*args, **kwargs)
+                    return
+                except IntegrityError as e:
+                    if 'code' not in str(e).lower():
+                        raise
+                    self.code = generate_client_code(self.first_name, self.last_name)
         super().save(*args, **kwargs)
 
 
