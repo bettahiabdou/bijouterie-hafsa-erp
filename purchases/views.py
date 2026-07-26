@@ -538,6 +538,26 @@ def purchase_invoice_detail(request, reference):
                     )
                     product.save()
 
+                    # Optional per-row product photo(s)
+                    try:
+                        from products.models import ProductImage
+                        from products.views import convert_image_to_jpeg
+                        row_images = request.FILES.getlist(f'product_image_{i}')
+                        for img_idx, img_file in enumerate(row_images):
+                            converted = convert_image_to_jpeg(img_file)
+                            p_img = ProductImage.objects.create(
+                                product=product,
+                                image=converted,
+                                is_primary=(img_idx == 0),
+                                display_order=img_idx,
+                            )
+                            if img_idx == 0:
+                                product.main_image = p_img.image
+                                product.save(update_fields=['main_image'])
+                    except Exception:
+                        import logging
+                        logging.getLogger(__name__).exception('Batch product image upload failed')
+
                     # Create invoice item linked to product
                     PurchaseInvoiceItem.objects.create(
                         invoice=invoice,
