@@ -14,17 +14,48 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+def _get_telegram_config():
+    """
+    Return (bot_token, chat_ids_str, enabled).
+
+    Recipients and token come from SystemConfig (editable in Settings >
+    Configuration Système — no terminal needed); environment variables are used
+    only as a fallback when the DB values are empty.
+    """
+    token = ''
+    chat_ids_str = ''
+    enabled = True
+    try:
+        from settings_app.models import SystemConfig
+        cfg = SystemConfig.get_config()
+        token = (cfg.telegram_bot_token or '').strip()
+        chat_ids_str = (cfg.telegram_chat_id or '').strip()
+        enabled = bool(cfg.telegram_enabled)
+    except Exception:
+        logger.warning("Telegram: could not read SystemConfig, using env fallback")
+
+    if not token:
+        token = (getattr(settings, 'TELEGRAM_BOT_TOKEN', '') or '').strip()
+    if not chat_ids_str:
+        chat_ids_str = (getattr(settings, 'TELEGRAM_ADMIN_CHAT_ID', '') or '').strip()
+    return token, chat_ids_str, enabled
+
+
 def notify_admin_new_sale(invoice):
     """
     Send a Telegram notification to all admins about a new/completed sale.
     Sends invoice photos (if any) with sale details as caption.
-    Supports multiple admin chat IDs (comma-separated in TELEGRAM_ADMIN_CHAT_ID).
+    Recipients come from SystemConfig.telegram_chat_id (comma-separated for
+    multiple admins), editable from the Settings page.
 
     Args:
         invoice: SaleInvoice instance (should have items, photos, payments prefetched ideally)
     """
-    bot_token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
-    admin_chat_ids_str = getattr(settings, 'TELEGRAM_ADMIN_CHAT_ID', '')
+    bot_token, admin_chat_ids_str, enabled = _get_telegram_config()
+
+    if not enabled:
+        logger.info("Telegram admin notification skipped: notifications disabled")
+        return
 
     if not bot_token or not admin_chat_ids_str:
         logger.warning("Telegram admin notification skipped: missing bot token or admin chat ID")

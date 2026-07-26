@@ -688,9 +688,9 @@ class SystemConfig(models.Model):
     )
     telegram_chat_id = models.CharField(
         _('Chat ID Telegram'),
-        max_length=50,
+        max_length=500,
         blank=True,
-        help_text=_('ID du chat/groupe pour recevoir les notifications')
+        help_text=_('ID(s) de chat pour recevoir les ventes. Séparez plusieurs admins par des virgules.')
     )
     telegram_enabled = models.BooleanField(
         _('Telegram activé'),

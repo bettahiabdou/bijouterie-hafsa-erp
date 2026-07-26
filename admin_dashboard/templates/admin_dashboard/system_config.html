@@ -59,10 +59,14 @@
                         <p class="form-help">Obtenez-le via @BotFather sur Telegram</p>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Chat ID</label>
+                        <label class="form-label">Chat ID(s) admin</label>
                         <input type="text" name="telegram_chat_id" value="{{ form.telegram_chat_id.value|default:'' }}"
-                            class="form-input" placeholder="-100123456789">
-                        <p class="form-help">ID du groupe ou chat pour les notifications</p>
+                            class="form-input" placeholder="123456789, 987654321, -100123456789">
+                        <p class="form-help">
+                            Qui reçoit les ventes. Séparez plusieurs admins par des virgules.
+                            Chaque personne écrit à <strong>@userinfobot</strong> sur Telegram pour obtenir son ID,
+                            puis colle-le ici (elle doit aussi avoir écrit une fois au bot du magasin).
+                        </p>
                     </div>
                 </div>
                 <div class="form-group form-checkbox-group">
