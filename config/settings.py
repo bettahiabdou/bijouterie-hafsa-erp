@@ -182,9 +182,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # Login/Logout URLs
-LOGIN_URL = 'users:login'
+# The login route is defined at the project root as name='login' (/login/).
+# 'users:login' does not exist, so using it made @login_required views raise
+# NoReverseMatch (HTTP 500) instead of redirecting when unauthenticated.
+LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
-LOGOUT_REDIRECT_URL = 'users:login'
+LOGOUT_REDIRECT_URL = 'login'
 
 
 # Session settings
