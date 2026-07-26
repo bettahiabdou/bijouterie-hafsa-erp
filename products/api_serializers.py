@@ -20,11 +20,15 @@ class ProductRFIDSerializer(serializers.ModelSerializer):
         ]
 
     def get_main_image_url(self, obj):
-        if obj.main_image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.main_image.url)
-            return obj.main_image.url
+        # A missing/broken image file must never break the whole inventory response
+        try:
+            if obj.main_image:
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(obj.main_image.url)
+                return obj.main_image.url
+        except Exception:
+            return None
         return None
 
 

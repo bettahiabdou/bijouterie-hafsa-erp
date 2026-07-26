@@ -11,12 +11,16 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+import logging
+
 from .models import Product, RFIDInventorySession
 from .api_serializers import (
     ProductRFIDSerializer,
     RFIDInventorySessionSerializer,
     RFIDInventorySessionDetailSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _find_product_by_epc(epc):
@@ -140,49 +144,56 @@ def rfid_batch_check(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Normalize to uppercase
-    epcs_upper = [e.strip().upper() for e in epcs if isinstance(e, str)]
+    try:
+        # Normalize to uppercase
+        epcs_upper = [e.strip().upper() for e in epcs if isinstance(e, str)]
 
-    # Find all matching products (handles PC-word offset)
-    found_map = _batch_find_products(epcs_upper)
+        # Find all matching products (handles PC-word offset)
+        found_map = _batch_find_products(epcs_upper)
 
-    found = []
-    unknown = []
-    for epc in epcs_upper:
-        if epc in found_map:
-            found.append(epc)
-        else:
-            unknown.append(epc)
+        found = []
+        unknown = []
+        for epc in epcs_upper:
+            if epc in found_map:
+                found.append(epc)
+            else:
+                unknown.append(epc)
 
-    found_serializer = ProductRFIDSerializer(
-        [found_map[e] for e in found],
-        many=True,
-        context={'request': request},
-    )
+        found_serializer = ProductRFIDSerializer(
+            [found_map[e] for e in found],
+            many=True,
+            context={'request': request},
+        )
 
-    # Missing = available products with RFID tags that were NOT scanned
-    found_ids = [p.id for p in found_map.values()]
-    expected_qs = Product.objects.filter(
-        status='available',
-        rfid_tag__isnull=False,
-    ).exclude(rfid_tag='').select_related('category', 'metal_purity')
-    missing_qs = expected_qs.exclude(id__in=found_ids)
+        # Missing = available products with RFID tags that were NOT scanned
+        found_ids = [p.id for p in found_map.values()]
+        expected_qs = Product.objects.filter(
+            status='available',
+            rfid_tag__isnull=False,
+        ).exclude(rfid_tag='').select_related('category', 'metal_purity')
+        missing_qs = expected_qs.exclude(id__in=found_ids)
 
-    missing_serializer = ProductRFIDSerializer(
-        missing_qs,
-        many=True,
-        context={'request': request},
-    )
+        missing_serializer = ProductRFIDSerializer(
+            missing_qs,
+            many=True,
+            context={'request': request},
+        )
 
-    return Response({
-        'found': found_serializer.data,
-        'missing': missing_serializer.data,
-        'unknown_epcs': unknown,
-        'expected_count': expected_qs.count(),
-        'found_count': len(found),
-        'missing_count': missing_qs.count(),
-        'unknown_count': len(unknown),
-    })
+        return Response({
+            'found': found_serializer.data,
+            'missing': missing_serializer.data,
+            'unknown_epcs': unknown,
+            'expected_count': expected_qs.count(),
+            'found_count': len(found),
+            'missing_count': missing_qs.count(),
+            'unknown_count': len(unknown),
+        })
+    except Exception as e:
+        logger.exception("rfid_batch_check failed (%d epcs)", len(epcs))
+        return Response(
+            {'error': f'Erreur de vérification: {e}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(['POST'])
@@ -228,48 +239,55 @@ def rfid_session_save(request, session_id):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    scanned_tags = request.data.get('scanned_tags', [])
-    new_status = request.data.get('status', 'completed')
+    try:
+        scanned_tags = request.data.get('scanned_tags', [])
+        new_status = request.data.get('status', 'completed')
 
-    # Extract unique EPCs from scan
-    scanned_epcs = list({
-        t.get('epc', '').strip().upper()
-        for t in scanned_tags
-        if isinstance(t, dict) and t.get('epc')
-    })
+        # Extract unique EPCs from scan
+        scanned_epcs = list({
+            t.get('epc', '').strip().upper()
+            for t in scanned_tags
+            if isinstance(t, dict) and t.get('epc')
+        })
 
-    # Find matching products (handles PC-word offset)
-    found_map = _batch_find_products(scanned_epcs)
-    found_products = Product.objects.filter(id__in=[p.id for p in found_map.values()])
-    found_ids = set(found_products.values_list('id', flat=True))
+        # Find matching products (handles PC-word offset)
+        found_map = _batch_find_products(scanned_epcs)
+        found_products = Product.objects.filter(id__in=[p.id for p in found_map.values()])
+        found_ids = set(found_products.values_list('id', flat=True))
 
-    # Missing = expected available products not found
-    expected_qs = Product.objects.filter(
-        status='available',
-        rfid_tag__isnull=False,
-    ).exclude(rfid_tag='')
-    if session.location_id:
-        expected_qs = expected_qs.filter(location_id=session.location_id)
+        # Missing = expected available products not found
+        expected_qs = Product.objects.filter(
+            status='available',
+            rfid_tag__isnull=False,
+        ).exclude(rfid_tag='')
+        if session.location_id:
+            expected_qs = expected_qs.filter(location_id=session.location_id)
 
-    missing_products = expected_qs.exclude(id__in=found_ids)
+        missing_products = expected_qs.exclude(id__in=found_ids)
 
-    # Update session
-    session.scanned_tags = scanned_tags
-    session.found_count = found_products.count()
-    session.missing_count = missing_products.count()
-    session.status = new_status
-    if new_status in ('completed', 'cancelled'):
-        session.completed_at = timezone.now()
-    if 'notes' in request.data:
-        session.notes = request.data['notes']
-    session.save()
+        # Update session
+        session.scanned_tags = scanned_tags
+        session.found_count = found_products.count()
+        session.missing_count = missing_products.count()
+        session.status = new_status
+        if new_status in ('completed', 'cancelled'):
+            session.completed_at = timezone.now()
+        if 'notes' in request.data:
+            session.notes = request.data['notes']
+        session.save()
 
-    # Set M2M relations
-    session.found_products.set(found_products)
-    session.missing_products.set(missing_products)
+        # Set M2M relations
+        session.found_products.set(found_products)
+        session.missing_products.set(missing_products)
 
-    serializer = RFIDInventorySessionDetailSerializer(session, context={'request': request})
-    return Response(serializer.data)
+        serializer = RFIDInventorySessionDetailSerializer(session, context={'request': request})
+        return Response(serializer.data)
+    except Exception as e:
+        logger.exception("rfid_session_save failed for session %s", session_id)
+        return Response(
+            {'error': f'Erreur d\'enregistrement: {e}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(['GET'])
