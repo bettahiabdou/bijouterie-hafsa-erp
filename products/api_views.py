@@ -168,19 +168,23 @@ def rfid_batch_check(request):
         ).exclude(rfid_tag='')
         missing_qs = expected_qs.exclude(id__in=found_ids)
 
-        # Lightweight payload only: the handheld cannot move a multi-MB response
-        # across its Binder boundary. The 'found' items (everything present) are
-        # not actionable for a stock check, so we send only their count; the
-        # actionable data (missing + unknown) is sent lightweight.
-        missing_serializer = ProductRFIDLiteSerializer(missing_qs, many=True)
+        # The handheld bundles the whole result into an Intent to open its result
+        # screen; Android caps that transaction at ~1 MB. So we send the full
+        # COUNTS (what a stock check needs) but only a bounded sample of the
+        # lists, lightweight. 'found' (everything present) is not actionable.
+        LIST_CAP = 500
+        missing_count = missing_qs.count()
+        missing_serializer = ProductRFIDLiteSerializer(missing_qs[:LIST_CAP], many=True)
 
         return Response({
             'found': [],  # details omitted to keep the response small — see found_count
             'missing': missing_serializer.data,
-            'unknown_epcs': unknown,
+            'missing_truncated': missing_count > LIST_CAP,
+            'unknown_epcs': unknown[:LIST_CAP],
+            'unknown_truncated': len(unknown) > LIST_CAP,
             'expected_count': expected_qs.count(),
             'found_count': len(found),
-            'missing_count': missing_qs.count(),
+            'missing_count': missing_count,
             'unknown_count': len(unknown),
         })
     except Exception as e:
