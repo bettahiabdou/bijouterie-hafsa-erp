@@ -70,17 +70,12 @@
                     </div>
                     <div class="form-group mb-0" style="flex: 1; min-width: 180px;">
                         <label class="form-label">Vendeuse</label>
-                        <div class="flex gap-2">
-                            <select name="seller_id" id="out-seller" class="form-input" style="flex:1;">
-                                <option value="">-- Aucune --</option>
-                                {% for s in sellers %}
-                                    <option value="{{ s.id }}">{{ s.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <button type="button" class="btn btn-secondary" onclick="openSellerModal()" title="Nouvelle vendeuse">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
+                        <select name="seller_id" id="out-seller" class="form-input">
+                            <option value="">-- Aucune --</option>
+                            {% for s in sellers %}
+                                <option value="{{ s.id }}">{{ s.get_full_name|default:s.username }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="form-group mb-0" style="flex: 1; min-width: 160px;">
                         <label class="form-label">Notes (optionnel)</label>
@@ -117,7 +112,7 @@
                             <select name="seller" class="form-input">
                                 <option value="">Toutes</option>
                                 {% for s in sellers %}
-                                    <option value="{{ s.id }}" {% if seller_filter == s.id|stringformat:'s' %}selected{% endif %}>{{ s.name }}</option>
+                                    <option value="{{ s.id }}" {% if seller_filter == s.id|stringformat:'s' %}selected{% endif %}>{{ s.get_full_name|default:s.username }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -127,7 +122,7 @@
 
                 {% if out_items %}
                     <div class="table-responsive">
-                        <table class="table">
+                        <table class="table circ-table">
                             <thead>
                                 <tr>
                                     <th>Produit</th>
@@ -141,7 +136,7 @@
                             <tbody>
                                 {% for c in out_items %}
                                     <tr>
-                                        <td>
+                                        <td data-label="Produit">
                                             <div class="prod-cell">
                                                 {% with img=c.product.main_image %}
                                                     {% if img %}
@@ -158,11 +153,11 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>{% if c.seller %}{{ c.seller.name }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
-                                        <td>{{ c.sent_by.get_full_name|default:c.sent_by.username|default:'-' }}</td>
-                                        <td>{{ c.date_out|date:"d/m/Y H:i" }}</td>
-                                        <td>{{ c.notes|default:'' }}</td>
-                                        <td class="text-right">
+                                        <td data-label="Vendeuse">{% if c.seller %}{{ c.seller.get_full_name|default:c.seller.username }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                        <td data-label="Sortie par">{{ c.sent_by.get_full_name|default:c.sent_by.username|default:'-' }}</td>
+                                        <td data-label="Date sortie">{{ c.date_out|date:"d/m/Y H:i" }}</td>
+                                        <td data-label="Notes">{{ c.notes|default:'-' }}</td>
+                                        <td class="text-right circ-action">
                                             <form method="post" action="{% url 'sales:circulation_return' c.id %}" style="display:inline;"
                                                   onsubmit="return confirm('Confirmer le retour vitrine de {{ c.product.reference }} ?');">
                                                 {% csrf_token %}
@@ -189,7 +184,7 @@
             <div class="circ-panel" id="panel-history" style="display:none;">
                 {% if history_items %}
                     <div class="table-responsive">
-                        <table class="table">
+                        <table class="table circ-table">
                             <thead>
                                 <tr>
                                     <th>Produit</th>
@@ -203,25 +198,25 @@
                             <tbody>
                                 {% for c in history_items %}
                                     <tr>
-                                        <td>
+                                        <td data-label="Produit">
                                             <div class="prod-ref">{{ c.product.reference }}</div>
                                             <div class="prod-name">{{ c.product.name }}</div>
                                         </td>
-                                        <td>
+                                        <td data-label="Statut">
                                             {% if c.status == 'sold' %}
                                                 <span class="badge badge-success">Vendu</span>
                                             {% else %}
                                                 <span class="badge badge-warning">Retour vitrine</span>
                                             {% endif %}
                                         </td>
-                                        <td>{% if c.seller %}{{ c.seller.name }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
-                                        <td>
+                                        <td data-label="Vendeuse">{% if c.seller %}{{ c.seller.get_full_name|default:c.seller.username }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                        <td data-label="Facture">
                                             {% if c.invoice %}
                                                 <a href="{% url 'sales:invoice_detail' c.invoice.reference %}">{{ c.invoice.reference }}</a>
                                             {% else %}<span class="text-muted">-</span>{% endif %}
                                         </td>
-                                        <td>{{ c.date_back|date:"d/m/Y H:i"|default:'-' }}</td>
-                                        <td class="text-right">
+                                        <td data-label="Date">{{ c.date_back|date:"d/m/Y H:i"|default:'-' }}</td>
+                                        <td class="text-right circ-action">
                                             <form method="post" action="{% url 'sales:circulation_revert' c.id %}" style="display:inline;"
                                                   onsubmit="return confirm('Remettre {{ c.product.reference }} en circulation ?');">
                                                 {% csrf_token %}
@@ -241,25 +236,6 @@
                         <h3 class="empty-state-title">Aucun historique</h3>
                     </div>
                 {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Seller modal -->
-    <div id="seller-modal" class="circ-modal" style="display:none;">
-        <div class="circ-modal-box">
-            <h3 class="mb-4">Nouvelle vendeuse</h3>
-            <div class="form-group">
-                <label class="form-label">Nom *</label>
-                <input type="text" id="seller-name" class="form-input" placeholder="Nom de la vendeuse">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Téléphone</label>
-                <input type="text" id="seller-phone" class="form-input" placeholder="Optionnel">
-            </div>
-            <div class="flex gap-2 justify-end mt-4">
-                <button type="button" class="btn btn-secondary" onclick="closeSellerModal()">Annuler</button>
-                <button type="button" class="btn btn-primary" onclick="saveSeller()">Enregistrer</button>
             </div>
         </div>
     </div>
@@ -288,9 +264,37 @@
         .circ-tabs { display: flex; gap: var(--space-2); border-bottom: 1px solid var(--neutral-200); margin-bottom: var(--space-4); }
         .circ-tab { padding: var(--space-3) var(--space-4); border: none; background: none; cursor: pointer; font-weight: var(--font-medium); color: var(--neutral-500); border-bottom: 2px solid transparent; }
         .circ-tab.active { color: var(--primary-700); border-bottom-color: var(--primary-600); }
-        .circ-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
-        .circ-modal-box { background: var(--surface, #fff); padding: var(--space-6); border-radius: var(--radius-lg); width: 90%; max-width: 400px; }
-        @media (max-width: 768px) { .table-responsive { overflow-x: auto; } }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        /* Mobile: stack the tables into cards */
+        @media (max-width: 640px) {
+            .circ-table thead { display: none; }
+            .circ-table, .circ-table tbody, .circ-table tr, .circ-table td { display: block; width: 100%; }
+            .circ-table tr {
+                border: 1px solid var(--neutral-200); border-radius: var(--radius-lg);
+                padding: var(--space-3); margin-bottom: var(--space-3);
+                background: var(--surface, #fff); box-shadow: var(--shadow-sm);
+            }
+            .circ-table td {
+                border: none; padding: 6px 0; display: flex; align-items: center;
+                justify-content: space-between; gap: var(--space-3); text-align: right;
+            }
+            .circ-table td[data-label]::before {
+                content: attr(data-label); font-weight: var(--font-semibold);
+                color: var(--neutral-500); text-align: left; flex-shrink: 0;
+            }
+            .circ-table td[data-label="Produit"] { padding-bottom: var(--space-3); }
+            .circ-table td[data-label="Produit"]::before { display: none; }
+            .circ-table td[data-label="Produit"] .prod-cell,
+            .circ-table td[data-label="Produit"] .prod-ref { text-align: left; }
+            .circ-table td.circ-action { padding-top: var(--space-3); }
+            .circ-table td.circ-action form { display: block !important; width: 100%; }
+            .circ-table td.circ-action .btn { width: 100%; }
+
+            .circ-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .circ-tab { white-space: nowrap; }
+            #out-submit { width: 100%; }
+        }
     </style>
 
     <script>
@@ -361,31 +365,6 @@
                 document.getElementById('panel-history').style.display = this.dataset.tab === 'history' ? 'block' : 'none';
             });
         });
-
-        // Seller modal
-        window.openSellerModal = () => { document.getElementById('seller-modal').style.display = 'flex'; };
-        window.closeSellerModal = () => { document.getElementById('seller-modal').style.display = 'none'; };
-        window.saveSeller = function() {
-            const name = document.getElementById('seller-name').value.trim();
-            const phone = document.getElementById('seller-phone').value.trim();
-            if (!name) { alert('Le nom est requis.'); return; }
-            fetch('{% url "sales:circulation_seller_create" %}', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-                body: JSON.stringify({ name, phone })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) { alert(data.error || 'Erreur'); return; }
-                const sel = document.getElementById('out-seller');
-                const opt = new Option(data.name, data.id, true, true);
-                sel.add(opt);
-                document.getElementById('seller-name').value = '';
-                document.getElementById('seller-phone').value = '';
-                closeSellerModal();
-            })
-            .catch(() => alert('Erreur de connexion'));
-        };
     })();
     </script>
 {% endblock %}

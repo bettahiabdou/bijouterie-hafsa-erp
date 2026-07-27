@@ -65,7 +65,6 @@ urlpatterns = [
     path('circulation/out/', views.circulation_out, name='circulation_out'),
     path('circulation/<int:pk>/return/', views.circulation_return, name='circulation_return'),
     path('circulation/<int:pk>/revert/', views.circulation_revert, name='circulation_revert'),
-    path('circulation/seller/create/', views.circulation_seller_create, name='circulation_seller_create'),
 
     # Livraisons (Delivery Tracking)
     path('livraisons/', views.delivery_list, name='delivery_list'),

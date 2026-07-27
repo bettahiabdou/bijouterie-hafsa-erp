@@ -1224,25 +1224,6 @@ class DataExportJob(models.Model):
         return f"Export #{self.pk} ({self.get_status_display()})"
 
 
-class OnlineSeller(models.Model):
-    """
-    Online sellers ("vendeuses en ligne") that receive products in
-    circulation to show and sell them online.
-    """
-    name = models.CharField(_('Nom'), max_length=150)
-    phone = models.CharField(_('Téléphone'), max_length=30, blank=True)
-    is_active = models.BooleanField(_('Active'), default=True)
-    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
-
-    class Meta:
-        verbose_name = _('Vendeuse en ligne')
-        verbose_name_plural = _('Vendeuses en ligne')
-        ordering = ['name']
-
-    def __str__(self):
-        return self.name
-
-
 class ProductCirculation(models.Model):
     """
     Circulation register for the online-selling flow.
@@ -1275,11 +1256,11 @@ class ProductCirculation(models.Model):
         db_index=True
     )
     seller = models.ForeignKey(
-        OnlineSeller,
+        'users.User',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='circulations',
+        related_name='circulations_as_seller',
         verbose_name=_('Vendeuse')
     )
     sent_by = models.ForeignKey(

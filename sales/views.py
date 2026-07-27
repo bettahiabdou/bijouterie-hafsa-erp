@@ -14,7 +14,7 @@ from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 from .models import (
     SaleInvoice, SaleInvoiceItem, SaleInvoiceAction, ClientLoan, Layaway,
-    OnlineSeller, ProductCirculation,
+    ProductCirculation,
 )
 from products.models import Product
 from clients.models import Client
@@ -5188,10 +5188,14 @@ def circulation_list(request):
         status=ProductCirculation.Status.OUT
     ).select_related('product', 'seller', 'sent_by', 'returned_by', 'invoice')[:100]
 
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    sellers = User.objects.filter(is_active=True).order_by('first_name', 'last_name', 'username')
+
     context = {
         'out_items': out_qs,
         'history_items': history_qs,
-        'sellers': OnlineSeller.objects.filter(is_active=True),
+        'sellers': sellers,
         'stats': {
             'out': ProductCirculation.objects.filter(status=ProductCirculation.Status.OUT).count(),
             'sold': ProductCirculation.objects.filter(status=ProductCirculation.Status.SOLD).count(),
@@ -5264,7 +5268,10 @@ def circulation_out(request):
         messages.error(request, f"{product.reference} est déjà vendu, il ne peut pas circuler.")
         return redirect('sales:circulation')
 
-    seller = OnlineSeller.objects.filter(id=seller_id).first() if seller_id else None
+    seller = None
+    if seller_id:
+        from django.contrib.auth import get_user_model
+        seller = get_user_model().objects.filter(id=seller_id).first()
 
     circ = ProductCirculation.objects.create(
         product=product,
@@ -5321,26 +5328,3 @@ def circulation_revert(request, pk):
     circ.save(update_fields=['status', 'invoice', 'date_back', 'returned_by'])
     messages.success(request, f"{circ.product.reference} remis en circulation.")
     return redirect('sales:circulation')
-
-
-@login_required(login_url='login')
-@require_http_methods(["POST"])
-def circulation_seller_create(request):
-    """AJAX: create an online seller from the circulation page."""
-    import json as _json
-    try:
-        data = _json.loads(request.body or '{}')
-    except ValueError:
-        data = {}
-    name = (data.get('name') or '').strip()
-    phone = (data.get('phone') or '').strip()
-    if not name:
-        return JsonResponse({'success': False, 'error': 'Le nom est requis.'}, status=400)
-
-    seller, created = OnlineSeller.objects.get_or_create(
-        name=name, defaults={'phone': phone, 'is_active': True}
-    )
-    if not created and not seller.is_active:
-        seller.is_active = True
-        seller.save(update_fields=['is_active'])
-    return JsonResponse({'success': True, 'id': seller.id, 'name': seller.name})
