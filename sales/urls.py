@@ -66,6 +66,10 @@ urlpatterns = [
     path('circulation/<int:pk>/return/', views.circulation_return, name='circulation_return'),
     path('circulation/<int:pk>/revert/', views.circulation_revert, name='circulation_revert'),
 
+    # Bénéfice (profit report)
+    path('benefice/', views.benefice_report, name='benefice'),
+    path('benefice/print/', views.benefice_report_print, name='benefice_print'),
+
     # Livraisons (Delivery Tracking)
     path('livraisons/', views.delivery_list, name='delivery_list'),
     path('livraisons/bulk-check/', views.delivery_bulk_check, name='delivery_bulk_check'),

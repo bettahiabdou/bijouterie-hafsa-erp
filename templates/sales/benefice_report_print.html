@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Rapport de Bénéfice - Bijouterie Hafsa</title>
+    <style>
+        @page { size: A4; margin: 12mm; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #111; font-size: 11px; margin: 0;
+        }
+        .toolbar { text-align: center; margin-bottom: 14px; }
+        .toolbar button {
+            padding: 8px 18px; font-size: 13px; cursor: pointer;
+            background: #111; color: #fff; border: none; border-radius: 6px;
+        }
+        .report-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
+        .report-head h1 { font-size: 18px; margin: 0; }
+        .brand { font-size: 13px; font-weight: 700; }
+        .meta { font-size: 10px; color: #444; text-align: right; }
+        .filters-line { font-size: 10px; color: #333; margin-bottom: 10px; }
+        .filters-line strong { color: #111; }
+        table { width: 100%; border-collapse: collapse; }
+        thead { display: table-header-group; }
+        th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; vertical-align: middle; }
+        th { background: #f2f2f2; font-size: 10px; text-transform: uppercase; letter-spacing: .3px; }
+        td.num, th.num { text-align: right; white-space: nowrap; }
+        td.ctr, th.ctr { text-align: center; }
+        tr { page-break-inside: avoid; }
+        .thumb { width: 38px; height: 38px; object-fit: cover; border-radius: 4px; }
+        .ref { font-weight: 700; }
+        .sub { font-size: 9px; color: #666; }
+        .gain-neg { color: #c00; font-weight: 700; }
+        .gain-pos { color: #060; font-weight: 700; }
+        tfoot td { border-top: 2px solid #111; font-weight: 700; background: #fafafa; }
+        .empty { text-align: center; padding: 30px; color: #666; }
+        @media print { .toolbar { display: none; } body { font-size: 10px; } }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button onclick="window.print()">Imprimer</button>
+    </div>
+
+    <div class="report-head">
+        <div>
+            <div class="brand">Bijouterie Hafsa</div>
+            <h1>Rapport de Bénéfice</h1>
+        </div>
+        <div class="meta">
+            Édité le {{ now|date:"d/m/Y H:i" }}<br>
+            Par {{ user.get_full_name|default:user.username }}
+        </div>
+    </div>
+
+    <div class="filters-line">
+        <strong>Filtres :</strong>
+        {% if filters.date_from or filters.date_to %}
+            Période {{ filters.date_from|default:"…" }} → {{ filters.date_to|default:"…" }} ·
+        {% endif %}
+        {% if filters.product %}Produit « {{ filters.product }} » · {% endif %}
+        {% if filters.invoice %}Facture « {{ filters.invoice }} » · {% endif %}
+        {% if not filters.date_from and not filters.date_to and not filters.product and not filters.invoice %}Toutes les données{% endif %}
+        &nbsp;|&nbsp; {{ totals.count }} article{{ totals.count|pluralize }}
+    </div>
+
+    {% if rows %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Facture</th>
+                    <th>Produit</th>
+                    <th class="num">Prix vente</th>
+                    <th class="num">Prix achat</th>
+                    <th class="num">Gain</th>
+                    <th class="ctr">Img produit</th>
+                    <th class="ctr">Img facture</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                    <tr>
+                        <td><span class="ref">{{ r.invoice.reference }}</span><div class="sub">{{ r.invoice.date|date:"d/m/Y" }}</div></td>
+                        <td><span class="ref">{{ r.product.reference }}</span><div class="sub">{{ r.product.name }}</div></td>
+                        <td class="num">{{ r.total_amount|floatformat:2 }}</td>
+                        <td class="num">{{ r.bought_price|floatformat:2 }}</td>
+                        <td class="num {% if r.gain < 0 %}gain-neg{% else %}gain-pos{% endif %}">{{ r.gain|floatformat:2 }}</td>
+                        <td class="ctr">
+                            {% with img=r.product.main_image %}
+                                {% if img %}<img class="thumb" src="{{ img.url }}" alt="">
+                                {% elif r.product.images.first %}<img class="thumb" src="{{ r.product.images.first.image.url }}" alt="">
+                                {% else %}-{% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="ctr">
+                            {% with photo=r.invoice.photos.first %}
+                                {% if photo %}<img class="thumb" src="{{ photo.image.url }}" alt="">{% else %}-{% endif %}
+                            {% endwith %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2">TOTAL</td>
+                    <td class="num">{{ totals.total_sales|floatformat:2 }}</td>
+                    <td class="num">{{ totals.total_cost|floatformat:2 }}</td>
+                    <td class="num">{{ totals.total_gain|floatformat:2 }}</td>
+                    <td colspan="2" class="ctr">Marge {{ totals.margin|floatformat:1 }} %</td>
+                </tr>
+            </tfoot>
+        </table>
+    {% else %}
+        <div class="empty">Aucun article vendu pour ces filtres.</div>
+    {% endif %}
+
+    <script>
+        window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 300); });
+    </script>
+</body>
+</html>

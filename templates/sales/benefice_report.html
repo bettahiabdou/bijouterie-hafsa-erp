@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+
+{% block title %}Bénéfice - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_list' %}" class="breadcrumb-item">Ventes</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Bénéfice</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title"><i class="fas fa-coins text-success mr-2"></i> Bénéfice</h1>
+                <p class="page-subtitle">Gain par article vendu (prix de vente − prix d'achat)</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:benefice_print' %}{% if querystring %}?{{ querystring }}{% endif %}"
+                   target="_blank" class="btn btn-primary">
+                    <i class="fas fa-print"></i>
+                    <span>Imprimer rapport A4</span>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <!-- Filters -->
+    <div class="card mb-6">
+        <div class="card-body">
+            <form method="get" class="benefice-filters">
+                <div class="form-group mb-0">
+                    <label class="form-label">Du</label>
+                    <input type="date" name="date_from" value="{{ filters.date_from }}" class="form-input">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label">Au</label>
+                    <input type="date" name="date_to" value="{{ filters.date_to }}" class="form-input">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label">Produit</label>
+                    <input type="text" name="product" value="{{ filters.product }}" class="form-input" placeholder="Référence ou nom">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label">Facture</label>
+                    <input type="text" name="invoice" value="{{ filters.invoice }}" class="form-input" placeholder="N° facture">
+                </div>
+                <div class="benefice-filter-actions">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filtrer</button>
+                    <a href="{% url 'sales:benefice' %}" class="btn btn-secondary"><i class="fas fa-times"></i> Réinitialiser</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Totals -->
+    <div class="stats-grid mb-6">
+        <div class="stat-card stat-info">
+            <div class="stat-icon"><i class="fas fa-tag"></i></div>
+            <div class="stat-content">
+                <span class="stat-value">{{ totals.total_sales|floatformat:2 }} DH</span>
+                <span class="stat-label">Total ventes</span>
+            </div>
+        </div>
+        <div class="stat-card stat-warning">
+            <div class="stat-icon"><i class="fas fa-shopping-bag"></i></div>
+            <div class="stat-content">
+                <span class="stat-value">{{ totals.total_cost|floatformat:2 }} DH</span>
+                <span class="stat-label">Total achats</span>
+            </div>
+        </div>
+        <div class="stat-card stat-success">
+            <div class="stat-icon"><i class="fas fa-coins"></i></div>
+            <div class="stat-content">
+                <span class="stat-value">{{ totals.total_gain|floatformat:2 }} DH</span>
+                <span class="stat-label">Bénéfice total</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+            <div class="stat-content">
+                <span class="stat-value">{{ totals.margin|floatformat:1 }} %</span>
+                <span class="stat-label">Marge ({{ totals.count }} article{{ totals.count|pluralize }})</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+        <div class="card-body">
+            {% if rows %}
+                <div class="table-responsive">
+                    <table class="table benefice-table">
+                        <thead>
+                            <tr>
+                                <th>Facture</th>
+                                <th>Produit</th>
+                                <th class="text-right">Prix vente</th>
+                                <th class="text-right">Prix achat</th>
+                                <th class="text-right">Gain</th>
+                                <th class="text-center">Image produit</th>
+                                <th class="text-center">Image facture</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in rows %}
+                                <tr>
+                                    <td data-label="Facture">
+                                        <a href="{% url 'sales:invoice_detail' r.invoice.reference %}">{{ r.invoice.reference }}</a>
+                                        <div class="row-sub">{{ r.invoice.date|date:"d/m/Y" }}</div>
+                                    </td>
+                                    <td data-label="Produit">
+                                        <div class="prod-ref">{{ r.product.reference }}</div>
+                                        <div class="row-sub">{{ r.product.name }}</div>
+                                    </td>
+                                    <td data-label="Prix vente" class="text-right">{{ r.total_amount|floatformat:2 }} DH</td>
+                                    <td data-label="Prix achat" class="text-right">{{ r.bought_price|floatformat:2 }} DH</td>
+                                    <td data-label="Gain" class="text-right">
+                                        <span class="gain {% if r.gain < 0 %}gain-neg{% else %}gain-pos{% endif %}">
+                                            {{ r.gain|floatformat:2 }} DH
+                                        </span>
+                                    </td>
+                                    <td data-label="Image produit" class="text-center">
+                                        {% with img=r.product.main_image %}
+                                            {% if img %}
+                                                <a href="{{ img.url }}" target="_blank"><img src="{{ img.url }}" class="rep-thumb" alt=""></a>
+                                            {% elif r.product.images.first %}
+                                                <a href="{{ r.product.images.first.image.url }}" target="_blank"><img src="{{ r.product.images.first.image.url }}" class="rep-thumb" alt=""></a>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td data-label="Image facture" class="text-center">
+                                        {% with photo=r.invoice.photos.first %}
+                                            {% if photo %}
+                                                <a href="{{ photo.image.url }}" target="_blank"><img src="{{ photo.image.url }}" class="rep-thumb" alt=""></a>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if page_obj.has_other_pages %}
+                    <div class="pagination-wrapper mt-6">
+                        <nav class="pagination">
+                            {% if page_obj.has_previous %}
+                                <a href="?page={{ page_obj.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}" class="pagination-link"><i class="fas fa-chevron-left"></i></a>
+                            {% endif %}
+                            <span class="pagination-info">Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}</span>
+                            {% if page_obj.has_next %}
+                                <a href="?page={{ page_obj.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}" class="pagination-link"><i class="fas fa-chevron-right"></i></a>
+                            {% endif %}
+                        </nav>
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-coins empty-state-icon"></i>
+                    <h3 class="empty-state-title">Aucun article vendu</h3>
+                    <p class="empty-state-text">Aucune donnée pour ces filtres.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <style>
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4); }
+        .benefice-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-4); align-items: end; }
+        .benefice-filter-actions { display: flex; gap: var(--space-2); align-items: end; }
+        .rep-thumb { width: 46px; height: 46px; object-fit: cover; border-radius: var(--radius-md); border: 1px solid var(--neutral-200); }
+        .prod-ref { font-weight: var(--font-semibold); color: var(--primary-700); }
+        .row-sub { font-size: var(--text-xs); color: var(--neutral-500); }
+        .gain { font-weight: var(--font-semibold); }
+        .gain-pos { color: var(--success-600, #16a34a); }
+        .gain-neg { color: var(--error-600, #dc2626); }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        @media (max-width: 720px) {
+            .benefice-table thead { display: none; }
+            .benefice-table, .benefice-table tbody, .benefice-table tr, .benefice-table td { display: block; width: 100%; }
+            .benefice-table tr {
+                border: 1px solid var(--neutral-200); border-radius: var(--radius-lg);
+                padding: var(--space-3); margin-bottom: var(--space-3); box-shadow: var(--shadow-sm);
+            }
+            .benefice-table td {
+                border: none; padding: 6px 0; display: flex; align-items: center;
+                justify-content: space-between; gap: var(--space-3); text-align: right;
+            }
+            .benefice-table td::before {
+                content: attr(data-label); font-weight: var(--font-semibold);
+                color: var(--neutral-500); text-align: left; flex-shrink: 0;
+            }
+        }
+    </style>
+{% endblock %}

@@ -5328,3 +5328,115 @@ def circulation_revert(request, pk):
     circ.save(update_fields=['status', 'invoice', 'date_back', 'returned_by'])
     messages.success(request, f"{circ.product.reference} remis en circulation.")
     return redirect('sales:circulation')
+
+
+# ============================================================================
+# Bénéfice (profit report)
+# ============================================================================
+
+def _benefice_queryset(request):
+    """
+    Build the profit queryset (one row per sold line item) from the request
+    filters. Returns (queryset, filters_dict). Each row is annotated with
+    `bought_price` (product cost x quantity) and `gain` (sale - cost).
+    """
+    from django.db.models import ExpressionWrapper, DecimalField
+    from django.db.models.functions import Coalesce
+
+    money = DecimalField(max_digits=14, decimal_places=2)
+    cost_expr = ExpressionWrapper(
+        Coalesce(F('product__total_cost'), Decimal('0')) * F('quantity'),
+        output_field=money,
+    )
+    gain_expr = ExpressionWrapper(
+        F('total_amount') - Coalesce(F('product__total_cost'), Decimal('0')) * F('quantity'),
+        output_field=money,
+    )
+
+    qs = (SaleInvoiceItem.objects
+          .select_related('invoice', 'product')
+          .filter(invoice__is_deleted=False, is_returned=False)
+          .exclude(invoice__status__in=['draft', 'cancelled'])
+          .annotate(bought_price=cost_expr, gain=gain_expr))
+
+    date_from = (request.GET.get('date_from') or '').strip()
+    date_to = (request.GET.get('date_to') or '').strip()
+    product_q = (request.GET.get('product') or '').strip()
+    invoice_q = (request.GET.get('invoice') or '').strip()
+
+    if date_from:
+        qs = qs.filter(invoice__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(invoice__date__lte=date_to)
+    if product_q:
+        qs = qs.filter(Q(product__reference__icontains=product_q) |
+                       Q(product__name__icontains=product_q))
+    if invoice_q:
+        qs = qs.filter(invoice__reference__icontains=invoice_q)
+
+    qs = qs.order_by('-invoice__date', '-invoice__created_at', 'id')
+
+    filters = {
+        'date_from': date_from, 'date_to': date_to,
+        'product': product_q, 'invoice': invoice_q,
+    }
+    return qs, filters
+
+
+def _benefice_totals(qs):
+    from django.db.models import Sum
+    agg = qs.aggregate(
+        total_sales=Sum('total_amount'),
+        total_cost=Sum('bought_price'),
+        total_gain=Sum('gain'),
+    )
+    total_sales = agg['total_sales'] or Decimal('0')
+    total_cost = agg['total_cost'] or Decimal('0')
+    total_gain = agg['total_gain'] or Decimal('0')
+    margin = (total_gain / total_cost * 100) if total_cost else Decimal('0')
+    return {
+        'total_sales': total_sales,
+        'total_cost': total_cost,
+        'total_gain': total_gain,
+        'margin': margin,
+        'count': qs.count(),
+    }
+
+
+@login_required(login_url='login')
+def benefice_report(request):
+    """Profit report: one row per sold item with sale/cost/gain + images."""
+    qs, filters = _benefice_queryset(request)
+    totals = _benefice_totals(qs)
+
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    # Preserve filters (without page) for pagination + print links
+    params = request.GET.copy()
+    params.pop('page', None)
+    querystring = params.urlencode()
+
+    context = {
+        'rows': page_obj,
+        'page_obj': page_obj,
+        'totals': totals,
+        'filters': filters,
+        'querystring': querystring,
+    }
+    return render(request, 'sales/benefice_report.html', context)
+
+
+@login_required(login_url='login')
+def benefice_report_print(request):
+    """A4 print view: all filtered rows (no pagination) + totals."""
+    qs, filters = _benefice_queryset(request)
+    totals = _benefice_totals(qs)
+    context = {
+        'rows': qs,
+        'totals': totals,
+        'filters': filters,
+        'now': timezone.now(),
+        'user': request.user,
+    }
+    return render(request, 'sales/benefice_report_print.html', context)
