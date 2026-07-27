@@ -233,6 +233,84 @@
                 {% endif %}
             </div>
 
+            <!-- Sale Photos (Photos de Vente) -->
+            <div class="card animate-slide-up" id="sale-photos-card">
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3><i class="fas fa-camera mr-2"></i> Photos de Vente</h3>
+                    <label class="btn btn-primary btn-sm" style="cursor:pointer; margin:0;">
+                        <i class="fas fa-plus"></i> Ajouter
+                        <input type="file" id="sale-photo-input" accept="image/*" multiple
+                               style="display:none;" onchange="uploadSalePhotos(this)">
+                    </label>
+                </div>
+                <div class="card-body">
+                    <div id="sale-photo-progress" style="display:none; color:var(--neutral-500); font-size:var(--text-sm); margin-bottom:var(--space-2);">
+                        <i class="fas fa-spinner fa-spin"></i> Envoi en cours…
+                    </div>
+                    <div id="sale-photos-grid" class="photos-grid">
+                        {% for photo in invoice.photos.all %}
+                        <div class="photo-item" id="sale-photo-{{ photo.id }}">
+                            <a href="{{ photo.image.url }}" target="_blank" class="photo-link">
+                                <img src="{{ photo.image.url }}" alt="Photo de vente" class="photo-thumbnail">
+                                <div class="photo-overlay"><i class="fas fa-expand"></i></div>
+                            </a>
+                            <span class="photo-type badge badge-sm badge-info">{{ photo.get_photo_type_display }}</span>
+                            <button type="button" class="btn btn-error btn-sm" style="margin-top:4px;"
+                                    onclick="deleteSalePhoto({{ photo.id }})"><i class="fas fa-trash"></i></button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="sale-photos-empty" class="empty-state" {% if invoice.photos.all %}style="display:none;"{% endif %}>
+                        <i class="fas fa-camera"></i>
+                        <p>Aucune photo de vente. Cliquez sur « Ajouter » pour en joindre.</p>
+                    </div>
+                </div>
+            </div>
+            <script>
+                function uploadSalePhotos(input) {
+                    if (!input.files || !input.files.length) return;
+                    var fd = new FormData();
+                    for (var i = 0; i < input.files.length; i++) fd.append('photos', input.files[i]);
+                    var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                    document.getElementById('sale-photo-progress').style.display = 'block';
+                    fetch("{% url 'sales:add_invoice_photo' invoice.reference %}", {
+                        method: 'POST', body: fd, headers: {'X-CSRFToken': csrf}
+                    })
+                    .then(function(r){ return r.json(); })
+                    .then(function(data){
+                        document.getElementById('sale-photo-progress').style.display = 'none';
+                        if (!data.success) { alert(data.error || 'Échec du téléversement'); return; }
+                        var grid = document.getElementById('sale-photos-grid');
+                        data.photos.forEach(function(p){
+                            var d = document.createElement('div');
+                            d.className = 'photo-item'; d.id = 'sale-photo-' + p.id;
+                            d.innerHTML = '<a href="'+p.url+'" target="_blank" class="photo-link">'
+                                + '<img src="'+p.url+'" class="photo-thumbnail"><div class="photo-overlay"><i class="fas fa-expand"></i></div></a>'
+                                + '<span class="photo-type badge badge-sm badge-info">'+p.type+'</span>'
+                                + '<button type="button" class="btn btn-error btn-sm" style="margin-top:4px;" onclick="deleteSalePhoto('+p.id+')"><i class="fas fa-trash"></i></button>';
+                            grid.appendChild(d);
+                        });
+                        document.getElementById('sale-photos-empty').style.display = 'none';
+                        input.value = '';
+                    })
+                    .catch(function(){ document.getElementById('sale-photo-progress').style.display = 'none'; alert('Erreur de connexion'); });
+                }
+                function deleteSalePhoto(id) {
+                    if (!confirm('Supprimer cette photo ?')) return;
+                    var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                    fetch('/sales/invoices/photo/' + id + '/delete/', {method:'POST', headers:{'X-CSRFToken':csrf}})
+                    .then(function(r){ return r.json(); })
+                    .then(function(data){
+                        if (data.success) {
+                            var el = document.getElementById('sale-photo-' + id); if (el) el.remove();
+                            if (!document.querySelectorAll('#sale-photos-grid .photo-item').length)
+                                document.getElementById('sale-photos-empty').style.display = '';
+                        } else { alert(data.error || 'Échec de la suppression'); }
+                    })
+                    .catch(function(){ alert('Erreur de connexion'); });
+                }
+            </script>
+
             <!-- Product Images -->
             {% if items %}
             <div class="card animate-slide-up" style="animation-delay: 150ms;">

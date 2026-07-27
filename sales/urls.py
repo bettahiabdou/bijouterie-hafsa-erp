@@ -30,6 +30,8 @@ urlpatterns = [
     path('invoices/<str:reference>/add-item/', views.add_invoice_item, name='add_item'),
     path('invoices/delete-item/', views.delete_invoice_item, name='delete_item'),
     path('invoices/update-item/', views.update_invoice_item, name='update_item'),
+    path('invoices/<str:reference>/add-photo/', views.add_invoice_photo, name='add_invoice_photo'),
+    path('invoices/photo/<int:photo_id>/delete/', views.delete_invoice_photo, name='delete_invoice_photo'),
 
     # Payment editing
     path('api/update-payment/', views.update_payment, name='update_payment'),

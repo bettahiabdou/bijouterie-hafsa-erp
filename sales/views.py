@@ -1822,6 +1822,74 @@ def delete_invoice_item(request):
 
 @login_required(login_url='login')
 @require_http_methods(["POST"])
+def add_invoice_photo(request, reference):
+    """Attach one or more sale photos (Photos de Vente) to an invoice."""
+    try:
+        invoice = get_object_or_404(SaleInvoice, reference=reference, is_deleted=False)
+        if not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'Permission refusée'}, status=403)
+
+        from .models import InvoicePhoto
+        from products.views import convert_image_to_jpeg
+
+        files = request.FILES.getlist('photos')
+        if not files and 'photo' in request.FILES:
+            files = [request.FILES['photo']]
+        if not files:
+            return JsonResponse({'success': False, 'error': 'Aucune image fournie'}, status=400)
+
+        valid_types = dict(InvoicePhoto.PhotoType.choices)
+        ptype = request.POST.get('photo_type', 'other')
+        if ptype not in valid_types:
+            ptype = 'other'
+
+        created = []
+        for f in files:
+            img = convert_image_to_jpeg(f)
+            p = InvoicePhoto.objects.create(invoice=invoice, image=img, photo_type=ptype)
+            created.append({
+                'id': p.id,
+                'url': request.build_absolute_uri(p.image.url),
+                'type': p.get_photo_type_display(),
+            })
+
+        ActivityLog.objects.create(
+            user=request.user, action=ActivityLog.ActionType.UPDATE,
+            model_name='SaleInvoice', object_id=str(invoice.id),
+            object_repr=f'{invoice.reference} (+{len(created)} photo)',
+            ip_address=get_client_ip(request))
+
+        return JsonResponse({'success': True, 'photos': created})
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception('add_invoice_photo failed')
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def delete_invoice_photo(request, photo_id):
+    """Delete a sale photo from an invoice."""
+    try:
+        from .models import InvoicePhoto
+        photo = get_object_or_404(InvoicePhoto, id=photo_id)
+        if not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'Permission refusée'}, status=403)
+        ref = photo.invoice.reference
+        photo.delete()
+        ActivityLog.objects.create(
+            user=request.user, action=ActivityLog.ActionType.UPDATE,
+            model_name='SaleInvoice', object_id=str(photo.invoice_id),
+            object_repr=f'{ref} (-1 photo)', ip_address=get_client_ip(request))
+        return JsonResponse({'success': True})
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception('delete_invoice_photo failed')
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
 def update_invoice_item(request):
     """Update price/quantity of an existing invoice item (AJAX)"""
     import json
