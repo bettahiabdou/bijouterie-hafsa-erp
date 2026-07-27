@@ -1,0 +1,391 @@
+{% extends 'base.html' %}
+
+{% block title %}Circulation - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:invoice_list' %}" class="breadcrumb-item">Ventes</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Circulation</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title">
+                    <i class="fas fa-sync-alt text-info mr-2"></i>
+                    Circulation (vente en ligne)
+                </h1>
+                <p class="page-subtitle">Produits sortis pour la vente en ligne, retour vitrine ou vente automatique</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <form id="csrf-form" style="display:none;">{% csrf_token %}</form>
+
+    <!-- Stats -->
+    <div class="stats-grid mb-6">
+        <div class="stat-card stat-info">
+            <div class="stat-icon"><i class="fas fa-share-square"></i></div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats.out }}</span>
+                <span class="stat-label">En circulation</span>
+            </div>
+        </div>
+        <div class="stat-card stat-success">
+            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats.sold }}</span>
+                <span class="stat-label">Vendus</span>
+            </div>
+        </div>
+        <div class="stat-card stat-warning">
+            <div class="stat-icon"><i class="fas fa-undo"></i></div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats.returned }}</span>
+                <span class="stat-label">Retours vitrine</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sortir un produit -->
+    <div class="card mb-6">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-share-square text-info mr-2"></i> Sortir un produit</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'sales:circulation_out' %}" id="out-form">
+                {% csrf_token %}
+                <input type="hidden" name="product_id" id="out-product-id">
+                <div class="flex gap-4 flex-wrap items-end">
+                    <div class="form-group mb-0" style="flex: 2; min-width: 240px; position: relative;">
+                        <label class="form-label">Produit (référence, code-barres ou nom)</label>
+                        <input type="text" id="out-product-search" class="form-input" autocomplete="off"
+                               placeholder="Tapez pour rechercher...">
+                        <div id="out-search-results" class="search-results" style="display:none;"></div>
+                        <div id="out-selected" class="selected-product" style="display:none;"></div>
+                    </div>
+                    <div class="form-group mb-0" style="flex: 1; min-width: 180px;">
+                        <label class="form-label">Vendeuse</label>
+                        <div class="flex gap-2">
+                            <select name="seller_id" id="out-seller" class="form-input" style="flex:1;">
+                                <option value="">-- Aucune --</option>
+                                {% for s in sellers %}
+                                    <option value="{{ s.id }}">{{ s.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn btn-secondary" onclick="openSellerModal()" title="Nouvelle vendeuse">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group mb-0" style="flex: 1; min-width: 160px;">
+                        <label class="form-label">Notes (optionnel)</label>
+                        <input type="text" name="notes" class="form-input" placeholder="Remarque...">
+                    </div>
+                    <div class="form-group mb-0">
+                        <button type="submit" class="btn btn-primary" id="out-submit" disabled>
+                            <i class="fas fa-share-square"></i> <span>Sortir</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card">
+        <div class="card-body">
+            <div class="circ-tabs">
+                <button class="circ-tab active" data-tab="out">En circulation ({{ stats.out }})</button>
+                <button class="circ-tab" data-tab="history">Historique</button>
+            </div>
+
+            <!-- EN CIRCULATION -->
+            <div class="circ-panel" id="panel-out">
+                <div class="flex gap-4 items-end mb-4 flex-wrap">
+                    <form method="get" class="flex gap-2 items-end flex-wrap" style="flex:1;">
+                        <div class="form-group mb-0" style="flex:1; min-width:180px;">
+                            <label class="form-label">Rechercher</label>
+                            <input type="text" name="search" value="{{ search }}" class="form-input" placeholder="Référence, nom...">
+                        </div>
+                        <div class="form-group mb-0" style="min-width:160px;">
+                            <label class="form-label">Vendeuse</label>
+                            <select name="seller" class="form-input">
+                                <option value="">Toutes</option>
+                                {% for s in sellers %}
+                                    <option value="{{ s.id }}" {% if seller_filter == s.id|stringformat:'s' %}selected{% endif %}>{{ s.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-secondary"><i class="fas fa-filter"></i></button>
+                    </form>
+                </div>
+
+                {% if out_items %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Vendeuse</th>
+                                    <th>Sortie par</th>
+                                    <th>Date sortie</th>
+                                    <th>Notes</th>
+                                    <th class="text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in out_items %}
+                                    <tr>
+                                        <td>
+                                            <div class="prod-cell">
+                                                {% with img=c.product.main_image %}
+                                                    {% if img %}
+                                                        <img src="{{ img.url }}" alt="" class="prod-thumb">
+                                                    {% elif c.product.images.first %}
+                                                        <img src="{{ c.product.images.first.image.url }}" alt="" class="prod-thumb">
+                                                    {% else %}
+                                                        <div class="prod-thumb prod-thumb-empty"><i class="fas fa-gem"></i></div>
+                                                    {% endif %}
+                                                {% endwith %}
+                                                <div>
+                                                    <div class="prod-ref">{{ c.product.reference }}</div>
+                                                    <div class="prod-name">{{ c.product.name }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>{% if c.seller %}{{ c.seller.name }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                        <td>{{ c.sent_by.get_full_name|default:c.sent_by.username|default:'-' }}</td>
+                                        <td>{{ c.date_out|date:"d/m/Y H:i" }}</td>
+                                        <td>{{ c.notes|default:'' }}</td>
+                                        <td class="text-right">
+                                            <form method="post" action="{% url 'sales:circulation_return' c.id %}" style="display:inline;"
+                                                  onsubmit="return confirm('Confirmer le retour vitrine de {{ c.product.reference }} ?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-secondary">
+                                                    <i class="fas fa-undo"></i> Retour vitrine
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-share-square empty-state-icon"></i>
+                        <h3 class="empty-state-title">Aucun produit en circulation</h3>
+                        <p class="empty-state-text">Sortez un produit ci-dessus pour l'envoyer en vente en ligne.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- HISTORIQUE -->
+            <div class="circ-panel" id="panel-history" style="display:none;">
+                {% if history_items %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Statut</th>
+                                    <th>Vendeuse</th>
+                                    <th>Facture</th>
+                                    <th>Date</th>
+                                    <th class="text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in history_items %}
+                                    <tr>
+                                        <td>
+                                            <div class="prod-ref">{{ c.product.reference }}</div>
+                                            <div class="prod-name">{{ c.product.name }}</div>
+                                        </td>
+                                        <td>
+                                            {% if c.status == 'sold' %}
+                                                <span class="badge badge-success">Vendu</span>
+                                            {% else %}
+                                                <span class="badge badge-warning">Retour vitrine</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{% if c.seller %}{{ c.seller.name }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                        <td>
+                                            {% if c.invoice %}
+                                                <a href="{% url 'sales:invoice_detail' c.invoice.reference %}">{{ c.invoice.reference }}</a>
+                                            {% else %}<span class="text-muted">-</span>{% endif %}
+                                        </td>
+                                        <td>{{ c.date_back|date:"d/m/Y H:i"|default:'-' }}</td>
+                                        <td class="text-right">
+                                            <form method="post" action="{% url 'sales:circulation_revert' c.id %}" style="display:inline;"
+                                                  onsubmit="return confirm('Remettre {{ c.product.reference }} en circulation ?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-light" title="Correction">
+                                                    <i class="fas fa-rotate-left"></i> Remettre
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-history empty-state-icon"></i>
+                        <h3 class="empty-state-title">Aucun historique</h3>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Seller modal -->
+    <div id="seller-modal" class="circ-modal" style="display:none;">
+        <div class="circ-modal-box">
+            <h3 class="mb-4">Nouvelle vendeuse</h3>
+            <div class="form-group">
+                <label class="form-label">Nom *</label>
+                <input type="text" id="seller-name" class="form-input" placeholder="Nom de la vendeuse">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Téléphone</label>
+                <input type="text" id="seller-phone" class="form-input" placeholder="Optionnel">
+            </div>
+            <div class="flex gap-2 justify-end mt-4">
+                <button type="button" class="btn btn-secondary" onclick="closeSellerModal()">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="saveSeller()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4); }
+        .search-results {
+            position: absolute; top: 100%; left: 0; right: 0; z-index: 30;
+            background: var(--surface, #fff); border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md); box-shadow: var(--shadow-lg); max-height: 320px; overflow-y: auto;
+        }
+        .search-result-item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); cursor: pointer; }
+        .search-result-item:hover { background: var(--neutral-100); }
+        .search-result-item.disabled { opacity: 0.5; cursor: not-allowed; }
+        .search-result-item img, .sri-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: var(--radius-md); background: var(--neutral-100); flex-shrink: 0; }
+        .selected-product {
+            margin-top: var(--space-2); padding: var(--space-2) var(--space-3);
+            background: var(--info-50, #eff6ff); border: 1px solid var(--info-200, #bfdbfe);
+            border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between;
+        }
+        .prod-cell { display: flex; align-items: center; gap: var(--space-3); }
+        .prod-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: var(--radius-md); }
+        .prod-thumb-empty { display:flex; align-items:center; justify-content:center; background: var(--neutral-100); color: var(--neutral-400); }
+        .prod-ref { font-weight: var(--font-semibold); color: var(--primary-700); }
+        .prod-name { font-size: var(--text-sm); color: var(--neutral-500); }
+        .circ-tabs { display: flex; gap: var(--space-2); border-bottom: 1px solid var(--neutral-200); margin-bottom: var(--space-4); }
+        .circ-tab { padding: var(--space-3) var(--space-4); border: none; background: none; cursor: pointer; font-weight: var(--font-medium); color: var(--neutral-500); border-bottom: 2px solid transparent; }
+        .circ-tab.active { color: var(--primary-700); border-bottom-color: var(--primary-600); }
+        .circ-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .circ-modal-box { background: var(--surface, #fff); padding: var(--space-6); border-radius: var(--radius-lg); width: 90%; max-width: 400px; }
+        @media (max-width: 768px) { .table-responsive { overflow-x: auto; } }
+    </style>
+
+    <script>
+    (function() {
+        const csrf = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
+        const searchInput = document.getElementById('out-product-search');
+        const resultsBox = document.getElementById('out-search-results');
+        const selectedBox = document.getElementById('out-selected');
+        const productIdInput = document.getElementById('out-product-id');
+        const submitBtn = document.getElementById('out-submit');
+        let searchTimer = null;
+
+        searchInput.addEventListener('input', function() {
+            const q = this.value.trim();
+            clearTimeout(searchTimer);
+            productIdInput.value = '';
+            submitBtn.disabled = true;
+            if (q.length < 2) { resultsBox.style.display = 'none'; return; }
+            searchTimer = setTimeout(() => doSearch(q), 250);
+        });
+
+        function doSearch(q) {
+            fetch('{% url "sales:circulation_product_search" %}?q=' + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(data => {
+                    const items = data.products || [];
+                    if (!items.length) { resultsBox.innerHTML = '<div class="search-result-item disabled">Aucun produit</div>'; resultsBox.style.display = 'block'; return; }
+                    resultsBox.innerHTML = items.map(p => {
+                        const img = p.image ? '<img src="' + p.image + '">' : '<div class="sri-thumb"></div>';
+                        const badge = p.already_out ? ' <span class="badge badge-warning">Déjà sorti</span>' : '';
+                        return '<div class="search-result-item ' + (p.already_out ? 'disabled' : '') + '" ' +
+                               (p.already_out ? '' : 'data-id="' + p.id + '" data-ref="' + p.reference + '" data-name="' + (p.name || '').replace(/"/g, '&quot;') + '"') + '>' +
+                               img + '<div><div class="prod-ref">' + p.reference + badge + '</div><div class="prod-name">' + (p.name || '') + '</div></div></div>';
+                    }).join('');
+                    resultsBox.querySelectorAll('.search-result-item[data-id]').forEach(el => {
+                        el.addEventListener('click', () => selectProduct(el.dataset.id, el.dataset.ref, el.dataset.name));
+                    });
+                    resultsBox.style.display = 'block';
+                });
+        }
+
+        function selectProduct(id, ref, name) {
+            productIdInput.value = id;
+            selectedBox.innerHTML = '<span><i class="fas fa-check-circle text-success"></i> <strong>' + ref + '</strong> — ' + (name || '') + '</span>' +
+                '<button type="button" class="btn btn-sm btn-light" onclick="window.clearOutSelection()"><i class="fas fa-times"></i></button>';
+            selectedBox.style.display = 'flex';
+            resultsBox.style.display = 'none';
+            searchInput.value = '';
+            submitBtn.disabled = false;
+        }
+
+        window.clearOutSelection = function() {
+            productIdInput.value = '';
+            selectedBox.style.display = 'none';
+            submitBtn.disabled = true;
+        };
+
+        document.addEventListener('click', (e) => {
+            if (!resultsBox.contains(e.target) && e.target !== searchInput) resultsBox.style.display = 'none';
+        });
+
+        // Tabs
+        document.querySelectorAll('.circ-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.circ-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('panel-out').style.display = this.dataset.tab === 'out' ? 'block' : 'none';
+                document.getElementById('panel-history').style.display = this.dataset.tab === 'history' ? 'block' : 'none';
+            });
+        });
+
+        // Seller modal
+        window.openSellerModal = () => { document.getElementById('seller-modal').style.display = 'flex'; };
+        window.closeSellerModal = () => { document.getElementById('seller-modal').style.display = 'none'; };
+        window.saveSeller = function() {
+            const name = document.getElementById('seller-name').value.trim();
+            const phone = document.getElementById('seller-phone').value.trim();
+            if (!name) { alert('Le nom est requis.'); return; }
+            fetch('{% url "sales:circulation_seller_create" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                body: JSON.stringify({ name, phone })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) { alert(data.error || 'Erreur'); return; }
+                const sel = document.getElementById('out-seller');
+                const opt = new Option(data.name, data.id, true, true);
+                sel.add(opt);
+                document.getElementById('seller-name').value = '';
+                document.getElementById('seller-phone').value = '';
+                closeSellerModal();
+            })
+            .catch(() => alert('Erreur de connexion'));
+        };
+    })();
+    </script>
+{% endblock %}

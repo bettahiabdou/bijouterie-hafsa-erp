@@ -570,6 +570,10 @@
                             <i class="fas fa-clock text-warning" style="margin-right: 6px;"></i>
                             <span class="nav-text">En Attente (Telegram)</span>
                         </a>
+                        <a href="{% url 'sales:circulation' %}" class="nav-link {% if 'circulation' in request.path %}active{% endif %}">
+                            <i class="fas fa-sync-alt text-info" style="margin-right: 6px;"></i>
+                            <span class="nav-text">Circulation (vente en ligne)</span>
+                        </a>
                         <a href="{% url 'sales:invoice_list' %}" class="nav-link {% if 'invoices' in request.path and 'sales' in request.path %}active{% endif %}">
                             <span class="nav-text">Historique</span>
                         </a>

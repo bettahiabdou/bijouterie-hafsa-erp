@@ -1222,3 +1222,101 @@ class DataExportJob(models.Model):
 
     def __str__(self):
         return f"Export #{self.pk} ({self.get_status_display()})"
+
+
+class OnlineSeller(models.Model):
+    """
+    Online sellers ("vendeuses en ligne") that receive products in
+    circulation to show and sell them online.
+    """
+    name = models.CharField(_('Nom'), max_length=150)
+    phone = models.CharField(_('Téléphone'), max_length=30, blank=True)
+    is_active = models.BooleanField(_('Active'), default=True)
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('Vendeuse en ligne')
+        verbose_name_plural = _('Vendeuses en ligne')
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class ProductCirculation(models.Model):
+    """
+    Circulation register for the online-selling flow.
+
+    A product taken from the vitrine to be shown online by a seller is
+    logged here as OUT ("En circulation"). It leaves circulation in one of
+    two ways:
+      * SOLD  - auto-detected when the product is added to any invoice
+                (draft "vente en attente" or finalized).
+      * RETURNED - the operator marks it back in when it comes back unsold.
+
+    Each out/in cycle is a separate row, so a product can circulate many times.
+    """
+    class Status(models.TextChoices):
+        OUT = 'out', _('En circulation')
+        SOLD = 'sold', _('Vendu')
+        RETURNED = 'returned', _('Retour vitrine')
+
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.CASCADE,
+        related_name='circulations',
+        verbose_name=_('Produit')
+    )
+    status = models.CharField(
+        _('Statut'),
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OUT,
+        db_index=True
+    )
+    seller = models.ForeignKey(
+        OnlineSeller,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='circulations',
+        verbose_name=_('Vendeuse')
+    )
+    sent_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='circulations_sent',
+        verbose_name=_('Sortie par')
+    )
+    returned_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='circulations_returned',
+        verbose_name=_('Retour saisi par')
+    )
+    invoice = models.ForeignKey(
+        SaleInvoice,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='circulations',
+        verbose_name=_('Facture')
+    )
+    date_out = models.DateTimeField(_('Date de sortie'), auto_now_add=True)
+    date_back = models.DateTimeField(_('Date de retour/vente'), null=True, blank=True)
+    notes = models.TextField(_('Notes'), blank=True)
+
+    class Meta:
+        verbose_name = _('Circulation produit')
+        verbose_name_plural = _('Circulations produits')
+        ordering = ['-date_out']
+        indexes = [
+            models.Index(fields=['status', 'product']),
+        ]
+
+    def __str__(self):
+        return f"{self.product.reference} - {self.get_status_display()}"

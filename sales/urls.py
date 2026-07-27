@@ -59,6 +59,14 @@ urlpatterns = [
     path('pending/<str:reference>/api/', views.pending_invoice_detail_api, name='pending_invoice_detail_api'),
     path('pending/<str:reference>/complete/api/', views.pending_invoice_complete_api, name='pending_invoice_complete_api'),
 
+    # Circulation (online-selling flow)
+    path('circulation/', views.circulation_list, name='circulation'),
+    path('circulation/search/', views.circulation_product_search, name='circulation_product_search'),
+    path('circulation/out/', views.circulation_out, name='circulation_out'),
+    path('circulation/<int:pk>/return/', views.circulation_return, name='circulation_return'),
+    path('circulation/<int:pk>/revert/', views.circulation_revert, name='circulation_revert'),
+    path('circulation/seller/create/', views.circulation_seller_create, name='circulation_seller_create'),
+
     # Livraisons (Delivery Tracking)
     path('livraisons/', views.delivery_list, name='delivery_list'),
     path('livraisons/bulk-check/', views.delivery_bulk_check, name='delivery_bulk_check'),

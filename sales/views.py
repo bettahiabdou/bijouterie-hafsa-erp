@@ -12,7 +12,10 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation
-from .models import SaleInvoice, SaleInvoiceItem, SaleInvoiceAction, ClientLoan, Layaway
+from .models import (
+    SaleInvoice, SaleInvoiceItem, SaleInvoiceAction, ClientLoan, Layaway,
+    OnlineSeller, ProductCirculation,
+)
 from products.models import Product
 from clients.models import Client
 from quotes.models import Quote
@@ -5142,3 +5145,202 @@ def pending_invoice_complete_api(request, reference):
         'client': {'id': invoice.client.id if invoice.client else None, 'created': client_created},
         'warnings': warnings,
     })
+
+
+# ============================================================================
+# Product circulation (online-selling flow)
+# ============================================================================
+
+def _circulation_ip(request):
+    xff = request.META.get('HTTP_X_FORWARDED_FOR')
+    return xff.split(',')[0] if xff else request.META.get('REMOTE_ADDR')
+
+
+def _product_image_url(product):
+    try:
+        if product.main_image:
+            return product.main_image.url
+    except Exception:
+        pass
+    img = product.images.first()
+    return img.image.url if img and img.image else ''
+
+
+@login_required(login_url='login')
+def circulation_list(request):
+    """Circulation register: products out with online sellers + history."""
+    out_qs = ProductCirculation.objects.filter(
+        status=ProductCirculation.Status.OUT
+    ).select_related('product', 'seller', 'sent_by').prefetch_related('product__images')
+
+    seller_filter = request.GET.get('seller', '')
+    if seller_filter:
+        out_qs = out_qs.filter(seller_id=seller_filter)
+
+    search = request.GET.get('search', '').strip()
+    if search:
+        out_qs = out_qs.filter(
+            Q(product__reference__icontains=search) |
+            Q(product__name__icontains=search)
+        )
+
+    history_qs = ProductCirculation.objects.exclude(
+        status=ProductCirculation.Status.OUT
+    ).select_related('product', 'seller', 'sent_by', 'returned_by', 'invoice')[:100]
+
+    context = {
+        'out_items': out_qs,
+        'history_items': history_qs,
+        'sellers': OnlineSeller.objects.filter(is_active=True),
+        'stats': {
+            'out': ProductCirculation.objects.filter(status=ProductCirculation.Status.OUT).count(),
+            'sold': ProductCirculation.objects.filter(status=ProductCirculation.Status.SOLD).count(),
+            'returned': ProductCirculation.objects.filter(status=ProductCirculation.Status.RETURNED).count(),
+        },
+        'seller_filter': seller_filter,
+        'search': search,
+    }
+    return render(request, 'sales/circulation_list.html', context)
+
+
+@login_required(login_url='login')
+def circulation_product_search(request):
+    """Search finished products to send out (annotates already-out)."""
+    query = request.GET.get('q', '').strip()
+    if len(query) < 2:
+        return JsonResponse({'products': []})
+
+    products = Product.objects.filter(
+        product_type=Product.ProductType.FINISHED
+    ).filter(
+        Q(reference__icontains=query) |
+        Q(barcode__iexact=query) |
+        Q(name__icontains=query)
+    ).exclude(status='sold').select_related('category')[:20]
+
+    out_ids = set(ProductCirculation.objects.filter(
+        product__in=products, status=ProductCirculation.Status.OUT
+    ).values_list('product_id', flat=True))
+
+    results = [{
+        'id': p.id,
+        'reference': p.reference or '',
+        'name': p.name or (p.category.name if p.category else 'Produit'),
+        'category': p.category.name if p.category else '',
+        'image': _product_image_url(p),
+        'already_out': p.id in out_ids,
+    } for p in products]
+    return JsonResponse({'products': results})
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def circulation_out(request):
+    """Mark a product as out (en circulation) with an online seller."""
+    product_id = (request.POST.get('product_id') or '').strip()
+    reference = (request.POST.get('reference') or '').strip()
+    seller_id = (request.POST.get('seller_id') or '').strip()
+    notes = (request.POST.get('notes') or '').strip()
+
+    product = None
+    if product_id:
+        product = Product.objects.filter(id=product_id).first()
+    if not product and reference:
+        product = Product.objects.filter(
+            Q(reference__iexact=reference) | Q(barcode__iexact=reference)
+        ).first()
+
+    if not product:
+        messages.error(request, "Produit introuvable.")
+        return redirect('sales:circulation')
+
+    if ProductCirculation.objects.filter(
+        product=product, status=ProductCirculation.Status.OUT
+    ).exists():
+        messages.warning(request, f"{product.reference} est déjà en circulation.")
+        return redirect('sales:circulation')
+
+    if product.status == 'sold':
+        messages.error(request, f"{product.reference} est déjà vendu, il ne peut pas circuler.")
+        return redirect('sales:circulation')
+
+    seller = OnlineSeller.objects.filter(id=seller_id).first() if seller_id else None
+
+    circ = ProductCirculation.objects.create(
+        product=product,
+        seller=seller,
+        sent_by=request.user,
+        notes=notes,
+    )
+    ActivityLog.objects.create(
+        user=request.user,
+        action=ActivityLog.ActionType.CREATE,
+        model_name='ProductCirculation',
+        object_id=str(circ.id),
+        object_repr=f"Sortie circulation {product.reference}",
+        ip_address=_circulation_ip(request),
+    )
+    messages.success(request, f"{product.reference} mis en circulation.")
+    return redirect('sales:circulation')
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def circulation_return(request, pk):
+    """Operator marks a circulating product back in (returned, unsold)."""
+    circ = get_object_or_404(ProductCirculation, pk=pk)
+    if circ.status != ProductCirculation.Status.OUT:
+        messages.warning(request, "Cet article n'est plus en circulation.")
+        return redirect('sales:circulation')
+
+    circ.status = ProductCirculation.Status.RETURNED
+    circ.returned_by = request.user
+    circ.date_back = timezone.now()
+    circ.save(update_fields=['status', 'returned_by', 'date_back'])
+    ActivityLog.objects.create(
+        user=request.user,
+        action=ActivityLog.ActionType.UPDATE,
+        model_name='ProductCirculation',
+        object_id=str(circ.id),
+        object_repr=f"Retour vitrine {circ.product.reference}",
+        ip_address=_circulation_ip(request),
+    )
+    messages.success(request, f"{circ.product.reference} de retour en vitrine.")
+    return redirect('sales:circulation')
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def circulation_revert(request, pk):
+    """Correction: put a sold/returned record back in circulation."""
+    circ = get_object_or_404(ProductCirculation, pk=pk)
+    circ.status = ProductCirculation.Status.OUT
+    circ.invoice = None
+    circ.date_back = None
+    circ.returned_by = None
+    circ.save(update_fields=['status', 'invoice', 'date_back', 'returned_by'])
+    messages.success(request, f"{circ.product.reference} remis en circulation.")
+    return redirect('sales:circulation')
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def circulation_seller_create(request):
+    """AJAX: create an online seller from the circulation page."""
+    import json as _json
+    try:
+        data = _json.loads(request.body or '{}')
+    except ValueError:
+        data = {}
+    name = (data.get('name') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    if not name:
+        return JsonResponse({'success': False, 'error': 'Le nom est requis.'}, status=400)
+
+    seller, created = OnlineSeller.objects.get_or_create(
+        name=name, defaults={'phone': phone, 'is_active': True}
+    )
+    if not created and not seller.is_active:
+        seller.is_active = True
+        seller.save(update_fields=['is_active'])
+    return JsonResponse({'success': True, 'id': seller.id, 'name': seller.name})

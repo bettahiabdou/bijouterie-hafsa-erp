@@ -1,7 +1,23 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
-from .models import SaleInvoice, ClientLoan, Layaway
+from .models import SaleInvoice, ClientLoan, Layaway, OnlineSeller, ProductCirculation
+
+
+@admin.register(OnlineSeller)
+class OnlineSellerAdmin(admin.ModelAdmin):
+    list_display = ('name', 'phone', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'phone')
+
+
+@admin.register(ProductCirculation)
+class ProductCirculationAdmin(admin.ModelAdmin):
+    list_display = ('product', 'status', 'seller', 'sent_by', 'date_out', 'date_back')
+    list_filter = ('status', 'seller')
+    search_fields = ('product__reference', 'product__name')
+    raw_id_fields = ('product', 'invoice', 'seller', 'sent_by', 'returned_by')
+    readonly_fields = ('date_out',)
 
 
 @admin.register(SaleInvoice)
