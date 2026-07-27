@@ -3632,6 +3632,14 @@ def pending_invoice_complete(request, reference):
                 from payments.models import ClientPayment
                 from datetime import datetime
 
+                # This invoice is still a DRAFT (guaranteed above). Any ClientPayment
+                # already attached to it comes from an earlier failed completion
+                # attempt, so clear them before rebuilding the payment set from the
+                # form. This makes re-validation idempotent and avoids duplicate rows
+                # and PAY-<ref>-<idx> reference collisions on retry. amount_paid is
+                # recomputed from the form total further below.
+                ClientPayment.objects.filter(sale_invoice=invoice).delete()
+
                 total_amount_paid = exchange_credit
                 payment_details = []
                 for _entry in exchange_entries:
@@ -3680,10 +3688,11 @@ def pending_invoice_complete(request, reference):
                             pm = PaymentMethod.objects.get(id=method_id)
                             payment_details.append({'method': pm.name, 'amount': amount})
 
-                            if not pay_ref:
-                                pay_ref = f"PAY-{invoice.reference}-{idx}"
+                            # Leave the reference blank when the user didn't type one
+                            # so the model auto-generates a globally-unique PAY-*.
+                            # A deterministic PAY-<ref>-<idx> collides on re-completion.
                             ClientPayment.objects.create(
-                                reference=pay_ref,
+                                reference=pay_ref or '',
                                 date=pay_date,
                                 payment_type=ClientPayment.PaymentType.INVOICE,
                                 client=invoice.client,
