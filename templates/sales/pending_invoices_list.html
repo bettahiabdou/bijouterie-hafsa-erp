@@ -82,7 +82,7 @@
     {% if invoices %}
         <div class="pending-invoices-grid">
             {% for invoice in invoices %}
-                <div class="pending-invoice-card card animate-slide-up" style="animation-delay: {{ forloop.counter0|divisibleby:50 }}ms;">
+                <div class="pending-invoice-card card animate-slide-up" data-pending-ref="{{ invoice.reference }}" data-photo-count="{{ invoice.photos.count }}" style="animation-delay: {{ forloop.counter0|divisibleby:50 }}ms;">
                     <div class="card-body">
                         <!-- Header -->
                         <div class="pending-invoice-header">

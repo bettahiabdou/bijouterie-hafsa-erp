@@ -356,7 +356,7 @@
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleQuickClient()" title="Ajout rapide">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleQuickClient()" title="Ajout rapide" data-action="quick-add-client">
                                         <i class="fas fa-user-plus"></i>
                                     </button>
                                 </div>
@@ -1901,7 +1901,7 @@
                         console.log('Products found:', data.products.length);
                         if (data.products && data.products.length > 0) {
                             searchResults.innerHTML = data.products.map(p => `
-                                <div class="search-result-item" onclick='openAddProductModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
+                                <div class="search-result-item" data-product-id="${p.id}" data-product-ref="${p.reference || ''}" data-weight="${p.weight || ''}" onclick='openAddProductModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
                                     <div class="search-result-name">${p.name || p.category || 'Produit'}</div>
                                     <div class="search-result-details">
                                         <span class="search-result-ref">${p.reference}</span>
