@@ -9,7 +9,7 @@ from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse, HttpResponse
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import csv
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from .models import Product, ProductImage, ProductStone, ProductVideo
@@ -1522,38 +1522,89 @@ def product_video_delete_api(request, video_id):
 
 @login_required(login_url='login')
 def product_search_api(request):
-    """API endpoint to search products by barcode, reference, or name"""
+    """
+    Search products by barcode / reference / RFID / name.
+
+    Additive extensions (existing callers unaffected):
+      * response includes weight, purity, metal, category, price_per_gram
+      * optional filters combinable with q:
+          weight=2.730            exact weight (net or gross)
+          weight_min= / weight_max=   weight range
+          status=available|sold|...   default: all
+          limit=<n>               default 10, max 100
+    """
     query = request.GET.get('q', '').strip()
 
-    if not query:
+    def _dec(name):
+        raw = (request.GET.get(name) or '').strip()
+        if not raw:
+            return None
+        try:
+            return Decimal(raw)
+        except (InvalidOperation, ValueError):
+            return None
+
+    weight = _dec('weight')
+    weight_min = _dec('weight_min')
+    weight_max = _dec('weight_max')
+    status_filter = (request.GET.get('status') or '').strip()
+    has_filter = any(v is not None for v in (weight, weight_min, weight_max)) or bool(status_filter)
+
+    # Preserve original behaviour: nothing to search -> empty result
+    if not query and not has_filter:
         return JsonResponse({'products': []})
 
-    # Search by exact barcode first
-    products = Product.objects.filter(barcode=query)
+    qs = Product.objects.select_related('category', 'metal_type', 'metal_purity')
 
-    # If not found, search by reference (exact or partial)
-    if not products.exists():
-        products = Product.objects.filter(reference__icontains=query)
+    # Same cascade as before: first matching lookup type wins
+    if query:
+        by_barcode = qs.filter(barcode=query)
+        if by_barcode.exists():
+            qs = by_barcode
+        else:
+            by_ref = qs.filter(reference__icontains=query)
+            if by_ref.exists():
+                qs = by_ref
+            else:
+                by_rfid = qs.filter(rfid_tag__icontains=query)
+                if by_rfid.exists():
+                    qs = by_rfid
+                else:
+                    qs = qs.filter(name__icontains=query)
 
-    # If still not found, search by RFID tag
-    if not products.exists():
-        products = Product.objects.filter(rfid_tag__icontains=query)
+    # Optional filters
+    if weight is not None:
+        qs = qs.filter(Q(net_weight=weight) | Q(gross_weight=weight))
+    if weight_min is not None:
+        qs = qs.filter(net_weight__gte=weight_min)
+    if weight_max is not None:
+        qs = qs.filter(net_weight__lte=weight_max)
+    if status_filter:
+        qs = qs.filter(status=status_filter)
 
-    # If still not found, search by name
-    if not products.exists():
-        products = Product.objects.filter(name__icontains=query)
+    try:
+        limit = min(max(int(request.GET.get('limit', 10)), 1), 100)
+    except (ValueError, TypeError):
+        limit = 10
+    products = qs[:limit]
 
-    # Limit results
-    products = products[:10]
-
-    results = [{
-        'id': p.id,
-        'reference': p.reference,
-        'name': p.name,
-        'barcode': p.barcode,
-        'status': p.status,
-        'selling_price': str(p.selling_price) if p.selling_price else None,
-    } for p in products]
+    results = []
+    for p in products:
+        w = p.net_weight if p.net_weight is not None else p.gross_weight
+        results.append({
+            'id': p.id,
+            'reference': p.reference,
+            'name': p.name,
+            'barcode': p.barcode,
+            'status': p.status,
+            'selling_price': str(p.selling_price) if p.selling_price is not None else None,
+            # additive fields
+            'weight': str(w) if w is not None else None,
+            'purity': p.metal_purity.name if p.metal_purity else None,
+            'metal': p.metal_type.name if p.metal_type else None,
+            'category': p.category.name if p.category else None,
+            'price_per_gram': str(p.purchase_price_per_gram) if p.purchase_price_per_gram is not None else None,
+        })
 
     return JsonResponse({'products': results})
 
