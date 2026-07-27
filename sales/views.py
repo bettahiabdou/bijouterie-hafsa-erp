@@ -4763,6 +4763,68 @@ def full_export_download(request, job_id):
 
 
 @login_required(login_url='login')
+@require_http_methods(["GET"])
+def pending_invoice_detail_api(request, reference):
+    """
+    JSON metadata for a draft/pending sale (§6): seller, created date, client,
+    line items, totals, and full-resolution photo URLs — so the assistant can
+    read the receipt photos without scraping the DOM. No OCR is performed here.
+    """
+    invoice = (SaleInvoice.objects
+               .select_related('seller', 'client')
+               .prefetch_related('photos', 'items__product')
+               .filter(reference=reference, is_deleted=False).first())
+    if not invoice:
+        return JsonResponse({'ok': False, 'error': f'Facture {reference} introuvable'}, status=404)
+
+    def _abs(url):
+        try:
+            return request.build_absolute_uri(url)
+        except Exception:
+            return url
+
+    photos = []
+    for ph in invoice.photos.all():
+        if getattr(ph, 'image', None):
+            try:
+                photos.append(_abs(ph.image.url))
+            except Exception:
+                continue
+
+    items = [{
+        'product_id': it.product_id,
+        'reference': it.product.reference if it.product else None,
+        'name': it.product.name if it.product else None,
+        'quantity': str(it.quantity),
+        'unit_price': str(it.unit_price) if it.unit_price is not None else None,
+        'total': str(it.total_amount) if it.total_amount is not None else None,
+    } for it in invoice.items.all()]
+
+    seller = None
+    if invoice.seller:
+        seller = invoice.seller.get_full_name() or invoice.seller.username
+    client = None
+    if invoice.client:
+        client = {'id': invoice.client.id, 'name': invoice.client.full_name,
+                  'phone': invoice.client.phone or ''}
+
+    return JsonResponse({
+        'ok': True,
+        'id': invoice.id,
+        'reference': invoice.reference,
+        'status': invoice.status,
+        'seller': seller,
+        'created_at': invoice.created_at.isoformat() if invoice.created_at else None,
+        'date': invoice.date.isoformat() if invoice.date else None,
+        'client': client,
+        'photos': photos,
+        'items': items,
+        'subtotal': str(invoice.subtotal) if invoice.subtotal is not None else None,
+        'total': str(invoice.total_amount) if invoice.total_amount is not None else None,
+    })
+
+
+@login_required(login_url='login')
 @require_http_methods(["POST"])
 def pending_invoice_complete_api(request, reference):
     """
