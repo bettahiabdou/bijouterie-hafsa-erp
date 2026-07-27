@@ -51,6 +51,7 @@ urlpatterns = [
     # Pending invoices (Brouillon - from Telegram)
     path('pending/', views.pending_invoices_list, name='pending_invoices'),
     path('pending/<str:reference>/complete/', views.pending_invoice_complete, name='pending_invoice_complete'),
+    path('pending/<str:reference>/complete/api/', views.pending_invoice_complete_api, name='pending_invoice_complete_api'),
 
     # Livraisons (Delivery Tracking)
     path('livraisons/', views.delivery_list, name='delivery_list'),

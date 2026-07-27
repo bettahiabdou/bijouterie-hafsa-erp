@@ -4760,3 +4760,246 @@ def full_export_download(request, job_id):
         messages.error(request, "L'export n'est pas encore prêt.")
         return redirect('sales:sales_dashboard')
     return FileResponse(job.file.open('rb'), as_attachment=True, filename='export_complet.zip')
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def pending_invoice_complete_api(request, reference):
+    """
+    One-shot JSON completion of a draft invoice (§3 of the automation brief).
+
+    Does the whole completion atomically: rename reference, attach/create client,
+    add items, set delivery, record payments, reconcile and validate — replacing
+    8-12 sequential browser round-trips. Additive: the existing UI flow at
+    /sales/pending/<ref>/complete/ is unchanged.
+
+    Body: {reference, items[{product_id|reference, quantity, selling_price}],
+           delivery{type, tracking_number, carrier_id?}, client{id|first_name,last_name,phone}?,
+           payments[{method_id|method_code, date, amount, reference}], validate}
+    """
+    import json as _json
+    from django.db import transaction
+    from datetime import datetime as _dt
+    from payments.models import ClientPayment
+
+    def err(http_status, code, message, extra=None):
+        e = {'code': code, 'message': message}
+        if extra:
+            e.update(extra)
+        return JsonResponse({'ok': False, 'errors': [e]}, status=http_status)
+
+    try:
+        data = _json.loads(request.body or '{}')
+    except (ValueError, TypeError):
+        return err(400, 'bad_json', 'Corps JSON invalide')
+
+    invoice = SaleInvoice.objects.filter(reference=reference, is_deleted=False).first()
+    if not invoice:
+        return err(404, 'not_found', f'Facture {reference} introuvable')
+    if invoice.status != SaleInvoice.Status.DRAFT:
+        return err(409, 'already_completed',
+                   f'La facture {invoice.reference} a déjà été validée '
+                   f'(statut {invoice.get_status_display()}).')
+
+    items_in = data.get('items') or []
+    if not items_in:
+        return err(400, 'no_items', 'Au moins un article est requis')
+
+    warnings = []
+    client_created = False
+    do_validate = bool(data.get('validate', True))
+    DELIVERY_MAP = {
+        'magasin': 'magasin', 'amana': 'amana',
+        'autre_transporteur': 'transporteur', 'transporteur': 'transporteur',
+        'en_stock': 'en_stock',
+    }
+
+    try:
+        with transaction.atomic():
+            # --- Reference ---
+            new_ref = str(data.get('reference') or '').strip()
+            if new_ref and new_ref != invoice.reference:
+                if SaleInvoice.objects.filter(reference=new_ref, is_deleted=False).exclude(id=invoice.id).exists():
+                    return err(400, 'reference_taken', f'La référence {new_ref} existe déjà.')
+                invoice.reference = new_ref
+
+            # --- Client ---
+            cb = data.get('client')
+            if cb:
+                cid = cb.get('id')
+                phone = (cb.get('phone') or '').strip()
+                if cid:
+                    c = Client.objects.filter(pk=cid).first()
+                    if not c:
+                        return err(400, 'client_not_found', f'Client id={cid} introuvable')
+                    invoice.client = c
+                elif phone and Client.objects.filter(phone=phone, is_active=True).exists():
+                    invoice.client = Client.objects.filter(phone=phone, is_active=True).first()
+                    warnings.append({'code': 'client_exists',
+                                     'message': f'Un client avec le téléphone {phone} existe déjà; rattaché au lieu de créer un doublon.'})
+                else:
+                    fn = (cb.get('first_name') or '').strip()
+                    ln = (cb.get('last_name') or '').strip()
+                    if not (fn and ln and phone):
+                        return err(400, 'client_incomplete',
+                                   'Pour créer un client: first_name, last_name et phone requis.')
+                    invoice.client = Client.objects.create(
+                        first_name=fn, last_name=ln, phone=phone, is_active=True)
+                    client_created = True
+
+            invoice.date = timezone.now().date()
+            invoice.save()
+
+            # --- Items ---
+            for it in items_in:
+                pid = it.get('product_id')
+                pref = (it.get('reference') or '').strip()
+                product = None
+                if pid:
+                    product = Product.objects.filter(pk=pid).first()
+                elif pref:
+                    product = Product.objects.filter(reference=pref).first()
+                if not product:
+                    return err(400, 'product_not_found',
+                               f'Produit introuvable: {pid or pref}', {'item': it})
+                if product.status == 'sold':
+                    return err(400, 'product_sold',
+                               f'Produit déjà vendu: {product.reference}', {'product_id': product.id})
+                try:
+                    qty = Decimal(str(it.get('quantity', 1)))
+                    sp_raw = it.get('selling_price')
+                    sp = Decimal(str(sp_raw)) if sp_raw not in (None, '') else Decimal(str(product.selling_price or 0))
+                except (InvalidOperation, TypeError):
+                    return err(400, 'bad_item_values', f'Valeurs invalides pour {product.reference}')
+                if qty <= 0:
+                    return err(400, 'bad_quantity', f'Quantité invalide pour {product.reference}')
+                SaleInvoiceItem.objects.create(
+                    invoice=invoice, product=product, quantity=qty,
+                    original_price=product.selling_price or sp,
+                    negotiated_price=sp, unit_price=sp,
+                    total_amount=sp * qty,
+                )
+
+            invoice.calculate_totals()
+            invoice.refresh_from_db()
+
+            # --- Payments ---
+            total_paid = Decimal('0')
+            for i, pay in enumerate(data.get('payments') or []):
+                try:
+                    amount = Decimal(str(pay.get('amount', '0')))
+                except (InvalidOperation, TypeError):
+                    return err(400, 'bad_payment_amount', f'Montant invalide (paiement {i + 1})')
+                if amount <= 0:
+                    continue
+                pm = None
+                if pay.get('method_id'):
+                    pm = PaymentMethod.objects.filter(pk=pay['method_id']).first()
+                if not pm and pay.get('method_code'):
+                    pm = PaymentMethod.objects.filter(code=pay['method_code']).first()
+                if not pm:
+                    return err(400, 'payment_method_not_found',
+                               f'Mode de paiement introuvable (paiement {i + 1})')
+                date_str = (pay.get('date') or '').strip()
+                try:
+                    pay_date = _dt.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
+                except ValueError:
+                    pay_date = timezone.now().date()
+                pref_pay = (pay.get('reference') or '').strip() or f"PAY-{invoice.reference}-{i + 1}"
+                ClientPayment.objects.create(
+                    reference=pref_pay, date=pay_date,
+                    payment_type=ClientPayment.PaymentType.INVOICE,
+                    client=invoice.client, amount=amount, payment_method=pm,
+                    sale_invoice=invoice, created_by=request.user,
+                )
+                total_paid += amount
+
+            # --- Reconcile arithmetic ---
+            if total_paid > invoice.total_amount:
+                return err(400, 'overpaid',
+                           f'Somme des paiements ({total_paid}) supérieure au total ({invoice.total_amount}).',
+                           {'total': str(invoice.total_amount), 'total_paid': str(total_paid)})
+
+            recorded = min(total_paid, invoice.total_amount)
+            invoice.amount_paid = recorded
+            invoice.balance_due = invoice.total_amount - recorded
+            if total_paid >= invoice.total_amount and invoice.total_amount > 0:
+                invoice.status = SaleInvoice.Status.PAID
+                invoice.balance_due = Decimal('0')
+            elif total_paid > 0:
+                invoice.status = SaleInvoice.Status.PARTIAL_PAID
+            else:
+                invoice.status = SaleInvoice.Status.UNPAID
+
+            # --- Delivery ---
+            db = data.get('delivery') or {}
+            dtype = DELIVERY_MAP.get((db.get('type') or 'magasin').strip(), 'magasin')
+            invoice.delivery_method_type = dtype
+            tracking = (db.get('tracking_number') or '').strip()
+            invoice.tracking_number = tracking
+            if dtype in ('amana', 'transporteur') and not tracking:
+                warnings.append({'code': 'no_tracking',
+                                 'message': f'Aucun numéro de suivi fourni pour {dtype}.'})
+            if db.get('carrier_id') and dtype == 'transporteur':
+                from settings_app.models import Carrier
+                inv_carrier = Carrier.objects.filter(pk=db['carrier_id']).first()
+                if inv_carrier:
+                    invoice.carrier = inv_carrier
+
+            if not do_validate:
+                invoice.status = SaleInvoice.Status.DRAFT  # save without validating
+            invoice.save()
+
+            if do_validate:
+                if dtype in ('amana', 'transporteur'):
+                    from sales.models import Delivery
+                    Delivery.objects.create(
+                        invoice=invoice,
+                        client_name=invoice.client.full_name if invoice.client else '',
+                        client_phone=invoice.client.phone if invoice.client else '',
+                        total_amount=invoice.total_amount, delivery_method_type=dtype,
+                        carrier=invoice.carrier, tracking_number=tracking, status='pending',
+                    )
+                if dtype == 'en_stock' and invoice.client:
+                    from stock_storage.models import StockStorageAccount, StockStorageItem
+                    acct, _ = StockStorageAccount.objects.get_or_create(
+                        client=invoice.client, defaults={'created_by': request.user})
+                    for inv_item in invoice.items.select_related('product'):
+                        if inv_item.product:
+                            StockStorageItem.objects.create(
+                                account=acct, invoice=invoice, product=inv_item.product,
+                                product_reference=inv_item.product.reference,
+                                product_name=inv_item.product.name,
+                                product_weight=inv_item.product.gross_weight or 0,
+                                price=inv_item.total_amount or 0, created_by=request.user)
+                for inv_item in invoice.items.all():
+                    if inv_item.product:
+                        inv_item.product.status = 'sold'
+                        inv_item.product.save(update_fields=['status'])
+
+            ActivityLog.objects.create(
+                user=request.user, action=ActivityLog.ActionType.UPDATE,
+                model_name='SaleInvoice', object_id=str(invoice.id),
+                object_repr=str(invoice),
+                details={'action': 'completed_via_api', 'reference': invoice.reference})
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception('pending_invoice_complete_api failed')
+        return err(500, 'server_error', str(e))
+
+    STATUS_MAP = {'paid': 'PAYEE', 'partial': 'PARTIELLEMENT_PAYEE',
+                  'unpaid': 'NON_PAYEE', 'draft': 'BROUILLON'}
+    return JsonResponse({
+        'ok': True,
+        'invoice_id': invoice.id,
+        'reference': invoice.reference,
+        'status': STATUS_MAP.get(invoice.status, invoice.status.upper()),
+        'status_code': invoice.status,
+        'subtotal': str(invoice.subtotal),
+        'discount': str(invoice.discount_amount),
+        'total': str(invoice.total_amount),
+        'total_paid': str(invoice.amount_paid),
+        'url': f'/sales/invoices/{invoice.reference}/',
+        'client': {'id': invoice.client.id if invoice.client else None, 'created': client_created},
+        'warnings': warnings,
+    })

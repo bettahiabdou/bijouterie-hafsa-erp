@@ -286,17 +286,27 @@ def client_delete(request, pk):
 
 @login_required(login_url='login')
 def api_search_clients(request):
-    """API endpoint to search clients by name, phone, or code - returns deposit balance info"""
-    query = request.GET.get('q', '').strip()
-    if len(query) < 2:
-        return JsonResponse({'results': []})
+    """
+    Search clients by name, phone, or code — returns deposit balance info.
 
-    clients = Client.objects.filter(
-        Q(first_name__icontains=query) |
-        Q(last_name__icontains=query) |
-        Q(phone__icontains=query) |
-        Q(code__icontains=query)
-    ).filter(is_active=True).order_by('first_name', 'last_name')[:50]
+    Additive extensions (existing callers unaffected):
+      * optional exact `phone` param (?phone=0679425461) for duplicate checks
+      * first_name / last_name returned alongside name
+    """
+    query = request.GET.get('q', '').strip()
+    phone_exact = (request.GET.get('phone') or '').strip()
+
+    if phone_exact:
+        clients = Client.objects.filter(phone=phone_exact, is_active=True).order_by('first_name', 'last_name')[:50]
+    else:
+        if len(query) < 2:
+            return JsonResponse({'results': []})
+        clients = Client.objects.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(phone__icontains=query) |
+            Q(code__icontains=query)
+        ).filter(is_active=True).order_by('first_name', 'last_name')[:50]
 
     results = []
     for client in clients:
@@ -314,6 +324,8 @@ def api_search_clients(request):
         results.append({
             'id': client.id,
             'name': client.full_name,
+            'first_name': client.first_name or '',
+            'last_name': client.last_name or '',
             'phone': client.phone or '',
             'code': client.code or '',
             'has_deposit': has_deposit,
