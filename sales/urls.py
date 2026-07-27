@@ -20,18 +20,21 @@ urlpatterns = [
     path('invoices/', views.invoice_list, name='invoice_list'),
     path('invoices/create/', views.invoice_create, name='invoice_create'),
     path('invoices/bulk-create/', views.bulk_invoice_create, name='bulk_create'),
+
+    # Static invoice-item / photo routes — MUST come before the <reference>
+    # catch-all below, otherwise 'update-item' etc. are matched as a reference (404).
+    path('invoices/delete-item/', views.delete_invoice_item, name='delete_item'),
+    path('invoices/update-item/', views.update_invoice_item, name='update_item'),
+    path('invoices/photo/<int:photo_id>/delete/', views.delete_invoice_photo, name='delete_invoice_photo'),
+
+    # Reference-based invoice routes (suffix'd sub-paths don't collide with <reference>)
     path('invoices/<str:reference>/', views.invoice_detail, name='invoice_detail'),
     path('invoices/<str:reference>/edit/', views.invoice_edit, name='invoice_edit'),
     path('invoices/<str:reference>/delete/', views.invoice_delete, name='invoice_delete'),
     path('invoices/<str:reference>/payment/', views.invoice_payment, name='invoice_payment'),
     path('invoices/<str:reference>/delivery/', views.invoice_delivery, name='invoice_delivery'),
-
-    # Invoice Items (Add/Delete/Update)
     path('invoices/<str:reference>/add-item/', views.add_invoice_item, name='add_item'),
-    path('invoices/delete-item/', views.delete_invoice_item, name='delete_item'),
-    path('invoices/update-item/', views.update_invoice_item, name='update_item'),
     path('invoices/<str:reference>/add-photo/', views.add_invoice_photo, name='add_invoice_photo'),
-    path('invoices/photo/<int:photo_id>/delete/', views.delete_invoice_photo, name='delete_invoice_photo'),
 
     # Payment editing
     path('api/update-payment/', views.update_payment, name='update_payment'),
