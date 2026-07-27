@@ -52,7 +52,7 @@
     </div>
 
     <!-- Sortir un produit -->
-    <div class="card mb-6">
+    <div class="card mb-6 circ-out-card">
         <div class="card-header">
             <h3 class="card-title"><i class="fas fa-share-square text-info mr-2"></i> Sortir un produit</h3>
         </div>
@@ -242,6 +242,8 @@
 
     <style>
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4); }
+        /* Let the product-search dropdown escape the card (which clips overflow) */
+        .circ-out-card, .circ-out-card .card-body { overflow: visible; }
         .search-results {
             position: absolute; top: 100%; left: 0; right: 0; z-index: 30;
             background: var(--surface, #fff); border: 1px solid var(--neutral-200);
