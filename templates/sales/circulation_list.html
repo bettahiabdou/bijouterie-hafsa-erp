@@ -60,13 +60,13 @@
             <form method="post" action="{% url 'sales:circulation_out' %}" id="out-form">
                 {% csrf_token %}
                 <input type="hidden" name="product_id" id="out-product-id">
-                <div class="flex gap-4 flex-wrap items-end">
+                <div class="flex gap-4 flex-wrap items-end sortir-row">
                     <div class="form-group mb-0" style="flex: 2; min-width: 240px; position: relative;">
                         <label class="form-label">Produit (référence, code-barres ou nom)</label>
-                        <div style="display:flex; gap:8px;">
+                        <div class="scan-input-row">
                             <input type="text" id="out-product-search" class="form-input" autocomplete="off"
-                                   inputmode="text" placeholder="Tapez ou scannez..." style="flex:1;">
-                            <button type="button" id="scan-btn" class="btn btn-secondary" title="Scanner un code-barres" style="white-space:nowrap;">
+                                   inputmode="text" placeholder="Tapez ou scannez...">
+                            <button type="button" id="scan-btn" class="btn btn-secondary" title="Scanner un code-barres">
                                 <i class="fas fa-barcode"></i> <span class="scan-btn-label">Scanner</span>
                             </button>
                         </div>
@@ -292,6 +292,20 @@
         .circ-tab { padding: var(--space-3) var(--space-4); border: none; background: none; cursor: pointer; font-weight: var(--font-medium); color: var(--neutral-500); border-bottom: 2px solid transparent; }
         .circ-tab.active { color: var(--primary-700); border-bottom-color: var(--primary-600); }
         .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        /* Product input + Scanner button */
+        .scan-input-row { display: flex; gap: 8px; align-items: stretch; }
+        .scan-input-row .form-input { flex: 1; min-width: 0; }
+        .scan-input-row #scan-btn { white-space: nowrap; flex-shrink: 0; }
+
+        /* Mobile: stack the whole Sortir form and the input/scanner button */
+        @media (max-width: 768px) {
+            .sortir-row { flex-direction: column; align-items: stretch; }
+            .sortir-row .form-group { width: 100%; min-width: 0 !important; flex: none !important; }
+            .sortir-row #out-submit { width: 100%; }
+            .scan-input-row { flex-direction: column; }
+            .scan-input-row #scan-btn { width: 100%; padding: 12px; }
+        }
 
         /* Scan hint under the search box */
         .scan-hint { margin-top: var(--space-2); font-size: var(--text-sm); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); }
