@@ -528,7 +528,7 @@
             // decode frames from it.
             try {
                 scanStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
                     audio: false
                 });
             } catch (err) {
@@ -553,8 +553,21 @@
             if (!nativeDetector) {
                 setStatus('Chargement du lecteur…');
                 try { await loadScript(ZXING_URL); } catch (e) {}
-                if (window.ZXing && window.ZXing.BrowserMultiFormatReader) {
-                    zxingReader = new window.ZXing.BrowserMultiFormatReader();
+                const ZX = window.ZXing;
+                if (ZX && ZX.BrowserMultiFormatReader) {
+                    // TRY_HARDER + the 1D/2D formats our labels use, so real-world
+                    // (slightly blurred / angled) barcodes still decode.
+                    const hints = new Map();
+                    try {
+                        hints.set(ZX.DecodeHintType.TRY_HARDER, true);
+                        hints.set(ZX.DecodeHintType.POSSIBLE_FORMATS, [
+                            ZX.BarcodeFormat.CODE_128, ZX.BarcodeFormat.CODE_39, ZX.BarcodeFormat.CODE_93,
+                            ZX.BarcodeFormat.EAN_13, ZX.BarcodeFormat.EAN_8, ZX.BarcodeFormat.UPC_A,
+                            ZX.BarcodeFormat.UPC_E, ZX.BarcodeFormat.ITF, ZX.BarcodeFormat.CODABAR,
+                            ZX.BarcodeFormat.QR_CODE, ZX.BarcodeFormat.DATA_MATRIX
+                        ]);
+                    } catch (e) {}
+                    zxingReader = new ZX.BrowserMultiFormatReader(hints);
                 }
             }
             if (!nativeDetector && !zxingReader) {
@@ -576,6 +589,27 @@
             return canvas;
         }
 
+        // Crop the centre of a canvas (roughly the aiming box) to remove
+        // background noise and enlarge the barcode for the decoder.
+        function cropCenter(src, wFrac, hFrac) {
+            const w = Math.max(1, Math.round(src.width * wFrac));
+            const h = Math.max(1, Math.round(src.height * hFrac));
+            const x = Math.round((src.width - w) / 2);
+            const y = Math.round((src.height - h) / 2);
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            c.getContext('2d').drawImage(src, x, y, w, h, 0, 0, w, h);
+            return c;
+        }
+
+        async function zxingDecodeCanvas(cv) {
+            try {
+                const result = await zxingReader.decodeFromImageUrl(cv.toDataURL('image/jpeg', 0.95));
+                if (result) return result.getText();
+            } catch (e) { /* NotFoundException when no code in this frame */ }
+            return null;
+        }
+
         // Decode a single frame. Returns the decoded string or null.
         async function decodeOnce() {
             if (nativeDetector) {
@@ -586,12 +620,14 @@
                 return null;
             }
             if (zxingReader) {
-                const canvas = grabCanvas();
-                if (!canvas) return null;
-                try {
-                    const result = await zxingReader.decodeFromImageUrl(canvas.toDataURL('image/jpeg', 0.92));
-                    if (result) return result.getText();
-                } catch (e) { /* NotFoundException when no code in frame */ }
+                const full = grabCanvas();
+                if (!full) return null;
+                // Try the aimed centre first (cleaner, bigger barcode), then the
+                // whole frame as a fallback.
+                for (const cv of [cropCenter(full, 0.92, 0.5), cropCenter(full, 0.7, 0.32), full]) {
+                    const v = await zxingDecodeCanvas(cv);
+                    if (v) return v;
+                }
                 return null;
             }
             return null;
