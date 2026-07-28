@@ -92,7 +92,7 @@
     <div class="card">
         <div class="card-body">
             {% if rows %}
-                <div class="table-responsive">
+                <div class="table-responsive benefice-desktop">
                     <table class="table benefice-table">
                         <thead>
                             <tr>
@@ -149,6 +149,41 @@
                     </table>
                 </div>
 
+                <!-- Mobile card list (shown only on phones) -->
+                <div class="benefice-cards">
+                    {% for r in rows %}
+                        <div class="bcard">
+                            <div class="bcard-head">
+                                <div class="bcard-head-left">
+                                    <a href="{% url 'sales:invoice_detail' r.invoice.reference %}" class="bcard-inv">{{ r.invoice.reference }}</a>
+                                    <span class="bcard-date">{{ r.invoice.date|date:"d/m/Y" }}</span>
+                                </div>
+                                <span class="gain {% if r.gain < 0 %}gain-neg{% else %}gain-pos{% endif %}">{{ r.gain|floatformat:2 }} DH</span>
+                            </div>
+                            <div class="bcard-prod">
+                                <span class="prod-ref">{{ r.product.reference }}</span>
+                                <span class="row-sub">{{ r.product.name }}</span>
+                            </div>
+                            <div class="bcard-line"><span>Prix vente</span><strong>{{ r.total_amount|floatformat:2 }} DH</strong></div>
+                            <div class="bcard-line"><span>Prix achat</span><strong>{{ r.bought_price|floatformat:2 }} DH</strong></div>
+                            <div class="bcard-imgs">
+                                {% with img=r.product.main_image %}
+                                    {% if img %}
+                                        <a href="{{ img.url }}" target="_blank"><img src="{{ img.url }}" class="rep-thumb" alt="Produit"></a>
+                                    {% elif r.product.images.first %}
+                                        <a href="{{ r.product.images.first.image.url }}" target="_blank"><img src="{{ r.product.images.first.image.url }}" class="rep-thumb" alt="Produit"></a>
+                                    {% endif %}
+                                {% endwith %}
+                                {% with photo=r.invoice.photos.first %}
+                                    {% if photo %}
+                                        <a href="{{ photo.image.url }}" target="_blank"><img src="{{ photo.image.url }}" class="rep-thumb" alt="Facture"></a>
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
                 {% if page_obj.has_other_pages %}
                     <div class="pagination-wrapper mt-6">
                         <nav class="pagination">
@@ -184,21 +219,31 @@
         .gain-neg { color: var(--error-600, #dc2626); }
         .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-        @media (max-width: 720px) {
-            .benefice-table thead { display: none; }
-            .benefice-table, .benefice-table tbody, .benefice-table tr, .benefice-table td { display: block; width: 100%; }
-            .benefice-table tr {
-                border: 1px solid var(--neutral-200); border-radius: var(--radius-lg);
-                padding: var(--space-3); margin-bottom: var(--space-3); box-shadow: var(--shadow-sm);
-            }
-            .benefice-table td {
-                border: none; padding: 6px 0; display: flex; align-items: center;
-                justify-content: space-between; gap: var(--space-3); text-align: right;
-            }
-            .benefice-table td::before {
-                content: attr(data-label); font-weight: var(--font-semibold);
-                color: var(--neutral-500); text-align: left; flex-shrink: 0;
-            }
+        /* Mobile card list — hidden on desktop, replaces the table on phones */
+        .benefice-cards { display: none; }
+        .bcard {
+            border: 1px solid var(--neutral-200); border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm); padding: var(--space-4);
+            margin-bottom: var(--space-3); background: #fff;
+        }
+        .bcard-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
+        .bcard-inv { font-weight: var(--font-semibold); color: var(--primary-700); }
+        .bcard-date { display: block; font-size: var(--text-xs); color: var(--neutral-500); }
+        .bcard-head .gain { font-size: var(--text-lg); white-space: nowrap; }
+        .bcard-prod { margin: var(--space-2) 0 var(--space-3); display: flex; flex-direction: column; }
+        .bcard-line {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 6px 0; border-top: 1px solid var(--neutral-100);
+        }
+        .bcard-line span { color: var(--neutral-500); font-size: var(--text-sm); }
+        .bcard-imgs { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+        .bcard-imgs .rep-thumb { width: 56px; height: 56px; }
+
+        @media (max-width: 768px) {
+            .benefice-desktop { display: none !important; }
+            .benefice-cards { display: block; }
+            .benefice-filter-actions { grid-column: 1 / -1; }
+            .benefice-filter-actions .btn { flex: 1; }
         }
     </style>
 {% endblock %}

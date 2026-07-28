@@ -35,7 +35,32 @@
         .gain-pos { color: #060; font-weight: 700; }
         tfoot td { border-top: 2px solid #111; font-weight: 700; background: #fafafa; }
         .empty { text-align: center; padding: 30px; color: #666; }
-        @media print { .toolbar { display: none; } body { font-size: 10px; } }
+
+        /* Phone-screen card list (hidden on desktop and when printing) */
+        .print-cards { display: none; }
+        .pcard { border: 1px solid #ccc; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+        .pcard-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .pcard-ref { font-weight: 700; }
+        .pcard-sub { font-size: 11px; color: #666; }
+        .pcard-line { display: flex; justify-content: space-between; padding: 4px 0; border-top: 1px solid #eee; }
+        .pcard-line span { color: #555; }
+        .pcard-imgs { display: flex; gap: 8px; margin-top: 8px; }
+        .pcard-imgs img { width: 54px; height: 54px; object-fit: cover; border-radius: 5px; }
+        .ptotals { border: 2px solid #111; border-radius: 8px; padding: 12px; margin-top: 6px; background: #fafafa; }
+        .ptotals .pcard-line { border-top: none; font-weight: 700; }
+
+        @media screen and (max-width: 768px) {
+            body { font-size: 14px; padding: 0 10px; }
+            table.report-table { display: none; }
+            .print-cards { display: block; }
+            .report-head h1 { font-size: 16px; }
+        }
+        @media print {
+            .toolbar { display: none; }
+            body { font-size: 10px; }
+            .print-cards { display: none !important; }
+            table.report-table { display: table !important; }
+        }
     </style>
 </head>
 <body>
@@ -66,7 +91,7 @@
     </div>
 
     {% if rows %}
-        <table>
+        <table class="report-table">
             <thead>
                 <tr>
                     <th>Facture</th>
@@ -111,12 +136,51 @@
                 </tr>
             </tfoot>
         </table>
+
+        <!-- Phone-screen card list (shown only on small screens) -->
+        <div class="print-cards">
+            {% for r in rows %}
+                <div class="pcard">
+                    <div class="pcard-head">
+                        <div>
+                            <div class="pcard-ref">{{ r.invoice.reference }}</div>
+                            <div class="pcard-sub">{{ r.invoice.date|date:"d/m/Y" }} · {{ r.product.reference }}</div>
+                        </div>
+                        <div class="{% if r.gain < 0 %}gain-neg{% else %}gain-pos{% endif %}">{{ r.gain|floatformat:2 }} DH</div>
+                    </div>
+                    <div class="pcard-sub">{{ r.product.name }}</div>
+                    <div class="pcard-line"><span>Prix vente</span><strong>{{ r.total_amount|floatformat:2 }} DH</strong></div>
+                    <div class="pcard-line"><span>Prix achat</span><strong>{{ r.bought_price|floatformat:2 }} DH</strong></div>
+                    <div class="pcard-imgs">
+                        {% with img=r.product.main_image %}
+                            {% if img %}<img src="{{ img.url }}" alt="">
+                            {% elif r.product.images.first %}<img src="{{ r.product.images.first.image.url }}" alt="">{% endif %}
+                        {% endwith %}
+                        {% with photo=r.invoice.photos.first %}
+                            {% if photo %}<img src="{{ photo.image.url }}" alt="">{% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+            {% endfor %}
+            <div class="ptotals">
+                <div class="pcard-line"><span>Total ventes</span><strong>{{ totals.total_sales|floatformat:2 }} DH</strong></div>
+                <div class="pcard-line"><span>Total achats</span><strong>{{ totals.total_cost|floatformat:2 }} DH</strong></div>
+                <div class="pcard-line"><span>Bénéfice</span><strong>{{ totals.total_gain|floatformat:2 }} DH</strong></div>
+                <div class="pcard-line"><span>Marge</span><strong>{{ totals.margin|floatformat:1 }} %</strong></div>
+            </div>
+        </div>
     {% else %}
         <div class="empty">Aucun article vendu pour ces filtres.</div>
     {% endif %}
 
     <script>
-        window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 300); });
+        // Auto-open the print dialog on desktop only; on phones show the
+        // readable card view first (the user can tap "Imprimer" to print/PDF).
+        window.addEventListener('load', function () {
+            if (window.innerWidth > 768) {
+                setTimeout(function () { window.print(); }, 300);
+            }
+        });
     </script>
 </body>
 </html>
