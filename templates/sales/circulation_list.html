@@ -503,8 +503,9 @@
         const scanStatus = document.getElementById('scan-status');
         const scanTorch = document.getElementById('scan-torch');
         const scanCapture = document.getElementById('scan-capture');
-        // @zxing/library UMD (global `ZXing`) — decoder for browsers without a
-        // native BarcodeDetector (e.g. iOS Safari).
+        // Decoders for browsers without a native BarcodeDetector (e.g. iOS Safari):
+        // Quagga2 (global `Quagga`, strong 1D) + @zxing/library (global `ZXing`, backup).
+        const QUAGGA_URL = 'https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js';
         const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js';
         let scanStream = null, nativeDetector = null, zxingReader = null,
             scanTimer = null, scanningActive = false, busy = false, torchOn = false,
@@ -552,11 +553,11 @@
             }
             if (!nativeDetector) {
                 setStatus('Chargement du lecteur…');
+                // Quagga2 (best for 1D like Code128/EAN) + ZXing as a backup.
+                try { await loadScript(QUAGGA_URL); } catch (e) {}
                 try { await loadScript(ZXING_URL); } catch (e) {}
                 const ZX = window.ZXing;
                 if (ZX && ZX.BrowserMultiFormatReader) {
-                    // TRY_HARDER + the 1D/2D formats our labels use, so real-world
-                    // (slightly blurred / angled) barcodes still decode.
                     const hints = new Map();
                     try {
                         hints.set(ZX.DecodeHintType.TRY_HARDER, true);
@@ -570,7 +571,8 @@
                     zxingReader = new ZX.BrowserMultiFormatReader(hints);
                 }
             }
-            if (!nativeDetector && !zxingReader) {
+            const haveDecoder = nativeDetector || zxingReader || (window.Quagga && window.Quagga.decodeSingle);
+            if (!haveDecoder) {
                 setStatus('Lecteur indisponible.');
                 showHint('Scanner non disponible sur ce navigateur. Saisissez le code ou utilisez un lecteur externe.', 'err');
                 return;
@@ -602,9 +604,34 @@
             return c;
         }
 
-        async function zxingDecodeCanvas(cv) {
+        // Quagga2 single-image decode (best for 1D). locate:true finds the code
+        // within the frame; numOfWorkers:0 keeps it on the main thread (no blob workers).
+        function quaggaDecode(src) {
+            return new Promise((resolve) => {
+                if (!window.Quagga || !window.Quagga.decodeSingle) return resolve(null);
+                try {
+                    window.Quagga.decodeSingle({
+                        src: src,
+                        numOfWorkers: 0,
+                        locate: true,
+                        inputStream: { size: 1600 },
+                        locator: { patchSize: 'medium', halfSample: false },
+                        decoder: { readers: [
+                            'code_128_reader', 'ean_reader', 'ean_8_reader', 'code_39_reader',
+                            'code_39_vin_reader', 'codabar_reader', 'upc_reader', 'upc_e_reader',
+                            'i2of5_reader', '2of5_reader', 'code_93_reader'
+                        ] }
+                    }, (result) => {
+                        resolve(result && result.codeResult && result.codeResult.code ? result.codeResult.code : null);
+                    });
+                } catch (e) { resolve(null); }
+            });
+        }
+
+        async function zxingDecodeUrl(url) {
+            if (!zxingReader) return null;
             try {
-                const result = await zxingReader.decodeFromImageUrl(cv.toDataURL('image/jpeg', 0.95));
+                const result = await zxingReader.decodeFromImageUrl(url);
                 if (result) return result.getText();
             } catch (e) { /* NotFoundException when no code in this frame */ }
             return null;
@@ -619,16 +646,16 @@
                 } catch (e) {}
                 return null;
             }
-            if (zxingReader) {
-                const full = grabCanvas();
-                if (!full) return null;
-                // Try the aimed centre first (cleaner, bigger barcode), then the
-                // whole frame as a fallback.
-                for (const cv of [cropCenter(full, 0.92, 0.5), cropCenter(full, 0.7, 0.32), full]) {
-                    const v = await zxingDecodeCanvas(cv);
-                    if (v) return v;
-                }
-                return null;
+            const full = grabCanvas();
+            if (!full) return null;
+            // Aimed centre first (cleaner/bigger), then the whole frame; each tried
+            // with Quagga (1D) then ZXing (backup, also 2D).
+            for (const cv of [cropCenter(full, 0.95, 0.55), full]) {
+                const url = cv.toDataURL('image/jpeg', 0.95);
+                const q = await quaggaDecode(url);
+                if (q) return q;
+                const z = await zxingDecodeUrl(url);
+                if (z) return z;
             }
             return null;
         }
@@ -643,7 +670,7 @@
                 busy = false;
                 if (v) { onDecoded(v); return; }
             }
-            scanTimer = setTimeout(scanLoop, nativeDetector ? 150 : 700);
+            scanTimer = setTimeout(scanLoop, nativeDetector ? 150 : 900);
         }
 
         // Manual capture: decode the current frame right now.
