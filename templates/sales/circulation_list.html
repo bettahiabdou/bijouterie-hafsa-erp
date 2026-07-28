@@ -259,6 +259,9 @@
             <button type="button" class="btn btn-light" id="scan-torch" style="display:none;">
                 <i class="fas fa-bolt"></i> Lampe
             </button>
+            <button type="button" class="btn btn-primary" id="scan-capture">
+                <i class="fas fa-crosshairs"></i> Capturer
+            </button>
             <button type="button" class="btn btn-danger" id="scan-close">
                 <i class="fas fa-times"></i> Fermer
             </button>
@@ -333,6 +336,7 @@
             display: flex; gap: 12px; justify-content: center; background: #000;
         }
         .scan-bottombar .btn { flex: 1; max-width: 220px; padding: 14px; font-size: 16px; }
+        #scan-capture { flex: 2; max-width: none; font-weight: 700; }
 
         /* Mobile: stack the tables into cards */
         @media (max-width: 640px) {
@@ -496,16 +500,19 @@
         const scanVideo = document.getElementById('scan-video');
         const scanStatus = document.getElementById('scan-status');
         const scanTorch = document.getElementById('scan-torch');
-        // @zxing/library UMD (global `ZXing`) — used when the browser has no
+        const scanCapture = document.getElementById('scan-capture');
+        // @zxing/library UMD (global `ZXing`) — decoder for browsers without a
         // native BarcodeDetector (e.g. iOS Safari).
         const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js';
         let scanStream = null, nativeDetector = null, zxingReader = null,
-            scanTimer = null, scanningActive = false, torchOn = false, lastCode = '', lastTime = 0;
+            scanTimer = null, scanningActive = false, busy = false, torchOn = false,
+            lastCode = '', lastTime = 0;
 
         function setStatus(t) { scanStatus.textContent = t; }
 
         scanBtn.addEventListener('click', openScanner);
         document.getElementById('scan-close').addEventListener('click', closeScanner);
+        scanCapture.addEventListener('click', captureNow);
 
         async function openScanner() {
             hideHint();
@@ -515,70 +522,102 @@
             }
             scanModal.style.display = 'flex';
             setStatus('Initialisation de la caméra…');
+            // Keep our own rear-camera stream (displays reliably, incl. iOS) and
+            // decode frames from it.
             try {
                 scanStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' } }, audio: false
+                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
                 });
             } catch (err) {
                 closeScanner();
                 showHint('Accès caméra refusé/indisponible. Autorisez la caméra ou saisissez le code.', 'err');
                 return;
             }
+            scanVideo.srcObject = scanStream;
+            try { await scanVideo.play(); } catch (e) {}
+            setupTorch();
 
-            // Native path (Android Chrome, the C72): decode from our own stream,
-            // with torch support.
+            // Prepare a decoder: native BarcodeDetector, else ZXing.
+            nativeDetector = null; zxingReader = null;
             if ('BarcodeDetector' in window) {
                 try {
-                    scanVideo.srcObject = scanStream;
-                    try { await scanVideo.play(); } catch (e) {}
-                    setupTorch();
                     let fmts;
                     try { fmts = await window.BarcodeDetector.getSupportedFormats(); } catch (e) { fmts = null; }
                     nativeDetector = (fmts && fmts.length) ? new window.BarcodeDetector({ formats: fmts })
                                                            : new window.BarcodeDetector();
-                    scanningActive = true;
-                    setStatus('Visez le code-barres…');
-                    nativeLoop();
-                    return;
                 } catch (e) { nativeDetector = null; }
             }
-
-            // Fallback path (iOS Safari, etc.): hand the back camera to ZXing.
-            // Grab the deviceId from our stream, then release it so ZXing can
-            // reopen the same (rear) camera itself.
-            let deviceId;
-            try { deviceId = scanStream.getVideoTracks()[0].getSettings().deviceId; } catch (e) {}
-            try { scanStream.getTracks().forEach(t => t.stop()); } catch (e) {}
-            scanStream = null;
-
-            setStatus('Chargement du lecteur…');
-            try { await loadScript(ZXING_URL); } catch (e) {}
-            const ZX = window.ZXing;
-            if (!ZX || !ZX.BrowserMultiFormatReader) {
-                setStatus('Scanner non supporté.');
-                showHint('Scanner caméra non supporté sur ce navigateur. Utilisez la saisie ou un lecteur externe.', 'err');
+            if (!nativeDetector) {
+                setStatus('Chargement du lecteur…');
+                try { await loadScript(ZXING_URL); } catch (e) {}
+                if (window.ZXing && window.ZXing.BrowserMultiFormatReader) {
+                    zxingReader = new window.ZXing.BrowserMultiFormatReader();
+                }
+            }
+            if (!nativeDetector && !zxingReader) {
+                setStatus('Lecteur indisponible.');
+                showHint('Scanner non disponible sur ce navigateur. Saisissez le code ou utilisez un lecteur externe.', 'err');
                 return;
             }
-            try {
-                zxingReader = new ZX.BrowserMultiFormatReader();
-                scanningActive = true;
-                setStatus('Visez le code-barres…');
-                zxingReader.decodeFromVideoDevice(deviceId || undefined, scanVideo, (result) => {
-                    if (result && scanningActive) onDecoded(result.getText());
-                });
-            } catch (e) {
-                setStatus('Erreur du lecteur.');
-                showHint('Impossible de démarrer le scanner. Utilisez la saisie.', 'err');
-            }
+            scanningActive = true;
+            setStatus('Visez le code-barres, puis « Capturer » si besoin.');
+            scanLoop();
         }
 
-        async function nativeLoop() {
-            if (!scanningActive || !nativeDetector) return;
-            try {
-                const codes = await nativeDetector.detect(scanVideo);
-                if (codes && codes.length && codes[0].rawValue) { onDecoded(codes[0].rawValue); return; }
-            } catch (e) {}
-            scanTimer = setTimeout(nativeLoop, 120);
+        function grabCanvas() {
+            const w = scanVideo.videoWidth, h = scanVideo.videoHeight;
+            if (!w || !h) return null;
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(scanVideo, 0, 0, w, h);
+            return canvas;
+        }
+
+        // Decode a single frame. Returns the decoded string or null.
+        async function decodeOnce() {
+            if (nativeDetector) {
+                try {
+                    const codes = await nativeDetector.detect(scanVideo);
+                    if (codes && codes.length && codes[0].rawValue) return codes[0].rawValue;
+                } catch (e) {}
+                return null;
+            }
+            if (zxingReader) {
+                const canvas = grabCanvas();
+                if (!canvas) return null;
+                try {
+                    const result = await zxingReader.decodeFromImageUrl(canvas.toDataURL('image/jpeg', 0.92));
+                    if (result) return result.getText();
+                } catch (e) { /* NotFoundException when no code in frame */ }
+                return null;
+            }
+            return null;
+        }
+
+        // Gentle continuous auto-scan (native is fast; ZXing image-decode slower).
+        async function scanLoop() {
+            if (!scanningActive) return;
+            if (!busy) {
+                busy = true;
+                let v = null;
+                try { v = await decodeOnce(); } catch (e) {}
+                busy = false;
+                if (v) { onDecoded(v); return; }
+            }
+            scanTimer = setTimeout(scanLoop, nativeDetector ? 150 : 700);
+        }
+
+        // Manual capture: decode the current frame right now.
+        async function captureNow() {
+            if (!scanningActive || busy) return;
+            busy = true;
+            setStatus('Analyse de l’image…');
+            let v = null;
+            try { v = await decodeOnce(); } catch (e) {}
+            busy = false;
+            if (v) { onDecoded(v); return; }
+            setStatus('Aucun code détecté. Rapprochez-vous, stabilisez, puis « Capturer ».');
         }
 
         function onDecoded(value) {
@@ -608,11 +647,11 @@
 
         function closeScanner() {
             scanningActive = false;
+            busy = false;
             if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
             if (zxingReader) { try { zxingReader.reset(); } catch (e) {} zxingReader = null; }
             nativeDetector = null;
             if (scanStream) { scanStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} }); scanStream = null; }
-            // Also stop whatever stream ZXing attached to the <video>.
             try {
                 const s = scanVideo.srcObject;
                 if (s && s.getTracks) s.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
