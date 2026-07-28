@@ -317,7 +317,9 @@
         .scan-hint.err { background: var(--error-50, #fef2f2); color: var(--error-700, #b91c1c); border: 1px solid var(--error-200, #fecaca); }
 
         /* Fullscreen scanner */
-        .scan-modal { position: fixed; inset: 0; z-index: 2000; background: #000; display: flex; flex-direction: column; }
+        /* Above the app's fixed bottom nav (99990) and any 100000 overlay,
+           so the Capturer/Fermer bar is never hidden behind them. */
+        .scan-modal { position: fixed; inset: 0; z-index: 100001; background: #000; display: flex; flex-direction: column; }
         .scan-stage { position: relative; flex: 1; overflow: hidden; }
         #scan-video { width: 100%; height: 100%; object-fit: cover; background: #000; }
         .scan-reticle {
