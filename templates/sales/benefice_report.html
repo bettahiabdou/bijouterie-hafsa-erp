@@ -16,11 +16,16 @@
                 <h1 class="page-title"><i class="fas fa-coins text-success mr-2"></i> Bénéfice</h1>
                 <p class="page-subtitle">Gain par article vendu (prix de vente − prix d'achat)</p>
             </div>
-            <div class="page-actions">
+            <div class="page-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
                 <a href="{% url 'sales:benefice_print' %}{% if querystring %}?{{ querystring }}{% endif %}"
                    target="_blank" class="btn btn-primary">
                     <i class="fas fa-print"></i>
-                    <span>Imprimer rapport A4</span>
+                    <span>Imprimer A4</span>
+                </a>
+                <a href="{% url 'sales:benefice_print' %}?images=1{% if querystring %}&{{ querystring }}{% endif %}"
+                   target="_blank" class="btn btn-secondary" title="Plus lourd — à réserver aux rapports filtrés">
+                    <i class="fas fa-images"></i>
+                    <span>A4 avec images</span>
                 </a>
             </div>
         </div>

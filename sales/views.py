@@ -5495,7 +5495,12 @@ def benefice_report(request):
 
 @login_required(login_url='login')
 def benefice_report_print(request):
-    """A4 print view: all filtered rows (no pagination) + totals."""
+    """A4 print view: all filtered rows (no pagination) + totals.
+
+    Images are opt-in (?images=1): full-resolution product/invoice photos make
+    a large report too heavy to print reliably (and unusable on phones), so the
+    default is a clean, multi-page text table.
+    """
     qs, filters = _benefice_queryset(request)
     totals = _benefice_totals(qs)
     context = {
@@ -5504,5 +5509,6 @@ def benefice_report_print(request):
         'filters': filters,
         'now': timezone.now(),
         'user': request.user,
+        'show_images': request.GET.get('images') == '1',
     }
     return render(request, 'sales/benefice_report_print.html', context)

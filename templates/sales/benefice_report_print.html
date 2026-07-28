@@ -88,6 +88,8 @@
         {% if filters.invoice %}Facture « {{ filters.invoice }} » · {% endif %}
         {% if not filters.date_from and not filters.date_to and not filters.product and not filters.invoice %}Toutes les données{% endif %}
         &nbsp;|&nbsp; {{ totals.count }} article{{ totals.count|pluralize }}
+        &nbsp;|&nbsp; Marge {{ totals.margin|floatformat:1 }} %
+        {% if not show_images %}&nbsp;·&nbsp; <em>images masquées (rapport léger)</em>{% endif %}
     </div>
 
     {% if rows %}
@@ -99,8 +101,8 @@
                     <th class="num">Prix vente</th>
                     <th class="num">Prix achat</th>
                     <th class="num">Gain</th>
-                    <th class="ctr">Img produit</th>
-                    <th class="ctr">Img facture</th>
+                    {% if show_images %}<th class="ctr">Img produit</th>
+                    <th class="ctr">Img facture</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -111,6 +113,7 @@
                         <td class="num">{{ r.total_amount|floatformat:2 }}</td>
                         <td class="num">{{ r.bought_price|floatformat:2 }}</td>
                         <td class="num {% if r.gain < 0 %}gain-neg{% else %}gain-pos{% endif %}">{{ r.gain|floatformat:2 }}</td>
+                        {% if show_images %}
                         <td class="ctr">
                             {% with img=r.product.main_image %}
                                 {% if img %}<img class="thumb" src="{{ img.url }}" alt="">
@@ -123,6 +126,7 @@
                                 {% if photo %}<img class="thumb" src="{{ photo.image.url }}" alt="">{% else %}-{% endif %}
                             {% endwith %}
                         </td>
+                        {% endif %}
                     </tr>
                 {% endfor %}
             </tbody>
@@ -132,7 +136,7 @@
                     <td class="num">{{ totals.total_sales|floatformat:2 }}</td>
                     <td class="num">{{ totals.total_cost|floatformat:2 }}</td>
                     <td class="num">{{ totals.total_gain|floatformat:2 }}</td>
-                    <td colspan="2" class="ctr">Marge {{ totals.margin|floatformat:1 }} %</td>
+                    {% if show_images %}<td colspan="2" class="ctr">Marge {{ totals.margin|floatformat:1 }} %</td>{% endif %}
                 </tr>
             </tfoot>
         </table>
@@ -151,6 +155,7 @@
                     <div class="pcard-sub">{{ r.product.name }}</div>
                     <div class="pcard-line"><span>Prix vente</span><strong>{{ r.total_amount|floatformat:2 }} DH</strong></div>
                     <div class="pcard-line"><span>Prix achat</span><strong>{{ r.bought_price|floatformat:2 }} DH</strong></div>
+                    {% if show_images %}
                     <div class="pcard-imgs">
                         {% with img=r.product.main_image %}
                             {% if img %}<img src="{{ img.url }}" alt="">
@@ -160,6 +165,7 @@
                             {% if photo %}<img src="{{ photo.image.url }}" alt="">{% endif %}
                         {% endwith %}
                     </div>
+                    {% endif %}
                 </div>
             {% endfor %}
             <div class="ptotals">
