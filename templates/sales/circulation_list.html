@@ -496,6 +496,36 @@
             }
         });
 
+        // Global keyboard-wedge capture: USB HID readers (the RFID card reader,
+        // or a barcode gun) "type" the code very fast and end with Enter/Tab.
+        // Capture it anywhere on the page (as long as the user isn't typing in a
+        // field), so no need to focus the search box first.
+        let wedgeBuf = '', wedgeLast = 0;
+        document.addEventListener('keydown', function (e) {
+            const ae = document.activeElement;
+            if (ae === searchInput) return; // its own handler deals with this
+            const inField = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable);
+            if (inField) return;            // don't hijack manual typing elsewhere
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            const now = Date.now();
+            if (now - wedgeLast > 120) wedgeBuf = ''; // long gap => new scan
+            wedgeLast = now;
+
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                if (wedgeBuf.length >= 3) {
+                    const code = wedgeBuf;
+                    wedgeBuf = '';
+                    e.preventDefault();
+                    // reflect it in the box for visibility, then look it up
+                    searchInput.value = code;
+                    scanLookup(code);
+                }
+                return;
+            }
+            if (e.key && e.key.length === 1) wedgeBuf += e.key;
+        });
+
         // ---- Camera scanner (phones) ----
         const scanBtn = document.getElementById('scan-btn');
         const scanModal = document.getElementById('scan-modal');
