@@ -5245,6 +5245,65 @@ def circulation_product_search(request):
 
 
 @login_required(login_url='login')
+def circulation_scan_lookup(request):
+    """
+    Resolve a scanned barcode to a product. Handles both label generations:
+      * new labels = Code128 of the digits kept in sync with Product.barcode,
+      * old labels = whatever was stored in Product.barcode / reference.
+    Cascade (first hit wins): exact barcode -> exact reference -> exact rfid ->
+    digits-only barcode -> loose contains (only auto-picked when unique).
+    """
+    import re
+    code = (request.GET.get('code') or '').strip()
+    if not code:
+        return JsonResponse({'found': False, 'candidates': []})
+
+    def payload(p):
+        return {
+            'id': p.id,
+            'reference': p.reference or '',
+            'name': p.name or (p.category.name if p.category else 'Produit'),
+            'image': _product_image_url(p),
+            'status': p.get_status_display() if p.status else '',
+            'is_sold': p.status == 'sold',
+            'already_out': ProductCirculation.objects.filter(
+                product=p, status=ProductCirculation.Status.OUT).exists(),
+        }
+
+    product = None
+    matched = None
+    for field, q in (('barcode', Q(barcode__iexact=code)),
+                     ('reference', Q(reference__iexact=code)),
+                     ('rfid', Q(rfid_tag__iexact=code))):
+        product = Product.objects.select_related('category').filter(q).first()
+        if product:
+            matched = field
+            break
+
+    if not product:
+        digits = re.sub(r'\D', '', code)
+        if digits and digits != code:
+            product = Product.objects.select_related('category').filter(barcode__iexact=digits).first()
+            if product:
+                matched = 'barcode'
+
+    candidates = []
+    if not product:
+        cands = list(Product.objects.select_related('category').filter(
+            Q(barcode__icontains=code) | Q(reference__icontains=code)
+        )[:10])
+        if len(cands) == 1:
+            product, matched = cands[0], 'contains'
+        else:
+            candidates = cands
+
+    if product:
+        return JsonResponse({'found': True, 'matched': matched, 'product': payload(product)})
+    return JsonResponse({'found': False, 'code': code,
+                         'candidates': [payload(c) for c in candidates]})
+
+
+@login_required(login_url='login')
 @require_http_methods(["POST"])
 def circulation_out(request):
     """Mark a product as out (en circulation) with an online seller."""

@@ -63,10 +63,16 @@
                 <div class="flex gap-4 flex-wrap items-end">
                     <div class="form-group mb-0" style="flex: 2; min-width: 240px; position: relative;">
                         <label class="form-label">Produit (référence, code-barres ou nom)</label>
-                        <input type="text" id="out-product-search" class="form-input" autocomplete="off"
-                               placeholder="Tapez pour rechercher...">
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="out-product-search" class="form-input" autocomplete="off"
+                                   inputmode="text" placeholder="Tapez ou scannez..." style="flex:1;">
+                            <button type="button" id="scan-btn" class="btn btn-secondary" title="Scanner un code-barres" style="white-space:nowrap;">
+                                <i class="fas fa-barcode"></i> <span class="scan-btn-label">Scanner</span>
+                            </button>
+                        </div>
                         <div id="out-search-results" class="search-results" style="display:none;"></div>
                         <div id="out-selected" class="selected-product" style="display:none;"></div>
+                        <div id="out-hint" class="scan-hint" style="display:none;"></div>
                     </div>
                     <div class="form-group mb-0" style="flex: 1; min-width: 180px;">
                         <label class="form-label">Vendeuse</label>
@@ -240,6 +246,25 @@
         </div>
     </div>
 
+    <!-- Barcode scanner overlay -->
+    <div id="scan-modal" class="scan-modal" style="display:none;">
+        <div class="scan-stage">
+            <video id="scan-video" playsinline autoplay muted></video>
+            <div class="scan-reticle"></div>
+        </div>
+        <div class="scan-topbar">
+            <span id="scan-status">Initialisation de la caméra…</span>
+        </div>
+        <div class="scan-bottombar">
+            <button type="button" class="btn btn-light" id="scan-torch" style="display:none;">
+                <i class="fas fa-bolt"></i> Lampe
+            </button>
+            <button type="button" class="btn btn-danger" id="scan-close">
+                <i class="fas fa-times"></i> Fermer
+            </button>
+        </div>
+    </div>
+
     <style>
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4); }
         /* Let the product-search dropdown escape the card (which clips overflow) */
@@ -267,6 +292,33 @@
         .circ-tab { padding: var(--space-3) var(--space-4); border: none; background: none; cursor: pointer; font-weight: var(--font-medium); color: var(--neutral-500); border-bottom: 2px solid transparent; }
         .circ-tab.active { color: var(--primary-700); border-bottom-color: var(--primary-600); }
         .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        /* Scan hint under the search box */
+        .scan-hint { margin-top: var(--space-2); font-size: var(--text-sm); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); }
+        .scan-hint.ok { background: var(--success-50, #f0fdf4); color: var(--success-700, #15803d); border: 1px solid var(--success-200, #bbf7d0); }
+        .scan-hint.warn { background: var(--warning-50, #fffbeb); color: var(--warning-700, #b45309); border: 1px solid var(--warning-200, #fde68a); }
+        .scan-hint.err { background: var(--error-50, #fef2f2); color: var(--error-700, #b91c1c); border: 1px solid var(--error-200, #fecaca); }
+
+        /* Fullscreen scanner */
+        .scan-modal { position: fixed; inset: 0; z-index: 2000; background: #000; display: flex; flex-direction: column; }
+        .scan-stage { position: relative; flex: 1; overflow: hidden; }
+        #scan-video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+        .scan-reticle {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: min(78vw, 420px); height: min(46vw, 240px);
+            border: 3px solid rgba(255,255,255,0.95); border-radius: 14px;
+            box-shadow: 0 0 0 100vmax rgba(0,0,0,0.45);
+        }
+        .scan-topbar {
+            position: absolute; top: 0; left: 0; right: 0; padding: 16px;
+            color: #fff; text-align: center; font-weight: 600; font-size: 15px;
+            background: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0));
+        }
+        .scan-bottombar {
+            padding: 16px calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+            display: flex; gap: 12px; justify-content: center; background: #000;
+        }
+        .scan-bottombar .btn { flex: 1; max-width: 220px; padding: 14px; font-size: 16px; }
 
         /* Mobile: stack the tables into cards */
         @media (max-width: 640px) {
@@ -367,6 +419,184 @@
                 document.getElementById('panel-history').style.display = this.dataset.tab === 'history' ? 'block' : 'none';
             });
         });
+
+        // ================= Barcode scanning =================
+        const hintBox = document.getElementById('out-hint');
+        function showHint(msg, kind) { hintBox.textContent = msg; hintBox.className = 'scan-hint ' + (kind || ''); hintBox.style.display = 'block'; }
+        function hideHint() { hintBox.style.display = 'none'; }
+        searchInput.addEventListener('input', hideHint);
+
+        // Resolve a scanned/typed code to a product (old + new barcodes).
+        function scanLookup(code) {
+            code = (code || '').trim();
+            if (!code) return;
+            fetch('{% url "sales:circulation_scan_lookup" %}?code=' + encodeURIComponent(code))
+                .then(r => r.json())
+                .then(d => {
+                    if (d.found) {
+                        const p = d.product;
+                        if (p.is_sold) { showHint('⚠️ ' + p.reference + ' est déjà vendu.', 'warn'); return; }
+                        if (p.already_out) { showHint('⚠️ ' + p.reference + ' est déjà en circulation.', 'warn'); return; }
+                        selectProduct(p.id, p.reference, p.name);
+                        showHint('✓ Scanné : ' + p.reference, 'ok');
+                    } else if ((d.candidates || []).length) {
+                        renderCandidates(d.candidates);
+                        showHint('Plusieurs correspondances — choisissez ci-dessous.', 'warn');
+                    } else {
+                        searchInput.value = code;
+                        doSearch(code);
+                        showHint('Aucune correspondance exacte pour « ' + code + ' ».', 'err');
+                    }
+                })
+                .catch(() => showHint('Erreur de recherche.', 'err'));
+        }
+
+        function renderCandidates(items) {
+            resultsBox.innerHTML = items.map(p => {
+                const img = p.image ? '<img src="' + p.image + '">' : '<div class="sri-thumb"></div>';
+                const dis = (p.already_out || p.is_sold);
+                const badge = p.already_out ? ' <span class="badge badge-warning">Déjà sorti</span>'
+                              : (p.is_sold ? ' <span class="badge badge-danger">Vendu</span>' : '');
+                return '<div class="search-result-item ' + (dis ? 'disabled' : '') + '" ' +
+                       (dis ? '' : 'data-id="' + p.id + '" data-ref="' + p.reference + '" data-name="' + (p.name || '').replace(/"/g, '&quot;') + '"') + '>' +
+                       img + '<div><div class="prod-ref">' + p.reference + badge + '</div><div class="prod-name">' + (p.name || '') + '</div></div></div>';
+            }).join('');
+            resultsBox.querySelectorAll('.search-result-item[data-id]').forEach(el => {
+                el.addEventListener('click', () => selectProduct(el.dataset.id, el.dataset.ref, el.dataset.name));
+            });
+            resultsBox.style.display = 'block';
+        }
+
+        // Hardware / HID (keyboard-wedge) scanners: they type the code + Enter.
+        searchInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const v = this.value.trim();
+                if (v) scanLookup(v);
+            }
+        });
+
+        // ---- Camera scanner (phones) ----
+        const scanBtn = document.getElementById('scan-btn');
+        const scanModal = document.getElementById('scan-modal');
+        const scanVideo = document.getElementById('scan-video');
+        const scanStatus = document.getElementById('scan-status');
+        const scanTorch = document.getElementById('scan-torch');
+        const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js';
+        let scanStream = null, nativeDetector = null, zxingControls = null,
+            scanTimer = null, scanningActive = false, torchOn = false, lastCode = '', lastTime = 0;
+
+        function setStatus(t) { scanStatus.textContent = t; }
+
+        scanBtn.addEventListener('click', openScanner);
+        document.getElementById('scan-close').addEventListener('click', closeScanner);
+
+        async function openScanner() {
+            hideHint();
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showHint('Caméra non supportée. Utilisez la saisie ou un lecteur externe.', 'err');
+                return;
+            }
+            scanModal.style.display = 'flex';
+            setStatus('Initialisation de la caméra…');
+            try {
+                scanStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' } }, audio: false
+                });
+            } catch (err) {
+                closeScanner();
+                showHint('Accès caméra refusé/indisponible. Autorisez la caméra ou saisissez le code.', 'err');
+                return;
+            }
+            scanVideo.srcObject = scanStream;
+            try { await scanVideo.play(); } catch (e) {}
+            setupTorch();
+            scanningActive = true;
+
+            if ('BarcodeDetector' in window) {
+                try {
+                    let fmts;
+                    try { fmts = await window.BarcodeDetector.getSupportedFormats(); } catch (e) { fmts = null; }
+                    nativeDetector = (fmts && fmts.length) ? new window.BarcodeDetector({ formats: fmts })
+                                                           : new window.BarcodeDetector();
+                    setStatus('Visez le code-barres…');
+                    nativeLoop();
+                    return;
+                } catch (e) { nativeDetector = null; }
+            }
+            // Fallback: ZXing (covers browsers without BarcodeDetector, e.g. iOS Safari)
+            setStatus('Chargement du lecteur…');
+            try { await loadScript(ZXING_URL); } catch (e) {}
+            const ZB = window.ZXingBrowser;
+            if (!ZB || !ZB.BrowserMultiFormatReader) {
+                setStatus('Scanner non supporté.');
+                showHint('Scanner caméra non supporté sur ce navigateur. Utilisez la saisie ou un lecteur externe.', 'err');
+                return;
+            }
+            try {
+                const reader = new ZB.BrowserMultiFormatReader();
+                zxingControls = await reader.decodeFromStream(scanStream, scanVideo, (result) => {
+                    if (result && scanningActive) onDecoded(result.getText());
+                });
+                setStatus('Visez le code-barres…');
+            } catch (e) {
+                setStatus('Erreur du lecteur.');
+                showHint('Impossible de démarrer le scanner. Utilisez la saisie.', 'err');
+            }
+        }
+
+        async function nativeLoop() {
+            if (!scanningActive || !nativeDetector) return;
+            try {
+                const codes = await nativeDetector.detect(scanVideo);
+                if (codes && codes.length && codes[0].rawValue) { onDecoded(codes[0].rawValue); return; }
+            } catch (e) {}
+            scanTimer = setTimeout(nativeLoop, 120);
+        }
+
+        function onDecoded(value) {
+            const now = Date.now();
+            if (value === lastCode && (now - lastTime) < 1500) return; // ignore duplicate reads
+            lastCode = value; lastTime = now;
+            try { if (navigator.vibrate) navigator.vibrate(120); } catch (e) {}
+            closeScanner();
+            scanLookup(value);
+        }
+
+        function setupTorch() {
+            torchOn = false;
+            scanTorch.style.display = 'none';
+            try {
+                const track = scanStream.getVideoTracks()[0];
+                const caps = track.getCapabilities ? track.getCapabilities() : {};
+                if (caps && caps.torch) {
+                    scanTorch.style.display = 'inline-flex';
+                    scanTorch.onclick = async () => {
+                        torchOn = !torchOn;
+                        try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); } catch (e) {}
+                    };
+                }
+            } catch (e) {}
+        }
+
+        function closeScanner() {
+            scanningActive = false;
+            if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+            if (zxingControls) { try { zxingControls.stop(); } catch (e) {} zxingControls = null; }
+            nativeDetector = null;
+            if (scanStream) { scanStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} }); scanStream = null; }
+            scanModal.style.display = 'none';
+        }
+
+        function loadScript(src) {
+            return new Promise((res, rej) => {
+                if (document.querySelector('script[data-src="' + src + '"]')) return res();
+                const s = document.createElement('script');
+                s.src = src; s.setAttribute('data-src', src);
+                s.onload = res; s.onerror = rej;
+                document.head.appendChild(s);
+            });
+        }
     })();
     </script>
 {% endblock %}

@@ -62,6 +62,7 @@ urlpatterns = [
     # Circulation (online-selling flow)
     path('circulation/', views.circulation_list, name='circulation'),
     path('circulation/search/', views.circulation_product_search, name='circulation_product_search'),
+    path('circulation/scan/', views.circulation_scan_lookup, name='circulation_scan_lookup'),
     path('circulation/out/', views.circulation_out, name='circulation_out'),
     path('circulation/<int:pk>/return/', views.circulation_return, name='circulation_return'),
     path('circulation/<int:pk>/revert/', views.circulation_revert, name='circulation_revert'),
