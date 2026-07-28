@@ -3513,7 +3513,12 @@ def pending_invoice_complete(request, reference):
             if not invoice.items.exists():
                 messages.error(request, "Ajoutez au moins un article avant de valider.")
             else:
-                invoice.date = timezone.now().date()
+                # Keep the invoice's original date (set when the draft was
+                # created via Telegram) instead of stamping today. Completing
+                # an old pending sale must not change its invoice date.
+                # (Payment dates are recorded separately, per-payment.)
+                if not invoice.date:
+                    invoice.date = invoice.created_at.date() if invoice.created_at else timezone.now().date()
 
                 # Handle custom reference update
                 custom_reference = request.POST.get('custom_reference', '').strip()
@@ -4989,7 +4994,9 @@ def pending_invoice_complete_api(request, reference):
                         first_name=fn, last_name=ln, phone=phone, is_active=True)
                     client_created = True
 
-            invoice.date = timezone.now().date()
+            # Preserve the draft's original date (not today) when completing.
+            if not invoice.date:
+                invoice.date = invoice.created_at.date() if invoice.created_at else timezone.now().date()
             invoice.save()
 
             # --- Items ---
