@@ -15,6 +15,7 @@ Dry-run by default (reports only). Pass --apply to write the fix.
     python manage.py fix_pending_invoice_dates --apply     # fix
 """
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from sales.models import SaleInvoice
 
 
@@ -26,10 +27,14 @@ class Command(BaseCommand):
                             help='Apply the fix (default: report only).')
         parser.add_argument('--limit', type=int, default=100,
                             help='Max rows to list in the report (default 100).')
+        parser.add_argument('--max-gap', type=int, default=None,
+                            help='Only consider invoices shifted forward by at most N days '
+                                 '(e.g. --max-gap 7 to fix routine completion-lag first).')
 
     def handle(self, *args, **opts):
         apply = opts['apply']
         limit = opts['limit']
+        max_gap = opts['max_gap']
 
         qs = (SaleInvoice.objects
               .filter(is_deleted=False, notes__icontains='Créé via Telegram')
@@ -48,6 +53,8 @@ class Command(BaseCommand):
                 # date is *before* creation -> a deliberate manual backdate,
                 # not the completion-stamp bug. Leave it untouched.
                 skipped_backdated += 1
+                continue
+            if max_gap is not None and (inv.date - correct).days > max_gap:
                 continue
             affected.append((inv, correct))
 
@@ -83,8 +90,9 @@ class Command(BaseCommand):
             return
 
         fixed = 0
-        for inv, correct in affected:
-            SaleInvoice.objects.filter(pk=inv.pk).update(date=correct)
-            fixed += 1
+        with transaction.atomic():
+            for inv, correct in affected:
+                SaleInvoice.objects.filter(pk=inv.pk).update(date=correct)
+                fixed += 1
         self.stdout.write(self.style.SUCCESS(
             f"\nAPPLIED: restored the original date on {fixed} invoice(s)."))
