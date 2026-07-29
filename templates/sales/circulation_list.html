@@ -507,44 +507,59 @@
             resultsBox.style.display = 'block';
         }
 
-        // Hardware / HID (keyboard-wedge) scanners: they type the code + Enter.
-        searchInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const v = this.value.trim();
-                if (v) scanLookup(v);
-            }
-        });
+        // ---------- Hardware scanner capture (barcode gun / HID reader) ----------
+        // Reconstruct the code from the PHYSICAL key (event.code, e.g. "Digit1"),
+        // NOT the typed character — so it is immune to the keyboard layout. On a
+        // French AZERTY device a gun's digits otherwise arrive as &é"'(§è!çà etc.
+        // A scanner sends the whole code as a very fast keystroke burst + Enter.
+        let scBuf = '', scLast = 0, scFast = false;
 
-        // Global keyboard-wedge capture: USB HID readers (the RFID card reader,
-        // or a barcode gun) "type" the code very fast and end with Enter/Tab.
-        // Capture it anywhere on the page (as long as the user isn't typing in a
-        // field), so no need to focus the search box first.
-        let wedgeBuf = '', wedgeLast = 0;
+        function codeToChar(code) {
+            let m;
+            if ((m = /^Digit(\d)$/.exec(code))) return m[1];
+            if ((m = /^Numpad(\d)$/.exec(code))) return m[1];
+            if ((m = /^Key([A-Z])$/.exec(code))) return m[1];
+            if (code === 'Minus' || code === 'NumpadSubtract') return '-';
+            if (code === 'Period' || code === 'NumpadDecimal') return '.';
+            return null; // ignore other keys (Shift, arrows, etc.)
+        }
+        function resetScan() { scBuf = ''; scFast = false; }
+
         document.addEventListener('keydown', function (e) {
             const ae = document.activeElement;
-            if (ae === searchInput) return; // its own handler deals with this
-            const inField = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable);
-            if (inField) return;            // don't hijack manual typing elsewhere
+            // Don't touch manual typing in Notes / Vendeuse; the search box is fine.
+            if (ae && ae !== searchInput &&
+                (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable)) return;
             if (e.ctrlKey || e.metaKey || e.altKey) return;
 
             const now = Date.now();
-            if (now - wedgeLast > 120) wedgeBuf = ''; // long gap => new scan
-            wedgeLast = now;
+            const gap = now - scLast;
+            scLast = now;
 
-            if (e.key === 'Enter' || e.key === 'Tab') {
-                if (wedgeBuf.length >= 3) {
-                    const code = wedgeBuf;
-                    wedgeBuf = '';
+            if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === 'Enter' || e.key === 'Tab') {
+                if (scBuf.length >= 3 && scFast) {          // a completed scan burst
                     e.preventDefault();
-                    // reflect it in the box for visibility, then look it up
-                    searchInput.value = code;
+                    const code = scBuf;
+                    resetScan();
+                    searchInput.value = '';
                     scanLookup(code);
+                } else if (ae === searchInput && searchInput.value.trim()) {
+                    e.preventDefault();                     // manual entry in the box
+                    scanLookup(searchInput.value.trim());
                 }
+                resetScan();
                 return;
             }
-            if (e.key && e.key.length === 1) wedgeBuf += e.key;
-        });
+
+            const ch = codeToChar(e.code);
+            if (ch === null) return;
+            if (gap > 120) resetScan();                     // long pause => new/first key
+            scBuf += ch;
+            if (scBuf.length >= 3 && gap < 60) scFast = true;  // fast burst = a scanner
+            // Once it's clearly a scanner typing into the box, stop the layout-
+            // garbled characters from filling the field.
+            if (scFast && ae === searchInput) e.preventDefault();
+        }, true);
 
         // ---- Camera scanner (phones) ----
         const scanBtn = document.getElementById('scan-btn');
