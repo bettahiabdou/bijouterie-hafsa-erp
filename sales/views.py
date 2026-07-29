@@ -5188,7 +5188,8 @@ def circulation_list(request):
     if search:
         out_qs = out_qs.filter(
             Q(product__reference__icontains=search) |
-            Q(product__name__icontains=search)
+            Q(product__name__icontains=search) |
+            Q(product__barcode__icontains=search)
         )
 
     history_qs = ProductCirculation.objects.exclude(

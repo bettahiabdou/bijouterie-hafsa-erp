@@ -108,10 +108,10 @@
             <!-- EN CIRCULATION -->
             <div class="circ-panel" id="panel-out">
                 <div class="flex gap-4 items-end mb-4 flex-wrap">
-                    <form method="get" class="flex gap-2 items-end flex-wrap" style="flex:1;">
+                    <form method="get" class="flex gap-2 items-end flex-wrap" style="flex:1;" id="circ-filter-form">
                         <div class="form-group mb-0" style="flex:1; min-width:180px;">
                             <label class="form-label">Rechercher</label>
-                            <input type="text" name="search" value="{{ search }}" class="form-input" placeholder="Référence, nom...">
+                            <input type="text" name="search" id="circ-search" value="{{ search }}" class="form-input" placeholder="Référence, nom ou scan...">
                         </div>
                         <div class="form-group mb-0" style="min-width:160px;">
                             <label class="form-label">Vendeuse</label>
@@ -525,10 +525,15 @@
         }
         function resetScan() { scBuf = ''; scFast = false; }
 
+        // The "En circulation" filter box also accepts scans (to find a piece to
+        // return). It's a plain GET form, so a scan there submits the filter.
+        const circSearch = document.getElementById('circ-search');
+
         document.addEventListener('keydown', function (e) {
             const ae = document.activeElement;
-            // Don't touch manual typing in Notes / Vendeuse; the search box is fine.
-            if (ae && ae !== searchInput &&
+            // Allow the Sortir box and the circulation filter box; don't touch
+            // manual typing in Notes / Vendeuse / other fields.
+            if (ae && ae !== searchInput && ae !== circSearch &&
                 (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable)) return;
             if (e.ctrlKey || e.metaKey || e.altKey) return;
 
@@ -541,12 +546,18 @@
                     e.preventDefault();
                     const code = scBuf;
                     resetScan();
-                    searchInput.value = '';
-                    scanLookup(code);
+                    if (ae === circSearch && circSearch.form) {
+                        circSearch.value = code;            // filter the circulation list
+                        circSearch.form.submit();
+                    } else {
+                        searchInput.value = '';
+                        scanLookup(code);                   // Sortir flow
+                    }
                 } else if (ae === searchInput && searchInput.value.trim()) {
-                    e.preventDefault();                     // manual entry in the box
+                    e.preventDefault();                     // manual entry in the Sortir box
                     scanLookup(searchInput.value.trim());
                 }
+                // circulation filter box: manual Enter falls through -> form submits
                 resetScan();
                 return;
             }
@@ -556,9 +567,9 @@
             if (gap > 120) resetScan();                     // long pause => new/first key
             scBuf += ch;
             if (scBuf.length >= 3 && gap < 60) scFast = true;  // fast burst = a scanner
-            // Once it's clearly a scanner typing into the box, stop the layout-
+            // Once it's clearly a scanner typing into a box, stop the layout-
             // garbled characters from filling the field.
-            if (scFast && ae === searchInput) e.preventDefault();
+            if (scFast && (ae === searchInput || ae === circSearch)) e.preventDefault();
         }, true);
 
         // ---- Camera scanner (phones) ----
