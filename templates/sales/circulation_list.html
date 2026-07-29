@@ -446,10 +446,26 @@
         function hideHint() { hintBox.style.display = 'none'; }
         searchInput.addEventListener('input', hideHint);
 
-        // Resolve a scanned/typed code to a product (old + new barcodes).
-        function scanLookup(code) {
-            code = (code || '').trim();
-            if (!code) return;
+        // USB/Bluetooth barcode guns "type" digit keycodes; on a French (AZERTY)
+        // device those come out as symbols (1→&, 0→à, 6→§, 7→è …). Map them back
+        // to digits so a scan works whatever the keyboard layout is. Covers both
+        // PC-AZERTY (6=-, 8=_) and Mac/iOS-AZERTY (6=§, 8=!).
+        function azertyToDigits(s) {
+            const map = { '&': '1', 'é': '2', '"': '3', "'": '4', '(': '5', '-': '6', '§': '6', 'è': '7', '_': '8', '!': '8', 'ç': '9', 'à': '0' };
+            return s.replace(/[&é"'(§\-è_!çà]/g, function (ch) { return map[ch] || ch; });
+        }
+
+        // Resolve a scanned/typed code to a product (old + new barcodes). Tries the
+        // raw value first, then the AZERTY-corrected value.
+        function scanLookup(raw) {
+            raw = (raw || '').trim();
+            if (!raw) return;
+            const fixed = azertyToDigits(raw);
+            tryScanLookup(fixed !== raw ? [raw, fixed] : [raw], 0);
+        }
+
+        function tryScanLookup(tries, i) {
+            const code = tries[i];
             fetch('{% url "sales:circulation_scan_lookup" %}?code=' + encodeURIComponent(code))
                 .then(r => r.json())
                 .then(d => {
@@ -459,13 +475,17 @@
                         if (p.already_out) { showHint('⚠️ ' + p.reference + ' est déjà en circulation.', 'warn'); return; }
                         selectProduct(p.id, p.reference, p.name);
                         showHint('✓ Scanné : ' + p.reference, 'ok');
-                    } else if ((d.candidates || []).length) {
+                        return;
+                    }
+                    if (i + 1 < tries.length) { tryScanLookup(tries, i + 1); return; } // try AZERTY-fixed
+                    if ((d.candidates || []).length) {
                         renderCandidates(d.candidates);
                         showHint('Plusieurs correspondances — choisissez ci-dessous.', 'warn');
                     } else {
-                        searchInput.value = code;
-                        doSearch(code);
-                        showHint('Aucune correspondance exacte pour « ' + code + ' ».', 'err');
+                        const shown = tries[tries.length - 1];
+                        searchInput.value = shown;
+                        doSearch(shown);
+                        showHint('Aucune correspondance exacte pour « ' + shown + ' ».', 'err');
                     }
                 })
                 .catch(() => showHint('Erreur de recherche.', 'err'));
