@@ -140,7 +140,8 @@ def product_list(request):
             Q(reference__icontains=search_query) |
             Q(name__icontains=search_query) |
             Q(name_ar__icontains=search_query) |
-            Q(barcode__icontains=search_query)
+            Q(barcode__icontains=search_query) |
+            Q(rfid_tag__icontains=search_query)
         )
 
     # Filter by status

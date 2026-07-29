@@ -75,12 +75,12 @@
     <!-- Filters Card -->
     <div class="card mb-6 animate-slide-up">
         <div class="card-body filter-section">
-            <form method="get" class="filter-form">
+            <form method="get" class="filter-form" id="prod-filter-form">
                 <div class="filter-grid">
                     <!-- Search -->
                     <div class="form-group">
                         <label class="form-label">Recherche</label>
-                        <input type="text" name="search" value="{{ search_query }}" placeholder="Ref, Nom..." class="form-input">
+                        <input type="text" name="search" id="prod-search" value="{{ search_query }}" placeholder="Ref, nom ou scan..." class="form-input">
                     </div>
 
                     <!-- Status Filter -->
@@ -675,5 +675,51 @@
                 btn.dataset.busy = '0';
             });
         }
+
+        // ---- Barcode-gun capture for the product search (old + new codes) ----
+        // Reconstruct the code from the PHYSICAL key (event.code) so it is immune
+        // to the keyboard layout (AZERTY turns a gun's digits into &é"'(§è!çà…).
+        // A fast keystroke burst + Enter = a scan -> fills the box and filters.
+        (function () {
+            var input = document.getElementById('prod-search');
+            var form = document.getElementById('prod-filter-form');
+            if (!input || !form) return;
+            var buf = '', last = 0, fast = false;
+            function toChar(code) {
+                var m;
+                if ((m = /^Digit(\d)$/.exec(code))) return m[1];
+                if ((m = /^Numpad(\d)$/.exec(code))) return m[1];
+                if ((m = /^Key([A-Z])$/.exec(code))) return m[1];
+                if (code === 'Minus' || code === 'NumpadSubtract') return '-';
+                if (code === 'Period' || code === 'NumpadDecimal') return '.';
+                return null;
+            }
+            function reset() { buf = ''; fast = false; }
+            document.addEventListener('keydown', function (e) {
+                var ae = document.activeElement;
+                if (ae !== input) {
+                    var inField = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable);
+                    if (inField) return; // don't touch other filter fields
+                }
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                var now = Date.now(), gap = now - last; last = now;
+                if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === 'Enter' || e.key === 'Tab') {
+                    if (buf.length >= 3 && fast) {   // a completed scan burst
+                        e.preventDefault();
+                        var code = buf; reset();
+                        input.value = code;
+                        form.submit();
+                    }
+                    reset();
+                    return;                          // manual Enter -> native form submit
+                }
+                var ch = toChar(e.code);
+                if (ch === null) return;
+                if (gap > 120) reset();
+                buf += ch;
+                if (buf.length >= 3 && gap < 60) fast = true;
+                if (fast && ae === input) e.preventDefault(); // keep the box clean
+            }, true);
+        })();
     </script>
 {% endblock %}
