@@ -1085,6 +1085,27 @@ def invoice_list(request):
     return render(request, 'sales/invoice_list.html', context)
 
 
+def _return_exchange_datetime(request):
+    """
+    Parse the optional `action_date` from the Return/Exchange modal so the
+    operator can record when the return/exchange actually happened (today or a
+    past date). Returns (aware_datetime, date). Defaults to now / today; a
+    future date is clamped to today.
+    """
+    from datetime import datetime as _dt, time as _time
+    raw = (request.POST.get('action_date') or '').strip()
+    today = timezone.localdate()
+    try:
+        d = _dt.strptime(raw, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        d = today
+    now = timezone.now()
+    if d >= today:
+        return now, today
+    aware = timezone.make_aware(_dt.combine(d, _time(12, 0)), timezone.get_current_timezone())
+    return aware, d
+
+
 @login_required(login_url='login')
 def invoice_detail(request, reference):
     """Display invoice details"""
@@ -1117,6 +1138,7 @@ def invoice_detail(request, reference):
             refund_method = request.POST.get('refund_method', 'cash')
             refund_amount_str = request.POST.get('refund_amount', '')
             deposit_client_id = request.POST.get('deposit_client_id', '')
+            action_dt, _action_date = _return_exchange_datetime(request)
 
             if refund_method not in ('cash', 'deposit', 'none'):
                 refund_method = 'cash'
@@ -1149,11 +1171,11 @@ def invoice_detail(request, reference):
 
                     # Mark item as returned
                     item.is_returned = True
-                    item.returned_at = timezone.now()
+                    item.returned_at = action_dt
                     item.save(update_fields=['is_returned', 'returned_at'])
 
                     # Create action record (stores refund method/amount/deposit client)
-                    SaleInvoiceAction.objects.create(
+                    _return_action = SaleInvoiceAction.objects.create(
                         original_invoice=invoice,
                         action_type=SaleInvoiceAction.ActionType.RETURN,
                         original_product=product,
@@ -1164,6 +1186,8 @@ def invoice_detail(request, reference):
                         notes=notes,
                         created_by=request.user
                     )
+                    # Record it on the chosen return date (today or backdated).
+                    SaleInvoiceAction.objects.filter(pk=_return_action.pk).update(created_at=action_dt)
 
                     # If crediting a client deposit, create the deposit transaction
                     if refund_method == 'deposit' and deposit_client and refund_amount > 0:
@@ -1172,13 +1196,14 @@ def invoice_detail(request, reference):
                             client=deposit_client,
                             defaults={'created_by': request.user}
                         )
-                        DepositTransaction.objects.create(
+                        _dep_tx = DepositTransaction.objects.create(
                             account=dep_account,
                             transaction_type=DepositTransaction.TransactionType.REFUND,
                             amount=refund_amount,  # positive: credit into deposit
                             description=f'Remboursement retour facture {invoice.reference} ({product_ref})',
                             created_by=request.user
                         )
+                        DepositTransaction.objects.filter(pk=_dep_tx.pk).update(created_at=action_dt)
 
                     # Update product status to available
                     product.status = 'available'
@@ -1298,6 +1323,7 @@ def invoice_detail(request, reference):
             item_id = request.POST.get('item_id')
             replacement_products_json = request.POST.get('replacement_products', '[]')
             new_invoice_reference = request.POST.get('new_invoice_reference', '').strip()
+            action_dt, action_date = _return_exchange_datetime(request)
             # Payment 1
             payment_method_id = request.POST.get('payment_method_id', '')
             payment_reference = request.POST.get('payment_reference', '').strip()
@@ -1343,7 +1369,7 @@ def invoice_detail(request, reference):
                     # Create new invoice for the exchange
                     new_invoice = SaleInvoice.objects.create(
                         reference=exchange_reference,
-                        date=timezone.now().date(),
+                        date=action_date,
                         sale_type=invoice.sale_type,
                         client=invoice.client,
                         seller=request.user,
@@ -1439,7 +1465,7 @@ def invoice_detail(request, reference):
                             pay_ref_1 = payment_reference if payment_reference else f"PAY-{new_invoice.reference}-1"
                             ClientPayment.objects.create(
                                 reference=pay_ref_1,
-                                date=timezone.now().date(),
+                                date=action_date,
                                 payment_type=ClientPayment.PaymentType.INVOICE,
                                 client=new_invoice.client,  # Can be None for anonymous sales
                                 amount=amount_paid_1,
@@ -1462,7 +1488,7 @@ def invoice_detail(request, reference):
                             pay_ref_2 = payment_reference_2 if payment_reference_2 else f"PAY-{new_invoice.reference}-2"
                             ClientPayment.objects.create(
                                 reference=pay_ref_2,
-                                date=timezone.now().date(),
+                                date=action_date,
                                 payment_type=ClientPayment.PaymentType.INVOICE,
                                 client=new_invoice.client,  # Can be None for anonymous sales
                                 amount=amount_paid_2,
@@ -1507,7 +1533,7 @@ def invoice_detail(request, reference):
                     new_invoice.save()
 
                     # Create action record (link to first replacement product for reference)
-                    SaleInvoiceAction.objects.create(
+                    _exchange_action = SaleInvoiceAction.objects.create(
                         original_invoice=invoice,
                         action_type=SaleInvoiceAction.ActionType.EXCHANGE,
                         original_product=original_product,
@@ -1517,6 +1543,8 @@ def invoice_detail(request, reference):
                         notes=notes,
                         created_by=request.user
                     )
+                    # Record it on the chosen exchange date (today or backdated).
+                    SaleInvoiceAction.objects.filter(pk=_exchange_action.pk).update(created_at=action_dt)
 
                     # Update original product status to available
                     original_product.status = 'available'

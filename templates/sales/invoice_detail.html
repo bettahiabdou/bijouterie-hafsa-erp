@@ -1620,6 +1620,13 @@
             document.getElementById('returnExchangeProductRef').textContent = productRef;
             document.getElementById('originalPriceBadge').textContent = originalItemPrice.toFixed(2) + ' DH';
             document.getElementById('returnExchangeNotes').value = '';
+            // Default the return/exchange date to today (local).
+            (function(){
+                const d = new Date();
+                const ymd = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+                const dateEl = document.getElementById('returnExchangeDate');
+                if (dateEl) { dateEl.value = ymd; dateEl.max = ymd; }
+            })();
             document.getElementById('confirmReturnExchangeBtn').disabled = true;
 
             // Reset action choices
@@ -2044,6 +2051,7 @@
             if (!currentItemId || !currentAction) return;
 
             const notes = document.getElementById('returnExchangeNotes').value;
+            const actionDate = (document.getElementById('returnExchangeDate') || {}).value || '';
 
             if (currentAction === 'return') {
                 const typeEl = document.querySelector('input[name="refund_type"]:checked');
@@ -2067,6 +2075,7 @@
                 }
 
                 document.getElementById('returnItemId').value = currentItemId;
+                document.getElementById('returnActionDate').value = actionDate;
                 document.getElementById('returnNotes').value = notes;
                 document.getElementById('returnRefundMethod').value = refundMethod;
                 document.getElementById('returnRefundAmount').value = refundAmount.toFixed(2);
@@ -2080,6 +2089,7 @@
                 }));
 
                 document.getElementById('exchangeItemId').value = currentItemId;
+                document.getElementById('exchangeActionDate').value = actionDate;
                 document.getElementById('exchangeReplacementProducts').value = JSON.stringify(productsData);
                 document.getElementById('exchangeNewInvoiceRef').value = document.getElementById('exchangeNewReference').value;
                 // Payment 1
@@ -2340,6 +2350,13 @@
                     </div>
                 </div>
 
+                <!-- Date of the return/exchange -->
+                <div class="form-group" style="margin-top: var(--space-4);">
+                    <label>Date du retour / échange</label>
+                    <input type="date" id="returnExchangeDate" class="form-input">
+                    <small style="color: var(--neutral-500);">Laissez la date d'aujourd'hui, ou choisissez la date à laquelle le retour/échange a réellement eu lieu.</small>
+                </div>
+
                 <!-- Notes -->
                 <div class="form-group" style="margin-top: var(--space-4);">
                     <label>Notes (optionnel)</label>
@@ -2360,6 +2377,7 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="return_item">
         <input type="hidden" name="item_id" id="returnItemId" value="">
+        <input type="hidden" name="action_date" id="returnActionDate" value="">
         <input type="hidden" name="notes" id="returnNotes" value="">
         <input type="hidden" name="refund_method" id="returnRefundMethod" value="cash">
         <input type="hidden" name="refund_amount" id="returnRefundAmount" value="">
@@ -2370,6 +2388,7 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="exchange_item">
         <input type="hidden" name="item_id" id="exchangeItemId" value="">
+        <input type="hidden" name="action_date" id="exchangeActionDate" value="">
         <input type="hidden" name="replacement_products" id="exchangeReplacementProducts" value="">
         <input type="hidden" name="new_invoice_reference" id="exchangeNewInvoiceRef" value="">
         <!-- Payment 1 -->
