@@ -159,17 +159,39 @@ def product_list(request):
     if metal_filter:
         products = products.filter(metal_type_id=metal_filter)
 
-    # Sort
+    # Filter by time in stock: only products added more than N days ago
+    # (helps surface aged stock to sell fast, or spot pieces that may have
+    # left the shop without being declared).
+    from django.utils import timezone as _tz
+    from datetime import timedelta as _td
+    min_age = request.GET.get('min_age', '')
+    if min_age:
+        try:
+            days = int(min_age)
+            if days > 0:
+                products = products.filter(created_at__lte=_tz.now() - _td(days=days))
+        except (ValueError, TypeError):
+            pass
+
+    # Sort (whitelisted)
     sort_by = request.GET.get('sort', '-created_at')
-    try:
-        products = products.order_by(sort_by)
-    except:
-        products = products.order_by('-created_at')
+    allowed_sorts = {
+        '-created_at', 'created_at', 'reference', '-reference',
+        'name', '-name', 'selling_price', '-selling_price', 'status',
+    }
+    if sort_by not in allowed_sorts:
+        sort_by = '-created_at'
+    products = products.order_by(sort_by)
 
     # Pagination
     paginator = Paginator(products, 20)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
+
+    # Annotate each product on the page with how long it has been in stock
+    _now = _tz.now()
+    for _p in page_obj.object_list:
+        _p.days_in_stock = (_now - _p.created_at).days if _p.created_at else None
 
     # Statistics
     stats = {
@@ -186,6 +208,7 @@ def product_list(request):
         'status_filter': status_filter,
         'category_filter': category_filter,
         'metal_filter': metal_filter,
+        'min_age': min_age,
         'sort_by': sort_by,
         'categories': ProductCategory.objects.all(),
         'metals': MetalType.objects.filter(is_active=True),

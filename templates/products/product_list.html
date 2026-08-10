@@ -115,6 +115,31 @@
                             {% endfor %}
                         </select>
                     </div>
+
+                    <!-- En stock depuis (aged inventory) -->
+                    <div class="form-group">
+                        <label class="form-label">En stock depuis</label>
+                        <select name="min_age" class="form-select">
+                            <option value="">Peu importe</option>
+                            <option value="30"  {% if min_age == '30' %}selected{% endif %}>Plus de 30 jours</option>
+                            <option value="60"  {% if min_age == '60' %}selected{% endif %}>Plus de 60 jours</option>
+                            <option value="90"  {% if min_age == '90' %}selected{% endif %}>Plus de 90 jours</option>
+                            <option value="180" {% if min_age == '180' %}selected{% endif %}>Plus de 6 mois</option>
+                            <option value="365" {% if min_age == '365' %}selected{% endif %}>Plus d'un an</option>
+                        </select>
+                    </div>
+
+                    <!-- Sort -->
+                    <div class="form-group">
+                        <label class="form-label">Trier par</label>
+                        <select name="sort" class="form-select">
+                            <option value="created_at"     {% if sort_by == 'created_at' %}selected{% endif %}>Plus ancien en stock</option>
+                            <option value="-created_at"    {% if sort_by == '-created_at' %}selected{% endif %}>Plus récent</option>
+                            <option value="-selling_price" {% if sort_by == '-selling_price' %}selected{% endif %}>Prix décroissant</option>
+                            <option value="selling_price"  {% if sort_by == 'selling_price' %}selected{% endif %}>Prix croissant</option>
+                            <option value="reference"      {% if sort_by == 'reference' %}selected{% endif %}>Référence</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="filter-actions">
@@ -165,6 +190,13 @@
                             <i class="fas fa-ring"></i>
                             {{ product.metal_type.name|default:"-" }}
                         </span>
+                        {% if product.days_in_stock is not None %}
+                        <span class="meta-item age-badge{% if product.days_in_stock >= 365 %} age-old{% elif product.days_in_stock >= 90 %} age-warn{% endif %}"
+                              title="En stock depuis {{ product.created_at|date:'d/m/Y' }}">
+                            <i class="fas fa-clock"></i>
+                            {{ product.days_in_stock }} j en stock
+                        </span>
+                        {% endif %}
                     </div>
 
                     <div class="product-details">
@@ -399,6 +431,23 @@
 
         .meta-item i {
             color: var(--neutral-400);
+        }
+
+        /* Aged-stock badge */
+        .age-badge {
+            font-weight: var(--font-semibold);
+            padding: 1px 6px;
+            border-radius: var(--radius-full);
+            background: var(--neutral-100);
+        }
+        .age-badge i { color: inherit; }
+        .age-badge.age-warn {
+            color: var(--warning-700, #b45309);
+            background: var(--warning-50, #fffbeb);
+        }
+        .age-badge.age-old {
+            color: var(--error-700, #b91c1c);
+            background: var(--error-50, #fef2f2);
         }
 
         .product-details {
