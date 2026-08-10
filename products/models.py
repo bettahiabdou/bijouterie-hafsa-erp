@@ -1079,3 +1079,55 @@ class CatalogAccessLog(models.Model):
 
     def __str__(self):
         return f"{self.token.name} @ {self.accessed_at:%Y-%m-%d %H:%M}"
+
+
+class StockCountSession(models.Model):
+    """
+    A physical stock-count ("contrôle d'inventaire"): the operator scans each
+    product one at a time, then finishes and gets a reconciliation report of
+    what was expected available but not scanned (missing), and what was scanned
+    but not marked available (anomaly).
+    """
+    class Status(models.TextChoices):
+        OPEN = 'open', _('En cours')
+        CLOSED = 'closed', _('Terminé')
+
+    started_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='stock_counts', verbose_name=_('Démarré par'),
+    )
+    status = models.CharField(_('Statut'), max_length=10, choices=Status.choices, default=Status.OPEN)
+    notes = models.TextField(_('Notes'), blank=True)
+    started_at = models.DateTimeField(_('Démarré le'), auto_now_add=True)
+    finished_at = models.DateTimeField(_('Terminé le'), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _('Contrôle inventaire')
+        verbose_name_plural = _('Contrôles inventaire')
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f"Inventaire #{self.pk} - {self.get_status_display()}"
+
+
+class StockCountScan(models.Model):
+    """One scanned code within a stock-count session."""
+    session = models.ForeignKey(
+        StockCountSession, on_delete=models.CASCADE, related_name='scans',
+        verbose_name=_('Session'),
+    )
+    product = models.ForeignKey(
+        Product, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='stock_count_scans', verbose_name=_('Produit'),
+    )
+    code = models.CharField(_('Code scanné'), max_length=120)
+    scanned_at = models.DateTimeField(_('Scanné le'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('Scan inventaire')
+        verbose_name_plural = _('Scans inventaire')
+        ordering = ['-scanned_at']
+        indexes = [models.Index(fields=['session', 'product'])]
+
+    def __str__(self):
+        return f"{self.code} ({self.session_id})"

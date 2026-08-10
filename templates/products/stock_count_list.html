@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Contrôle d'inventaire - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:list' %}" class="breadcrumb-item">Produits</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Contrôle d'inventaire</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title"><i class="fas fa-clipboard-check text-primary mr-2"></i> Contrôle d'inventaire</h1>
+                <p class="page-subtitle">Scannez chaque produit, puis obtenez le rapport des manquants et anomalies</p>
+            </div>
+            <div class="page-actions">
+                <form method="post" action="{% url 'products:stock_count_start' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-play"></i>
+                        <span>{% if open_session %}Reprendre l'inventaire{% else %}Démarrer un inventaire{% endif %}</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    {% if sessions %}
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Statut</th><th>Démarré par</th>
+                                <th>Démarré le</th><th>Terminé le</th><th class="text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in sessions %}
+                                <tr>
+                                    <td>#{{ s.id }}</td>
+                                    <td>
+                                        {% if s.status == 'open' %}<span class="badge badge-warning">En cours</span>
+                                        {% else %}<span class="badge badge-success">Terminé</span>{% endif %}
+                                    </td>
+                                    <td>{{ s.started_by.get_full_name|default:s.started_by.username|default:'-' }}</td>
+                                    <td>{{ s.started_at|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ s.finished_at|date:"d/m/Y H:i"|default:'-' }}</td>
+                                    <td class="text-right">
+                                        <a href="{% url 'products:stock_count_detail' s.id %}" class="btn btn-sm btn-secondary">
+                                            {% if s.status == 'open' %}Continuer{% else %}Rapport{% endif %}
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-clipboard-check empty-state-icon"></i>
+            <h3 class="empty-state-title">Aucun inventaire</h3>
+            <p class="empty-state-text">Démarrez un inventaire pour commencer à scanner.</p>
+        </div>
+    {% endif %}
+{% endblock %}

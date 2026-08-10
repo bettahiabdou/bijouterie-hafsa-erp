@@ -18,6 +18,14 @@ urlpatterns = [
     path('inventory/dashboard/', views.inventory_dashboard, name='inventory_dashboard'),
     path('inventory/export/', views.inventory_export, name='inventory_export'),
 
+    # Contrôle d'inventaire (physical stock count) — static prefix, before <reference>
+    path('stock-count/', views.stock_count_list, name='stock_count_list'),
+    path('stock-count/start/', views.stock_count_start, name='stock_count_start'),
+    path('stock-count/<int:pk>/', views.stock_count_detail, name='stock_count_detail'),
+    path('stock-count/<int:pk>/scan/', views.stock_count_scan, name='stock_count_scan'),
+    path('stock-count/<int:pk>/finish/', views.stock_count_finish, name='stock_count_finish'),
+    path('stock-count/<int:pk>/print/', views.stock_count_report_print, name='stock_count_print'),
+
     # Print (must be before <str:reference> catch-all)
     path('print/test/', views.print_test, name='print_test'),
     path('print/debug/', views.printer_debug, name='printer_debug'),

@@ -12,7 +12,7 @@ from django.http import JsonResponse, HttpResponse
 from decimal import Decimal, InvalidOperation
 import csv
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from .models import Product, ProductImage, ProductStone, ProductVideo
+from .models import Product, ProductImage, ProductStone, ProductVideo, StockCountSession, StockCountScan
 from .video_utils import convert_video_to_mp4
 from .print_utils import print_product_label, print_price_tag, print_test_label, generate_product_label_zpl, generate_price_tag_zpl, queue_print_job, send_to_printer
 from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount, JewelryType, ProductNature
@@ -2695,3 +2695,157 @@ def catalog_access_logs(request):
     from .models import CatalogAccessLog
     logs = CatalogAccessLog.objects.select_related('token').order_by('-accessed_at')[:200]
     return render(request, 'products/catalog_access_logs.html', {'logs': logs})
+
+
+# ============================================================================
+# Contrôle d'inventaire (physical stock-count sessions)
+# ============================================================================
+
+def _resolve_product_by_code(code):
+    """Resolve a scanned/typed code to a Product (barcode -> reference -> rfid
+    -> digits-only barcode -> unique contains). Returns Product or None."""
+    import re
+    code = (code or '').strip()
+    if not code:
+        return None
+    for q in (Q(barcode__iexact=code), Q(reference__iexact=code), Q(rfid_tag__iexact=code)):
+        p = Product.objects.filter(q).first()
+        if p:
+            return p
+    digits = re.sub(r'\D', '', code)
+    if digits and digits != code:
+        p = Product.objects.filter(barcode__iexact=digits).first()
+        if p:
+            return p
+    cands = list(Product.objects.filter(Q(barcode__icontains=code) | Q(reference__icontains=code))[:2])
+    if len(cands) == 1:
+        return cands[0]
+    return None
+
+
+def _stock_count_report(session):
+    """Reconcile a session against products that should be available."""
+    scans = session.scans.select_related('product').all()
+    scanned_products = {}   # product_id -> product
+    unknown_codes = []
+    for s in scans:
+        if s.product_id:
+            scanned_products[s.product_id] = s.product
+        else:
+            unknown_codes.append(s.code)
+
+    scanned_ids = set(scanned_products.keys())
+
+    # Expected in stock = status 'available'
+    expected_qs = Product.objects.filter(status='available')
+    missing = list(expected_qs.exclude(id__in=scanned_ids).select_related('category')) if scanned_ids else list(expected_qs.select_related('category'))
+
+    # Scanned but not marked available (present but wrong status)
+    anomalies = [p for p in scanned_products.values() if p.status != 'available']
+    # Correctly counted (scanned AND available)
+    counted_ok = [p for p in scanned_products.values() if p.status == 'available']
+
+    return {
+        'missing': missing,
+        'anomalies': anomalies,
+        'counted_ok': counted_ok,
+        'unknown_codes': unknown_codes,
+        'scanned_total': len(scanned_products),
+        'expected_total': expected_qs.count(),
+        'missing_count': len(missing),
+        'anomaly_count': len(anomalies),
+    }
+
+
+@login_required(login_url='login')
+def stock_count_list(request):
+    sessions = StockCountSession.objects.select_related('started_by').all()[:100]
+    open_session = StockCountSession.objects.filter(status='open').order_by('-started_at').first()
+    return render(request, 'products/stock_count_list.html', {
+        'sessions': sessions, 'open_session': open_session,
+    })
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def stock_count_start(request):
+    # Reuse an existing open session if any, else create one.
+    session = StockCountSession.objects.filter(status='open').order_by('-started_at').first()
+    if not session:
+        session = StockCountSession.objects.create(started_by=request.user)
+    return redirect('products:stock_count_detail', pk=session.pk)
+
+
+@login_required(login_url='login')
+def stock_count_detail(request, pk):
+    session = get_object_or_404(StockCountSession, pk=pk)
+    context = {'session': session}
+    if session.status == 'open':
+        context['scans'] = session.scans.select_related('product').all()[:500]
+        context['scanned_count'] = session.scans.filter(product__isnull=False).values('product').distinct().count()
+    else:
+        context['report'] = _stock_count_report(session)
+    return render(request, 'products/stock_count_detail.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def stock_count_scan(request, pk):
+    import json as _json
+    session = get_object_or_404(StockCountSession, pk=pk)
+    if session.status != 'open':
+        return JsonResponse({'ok': False, 'error': 'Session terminée.'}, status=409)
+    try:
+        data = _json.loads(request.body or '{}')
+    except ValueError:
+        data = {}
+    code = (data.get('code') or '').strip()
+    if not code:
+        return JsonResponse({'ok': False, 'error': 'Code vide.'}, status=400)
+
+    product = _resolve_product_by_code(code)
+    if product:
+        already = session.scans.filter(product=product).exists()
+        if already:
+            result = 'duplicate'
+        else:
+            StockCountScan.objects.create(session=session, product=product, code=code)
+            result = 'counted'
+        payload = {
+            'ok': True, 'result': result,
+            'product': {'reference': product.reference, 'name': product.name or '',
+                        'status': product.get_status_display(), 'is_available': product.status == 'available'},
+        }
+    else:
+        StockCountScan.objects.create(session=session, product=None, code=code)
+        payload = {'ok': True, 'result': 'unknown', 'code': code}
+
+    payload['scanned_count'] = session.scans.filter(product__isnull=False).values('product').distinct().count()
+    return JsonResponse(payload)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def stock_count_finish(request, pk):
+    from django.utils import timezone as _tz
+    session = get_object_or_404(StockCountSession, pk=pk)
+    if session.status == 'open':
+        session.status = 'closed'
+        session.finished_at = _tz.now()
+        session.save(update_fields=['status', 'finished_at'])
+        ActivityLog.objects.create(
+            user=request.user, action=ActivityLog.ActionType.UPDATE,
+            model_name='StockCountSession', object_id=str(session.id),
+            object_repr=f'Inventaire #{session.id} terminé',
+        )
+    return redirect('products:stock_count_detail', pk=session.pk)
+
+
+@login_required(login_url='login')
+def stock_count_report_print(request, pk):
+    from django.utils import timezone as _tz
+    session = get_object_or_404(StockCountSession, pk=pk)
+    return render(request, 'products/stock_count_report_print.html', {
+        'session': session, 'report': _stock_count_report(session),
+        'now': _tz.now(), 'user': request.user,
+    })

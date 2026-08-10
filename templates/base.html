@@ -532,6 +532,10 @@
                         <a href="{% url 'products:sold_list' %}" class="nav-link {% if request.resolver_match.url_name == 'sold_list' %}active{% endif %}">
                             <span class="nav-text">Produits Vendus</span>
                         </a>
+                        <a href="{% url 'products:stock_count_list' %}" class="nav-link {% if 'stock-count' in request.path %}active{% endif %}">
+                            <i class="fas fa-clipboard-check text-primary" style="margin-right: 6px;"></i>
+                            <span class="nav-text">Contrôle d'inventaire</span>
+                        </a>
                         <a href="{% url 'products:create' %}" class="nav-link {% if 'create' in request.path and 'products' in request.path %}active{% endif %}">
                             <span class="nav-text">Nouveau Produit</span>
                         </a>

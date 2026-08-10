@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+{% block title %}Inventaire #{{ session.id }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:stock_count_list' %}" class="breadcrumb-item">Contrôle d'inventaire</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Inventaire #{{ session.id }}</span>
+{% endblock %}
+
+{% block content %}
+<form id="csrf-form" style="display:none;">{% csrf_token %}</form>
+
+{% if session.status == 'open' %}
+    <!-- ============ SCANNING MODE ============ -->
+    <div class="card mb-6">
+        <div class="card-body">
+            <div class="sc-head">
+                <div>
+                    <div class="sc-counter-num" id="sc-counter">{{ scanned_count }}</div>
+                    <div class="sc-counter-lbl">produits scannés</div>
+                </div>
+                <form method="post" action="{% url 'products:stock_count_finish' session.id %}"
+                      onsubmit="return confirm('Terminer l\'inventaire et générer le rapport ?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-flag-checkered"></i> Terminer</button>
+                </form>
+            </div>
+
+            <label class="form-label" style="margin-top:var(--space-4);">Scannez un produit (pistolet laser, C72, ou clavier)</label>
+            <div class="sc-input-row">
+                <input type="text" id="sc-input" class="form-input" autocomplete="off" inputmode="text"
+                       placeholder="Scannez ou tapez la référence / code-barres...">
+                <button type="button" id="sc-cam-btn" class="btn btn-secondary"><i class="fas fa-barcode"></i> Caméra</button>
+            </div>
+            <div id="sc-hint" class="sc-hint" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3 class="card-title">Derniers scans</h3></div>
+        <div class="card-body">
+            <div id="sc-list">
+                {% for sc in scans %}
+                    <div class="sc-row {% if sc.product %}{% if sc.product.status == 'available' %}sc-ok{% else %}sc-err{% endif %}{% else %}sc-err{% endif %}">
+                        <span class="sc-label">{% if sc.product %}✓{% else %}?{% endif %}</span>
+                        <strong>{% if sc.product %}{{ sc.product.reference }}{% else %}{{ sc.code }}{% endif %}</strong>
+                        {{ sc.product.name|default:'' }}
+                    </div>
+                {% empty %}
+                    <p class="text-muted" id="sc-empty">Aucun scan pour l'instant.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera scanner overlay -->
+    <div id="sc-modal" class="sc-scan-modal" style="display:none;">
+        <div class="sc-stage"><video id="sc-video" playsinline autoplay muted></video><div class="sc-reticle"></div></div>
+        <div class="sc-topbar"><span id="sc-status">Initialisation…</span></div>
+        <div class="sc-bottombar">
+            <button type="button" class="btn btn-primary" id="sc-capture"><i class="fas fa-crosshairs"></i> Capturer</button>
+            <button type="button" class="btn btn-danger" id="sc-close"><i class="fas fa-times"></i> Fermer</button>
+        </div>
+    </div>
+
+{% else %}
+    <!-- ============ REPORT MODE ============ -->
+    <div class="page-actions" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-4); flex-wrap:wrap; gap:8px;">
+        <h2 style="margin:0;">Rapport — Inventaire #{{ session.id }}
+            <small style="color:var(--neutral-500); font-weight:400;">{{ session.finished_at|date:"d/m/Y H:i" }}</small>
+        </h2>
+        <a href="{% url 'products:stock_count_print' session.id %}" target="_blank" class="btn btn-primary"><i class="fas fa-print"></i> Imprimer A4</a>
+    </div>
+
+    <div class="stats-grid mb-6">
+        <div class="stat-card stat-info"><div class="stat-icon"><i class="fas fa-box"></i></div><div class="stat-content"><span class="stat-value">{{ report.expected_total }}</span><span class="stat-label">Attendus (Disponible)</span></div></div>
+        <div class="stat-card stat-success"><div class="stat-icon"><i class="fas fa-check"></i></div><div class="stat-content"><span class="stat-value">{{ report.scanned_total }}</span><span class="stat-label">Scannés</span></div></div>
+        <div class="stat-card stat-warning"><div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="stat-content"><span class="stat-value">{{ report.missing_count }}</span><span class="stat-label">Manquants</span></div></div>
+        <div class="stat-card"><div class="stat-icon"><i class="fas fa-question"></i></div><div class="stat-content"><span class="stat-value">{{ report.anomaly_count }}</span><span class="stat-label">Anomalies</span></div></div>
+    </div>
+
+    <!-- Manquants -->
+    <div class="card mb-6">
+        <div class="card-header"><h3 class="card-title text-warning"><i class="fas fa-exclamation-triangle mr-2"></i> Manquants — attendus mais non scannés ({{ report.missing_count }})</h3></div>
+        <div class="card-body">
+            {% if report.missing %}
+                <div class="table-responsive"><table class="table"><thead><tr><th>Référence</th><th>Nom</th><th>Catégorie</th><th class="text-right">Prix</th></tr></thead><tbody>
+                    {% for p in report.missing %}
+                        <tr><td><a href="{% url 'products:detail' p.reference %}">{{ p.reference }}</a></td><td>{{ p.name }}</td><td>{{ p.category.name|default:'-' }}</td><td class="text-right">{{ p.selling_price|floatformat:2 }} DH</td></tr>
+                    {% endfor %}
+                </tbody></table></div>
+            {% else %}<p class="text-muted">Aucun manquant — tous les produits disponibles ont été scannés. ✓</p>{% endif %}
+        </div>
+    </div>
+
+    <!-- Anomalies -->
+    <div class="card mb-6">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-question-circle mr-2"></i> Anomalies — scannés mais non « Disponible » ({{ report.anomaly_count }})</h3></div>
+        <div class="card-body">
+            {% if report.anomalies %}
+                <div class="table-responsive"><table class="table"><thead><tr><th>Référence</th><th>Nom</th><th>Statut en base</th></tr></thead><tbody>
+                    {% for p in report.anomalies %}
+                        <tr><td><a href="{% url 'products:detail' p.reference %}">{{ p.reference }}</a></td><td>{{ p.name }}</td><td><span class="badge badge-warning">{{ p.get_status_display }}</span></td></tr>
+                    {% endfor %}
+                </tbody></table></div>
+            {% else %}<p class="text-muted">Aucune anomalie. ✓</p>{% endif %}
+        </div>
+    </div>
+
+    <!-- Unknown -->
+    {% if report.unknown_codes %}
+    <div class="card">
+        <div class="card-header"><h3 class="card-title">Codes inconnus ({{ report.unknown_codes|length }})</h3></div>
+        <div class="card-body"><p>{% for c in report.unknown_codes %}<span class="badge badge-neutral" style="margin:2px;">{{ c }}</span>{% endfor %}</p></div>
+    </div>
+    {% endif %}
+{% endif %}
+
+<style>
+    .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:var(--space-4); }
+    .sc-head { display:flex; justify-content:space-between; align-items:center; gap:var(--space-4); flex-wrap:wrap; }
+    .sc-counter-num { font-size:2.4rem; font-weight:800; color:var(--primary-700); line-height:1; }
+    .sc-counter-lbl { color:var(--neutral-500); font-size:var(--text-sm); }
+    .sc-input-row { display:flex; gap:8px; }
+    .sc-input-row .form-input { flex:1; min-width:0; font-size:1.1rem; }
+    .sc-input-row #sc-cam-btn { white-space:nowrap; flex-shrink:0; }
+    .sc-hint { margin-top:var(--space-2); padding:6px 12px; border-radius:var(--radius-md); font-size:var(--text-sm); }
+    .sc-hint.ok { background:var(--success-50,#f0fdf4); color:var(--success-700,#15803d); }
+    .sc-hint.warn { background:var(--warning-50,#fffbeb); color:var(--warning-700,#b45309); }
+    .sc-hint.err { background:var(--error-50,#fef2f2); color:var(--error-700,#b91c1c); }
+    .sc-row { padding:8px 10px; border-bottom:1px solid var(--neutral-100); display:flex; align-items:center; gap:8px; }
+    .sc-row .sc-label { font-weight:700; font-size:var(--text-sm); }
+    .sc-row.sc-ok { background:var(--success-50,#f0fdf4); }
+    .sc-row.sc-ok .sc-label { color:var(--success-700,#15803d); }
+    .sc-row.sc-warn { background:var(--warning-50,#fffbeb); }
+    .sc-row.sc-warn .sc-label { color:var(--warning-700,#b45309); }
+    .sc-row.sc-err { background:var(--error-50,#fef2f2); }
+    .sc-row.sc-err .sc-label { color:var(--error-700,#b91c1c); }
+    @media (max-width:640px){ .sc-input-row{ flex-direction:column; } .sc-input-row #sc-cam-btn{ width:100%; } }
+
+    .sc-scan-modal { position:fixed; inset:0; z-index:100001; background:#000; display:flex; flex-direction:column; }
+    .sc-stage { position:relative; flex:1; overflow:hidden; }
+    #sc-video { width:100%; height:100%; object-fit:cover; background:#000; }
+    .sc-reticle { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:min(78vw,420px); height:min(46vw,240px); border:3px solid rgba(255,255,255,.95); border-radius:14px; box-shadow:0 0 0 100vmax rgba(0,0,0,.45); }
+    .sc-topbar { position:absolute; top:0; left:0; right:0; padding:16px; color:#fff; text-align:center; font-weight:600; background:linear-gradient(rgba(0,0,0,.55),transparent); }
+    .sc-bottombar { padding:16px calc(16px + env(safe-area-inset-bottom)); display:flex; gap:12px; justify-content:center; background:#000; }
+    .sc-bottombar .btn { flex:1; max-width:220px; padding:14px; font-size:16px; }
+    #sc-capture { flex:2; max-width:none; font-weight:700; }
+</style>
+
+{% if session.status == 'open' %}
+<script>
+(function(){
+    const scanUrl = "{% url 'products:stock_count_scan' session.id %}";
+    const csrf = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
+    const input = document.getElementById('sc-input');
+    const list = document.getElementById('sc-list');
+    const counter = document.getElementById('sc-counter');
+    const hint = document.getElementById('sc-hint');
+    let busy = false, lastCode = '', lastTime = 0;
+
+    function showHint(m, k){ hint.textContent = m; hint.className = 'sc-hint ' + (k||''); hint.style.display='block'; }
+
+    function scanCode(code){
+        code = (code||'').trim();
+        if(!code) return;
+        const now = Date.now();
+        if(code === lastCode && now - lastTime < 800) return;  // debounce
+        lastCode = code; lastTime = now;
+        busy = true;
+        fetch(scanUrl, { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body:JSON.stringify({code}) })
+            .then(r => r.json()).then(d => {
+                busy = false;
+                if(!d.ok){ showHint(d.error || 'Erreur', 'err'); return; }
+                counter.textContent = d.scanned_count;
+                try{ if(navigator.vibrate) navigator.vibrate(60); }catch(e){}
+                const em = document.getElementById('sc-empty'); if(em) em.remove();
+                let cls, label;
+                if(d.result === 'counted'){ cls='sc-ok'; label='✓ Compté'; showHint('✓ ' + d.product.reference, 'ok'); }
+                else if(d.result === 'duplicate'){ cls='sc-warn'; label='Déjà scanné'; showHint('Déjà scanné : ' + d.product.reference, 'warn'); }
+                else { cls='sc-err'; label='? Inconnu'; showHint('Code inconnu : ' + (d.code||code), 'err'); }
+                let extra = '';
+                if(d.product && d.result !== 'unknown' && !d.product.is_available){ extra = ' <span class="badge badge-warning">' + d.product.status + '</span>'; }
+                const ref = d.product ? d.product.reference : (d.code || code);
+                const name = d.product ? (d.product.name || '') : '';
+                list.insertAdjacentHTML('afterbegin', '<div class="sc-row ' + cls + '"><span class="sc-label">' + label + '</span> <strong>' + ref + '</strong> ' + name + extra + '</div>');
+            }).catch(()=>{ busy = false; showHint('Erreur de connexion', 'err'); });
+    }
+
+    // Manual typing + Enter (slow) uses the field value.
+    input.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){ e.preventDefault(); const v = input.value.trim(); if(v){ scanCode(v); input.value=''; } }
+    });
+    input.focus();
+    // keep the box focused for the gun (unless the camera modal is open)
+    document.addEventListener('click', function(e){
+        if(document.getElementById('sc-modal').style.display === 'none' && e.target.id !== 'sc-input') {
+            setTimeout(()=>{ try{ input.focus(); }catch(x){} }, 0);
+        }
+    });
+
+    // ---- Physical-key capture (layout-independent, for laser/USB guns) ----
+    let scBuf = '', scLast = 0, scFast = false;
+    function codeToChar(code){ let m;
+        if((m=/^Digit(\d)$/.exec(code))) return m[1];
+        if((m=/^Numpad(\d)$/.exec(code))) return m[1];
+        if((m=/^Key([A-Z])$/.exec(code))) return m[1];
+        if(code==='Minus'||code==='NumpadSubtract') return '-';
+        return null;
+    }
+    function resetScan(){ scBuf=''; scFast=false; }
+    document.addEventListener('keydown', function(e){
+        if(e.ctrlKey||e.metaKey||e.altKey) return;
+        const now = Date.now(), gap = now - scLast; scLast = now;
+        if(e.code==='Enter'||e.code==='NumpadEnter'||e.key==='Enter'){
+            if(scBuf.length>=3 && scFast){ e.preventDefault(); e.stopPropagation(); const c=scBuf; resetScan(); input.value=''; scanCode(c); }
+            resetScan(); return;
+        }
+        const ch = codeToChar(e.code); if(ch===null) return;
+        if(gap>120) resetScan();
+        scBuf += ch;
+        if(scBuf.length>=3 && gap<60) scFast = true;
+        if(scFast && document.activeElement===input) e.preventDefault();
+    }, true);
+
+    // ---- Camera scanner (fallback) ----
+    const QUAGGA_URL = 'https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js';
+    const modal=document.getElementById('sc-modal'), video=document.getElementById('sc-video'), statusEl=document.getElementById('sc-status');
+    let stream=null, nativeDet=null, timer=null, active=false;
+    document.getElementById('sc-cam-btn').addEventListener('click', openCam);
+    document.getElementById('sc-close').addEventListener('click', closeCam);
+    document.getElementById('sc-capture').addEventListener('click', capture);
+
+    async function openCam(){
+        if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showHint('Caméra non supportée.', 'err'); return; }
+        modal.style.display='flex'; statusEl.textContent='Initialisation…';
+        try{ stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} }, audio:false }); }
+        catch(err){ closeCam(); showHint('Accès caméra refusé.', 'err'); return; }
+        video.srcObject = stream; try{ await video.play(); }catch(e){}
+        nativeDet = null;
+        if('BarcodeDetector' in window){ try{ let f; try{ f=await window.BarcodeDetector.getSupportedFormats(); }catch(e){ f=null; } nativeDet = (f&&f.length)? new window.BarcodeDetector({formats:f}) : new window.BarcodeDetector(); }catch(e){ nativeDet=null; } }
+        if(!nativeDet){ statusEl.textContent='Chargement du lecteur…'; try{ await loadScript(QUAGGA_URL); }catch(e){} }
+        active = true; statusEl.textContent='Visez le code-barres, puis « Capturer ».'; loop();
+    }
+    function grab(){ const w=video.videoWidth,h=video.videoHeight; if(!w||!h) return null; const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(video,0,0,w,h); return c; }
+    function crop(src,wf,hf){ const w=Math.round(src.width*wf),h=Math.round(src.height*hf),x=Math.round((src.width-w)/2),y=Math.round((src.height-h)/2); const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(src,x,y,w,h,0,0,w,h); return c; }
+    function quagga(src){ return new Promise(res=>{ if(!window.Quagga||!window.Quagga.decodeSingle) return res(null); try{ window.Quagga.decodeSingle({ src:src, numOfWorkers:0, locate:true, inputStream:{size:1600}, locator:{patchSize:'medium',halfSample:false}, decoder:{readers:['code_128_reader','ean_reader','ean_8_reader','code_39_reader','code_39_vin_reader','codabar_reader','upc_reader','upc_e_reader','i2of5_reader','code_93_reader']} }, r=>res(r&&r.codeResult&&r.codeResult.code?r.codeResult.code:null)); }catch(e){ res(null); } }); }
+    async function decodeOnce(){
+        if(nativeDet){ try{ const codes=await nativeDet.detect(video); if(codes&&codes.length&&codes[0].rawValue) return codes[0].rawValue; }catch(e){} return null; }
+        const full=grab(); if(!full) return null;
+        for(const cv of [crop(full,0.95,0.55), full]){ const q=await quagga(cv.toDataURL('image/jpeg',0.95)); if(q) return q; }
+        return null;
+    }
+    async function loop(){ if(!active) return; let v=null; try{ v=await decodeOnce(); }catch(e){} if(v){ onDecoded(v); return; } timer=setTimeout(loop, nativeDet?150:800); }
+    async function capture(){ statusEl.textContent='Analyse…'; let v=null; try{ v=await decodeOnce(); }catch(e){} if(v) onDecoded(v); else statusEl.textContent='Aucun code détecté. Rapprochez-vous, puis « Capturer ».'; }
+    function onDecoded(code){ closeCam(); scanCode(code); }
+    function closeCam(){ active=false; if(timer){ clearTimeout(timer); timer=null; } nativeDet=null; if(stream){ stream.getTracks().forEach(t=>{try{t.stop();}catch(e){}}); stream=null; } try{ const s=video.srcObject; if(s&&s.getTracks) s.getTracks().forEach(t=>{try{t.stop();}catch(e){}}); video.srcObject=null; }catch(e){} modal.style.display='none'; input.focus(); }
+    function loadScript(src){ return new Promise((res,rej)=>{ if(document.querySelector('script[data-src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.setAttribute('data-src',src); s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+})();
+</script>
+{% endif %}
+{% endblock %}
