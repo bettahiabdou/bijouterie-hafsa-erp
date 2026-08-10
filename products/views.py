@@ -193,6 +193,11 @@ def product_list(request):
     for _p in page_obj.object_list:
         _p.days_in_stock = (_now - _p.created_at).days if _p.created_at else None
 
+    # Preserve all filters/sort across pagination (everything except page)
+    _params = request.GET.copy()
+    _params.pop('page', None)
+    querystring = _params.urlencode()
+
     # Statistics
     stats = {
         'total': Product.objects.count(),
@@ -210,6 +215,7 @@ def product_list(request):
         'metal_filter': metal_filter,
         'min_age': min_age,
         'sort_by': sort_by,
+        'querystring': querystring,
         'categories': ProductCategory.objects.all(),
         'metals': MetalType.objects.filter(is_active=True),
         'stats': stats,
