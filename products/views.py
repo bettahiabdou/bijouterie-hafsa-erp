@@ -2201,7 +2201,8 @@ def catalog_api(request, token):
     cost_max = request.GET.get('cost_max', '')
     weight_min = request.GET.get('weight_min', '')
     weight_max = request.GET.get('weight_max', '')
-    size = request.GET.get('size', '').strip()
+    size_min = request.GET.get('size_min', '').strip()
+    size_max = request.GET.get('size_max', '').strip()
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
     sort = request.GET.get('sort', 'date_desc')
@@ -2245,8 +2246,32 @@ def catalog_api(request, token):
         qs = qs.filter(gross_weight__gte=weight_min)
     if weight_max:
         qs = qs.filter(gross_weight__lte=weight_max)
-    if size:
-        qs = qs.filter(size__icontains=size)
+
+    # Size range: size is free text ("53 cm", "18", "16.5"); parse its numeric
+    # part and filter on that so Min/Max work like the weight range.
+    def _to_float(v):
+        try:
+            return float(str(v).replace(',', '.'))
+        except (TypeError, ValueError):
+            return None
+    smin = _to_float(size_min) if size_min else None
+    smax = _to_float(size_max) if size_max else None
+    if smin is not None or smax is not None:
+        import re as _re
+        keep = []
+        for pid, sval in qs.values_list('id', 'size'):
+            if not sval:
+                continue
+            m = _re.search(r'\d+(?:[.,]\d+)?', sval)
+            if not m:
+                continue
+            num = float(m.group(0).replace(',', '.'))
+            if smin is not None and num < smin:
+                continue
+            if smax is not None and num > smax:
+                continue
+            keep.append(pid)
+        qs = qs.filter(id__in=keep)
 
     # Date filters
     if date_from:

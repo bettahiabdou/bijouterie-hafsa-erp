@@ -725,7 +725,11 @@
         </div>
         <div class="filter-group">
             <label>Taille</label>
-            <input type="text" id="fSize" placeholder="ex: 53 cm, 18..." style="width:100%;">
+            <div class="range-row">
+                <input type="number" id="fSizeMin" placeholder="Min" min="0" step="0.1">
+                <span>-</span>
+                <input type="number" id="fSizeMax" placeholder="Max" min="0" step="0.1">
+            </div>
         </div>
         <div class="filter-group">
             <label>Date ajout</label>
@@ -815,7 +819,8 @@ function getFilters() {
         cost_max: document.getElementById('fCostMax').value,
         weight_min: document.getElementById('fWeightMin').value,
         weight_max: document.getElementById('fWeightMax').value,
-        size: document.getElementById('fSize').value.trim(),
+        size_min: document.getElementById('fSizeMin').value,
+        size_max: document.getElementById('fSizeMax').value,
         date_from: document.getElementById('fDateFrom').value,
         date_to: document.getElementById('fDateTo').value,
         sort: document.getElementById('fSort').value,
@@ -941,7 +946,7 @@ function applyFilters() {
 }
 
 function resetFilters() {
-    ['fCategory','fMetal','fPurity','fPriceMin','fPriceMax','fCostMin','fCostMax','fWeightMin','fWeightMax','fSize','fDateFrom','fDateTo'].forEach(function(id) {
+    ['fCategory','fMetal','fPurity','fPriceMin','fPriceMax','fCostMin','fCostMax','fWeightMin','fWeightMax','fSizeMin','fSizeMax','fDateFrom','fDateTo'].forEach(function(id) {
         document.getElementById(id).value = '';
     });
     document.getElementById('fSort').value = 'date_desc';
@@ -960,7 +965,7 @@ function updateFilterBadge() {
     if (f.price_min || f.price_max) count++;
     if (f.cost_min || f.cost_max) count++;
     if (f.weight_min || f.weight_max) count++;
-    if (f.size) count++;
+    if (f.size_min || f.size_max) count++;
     if (f.date_from || f.date_to) count++;
     var badge = document.getElementById('filterBadge');
     badge.textContent = count;
@@ -981,7 +986,7 @@ function updateActiveFilters() {
     if (f.price_min || f.price_max) chips.push({label: 'Prix: ' + (f.price_min||'0') + '-' + (f.price_max||'...'), clear: function(){ document.getElementById('fPriceMin').value=''; document.getElementById('fPriceMax').value=''; loadProducts(true); }});
     if (f.cost_min || f.cost_max) chips.push({label: 'Cout: ' + (f.cost_min||'0') + '-' + (f.cost_max||'...'), clear: function(){ document.getElementById('fCostMin').value=''; document.getElementById('fCostMax').value=''; loadProducts(true); }});
     if (f.weight_min || f.weight_max) chips.push({label: 'Poids: ' + (f.weight_min||'0') + '-' + (f.weight_max||'...') + 'g', clear: function(){ document.getElementById('fWeightMin').value=''; document.getElementById('fWeightMax').value=''; loadProducts(true); }});
-    if (f.size) chips.push({label: 'Taille: ' + f.size, clear: function(){ document.getElementById('fSize').value=''; loadProducts(true); }});
+    if (f.size_min || f.size_max) chips.push({label: 'Taille: ' + (f.size_min||'0') + '-' + (f.size_max||'...'), clear: function(){ document.getElementById('fSizeMin').value=''; document.getElementById('fSizeMax').value=''; loadProducts(true); }});
     if (f.date_from || f.date_to) chips.push({label: (f.date_from||'...') + ' - ' + (f.date_to||'...'), clear: function(){ document.getElementById('fDateFrom').value=''; document.getElementById('fDateTo').value=''; loadProducts(true); }});
 
     var container = document.getElementById('activeFilters');
