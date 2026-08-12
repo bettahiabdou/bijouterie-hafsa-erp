@@ -65,6 +65,12 @@ urlpatterns = [
     path('catalog/<str:token>/api/deliveries/', views.catalog_my_deliveries_api, name='catalog_my_deliveries_api'),
     path('catalog/<str:token>/circulation/', views.catalog_my_circulation, name='catalog_my_circulation'),
     path('catalog/<str:token>/api/circulation/', views.catalog_my_circulation_api, name='catalog_my_circulation_api'),
+    path('catalog/<str:token>/deposits/', views.catalog_my_deposits, name='catalog_my_deposits'),
+    path('catalog/<str:token>/api/deposits/', views.catalog_my_deposits_api, name='catalog_my_deposits_api'),
+    path('catalog/<str:token>/api/deposits/create/', views.catalog_deposit_create, name='catalog_deposit_create'),
+    path('catalog/<str:token>/api/deposits/clients/', views.catalog_clients_search, name='catalog_clients_search'),
+    path('catalog/<str:token>/api/deposits/<int:account_id>/', views.catalog_deposit_detail_api, name='catalog_deposit_detail_api'),
+    path('catalog/<str:token>/api/deposits/<int:account_id>/add-fund/', views.catalog_deposit_add_fund, name='catalog_deposit_add_fund'),
     path('catalog/<str:token>/api/deliveries/<int:delivery_id>/status/', views.catalog_update_delivery_status, name='catalog_update_delivery_status'),
     path('catalog/<str:token>/api/deliveries/<int:delivery_id>/images/', views.catalog_delivery_images, name='catalog_delivery_images'),
 

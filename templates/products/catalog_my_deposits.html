@@ -1,0 +1,372 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Mes dépôts - {{ catalog_name }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --gold:#b8860b; --gold-dark:#8b6914; --bg:#fafaf7; --text:#1a1a1a; --muted:#6b7280; --border:#e5e5e0; --radius:10px; --shadow:0 1px 3px rgba(0,0,0,0.08); }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); padding-bottom:env(safe-area-inset-bottom,0); }
+        .top-bar { position:sticky; top:0; z-index:100; background:var(--gold); padding:12px; display:flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(184,134,11,0.3); }
+        .top-bar h1 { color:white; font-size:14px; flex:1; font-weight:600; }
+        .top-bar a { color:white; text-decoration:none; padding:8px 10px; background:rgba(255,255,255,0.15); border-radius:8px; font-size:13px; }
+        .nav-tabs { display:flex; gap:6px; padding:10px 12px; background:white; border-bottom:1px solid var(--border); overflow-x:auto; }
+        .nav-tabs a { padding:8px 14px; border-radius:20px; text-decoration:none; color:var(--muted); font-size:13px; font-weight:600; background:#f3f4f6; white-space:nowrap; }
+        .nav-tabs a.active { background:var(--gold); color:white; }
+        .summary { display:flex; gap:8px; padding:12px 12px 0; flex-wrap:wrap; }
+        .stat { flex:1; min-width:120px; background:white; border-radius:var(--radius); box-shadow:var(--shadow); padding:12px; text-align:center; }
+        .stat .n { font-size:20px; font-weight:700; }
+        .stat .l { font-size:11px; color:var(--muted); margin-top:2px; }
+        .stat.bal .n { color:var(--gold-dark); }
+        .toolbar { padding:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+        .toolbar input { padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; background:white; flex:1; min-width:140px; }
+        .btn-gold { padding:10px 16px; background:var(--gold); color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; white-space:nowrap; }
+        .btn-ghost { padding:8px 12px; background:#f3f4f6; border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; }
+        .list { padding:0 12px 80px; display:flex; flex-direction:column; gap:10px; }
+        .dep-card { background:white; border-radius:var(--radius); padding:14px; box-shadow:var(--shadow); }
+        .dep-card .row { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+        .client { font-weight:700; font-size:15px; }
+        .phone { font-size:12px; color:var(--muted); margin-top:2px; }
+        .bal { text-align:right; }
+        .bal .amt { font-size:18px; font-weight:700; color:var(--gold-dark); white-space:nowrap; }
+        .bal .lbl { font-size:11px; color:var(--muted); }
+        .card-actions { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+        .empty { text-align:center; padding:60px 20px; color:var(--muted); }
+        .pager { display:flex; justify-content:center; gap:8px; padding:16px; }
+        .pager button { padding:8px 14px; background:white; border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13px; }
+        .pager button:disabled { opacity:.4; cursor:not-allowed; }
+        /* Modal */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:flex-end; justify-content:center; }
+        .modal-overlay.open { display:flex; }
+        .modal-box { background:white; border-radius:16px 16px 0 0; max-width:560px; width:100%; max-height:92vh; overflow-y:auto; }
+        @media(min-width:600px){ .modal-overlay { align-items:center; } .modal-box { border-radius:16px; } }
+        .modal-head { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:white; }
+        .modal-head h3 { font-size:15px; font-weight:700; }
+        .modal-head button { background:transparent; border:none; font-size:22px; cursor:pointer; color:var(--muted); }
+        .modal-body { padding:16px 18px; }
+        .field { margin-bottom:12px; }
+        .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:600; }
+        .field input, .field select { width:100%; padding:11px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:white; }
+        .seg { display:flex; gap:6px; margin-bottom:14px; }
+        .seg button { flex:1; padding:9px; border:1px solid var(--border); background:#f9f9f7; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; color:var(--muted); }
+        .seg button.active { background:var(--gold); color:white; border-color:var(--gold); }
+        .cli-results { border:1px solid var(--border); border-radius:8px; margin-top:6px; max-height:180px; overflow-y:auto; display:none; }
+        .cli-results.show { display:block; }
+        .cli-item { padding:10px 12px; border-bottom:1px solid #f2f2ee; cursor:pointer; font-size:13px; }
+        .cli-item:last-child { border-bottom:none; }
+        .cli-item:hover { background:#faf7ef; }
+        .cli-item .p { color:var(--muted); font-size:11px; }
+        .cli-item.disabled { opacity:.5; cursor:not-allowed; }
+        .picked { background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:10px 12px; font-size:13px; display:none; align-items:center; justify-content:space-between; }
+        .picked.show { display:flex; }
+        .msg { font-size:13px; padding:10px 12px; border-radius:8px; margin-bottom:12px; display:none; }
+        .msg.err { background:#fef2f2; color:#dc2626; display:block; }
+        .tx { display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid #f2f2ee; font-size:13px; }
+        .tx .t-left .d { color:var(--muted); font-size:11px; margin-top:2px; }
+        .tx .amt-in { color:#059669; font-weight:700; white-space:nowrap; }
+        .tx .amt-out { color:#dc2626; font-weight:700; white-space:nowrap; }
+        .btn-full { width:100%; padding:13px; background:var(--gold); color:white; border:none; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; margin-top:4px; }
+    </style>
+</head>
+<body>
+    {% csrf_token %}
+    <div class="top-bar">
+        <h1><i class="fas fa-piggy-bank"></i> Mes dépôts clients</h1>
+        <a href="{% url 'products:catalog' token=token %}"><i class="fas fa-arrow-left"></i></a>
+    </div>
+
+    <div class="nav-tabs">
+        <a href="{% url 'products:catalog' token=token %}"><i class="fas fa-gem"></i> Catalogue</a>
+        <a href="{% url 'products:catalog_my_sales' token=token %}"><i class="fas fa-receipt"></i> Mes ventes</a>
+        <a href="{% url 'products:catalog_my_deliveries' token=token %}"><i class="fas fa-truck"></i> Mes livraisons</a>
+        <a href="{% url 'products:catalog_my_circulation' token=token %}"><i class="fas fa-arrows-rotate"></i> Ma circulation</a>
+        <a href="{% url 'products:catalog_my_deposits' token=token %}" class="active"><i class="fas fa-piggy-bank"></i> Mes dépôts</a>
+    </div>
+
+    <div class="summary">
+        <div class="stat"><div class="n" id="s-count">0</div><div class="l">Comptes</div></div>
+        <div class="stat bal"><div class="n" id="s-balance">0</div><div class="l">Solde total</div></div>
+    </div>
+
+    <div class="toolbar">
+        <input type="text" id="q" placeholder="Recherche client (nom, téléphone...)">
+        <button class="btn-gold" onclick="openCreate()"><i class="fas fa-plus"></i> Nouveau dépôt</button>
+    </div>
+
+    <div class="list" id="list">
+        <div class="empty"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>
+    </div>
+    <div class="pager" id="pager"></div>
+
+    <!-- Create modal -->
+    <div class="modal-overlay" id="createModal" onclick="if(event.target===this)closeModal('createModal')">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3><i class="fas fa-plus"></i> Nouveau dépôt client</h3>
+                <button onclick="closeModal('createModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="msg" id="createMsg"></div>
+                <div class="seg">
+                    <button type="button" id="segExisting" class="active" onclick="setMode('existing')">Client existant</button>
+                    <button type="button" id="segNew" onclick="setMode('new')">Nouveau client</button>
+                </div>
+
+                <div id="modeExisting">
+                    <div class="field">
+                        <label>Rechercher un client</label>
+                        <input type="text" id="cliSearch" placeholder="Nom, téléphone ou code...">
+                        <div class="cli-results" id="cliResults"></div>
+                    </div>
+                    <div class="picked" id="cliPicked">
+                        <span id="cliPickedLabel"></span>
+                        <button class="btn-ghost" type="button" onclick="clearPicked()">Changer</button>
+                    </div>
+                </div>
+
+                <div id="modeNew" style="display:none;">
+                    <div class="field"><label>Prénom *</label><input type="text" id="nFirst"></div>
+                    <div class="field"><label>Nom *</label><input type="text" id="nLast"></div>
+                    <div class="field"><label>Téléphone *</label><input type="tel" id="nPhone"></div>
+                </div>
+
+                <div class="field"><label>Montant du dépôt (MAD)</label><input type="number" id="cAmount" min="0" step="0.01" placeholder="0.00"></div>
+                <div class="field">
+                    <label>Mode de paiement</label>
+                    <select id="cPayMethod">
+                        <option value="">—</option>
+                        {% for pm in payment_methods %}<option value="{{ pm.id }}">{{ pm.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="field"><label>Référence (optionnel)</label><input type="text" id="cRef"></div>
+                <button class="btn-full" onclick="submitCreate()"><i class="fas fa-check"></i> Créer le dépôt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add fund modal -->
+    <div class="modal-overlay" id="fundModal" onclick="if(event.target===this)closeModal('fundModal')">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3><i class="fas fa-plus-circle"></i> Ajouter un dépôt</h3>
+                <button onclick="closeModal('fundModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="msg" id="fundMsg"></div>
+                <div id="fundClient" style="font-weight:700;margin-bottom:12px;"></div>
+                <div class="field"><label>Montant (MAD)</label><input type="number" id="fAmount" min="0" step="0.01" placeholder="0.00"></div>
+                <div class="field">
+                    <label>Mode de paiement</label>
+                    <select id="fPayMethod">
+                        <option value="">—</option>
+                        {% for pm in payment_methods %}<option value="{{ pm.id }}">{{ pm.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="field"><label>Référence (optionnel)</label><input type="text" id="fRef"></div>
+                <button class="btn-full" onclick="submitFund()"><i class="fas fa-check"></i> Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History modal -->
+    <div class="modal-overlay" id="histModal" onclick="if(event.target===this)closeModal('histModal')">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 id="histTitle"><i class="fas fa-clock-rotate-left"></i> Historique</h3>
+                <button onclick="closeModal('histModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="histBody">
+                <div class="empty"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>
+            </div>
+        </div>
+    </div>
+
+<script>
+const TOKEN = "{{ token }}";
+const BASE = `/products/catalog/${TOKEN}/api/deposits/`;
+let mode = 'existing';
+let pickedClientId = null;
+let fundAccountId = null;
+
+function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '=([^;]+)');
+    return m ? m.pop() : '';
+}
+function esc(s) { return (s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmt(n) {
+    const v = parseFloat(n || 0);
+    return v.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' MAD';
+}
+function post(url, data) {
+    const fd = new FormData();
+    Object.keys(data).forEach(k => fd.append(k, data[k]));
+    return fetch(url, { method:'POST', body:fd, headers:{'X-CSRFToken': getCookie('csrftoken')} }).then(r => r.json());
+}
+
+function load(page=1) {
+    const params = new URLSearchParams({ page, q: document.getElementById('q').value });
+    fetch(`${BASE}?${params}`).then(r => r.json()).then(data => {
+        if (data.summary) {
+            document.getElementById('s-count').textContent = data.summary.count;
+            document.getElementById('s-balance').textContent = fmt(data.summary.total_balance);
+        }
+        renderList(data.deposits);
+        renderPager(data);
+    });
+}
+function renderList(items) {
+    if (!items || !items.length) {
+        document.getElementById('list').innerHTML = '<div class="empty"><i class="fas fa-piggy-bank" style="font-size:28px;display:block;margin-bottom:8px;"></i>Aucun compte dépôt</div>';
+        return;
+    }
+    document.getElementById('list').innerHTML = items.map(a => `
+        <div class="dep-card">
+            <div class="row">
+                <div>
+                    <div class="client"><i class="fas fa-user" style="color:var(--muted)"></i> ${esc(a.client_name)}</div>
+                    ${a.client_phone ? `<div class="phone"><i class="fas fa-phone"></i> ${esc(a.client_phone)}</div>` : ''}
+                </div>
+                <div class="bal"><div class="amt">${fmt(a.balance)}</div><div class="lbl">${a.tx_count} opération(s)</div></div>
+            </div>
+            <div class="card-actions">
+                <button class="btn-gold" onclick="openFund(${a.id}, '${esc(a.client_name).replace(/'/g,"\\'")}')"><i class="fas fa-plus-circle"></i> Ajouter un dépôt</button>
+                <button class="btn-ghost" onclick="openHist(${a.id}, '${esc(a.client_name).replace(/'/g,"\\'")}')"><i class="fas fa-clock-rotate-left"></i> Historique</button>
+            </div>
+        </div>`).join('');
+}
+function renderPager(data) {
+    if (!data.pages || data.pages <= 1) { document.getElementById('pager').innerHTML = ''; return; }
+    document.getElementById('pager').innerHTML = `
+        <button ${data.page <= 1 ? 'disabled' : ''} onclick="load(${data.page - 1})"><i class="fas fa-chevron-left"></i></button>
+        <span style="padding:8px 14px;">Page ${data.page} / ${data.pages}</span>
+        <button ${!data.has_next ? 'disabled' : ''} onclick="load(${data.page + 1})"><i class="fas fa-chevron-right"></i></button>`;
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ---- Create ----
+function openCreate() {
+    mode = 'existing'; pickedClientId = null;
+    setMode('existing');
+    ['cliSearch','nFirst','nLast','nPhone','cAmount','cRef'].forEach(i => document.getElementById(i).value = '');
+    document.getElementById('cPayMethod').value = '';
+    document.getElementById('cliResults').classList.remove('show');
+    document.getElementById('cliPicked').classList.remove('show');
+    document.getElementById('createMsg').className = 'msg';
+    document.getElementById('createModal').classList.add('open');
+}
+function setMode(m) {
+    mode = m; pickedClientId = null;
+    document.getElementById('cliPicked').classList.remove('show');
+    document.getElementById('modeExisting').style.display = m === 'existing' ? 'block' : 'none';
+    document.getElementById('modeNew').style.display = m === 'new' ? 'block' : 'none';
+    document.getElementById('segExisting').classList.toggle('active', m === 'existing');
+    document.getElementById('segNew').classList.toggle('active', m === 'new');
+}
+let cliTimer;
+function searchClients() {
+    const q = document.getElementById('cliSearch').value.trim();
+    const box = document.getElementById('cliResults');
+    if (!q) { box.classList.remove('show'); box.innerHTML = ''; return; }
+    fetch(`${BASE}clients/?q=${encodeURIComponent(q)}`).then(r => r.json()).then(data => {
+        if (!data.clients.length) { box.innerHTML = '<div class="cli-item disabled">Aucun client</div>'; box.classList.add('show'); return; }
+        box.innerHTML = data.clients.map(c => c.has_deposit
+            ? `<div class="cli-item disabled" title="A déjà un compte dépôt">${esc(c.name)} <span class="p">· ${esc(c.phone)} · déjà un dépôt</span></div>`
+            : `<div class="cli-item" onclick="pickClient(${c.id}, '${esc(c.name).replace(/'/g,"\\'")}', '${esc(c.phone)}')">${esc(c.name)} <span class="p">· ${esc(c.phone)}</span></div>`
+        ).join('');
+        box.classList.add('show');
+    });
+}
+function pickClient(id, name, phone) {
+    pickedClientId = id;
+    document.getElementById('cliPickedLabel').innerHTML = `<i class="fas fa-user-check" style="color:#059669"></i> ${esc(name)} · ${esc(phone)}`;
+    document.getElementById('cliPicked').classList.add('show');
+    document.getElementById('cliResults').classList.remove('show');
+    document.getElementById('cliSearch').value = '';
+}
+function clearPicked() {
+    pickedClientId = null;
+    document.getElementById('cliPicked').classList.remove('show');
+}
+function submitCreate() {
+    const msg = document.getElementById('createMsg');
+    msg.className = 'msg';
+    const data = {
+        amount: document.getElementById('cAmount').value || '0',
+        payment_method: document.getElementById('cPayMethod').value,
+        payment_reference: document.getElementById('cRef').value,
+    };
+    if (mode === 'existing') {
+        if (!pickedClientId) { msg.textContent = 'Choisissez un client.'; msg.className = 'msg err'; return; }
+        data.client_id = pickedClientId;
+    } else {
+        data.first_name = document.getElementById('nFirst').value.trim();
+        data.last_name = document.getElementById('nLast').value.trim();
+        data.phone = document.getElementById('nPhone').value.trim();
+        if (!data.first_name || !data.last_name || !data.phone) { msg.textContent = 'Prénom, nom et téléphone requis.'; msg.className = 'msg err'; return; }
+    }
+    post(`${BASE}create/`, data).then(res => {
+        if (res.ok) { closeModal('createModal'); load(1); }
+        else { msg.textContent = res.error || 'Erreur.'; msg.className = 'msg err'; }
+    }).catch(() => { msg.textContent = 'Erreur réseau.'; msg.className = 'msg err'; });
+}
+
+// ---- Add fund ----
+function openFund(id, name) {
+    fundAccountId = id;
+    document.getElementById('fundClient').innerHTML = `<i class="fas fa-user" style="color:var(--muted)"></i> ${esc(name)}`;
+    ['fAmount','fRef'].forEach(i => document.getElementById(i).value = '');
+    document.getElementById('fPayMethod').value = '';
+    document.getElementById('fundMsg').className = 'msg';
+    document.getElementById('fundModal').classList.add('open');
+}
+function submitFund() {
+    const msg = document.getElementById('fundMsg');
+    msg.className = 'msg';
+    const amount = document.getElementById('fAmount').value;
+    if (!amount || parseFloat(amount) <= 0) { msg.textContent = 'Montant invalide.'; msg.className = 'msg err'; return; }
+    post(`${BASE}${fundAccountId}/add-fund/`, {
+        amount,
+        payment_method: document.getElementById('fPayMethod').value,
+        payment_reference: document.getElementById('fRef').value,
+    }).then(res => {
+        if (res.ok) { closeModal('fundModal'); load(1); }
+        else { msg.textContent = res.error || 'Erreur.'; msg.className = 'msg err'; }
+    }).catch(() => { msg.textContent = 'Erreur réseau.'; msg.className = 'msg err'; });
+}
+
+// ---- History ----
+function openHist(id, name) {
+    document.getElementById('histTitle').innerHTML = `<i class="fas fa-clock-rotate-left"></i> ${esc(name)}`;
+    document.getElementById('histBody').innerHTML = '<div class="empty"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>';
+    document.getElementById('histModal').classList.add('open');
+    fetch(`${BASE}${id}/`).then(r => r.json()).then(data => {
+        if (data.error) { document.getElementById('histBody').innerHTML = `<div class="empty">${esc(data.error)}</div>`; return; }
+        let html = `<div style="text-align:center;margin-bottom:14px;"><div style="font-size:12px;color:var(--muted)">Solde</div><div style="font-size:24px;font-weight:700;color:var(--gold-dark)">${fmt(data.account.balance)}</div></div>`;
+        if (!data.transactions.length) { html += '<div class="empty">Aucune opération.</div>'; }
+        else {
+            html += data.transactions.map(t => {
+                const positive = parseFloat(t.amount) >= 0;
+                return `<div class="tx">
+                    <div class="t-left">
+                        <div>${esc(t.type_display)}${t.payment_method ? ' · ' + esc(t.payment_method) : ''}</div>
+                        <div class="d">${t.date}${t.reference ? ' · réf ' + esc(t.reference) : ''}${t.description ? ' · ' + esc(t.description) : ''}</div>
+                    </div>
+                    <div class="${positive ? 'amt-in' : 'amt-out'}">${positive ? '+' : ''}${fmt(t.amount)}</div>
+                </div>`;
+            }).join('');
+        }
+        document.getElementById('histBody').innerHTML = html;
+    });
+}
+
+document.getElementById('q').addEventListener('input', () => { clearTimeout(cliTimer); cliTimer = setTimeout(() => load(1), 300); });
+document.getElementById('cliSearch').addEventListener('input', () => { clearTimeout(cliTimer); cliTimer = setTimeout(searchClients, 250); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') ['createModal','fundModal','histModal'].forEach(closeModal); });
+load(1);
+</script>
+</body>
+</html>

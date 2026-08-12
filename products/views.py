@@ -2639,6 +2639,258 @@ def catalog_my_circulation_api(request, token):
     })
 
 
+# ---------------------------------------------------------------------------
+# Catalogue: client deposits (dépôts) managed by the logged-in seller.
+# A seller is the "Responsable" (DepositAccount.managed_by) of the accounts
+# they see here; creating one makes them the Responsable.
+# ---------------------------------------------------------------------------
+
+def _catalog_deposits_error(err):
+    """Return an appropriate error response for the deposit APIs."""
+    if isinstance(err, JsonResponse):
+        return err
+    return JsonResponse({'error': 'Authentification requise'}, status=401)
+
+
+def catalog_my_deposits(request, token):
+    """Render the seller's own client-deposit accounts."""
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        return err
+    from settings_app.models import PaymentMethod
+    payment_methods = list(PaymentMethod.objects.filter(is_active=True).values('id', 'name'))
+    return render(request, 'products/catalog_my_deposits.html', {
+        'token': token,
+        'catalog_name': catalog_token.name,
+        'payment_methods': payment_methods,
+    })
+
+
+def catalog_my_deposits_api(request, token):
+    """List the deposit accounts where the seller is the Responsable."""
+    from deposits.models import DepositAccount
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        return _catalog_deposits_error(err)
+
+    q = request.GET.get('q', '').strip()
+    page = int(request.GET.get('page', 1))
+    per_page = min(int(request.GET.get('per_page', 20)), 50)
+
+    qs = (DepositAccount.objects
+          .filter(managed_by=catalog_token.user)
+          .select_related('client')
+          .annotate(bal=Sum('transactions__amount')))
+    if q:
+        qs = qs.filter(
+            Q(client__first_name__icontains=q) |
+            Q(client__last_name__icontains=q) |
+            Q(client__phone__icontains=q) |
+            Q(client__code__icontains=q)
+        )
+    qs = qs.order_by('client__last_name', 'client__first_name')
+
+    total = qs.count()
+    total_balance = sum((a.bal or Decimal('0')) for a in DepositAccount.objects
+                        .filter(managed_by=catalog_token.user)
+                        .annotate(bal=Sum('transactions__amount')))
+    start = (page - 1) * per_page
+    rows = qs[start:start + per_page]
+
+    results = []
+    for a in rows:
+        results.append({
+            'id': a.id,
+            'client_name': a.client.full_name if a.client else '—',
+            'client_phone': a.client.phone if a.client else '',
+            'balance': str(a.bal or 0),
+            'is_active': a.is_active,
+            'tx_count': a.transaction_count,
+        })
+
+    pages = (total + per_page - 1) // per_page
+    return JsonResponse({
+        'deposits': results,
+        'summary': {'count': total, 'total_balance': str(total_balance)},
+        'total': total,
+        'page': page,
+        'pages': pages,
+        'has_next': page < pages,
+    })
+
+
+def catalog_deposit_detail_api(request, token, account_id):
+    """Transactions history of one of the seller's deposit accounts."""
+    from deposits.models import DepositAccount
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        return _catalog_deposits_error(err)
+    try:
+        account = DepositAccount.objects.select_related('client').get(pk=account_id)
+    except DepositAccount.DoesNotExist:
+        return JsonResponse({'error': 'Compte introuvable.'}, status=404)
+    if account.managed_by_id != catalog_token.user_id:
+        return JsonResponse({'error': 'Accès refusé.'}, status=403)
+
+    txs = []
+    for t in account.transactions.select_related('payment_method').order_by('-date', '-created_at'):
+        txs.append({
+            'type': t.transaction_type,
+            'type_display': t.get_transaction_type_display(),
+            'amount': str(t.amount),
+            'date': t.date.strftime('%d/%m/%Y') if t.date else '',
+            'payment_method': t.payment_method.name if t.payment_method else '',
+            'reference': t.payment_reference,
+            'description': t.description,
+        })
+    return JsonResponse({
+        'account': {
+            'id': account.id,
+            'client_name': account.client.full_name if account.client else '—',
+            'client_phone': account.client.phone if account.client else '',
+            'balance': str(account.balance),
+            'is_active': account.is_active,
+        },
+        'transactions': txs,
+    })
+
+
+def catalog_clients_search(request, token):
+    """Search existing clients for the deposit-create picker."""
+    from clients.models import Client
+    from deposits.models import DepositAccount
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        return _catalog_deposits_error(err)
+    q = request.GET.get('q', '').strip()
+    if not q:
+        return JsonResponse({'clients': []})
+    with_deposit = set(DepositAccount.objects.values_list('client_id', flat=True))
+    qs = Client.objects.filter(is_active=True).filter(
+        Q(first_name__icontains=q) | Q(last_name__icontains=q) |
+        Q(phone__icontains=q) | Q(code__icontains=q)
+    ).order_by('last_name', 'first_name')[:15]
+    results = [{
+        'id': c.id,
+        'name': c.full_name,
+        'phone': c.phone,
+        'has_deposit': c.id in with_deposit,
+    } for c in qs]
+    return JsonResponse({'clients': results})
+
+
+def catalog_deposit_create(request, token):
+    """Create a new deposit account (Responsable = seller) with an initial dépôt."""
+    from django.db import transaction as db_transaction
+    from clients.models import Client
+    from deposits.models import DepositAccount, DepositTransaction
+    from settings_app.models import PaymentMethod
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        return _catalog_deposits_error(err)
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Méthode non autorisée.'}, status=405)
+
+    client_id = (request.POST.get('client_id') or '').strip()
+    first_name = (request.POST.get('first_name') or '').strip()
+    last_name = (request.POST.get('last_name') or '').strip()
+    phone = (request.POST.get('phone') or '').strip()
+    amount_raw = (request.POST.get('amount') or '0').strip()
+    pm_id = request.POST.get('payment_method')
+    pay_ref = (request.POST.get('payment_reference') or '').strip()
+
+    try:
+        amount = Decimal(amount_raw.replace(',', '.')) if amount_raw else Decimal('0')
+    except InvalidOperation:
+        return JsonResponse({'error': 'Montant invalide.'}, status=400)
+    if amount < 0:
+        return JsonResponse({'error': 'Le montant doit être positif.'}, status=400)
+
+    # Resolve or create the client
+    if client_id:
+        try:
+            client = Client.objects.get(pk=client_id)
+        except Client.DoesNotExist:
+            return JsonResponse({'error': 'Client introuvable.'}, status=404)
+    else:
+        if not (first_name and last_name and phone):
+            return JsonResponse({'error': 'Nom, prénom et téléphone du client sont requis.'}, status=400)
+        client = Client.objects.create(first_name=first_name, last_name=last_name, phone=phone)
+
+    if DepositAccount.objects.filter(client=client).exists():
+        return JsonResponse({'error': f'{client.full_name} a déjà un compte dépôt.'}, status=400)
+
+    pm = None
+    if pm_id:
+        try:
+            pm = PaymentMethod.objects.get(pk=pm_id)
+        except (PaymentMethod.DoesNotExist, ValueError):
+            pm = None
+
+    with db_transaction.atomic():
+        account = DepositAccount.objects.create(
+            client=client,
+            managed_by=catalog_token.user,
+            created_by=catalog_token.user,
+        )
+        if amount > 0:
+            DepositTransaction.objects.create(
+                account=account,
+                transaction_type=DepositTransaction.TransactionType.DEPOSIT,
+                amount=amount,
+                payment_method=pm,
+                payment_reference=pay_ref,
+                description='Dépôt initial',
+                created_by=catalog_token.user,
+            )
+    return JsonResponse({'ok': True, 'account_id': account.id})
+
+
+def catalog_deposit_add_fund(request, token, account_id):
+    """Record a dépôt (funds in) on one of the seller's own accounts."""
+    from deposits.models import DepositAccount, DepositTransaction
+    from settings_app.models import PaymentMethod
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        return _catalog_deposits_error(err)
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Méthode non autorisée.'}, status=405)
+    try:
+        account = DepositAccount.objects.get(pk=account_id)
+    except DepositAccount.DoesNotExist:
+        return JsonResponse({'error': 'Compte introuvable.'}, status=404)
+    if account.managed_by_id != catalog_token.user_id:
+        return JsonResponse({'error': 'Accès refusé.'}, status=403)
+
+    amount_raw = (request.POST.get('amount') or '0').strip()
+    pm_id = request.POST.get('payment_method')
+    pay_ref = (request.POST.get('payment_reference') or '').strip()
+    try:
+        amount = Decimal(amount_raw.replace(',', '.'))
+    except InvalidOperation:
+        return JsonResponse({'error': 'Montant invalide.'}, status=400)
+    if amount <= 0:
+        return JsonResponse({'error': 'Le montant doit être positif.'}, status=400)
+
+    pm = None
+    if pm_id:
+        try:
+            pm = PaymentMethod.objects.get(pk=pm_id)
+        except (PaymentMethod.DoesNotExist, ValueError):
+            pm = None
+
+    DepositTransaction.objects.create(
+        account=account,
+        transaction_type=DepositTransaction.TransactionType.DEPOSIT,
+        amount=amount,
+        payment_method=pm,
+        payment_reference=pay_ref,
+        description='Dépôt de fonds',
+        created_by=catalog_token.user,
+    )
+    return JsonResponse({'ok': True, 'balance': str(account.balance)})
+
+
 def catalog_delivery_images(request, token, delivery_id):
     """Return the InvoicePhotos attached to the sale of a given delivery."""
     from sales.models import Delivery
