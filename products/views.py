@@ -2201,6 +2201,7 @@ def catalog_api(request, token):
     cost_max = request.GET.get('cost_max', '')
     weight_min = request.GET.get('weight_min', '')
     weight_max = request.GET.get('weight_max', '')
+    size = request.GET.get('size', '').strip()
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
     sort = request.GET.get('sort', 'date_desc')
@@ -2244,6 +2245,8 @@ def catalog_api(request, token):
         qs = qs.filter(gross_weight__gte=weight_min)
     if weight_max:
         qs = qs.filter(gross_weight__lte=weight_max)
+    if size:
+        qs = qs.filter(size__icontains=size)
 
     # Date filters
     if date_from:
@@ -2304,6 +2307,7 @@ def catalog_api(request, token):
             'metal': p.metal_type.name if p.metal_type else '',
             'purity': p.metal_purity.name if p.metal_purity else '',
             'weight': str(p.gross_weight or 0),
+            'size': p.size or '',
             'price_per_gram': price_per_gram,
             'total_cost': str(p.total_cost or 0),
             'selling_price': str(p.selling_price or 0),

@@ -724,6 +724,10 @@
             </div>
         </div>
         <div class="filter-group">
+            <label>Taille</label>
+            <input type="text" id="fSize" placeholder="ex: 53 cm, 18..." style="width:100%;">
+        </div>
+        <div class="filter-group">
             <label>Date ajout</label>
             <div class="range-row">
                 <input type="date" id="fDateFrom">
@@ -811,6 +815,7 @@ function getFilters() {
         cost_max: document.getElementById('fCostMax').value,
         weight_min: document.getElementById('fWeightMin').value,
         weight_max: document.getElementById('fWeightMax').value,
+        size: document.getElementById('fSize').value.trim(),
         date_from: document.getElementById('fDateFrom').value,
         date_to: document.getElementById('fDateTo').value,
         sort: document.getElementById('fSort').value,
@@ -895,7 +900,9 @@ function createCard(p) {
         '<div class="card-body">' +
             '<div class="card-name">' + esc(p.name) + '</div>' +
             '<div class="card-tags">' + tags + '</div>' +
-            '<div class="card-weight"><i class="fas fa-weight-hanging"></i> ' + p.weight + ' g</div>' +
+            '<div class="card-weight"><i class="fas fa-weight-hanging"></i> ' + p.weight + ' g' +
+                (p.size ? ' <span style="margin-left:8px;"><i class="fas fa-ruler"></i> ' + esc(p.size) + '</span>' : '') +
+            '</div>' +
             '<div class="card-prices">' +
                 '<span class="price-gram">Prix/g: ' + formatPrice(p.price_per_gram) + ' DH</span>' +
                 '<span class="price-cost">Achat: ' + formatPrice(p.total_cost) + ' DH</span>' +
@@ -934,7 +941,7 @@ function applyFilters() {
 }
 
 function resetFilters() {
-    ['fCategory','fMetal','fPurity','fPriceMin','fPriceMax','fCostMin','fCostMax','fWeightMin','fWeightMax','fDateFrom','fDateTo'].forEach(function(id) {
+    ['fCategory','fMetal','fPurity','fPriceMin','fPriceMax','fCostMin','fCostMax','fWeightMin','fWeightMax','fSize','fDateFrom','fDateTo'].forEach(function(id) {
         document.getElementById(id).value = '';
     });
     document.getElementById('fSort').value = 'date_desc';
@@ -953,6 +960,7 @@ function updateFilterBadge() {
     if (f.price_min || f.price_max) count++;
     if (f.cost_min || f.cost_max) count++;
     if (f.weight_min || f.weight_max) count++;
+    if (f.size) count++;
     if (f.date_from || f.date_to) count++;
     var badge = document.getElementById('filterBadge');
     badge.textContent = count;
@@ -973,6 +981,7 @@ function updateActiveFilters() {
     if (f.price_min || f.price_max) chips.push({label: 'Prix: ' + (f.price_min||'0') + '-' + (f.price_max||'...'), clear: function(){ document.getElementById('fPriceMin').value=''; document.getElementById('fPriceMax').value=''; loadProducts(true); }});
     if (f.cost_min || f.cost_max) chips.push({label: 'Cout: ' + (f.cost_min||'0') + '-' + (f.cost_max||'...'), clear: function(){ document.getElementById('fCostMin').value=''; document.getElementById('fCostMax').value=''; loadProducts(true); }});
     if (f.weight_min || f.weight_max) chips.push({label: 'Poids: ' + (f.weight_min||'0') + '-' + (f.weight_max||'...') + 'g', clear: function(){ document.getElementById('fWeightMin').value=''; document.getElementById('fWeightMax').value=''; loadProducts(true); }});
+    if (f.size) chips.push({label: 'Taille: ' + f.size, clear: function(){ document.getElementById('fSize').value=''; loadProducts(true); }});
     if (f.date_from || f.date_to) chips.push({label: (f.date_from||'...') + ' - ' + (f.date_to||'...'), clear: function(){ document.getElementById('fDateFrom').value=''; document.getElementById('fDateTo').value=''; loadProducts(true); }});
 
     var container = document.getElementById('activeFilters');
@@ -1030,7 +1039,8 @@ function shareProduct(p) {
         p.reference + '\n' +
         (p.category ? p.category + ' | ' : '') +
         (p.metal ? p.metal + ' ' : '') + (p.purity ? p.purity : '') + '\n' +
-        'Poids: ' + p.weight + ' g';
+        'Poids: ' + p.weight + ' g' +
+        (p.size ? '\nTaille: ' + p.size : '');
 
     // If we can share images via Web Share API
     var imgs = (p.ai_images || []).concat(p.original_images || []);
@@ -1056,7 +1066,7 @@ function shareSelected() {
         return p.name + ' | ' +
             (p.category ? p.category + ' | ' : '') +
             (p.metal ? p.metal + ' ' : '') + (p.purity || '') +
-            ' | ' + p.weight + 'g';
+            ' | ' + p.weight + 'g' + (p.size ? ' | ' + p.size : '');
     });
     var text = 'Bijouterie Hafsa - ' + products.length + ' produit(s)\n\n' + lines.join('\n');
 
@@ -1121,6 +1131,7 @@ function openModal(p) {
             '<div class="detail-item"><label>Metal</label><span>' + esc(p.metal || '-') + '</span></div>' +
             '<div class="detail-item"><label>Purete</label><span>' + esc(p.purity || '-') + '</span></div>' +
             '<div class="detail-item"><label>Poids</label><span>' + p.weight + ' g</span></div>' +
+            (p.size ? '<div class="detail-item"><label>Taille</label><span>' + esc(p.size) + '</span></div>' : '') +
             '<div class="detail-item"><label>Prix par gramme</label><span>' + formatPrice(p.price_per_gram) + ' DH</span></div>' +
             '<div class="detail-item"><label>Cout achat</label><span>' + formatPrice(p.total_cost) + ' DH</span></div>' +
             '<div class="detail-item price-highlight"><label>Prix de vente</label><span>' + formatPrice(p.selling_price) + ' DH</span></div>' +
