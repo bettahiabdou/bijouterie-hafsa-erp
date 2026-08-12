@@ -126,6 +126,50 @@
                 </div>
             </div>
 
+            <!-- Circulation liée à ce compte (vendeuse) -->
+            {% if ct.out_count or ct.sold_count %}
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid #f0f0ec;">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;">
+                    <span style="padding:4px 10px;background:#eff6ff;color:#1e40af;border-radius:20px;font-weight:600;">
+                        <i class="fas fa-truck"></i> En circulation: {{ ct.out_count }}
+                    </span>
+                    {% if ct.sold_count %}
+                    <span style="padding:4px 10px;background:#ecfdf5;color:#059669;border-radius:20px;font-weight:600;">
+                        <i class="fas fa-check"></i> Vendus en circulation: {{ ct.sold_count }}
+                    </span>
+                    {% endif %}
+                    {% if ct.out_count %}
+                    <button type="button" onclick="toggleCirc({{ ct.id }})"
+                            style="padding:4px 10px;background:#f3f4f6;border:1px solid #e5e5e0;border-radius:20px;cursor:pointer;font-size:12px;">
+                        <i class="fas fa-list"></i> Voir les produits
+                    </button>
+                    {% endif %}
+                </div>
+                {% if ct.out_count %}
+                <div id="circ-{{ ct.id }}" style="display:none;margin-top:10px;overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead>
+                            <tr style="text-align:left;color:#6b7280;">
+                                <th style="padding:4px 6px;border-bottom:1px solid #eee;">Référence</th>
+                                <th style="padding:4px 6px;border-bottom:1px solid #eee;">Produit</th>
+                                <th style="padding:4px 6px;border-bottom:1px solid #eee;white-space:nowrap;">Sortie le</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in ct.out_circulations %}
+                            <tr>
+                                <td style="padding:4px 6px;border-bottom:1px solid #f4f4f4;font-family:monospace;">{{ c.product.reference }}</td>
+                                <td style="padding:4px 6px;border-bottom:1px solid #f4f4f4;">{{ c.product.name }}</td>
+                                <td style="padding:4px 6px;border-bottom:1px solid #f4f4f4;color:#6b7280;white-space:nowrap;">{{ c.date_out|date:"d/m/Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
             <!-- Inline change-password form -->
             <div id="pwd-form-{{ ct.id }}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #e5e7eb;">
                 <form method="post" autocomplete="off">
@@ -181,6 +225,11 @@ function togglePwd(id, btn) {
 
 function togglePwdForm(id) {
     const el = document.getElementById('pwd-form-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleCirc(id) {
+    const el = document.getElementById('circ-' + id);
     el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 

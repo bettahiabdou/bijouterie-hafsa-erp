@@ -2708,8 +2708,32 @@ def catalog_manage(request):
 
         return redirect('products:catalog_manage')
 
-    tokens = CatalogToken.objects.select_related('user').order_by('-created_at')
-    used_user_ids = list(tokens.values_list('user_id', flat=True))
+    tokens = list(CatalogToken.objects.select_related('user').order_by('-created_at'))
+    used_user_ids = [ct.user_id for ct in tokens if ct.user_id]
+
+    # Circulation linked to each account (as seller): products currently OUT,
+    # plus an all-time count of items that sold while out with them.
+    from sales.models import ProductCirculation
+    from django.db.models import Count
+    out_map = {}
+    out_qs = (ProductCirculation.objects
+              .filter(status=ProductCirculation.Status.OUT, seller_id__in=used_user_ids)
+              .select_related('product')
+              .order_by('-date_out'))
+    for c in out_qs:
+        out_map.setdefault(c.seller_id, []).append(c)
+    sold_counts = dict(
+        ProductCirculation.objects
+        .filter(status=ProductCirculation.Status.SOLD, seller_id__in=used_user_ids)
+        .values('seller_id')
+        .annotate(n=Count('id'))
+        .values_list('seller_id', 'n')
+    )
+    for ct in tokens:
+        ct.out_circulations = out_map.get(ct.user_id, [])
+        ct.out_count = len(ct.out_circulations)
+        ct.sold_count = sold_counts.get(ct.user_id, 0)
+
     available_users = User.objects.filter(is_active=True).exclude(id__in=used_user_ids).order_by('first_name', 'last_name', 'username')
     context = {
         'tokens': tokens,
