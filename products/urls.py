@@ -63,6 +63,8 @@ urlpatterns = [
     path('catalog/<str:token>/api/sales/', views.catalog_my_sales_api, name='catalog_my_sales_api'),
     path('catalog/<str:token>/deliveries/', views.catalog_my_deliveries, name='catalog_my_deliveries'),
     path('catalog/<str:token>/api/deliveries/', views.catalog_my_deliveries_api, name='catalog_my_deliveries_api'),
+    path('catalog/<str:token>/circulation/', views.catalog_my_circulation, name='catalog_my_circulation'),
+    path('catalog/<str:token>/api/circulation/', views.catalog_my_circulation_api, name='catalog_my_circulation_api'),
     path('catalog/<str:token>/api/deliveries/<int:delivery_id>/status/', views.catalog_update_delivery_status, name='catalog_update_delivery_status'),
     path('catalog/<str:token>/api/deliveries/<int:delivery_id>/images/', views.catalog_delivery_images, name='catalog_delivery_images'),
 

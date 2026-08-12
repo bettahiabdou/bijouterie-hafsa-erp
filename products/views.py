@@ -2551,6 +2551,94 @@ def catalog_my_deliveries_api(request, token):
     })
 
 
+def catalog_my_circulation(request, token):
+    """Render the catalog user's own circulation (produits en circulation)."""
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        return err
+    from sales.models import ProductCirculation
+    return render(request, 'products/catalog_my_circulation.html', {
+        'token': token,
+        'catalog_name': catalog_token.name,
+        'status_choices': ProductCirculation.Status.choices,
+    })
+
+
+def catalog_my_circulation_api(request, token):
+    """JSON API for the catalog user's own circulation rows (seller = user)."""
+    from sales.models import ProductCirculation
+    catalog_token, err = _catalog_require_user(request, token)
+    if err:
+        if isinstance(err, JsonResponse):
+            return err
+        return JsonResponse({'error': 'Authentification requise'}, status=401)
+
+    q = request.GET.get('q', '').strip()
+    status = request.GET.get('status', '')
+    page = int(request.GET.get('page', 1))
+    per_page = min(int(request.GET.get('per_page', 20)), 50)
+
+    base = ProductCirculation.objects.filter(seller=catalog_token.user)
+
+    # Status summary (currently out / sold / returned) over this seller's rows
+    from django.db.models import Count
+    summary = dict(base.values('status').annotate(n=Count('id')).values_list('status', 'n'))
+
+    qs = base.select_related('product', 'invoice').prefetch_related('product__images')
+    if q:
+        qs = qs.filter(
+            Q(product__reference__icontains=q) |
+            Q(product__name__icontains=q) |
+            Q(product__barcode__icontains=q)
+        )
+    if status:
+        qs = qs.filter(status=status)
+    qs = qs.order_by('-date_out')
+
+    total = qs.count()
+    start = (page - 1) * per_page
+    rows = qs[start:start + per_page]
+
+    results = []
+    for c in rows:
+        p = c.product
+        img = None
+        if p:
+            if p.main_image:
+                img = p.main_image.url
+            else:
+                for im in p.images.all():
+                    if im.image:
+                        img = im.image.url
+                        break
+        results.append({
+            'id': c.id,
+            'product_reference': p.reference if p else '',
+            'product_name': p.name if p else '',
+            'selling_price': str(p.selling_price or 0) if p else '0',
+            'image_url': img,
+            'status': c.status,
+            'status_display': c.get_status_display(),
+            'date_out': c.date_out.strftime('%d/%m/%Y') if c.date_out else '',
+            'date_back': c.date_back.strftime('%d/%m/%Y') if c.date_back else '',
+            'invoice_reference': c.invoice.reference if c.invoice else '',
+        })
+
+    pages = (total + per_page - 1) // per_page
+    return JsonResponse({
+        'circulations': results,
+        'summary': {
+            'out': summary.get('out', 0),
+            'sold': summary.get('sold', 0),
+            'returned': summary.get('returned', 0),
+        },
+        'total': total,
+        'page': page,
+        'pages': pages,
+        'has_next': page < pages,
+    })
+
+
 def catalog_delivery_images(request, token, delivery_id):
     """Return the InvoicePhotos attached to the sale of a given delivery."""
     from sales.models import Delivery

@@ -1,0 +1,155 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Ma circulation - {{ catalog_name }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --gold:#b8860b; --gold-dark:#8b6914; --bg:#fafaf7; --text:#1a1a1a; --muted:#6b7280; --border:#e5e5e0; --radius:10px; --shadow:0 1px 3px rgba(0,0,0,0.08); }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); padding-bottom:env(safe-area-inset-bottom,0); }
+        .top-bar { position:sticky; top:0; z-index:100; background:var(--gold); padding:12px; display:flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(184,134,11,0.3); }
+        .top-bar h1 { color:white; font-size:14px; flex:1; font-weight:600; }
+        .top-bar a { color:white; text-decoration:none; padding:8px 10px; background:rgba(255,255,255,0.15); border-radius:8px; font-size:13px; }
+        .nav-tabs { display:flex; gap:6px; padding:10px 12px; background:white; border-bottom:1px solid var(--border); overflow-x:auto; }
+        .nav-tabs a { padding:8px 14px; border-radius:20px; text-decoration:none; color:var(--muted); font-size:13px; font-weight:600; background:#f3f4f6; white-space:nowrap; }
+        .nav-tabs a.active { background:var(--gold); color:white; }
+        .summary { display:flex; gap:8px; padding:12px 12px 0; flex-wrap:wrap; }
+        .stat { flex:1; min-width:90px; background:white; border-radius:var(--radius); box-shadow:var(--shadow); padding:12px; text-align:center; }
+        .stat .n { font-size:22px; font-weight:700; }
+        .stat .l { font-size:11px; color:var(--muted); margin-top:2px; }
+        .stat.out .n { color:#1e40af; } .stat.sold .n { color:#059669; } .stat.returned .n { color:#b45309; }
+        .filters { padding:12px; display:flex; gap:8px; flex-wrap:wrap; }
+        .filters input, .filters select { padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; background:white; flex:1; min-width:140px; }
+        .list { padding:0 12px 80px; display:flex; flex-direction:column; gap:10px; }
+        .circ-card { background:white; border-radius:var(--radius); padding:12px; box-shadow:var(--shadow); display:flex; gap:12px; align-items:center; }
+        .thumb { width:64px; height:64px; border-radius:8px; object-fit:cover; background:#f3f4f6; flex-shrink:0; }
+        .thumb-ph { display:flex; align-items:center; justify-content:center; color:#d4a528; font-size:22px; }
+        .info { flex:1; min-width:0; }
+        .ref { font-family:monospace; font-size:12px; color:var(--muted); }
+        .name { font-weight:700; font-size:14px; margin:2px 0; }
+        .price { font-size:13px; color:var(--gold-dark); font-weight:600; }
+        .meta { font-size:11px; color:var(--muted); margin-top:4px; display:flex; flex-direction:column; gap:2px; }
+        .meta i { color:var(--gold); width:12px; }
+        .badge { padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; align-self:flex-start; }
+        .b-out { background:#dbeafe; color:#1e40af; }
+        .b-sold { background:#ecfdf5; color:#059669; }
+        .b-returned { background:#fef3c7; color:#b45309; }
+        .empty { text-align:center; padding:60px 20px; color:var(--muted); }
+        .pager { display:flex; justify-content:center; gap:8px; padding:16px; }
+        .pager button { padding:8px 14px; background:white; border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13px; }
+        .pager button:disabled { opacity:.4; cursor:not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1><i class="fas fa-arrows-rotate"></i> Ma circulation</h1>
+        <a href="{% url 'products:catalog' token=token %}"><i class="fas fa-arrow-left"></i></a>
+    </div>
+
+    <div class="nav-tabs">
+        <a href="{% url 'products:catalog' token=token %}"><i class="fas fa-gem"></i> Catalogue</a>
+        <a href="{% url 'products:catalog_my_sales' token=token %}"><i class="fas fa-receipt"></i> Mes ventes</a>
+        <a href="{% url 'products:catalog_my_deliveries' token=token %}"><i class="fas fa-truck"></i> Mes livraisons</a>
+        <a href="{% url 'products:catalog_my_circulation' token=token %}" class="active"><i class="fas fa-arrows-rotate"></i> Ma circulation</a>
+    </div>
+
+    <div class="summary">
+        <div class="stat out"><div class="n" id="s-out">0</div><div class="l">En circulation</div></div>
+        <div class="stat sold"><div class="n" id="s-sold">0</div><div class="l">Vendus</div></div>
+        <div class="stat returned"><div class="n" id="s-returned">0</div><div class="l">Retours</div></div>
+    </div>
+
+    <div class="filters">
+        <input type="text" id="q" placeholder="Recherche (réf, nom...)">
+        <select id="status">
+            <option value="">Tous les statuts</option>
+            {% for value, label in status_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="list" id="list">
+        <div class="empty"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>
+    </div>
+
+    <div class="pager" id="pager"></div>
+
+<script>
+const TOKEN = "{{ token }}";
+const API = `/products/catalog/${TOKEN}/api/circulation/`;
+let currentPage = 1;
+function load(page=1) {
+    currentPage = page;
+    const params = new URLSearchParams({
+        page,
+        q: document.getElementById('q').value,
+        status: document.getElementById('status').value,
+    });
+    fetch(`${API}?${params}`).then(r => r.json()).then(data => {
+        if (data.summary) {
+            document.getElementById('s-out').textContent = data.summary.out;
+            document.getElementById('s-sold').textContent = data.summary.sold;
+            document.getElementById('s-returned').textContent = data.summary.returned;
+        }
+        renderList(data.circulations);
+        renderPager(data);
+    });
+}
+function esc(s) { return (s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmt(n) {
+    const v = parseFloat(n || 0);
+    return v.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' MAD';
+}
+function renderList(items) {
+    if (!items || !items.length) {
+        document.getElementById('list').innerHTML = '<div class="empty"><i class="fas fa-arrows-rotate" style="font-size:28px;display:block;margin-bottom:8px;"></i>Aucun produit en circulation</div>';
+        return;
+    }
+    document.getElementById('list').innerHTML = items.map(c => {
+        const thumb = c.image_url
+            ? `<img class="thumb" src="${c.image_url}" alt="" loading="lazy">`
+            : `<div class="thumb thumb-ph"><i class="fas fa-gem"></i></div>`;
+        let dates = `<div><i class="fas fa-arrow-up-right-from-square"></i> Sortie: ${c.date_out || '—'}</div>`;
+        if (c.status === 'sold' && c.invoice_reference) {
+            dates += `<div><i class="fas fa-receipt"></i> Facture: ${esc(c.invoice_reference)}</div>`;
+        }
+        if (c.status !== 'out' && c.date_back) {
+            const lbl = c.status === 'sold' ? 'Vendu le' : 'Retour le';
+            dates += `<div><i class="fas fa-calendar-check"></i> ${lbl}: ${c.date_back}</div>`;
+        }
+        return `
+        <div class="circ-card">
+            ${thumb}
+            <div class="info">
+                <div class="ref">${esc(c.product_reference)}</div>
+                <div class="name">${esc(c.product_name)}</div>
+                <div class="price">${fmt(c.selling_price)}</div>
+                <div class="meta">${dates}</div>
+            </div>
+            <span class="badge b-${c.status}">${esc(c.status_display)}</span>
+        </div>`;
+    }).join('');
+}
+function renderPager(data) {
+    if (!data.pages || data.pages <= 1) { document.getElementById('pager').innerHTML = ''; return; }
+    document.getElementById('pager').innerHTML = `
+        <button ${data.page <= 1 ? 'disabled' : ''} onclick="load(${data.page - 1})"><i class="fas fa-chevron-left"></i></button>
+        <span style="padding:8px 14px;">Page ${data.page} / ${data.pages}</span>
+        <button ${!data.has_next ? 'disabled' : ''} onclick="load(${data.page + 1})"><i class="fas fa-chevron-right"></i></button>
+    `;
+}
+let timer;
+['q','status'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => load(1), 300);
+    });
+});
+load(1);
+</script>
+</body>
+</html>
