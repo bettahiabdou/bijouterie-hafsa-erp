@@ -3433,7 +3433,7 @@ def block_detail(request, pk):
             messages.success(request, 'Produit retiré du bloc.')
         return redirect('products:block_detail', pk=pk)
     products = block.products.select_related('category').order_by('reference')
-    return render(request, 'products/block_detail.html', {'block': block, 'products': products})
+    return render(request, 'products/block_detail.html', {'bloc': block, 'products': products})
 
 
 @login_required(login_url='login')

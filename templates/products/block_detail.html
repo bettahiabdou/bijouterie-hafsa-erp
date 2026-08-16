@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Bloc {{ block.name }} - Bijouterie Hafsa ERP{% endblock %}
+{% block title %}Bloc {{ bloc.name }} - Bijouterie Hafsa ERP{% endblock %}
 
 {% block breadcrumb %}
     <span class="breadcrumb-separator">/</span>
@@ -7,15 +7,15 @@
     <span class="breadcrumb-separator">/</span>
     <a href="{% url 'products:block_list' %}" class="breadcrumb-item">Blocs</a>
     <span class="breadcrumb-separator">/</span>
-    <span class="breadcrumb-item active">{{ block.name }}</span>
+    <span class="breadcrumb-item active">{{ bloc.name }}</span>
 {% endblock %}
 
 {% block page_header %}
     <div class="page-header">
         <div class="page-header-inner">
             <div>
-                <h1 class="page-title"><i class="fas fa-layer-group text-primary mr-2"></i> {{ block.name }}
-                    {% if not block.is_active %}<span class="badge badge-neutral">Inactif</span>{% endif %}
+                <h1 class="page-title"><i class="fas fa-layer-group text-primary mr-2"></i> {{ bloc.name }}
+                    {% if not bloc.is_active %}<span class="badge badge-neutral">Inactif</span>{% endif %}
                 </h1>
                 <p class="page-subtitle">{{ products|length }} produit(s) dans ce bloc</p>
             </div>
