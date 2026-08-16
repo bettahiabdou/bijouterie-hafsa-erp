@@ -15,20 +15,72 @@
                 <h1 class="page-title"><i class="fas fa-clipboard-check text-primary mr-2"></i> Contrôle d'inventaire</h1>
                 <p class="page-subtitle">Scannez chaque produit, puis obtenez le rapport des manquants et anomalies</p>
             </div>
-            <div class="page-actions">
+            <div class="page-actions" style="display:flex;gap:8px;">
+                <a href="{% url 'products:block_list' %}" class="btn btn-secondary"><i class="fas fa-layer-group"></i> <span>Blocs</span></a>
+                {% if open_session %}
                 <form method="post" action="{% url 'products:stock_count_start' %}">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-play"></i>
-                        <span>{% if open_session %}Reprendre l'inventaire{% else %}Démarrer un inventaire{% endif %}</span>
-                    </button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-play"></i> <span>Reprendre l'inventaire</span></button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>
 {% endblock %}
 
 {% block content %}
+    {% if not open_session %}
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-body">
+            <h3 style="margin:0 0 12px;font-size:16px;"><i class="fas fa-play text-primary"></i> Démarrer un inventaire</h3>
+            <form method="post" action="{% url 'products:stock_count_start' %}" id="startForm">
+                {% csrf_token %}
+                <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+                    <label class="mode-opt" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                        <input type="radio" name="mode" value="full" checked onchange="onModeChange()">
+                        <span><strong>Magasin complet</strong><br><span style="color:#6b7280;font-size:13px;">Rapprocher le scan avec tous les produits disponibles.</span></span>
+                    </label>
+                    <label class="mode-opt" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                        <input type="radio" name="mode" value="block_check" onchange="onModeChange()">
+                        <span><strong>Contrôle de bloc(s)</strong><br><span style="color:#6b7280;font-size:13px;">Vérifier un ou plusieurs blocs. Un article scanné sans bloc est ajouté au bloc (si un seul bloc), un article d'un autre bloc est signalé « Hors bloc ».</span></span>
+                    </label>
+                    <label class="mode-opt" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                        <input type="radio" name="mode" value="block_define" onchange="onModeChange()">
+                        <span><strong>Définir un bloc</strong><br><span style="color:#6b7280;font-size:13px;">Le scan devient le contenu du bloc : le bloc est vidé puis rempli avec les produits scannés. Choisissez un seul bloc.</span></span>
+                    </label>
+                </div>
+
+                <div id="blockPicker" style="display:none;margin-bottom:14px;">
+                    <label style="display:block;font-size:13px;color:#6b7280;font-weight:600;margin-bottom:6px;" id="blockPickerLabel">Blocs</label>
+                    {% if blocks %}
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                        {% for b in blocks %}
+                        <label style="display:flex;align-items:center;gap:6px;border:1px solid #e5e5e0;border-radius:20px;padding:6px 12px;cursor:pointer;font-size:13px;">
+                            <input type="checkbox" name="block_ids" value="{{ b.id }}"> {{ b.name }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p style="color:#6b7280;font-size:13px;">Aucun bloc. <a href="{% url 'products:block_list' %}">Créez un bloc</a> d'abord.</p>
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="btn btn-primary"><i class="fas fa-play"></i> Démarrer</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="card" style="margin-bottom:16px;border-left:4px solid #f59e0b;">
+        <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div><strong>Inventaire #{{ open_session.id }} en cours</strong> <span class="badge badge-warning">{{ open_session.get_mode_display }}</span>
+                {% for b in open_session.blocks.all %}<span class="badge badge-secondary">{{ b.name }}</span>{% endfor %}
+                <div style="color:#6b7280;font-size:13px;margin-top:4px;">Terminez-le avant d'en démarrer un nouveau.</div>
+            </div>
+            <a href="{% url 'products:stock_count_detail' open_session.id %}" class="btn btn-primary">Continuer</a>
+        </div>
+    </div>
+    {% endif %}
+
     {% if sessions %}
         <div class="card">
             <div class="card-body">
@@ -36,7 +88,7 @@
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>#</th><th>Statut</th><th>Démarré par</th>
+                                <th>#</th><th>Statut</th><th>Portée</th><th>Démarré par</th>
                                 <th>Démarré le</th><th>Terminé le</th><th class="text-right">Action</th>
                             </tr>
                         </thead>
@@ -47,6 +99,10 @@
                                     <td>
                                         {% if s.status == 'open' %}<span class="badge badge-warning">En cours</span>
                                         {% else %}<span class="badge badge-success">Terminé</span>{% endif %}
+                                    </td>
+                                    <td>
+                                        {{ s.get_mode_display }}
+                                        {% for b in s.blocks.all %}<span class="badge badge-secondary">{{ b.name }}</span>{% endfor %}
                                     </td>
                                     <td>{{ s.started_by.get_full_name|default:s.started_by.username|default:'-' }}</td>
                                     <td>{{ s.started_at|date:"d/m/Y H:i" }}</td>
@@ -70,4 +126,28 @@
             <p class="empty-state-text">Démarrez un inventaire pour commencer à scanner.</p>
         </div>
     {% endif %}
+
+    <script>
+    function onModeChange() {
+        var mode = document.querySelector('input[name="mode"]:checked').value;
+        var picker = document.getElementById('blockPicker');
+        var label = document.getElementById('blockPickerLabel');
+        if (mode === 'full') {
+            picker.style.display = 'none';
+        } else {
+            picker.style.display = 'block';
+            label.textContent = mode === 'block_define' ? 'Bloc à définir (un seul)' : 'Bloc(s) à contrôler';
+        }
+        // In define mode, keep only one checkbox selected at a time.
+        var boxes = document.querySelectorAll('input[name="block_ids"]');
+        boxes.forEach(function(b) {
+            b.onclick = function() {
+                if (mode === 'block_define' && this.checked) {
+                    boxes.forEach(function(o) { if (o !== b) o.checked = false; });
+                }
+            };
+        });
+    }
+    onModeChange();
+    </script>
 {% endblock %}

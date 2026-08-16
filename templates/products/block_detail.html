@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Bloc {{ block.name }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:list' %}" class="breadcrumb-item">Produits</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:block_list' %}" class="breadcrumb-item">Blocs</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ block.name }}</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title"><i class="fas fa-layer-group text-primary mr-2"></i> {{ block.name }}
+                    {% if not block.is_active %}<span class="badge badge-neutral">Inactif</span>{% endif %}
+                </h1>
+                <p class="page-subtitle">{{ products|length }} produit(s) dans ce bloc</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'products:block_list' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Blocs</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    {% if products %}
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead><tr><th>Référence</th><th>Nom</th><th>Catégorie</th><th>Statut</th><th class="text-right">Prix</th><th></th></tr></thead>
+                    <tbody>
+                        {% for p in products %}
+                        <tr>
+                            <td><a href="{% url 'products:detail' p.reference %}">{{ p.reference }}</a></td>
+                            <td>{{ p.name }}</td>
+                            <td>{{ p.category.name|default:'-' }}</td>
+                            <td>{% if p.status == 'available' %}<span class="badge badge-success">Disponible</span>{% else %}<span class="badge badge-neutral">{{ p.get_status_display }}</span>{% endif %}</td>
+                            <td class="text-right">{{ p.selling_price|floatformat:2 }} DH</td>
+                            <td class="text-right">
+                                <form method="post" style="display:inline;" onsubmit="return confirm('Retirer ce produit du bloc ?');">
+                                    {% csrf_token %}<input type="hidden" name="action" value="remove_product"><input type="hidden" name="product_id" value="{{ p.id }}">
+                                    <button type="submit" class="btn btn-sm btn-danger" title="Retirer du bloc"><i class="fas fa-times"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-box-open empty-state-icon"></i>
+        <h3 class="empty-state-title">Bloc vide</h3>
+        <p class="empty-state-text">Remplissez ce bloc en scannant (Contrôle d'inventaire → « Définir un bloc »), ou en sélectionnant des produits depuis la liste des produits (« Assigner au bloc »).</p>
+    </div>
+    {% endif %}
+{% endblock %}

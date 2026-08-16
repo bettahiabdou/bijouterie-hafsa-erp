@@ -69,6 +69,8 @@
     <div class="page-actions" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-4); flex-wrap:wrap; gap:8px;">
         <h2 style="margin:0;">Rapport — Inventaire #{{ session.id }}
             <small style="color:var(--neutral-500); font-weight:400;">{{ session.finished_at|date:"d/m/Y H:i" }}</small>
+            <span class="badge badge-info" style="margin-left:6px;">{{ report.mode_display }}</span>
+            {% for b in report.blocks %}<span class="badge badge-secondary">{{ b.name }}</span>{% endfor %}
         </h2>
         <a href="{% url 'products:stock_count_print' session.id %}" target="_blank" class="btn btn-primary"><i class="fas fa-print"></i> Imprimer A4</a>
     </div>
@@ -107,6 +109,42 @@
             {% else %}<p class="text-muted">Aucune anomalie. ✓</p>{% endif %}
         </div>
     </div>
+
+    <!-- Hors bloc -->
+    {% if report.mode == 'block_check' %}
+    <div class="card mb-6">
+        <div class="card-header"><h3 class="card-title text-danger"><i class="fas fa-map-marker-alt mr-2"></i> Hors bloc — scannés mais appartenant à un autre bloc ({{ report.hors_bloc_count }})</h3></div>
+        <div class="card-body">
+            {% if report.hors_bloc %}
+                <div class="table-responsive"><table class="table"><thead><tr><th>Référence</th><th>Nom</th><th>Bloc(s) réel(s)</th></tr></thead><tbody>
+                    {% for p in report.hors_bloc %}
+                        <tr><td><a href="{% url 'products:detail' p.reference %}">{{ p.reference }}</a></td><td>{{ p.name }}</td><td>{% for b in p.blocks.all %}<span class="badge badge-secondary">{{ b.name }}</span>{% endfor %}</td></tr>
+                    {% endfor %}
+                </tbody></table></div>
+            {% else %}<p class="text-muted">Aucun article mal placé. ✓</p>{% endif %}
+        </div>
+    </div>
+
+    <!-- Ajoutés au bloc -->
+    {% if report.absorbed %}
+    <div class="card mb-6">
+        <div class="card-header"><h3 class="card-title text-success"><i class="fas fa-plus-circle mr-2"></i> Ajoutés au bloc — nouveaux produits absorbés ({{ report.absorbed_count }})</h3></div>
+        <div class="card-body">
+            <div class="table-responsive"><table class="table"><thead><tr><th>Référence</th><th>Nom</th></tr></thead><tbody>
+                {% for p in report.absorbed %}
+                    <tr><td><a href="{% url 'products:detail' p.reference %}">{{ p.reference }}</a></td><td>{{ p.name }}</td></tr>
+                {% endfor %}
+            </tbody></table></div>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if report.mode == 'block_define' %}
+    <div class="card mb-6" style="border-left:4px solid #059669;">
+        <div class="card-body"><i class="fas fa-check-circle text-success"></i> Le bloc a été (re)défini avec <strong>{{ report.define_set_count }}</strong> produit(s) scanné(s).</div>
+    </div>
+    {% endif %}
 
     <!-- Unknown -->
     {% if report.unknown_codes %}

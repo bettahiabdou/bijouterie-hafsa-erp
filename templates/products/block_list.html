@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block title %}Blocs - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:list' %}" class="breadcrumb-item">Produits</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:stock_count_list' %}" class="breadcrumb-item">Contrôle d'inventaire</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Blocs</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title"><i class="fas fa-layer-group text-primary mr-2"></i> Blocs</h1>
+                <p class="page-subtitle">Zones (vitrine, coffre, présentoir…) regroupant des produits. Un produit peut appartenir à plusieurs blocs.</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-body">
+            <form method="post" action="{% url 'products:block_create' %}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                {% csrf_token %}
+                <input type="text" name="name" placeholder="Nom du nouveau bloc (ex: Vitrine 1)" required
+                       style="flex:1;min-width:200px;padding:10px 12px;border:1px solid #e5e5e0;border-radius:8px;font-size:14px;">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Créer le bloc</button>
+            </form>
+        </div>
+    </div>
+
+    {% if blocks %}
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead><tr><th>Bloc</th><th>Produits</th><th>Statut</th><th class="text-right">Actions</th></tr></thead>
+                    <tbody>
+                        {% for b in blocks %}
+                        <tr>
+                            <td><a href="{% url 'products:block_detail' b.id %}"><strong>{{ b.name }}</strong></a></td>
+                            <td>{{ b.n_products }}</td>
+                            <td>{% if b.is_active %}<span class="badge badge-success">Actif</span>{% else %}<span class="badge badge-neutral">Inactif</span>{% endif %}</td>
+                            <td class="text-right" style="white-space:nowrap;">
+                                <a href="{% url 'products:block_detail' b.id %}" class="btn btn-sm btn-secondary"><i class="fas fa-list"></i></a>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="renameBlock({{ b.id }}, '{{ b.name|escapejs }}')"><i class="fas fa-pen"></i></button>
+                                <form method="post" action="{% url 'products:block_update' b.id %}" style="display:inline;">
+                                    {% csrf_token %}<input type="hidden" name="action" value="toggle">
+                                    <button type="submit" class="btn btn-sm btn-secondary" title="{% if b.is_active %}Désactiver{% else %}Activer{% endif %}"><i class="fas fa-{% if b.is_active %}pause{% else %}play{% endif %}"></i></button>
+                                </form>
+                                <form method="post" action="{% url 'products:block_update' b.id %}" style="display:inline;" onsubmit="return confirm('Supprimer le bloc « {{ b.name|escapejs }} » ? Les produits ne sont pas supprimés, seulement le regroupement.');">
+                                    {% csrf_token %}<input type="hidden" name="action" value="delete">
+                                    <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-layer-group empty-state-icon"></i>
+        <h3 class="empty-state-title">Aucun bloc</h3>
+        <p class="empty-state-text">Créez un bloc ci-dessus, puis remplissez-le en scannant (mode « Définir un bloc ») ou depuis la liste des produits.</p>
+    </div>
+    {% endif %}
+
+    <!-- Rename form (hidden) -->
+    <form method="post" action="" id="renameForm" style="display:none;">{% csrf_token %}<input type="hidden" name="action" value="rename"><input type="hidden" name="name" id="renameName"></form>
+    <script>
+    function renameBlock(id, current) {
+        var name = prompt('Nouveau nom du bloc :', current);
+        if (!name || name.trim() === '' || name === current) return;
+        var f = document.getElementById('renameForm');
+        f.action = "{% url 'products:block_update' 0 %}".replace('/0/', '/' + id + '/');
+        document.getElementById('renameName').value = name.trim();
+        f.submit();
+    }
+    </script>
+{% endblock %}

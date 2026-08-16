@@ -26,6 +26,13 @@ urlpatterns = [
     path('stock-count/<int:pk>/finish/', views.stock_count_finish, name='stock_count_finish'),
     path('stock-count/<int:pk>/print/', views.stock_count_report_print, name='stock_count_print'),
 
+    # Blocs (zones) — static prefix, before <reference>
+    path('blocks/', views.block_list, name='block_list'),
+    path('blocks/create/', views.block_create, name='block_create'),
+    path('blocks/bulk-assign/', views.block_bulk_assign, name='block_bulk_assign'),
+    path('blocks/<int:pk>/', views.block_detail, name='block_detail'),
+    path('blocks/<int:pk>/update/', views.block_update, name='block_update'),
+
     # Print (must be before <str:reference> catch-all)
     path('print/test/', views.print_test, name='print_test'),
     path('print/debug/', views.printer_debug, name='printer_debug'),

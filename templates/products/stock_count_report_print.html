@@ -31,10 +31,12 @@
     </div>
 
     <div class="totals">
-        <span>Attendus (Disponible) : <b>{{ report.expected_total }}</b></span>
+        <span>Mode : <b>{{ report.mode_display }}</b>{% for b in report.blocks %} [{{ b.name }}]{% endfor %}</span>
+        <span>Attendus : <b>{{ report.expected_total }}</b></span>
         <span>Scannés : <b>{{ report.scanned_total }}</b></span>
         <span>Manquants : <b>{{ report.missing_count }}</b></span>
         <span>Anomalies : <b>{{ report.anomaly_count }}</b></span>
+        {% if report.mode == 'block_check' %}<span>Hors bloc : <b>{{ report.hors_bloc_count }}</b></span>{% endif %}
     </div>
 
     <h2>Manquants — attendus mais non scannés ({{ report.missing_count }})</h2>
@@ -50,6 +52,26 @@
             {% for p in report.anomalies %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td><td>{{ p.get_status_display }}</td></tr>{% endfor %}
         </tbody></table>
     {% else %}<div class="empty">Aucune anomalie.</div>{% endif %}
+
+    {% if report.mode == 'block_check' %}
+    <h2>Hors bloc — scannés mais appartenant à un autre bloc ({{ report.hors_bloc_count }})</h2>
+    {% if report.hors_bloc %}
+        <table><thead><tr><th>Référence</th><th>Nom</th><th>Bloc(s) réel(s)</th></tr></thead><tbody>
+            {% for p in report.hors_bloc %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td><td>{% for b in p.blocks.all %}{{ b.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td></tr>{% endfor %}
+        </tbody></table>
+    {% else %}<div class="empty">Aucun article mal placé.</div>{% endif %}
+    {% if report.absorbed %}
+    <h2>Ajoutés au bloc — nouveaux produits absorbés ({{ report.absorbed_count }})</h2>
+        <table><thead><tr><th>Référence</th><th>Nom</th></tr></thead><tbody>
+            {% for p in report.absorbed %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td></tr>{% endfor %}
+        </tbody></table>
+    {% endif %}
+    {% endif %}
+
+    {% if report.mode == 'block_define' %}
+    <h2>Bloc défini</h2>
+    <div>Le bloc a été (re)défini avec {{ report.define_set_count }} produit(s) scanné(s).</div>
+    {% endif %}
 
     {% if report.unknown_codes %}
     <h2>Codes inconnus ({{ report.unknown_codes|length }})</h2>

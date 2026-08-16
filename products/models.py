@@ -1092,11 +1092,26 @@ class StockCountSession(models.Model):
         OPEN = 'open', _('En cours')
         CLOSED = 'closed', _('Terminé')
 
+    class Mode(models.TextChoices):
+        FULL = 'full', _('Magasin complet')
+        BLOCK_CHECK = 'block_check', _('Contrôle de bloc(s)')
+        BLOCK_DEFINE = 'block_define', _('Définir un bloc')
+
     started_by = models.ForeignKey(
         'users.User', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='stock_counts', verbose_name=_('Démarré par'),
     )
     status = models.CharField(_('Statut'), max_length=10, choices=Status.choices, default=Status.OPEN)
+    mode = models.CharField(_('Mode'), max_length=20, choices=Mode.choices, default=Mode.FULL)
+    # Scope for block modes. FULL -> ignored; BLOCK_DEFINE -> exactly one bloc;
+    # BLOCK_CHECK -> one or more blocs.
+    blocks = models.ManyToManyField(
+        'ProductBlock', blank=True, related_name='sessions', verbose_name=_('Blocs'),
+    )
+    # Products absorbed into a bloc during a single-bloc check (they were unassigned).
+    absorbed_products = models.ManyToManyField(
+        'Product', blank=True, related_name='+', verbose_name=_('Produits ajoutés au bloc'),
+    )
     notes = models.TextField(_('Notes'), blank=True)
     started_at = models.DateTimeField(_('Démarré le'), auto_now_add=True)
     finished_at = models.DateTimeField(_('Terminé le'), null=True, blank=True)
@@ -1108,6 +1123,35 @@ class StockCountSession(models.Model):
 
     def __str__(self):
         return f"Inventaire #{self.pk} - {self.get_status_display()}"
+
+
+class ProductBlock(models.Model):
+    """
+    A physical zone / 'bloc' (vitrine, coffre, présentoir) grouping products.
+    A product can belong to several blocs (multi-block). Membership is set by
+    scanning (define/re-baseline, or absorbed during a check) or in bulk from
+    the product list.
+    """
+    name = models.CharField(_('Nom du bloc'), max_length=100, unique=True)
+    is_active = models.BooleanField(_('Actif'), default=True)
+    notes = models.TextField(_('Notes'), blank=True)
+    products = models.ManyToManyField(
+        Product, blank=True, related_name='blocks', verbose_name=_('Produits'),
+    )
+    created_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_blocks', verbose_name=_('Créé par'),
+    )
+    created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('Bloc')
+        verbose_name_plural = _('Blocs')
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
 
 
 class StockCountScan(models.Model):

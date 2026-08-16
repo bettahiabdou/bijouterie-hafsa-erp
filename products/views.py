@@ -12,7 +12,7 @@ from django.http import JsonResponse, HttpResponse
 from decimal import Decimal, InvalidOperation
 import csv
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from .models import Product, ProductImage, ProductStone, ProductVideo, StockCountSession, StockCountScan
+from .models import Product, ProductImage, ProductStone, ProductVideo, StockCountSession, StockCountScan, ProductBlock
 from .video_utils import convert_video_to_mp4
 from .print_utils import print_product_label, print_price_tag, print_test_label, generate_product_label_zpl, generate_price_tag_zpl, queue_print_job, send_to_printer
 from settings_app.models import ProductCategory, MetalType, MetalPurity, BankAccount, JewelryType, ProductNature
@@ -220,6 +220,7 @@ def product_list(request):
         'metals': MetalType.objects.filter(is_active=True),
         'stats': stats,
         'statuses': Product.Status.choices,
+        'blocks': ProductBlock.objects.filter(is_active=True).order_by('name'),
     }
 
     return render(request, 'products/product_list.html', context)
@@ -3117,7 +3118,14 @@ def _resolve_product_by_code(code):
 
 
 def _stock_count_report(session):
-    """Reconcile a session against products that should be available."""
+    """
+    Reconcile a session. Scope depends on session.mode:
+      * FULL          -> expected = all available products.
+      * BLOCK_CHECK   -> expected = available members of the selected bloc(s);
+                         scanned items that belong to no bloc are absorbed into
+                         a single-bloc check, items of another bloc are 'hors bloc'.
+      * BLOCK_DEFINE  -> the scan becomes the bloc; report shows what was set.
+    """
     scans = session.scans.select_related('product').all()
     scanned_products = {}   # product_id -> product
     unknown_codes = []
@@ -3128,44 +3136,122 @@ def _stock_count_report(session):
             unknown_codes.append(s.code)
 
     scanned_ids = set(scanned_products.keys())
-
-    # Expected in stock = status 'available'
-    expected_qs = Product.objects.filter(status='available')
-    missing = list(expected_qs.exclude(id__in=scanned_ids).select_related('category')) if scanned_ids else list(expected_qs.select_related('category'))
-
-    # Scanned but not marked available (present but wrong status)
+    avail_scanned = {pid: p for pid, p in scanned_products.items() if p.status == 'available'}
     anomalies = [p for p in scanned_products.values() if p.status != 'available']
-    # Correctly counted (scanned AND available)
-    counted_ok = [p for p in scanned_products.values() if p.status == 'available']
 
-    return {
-        'missing': missing,
+    block_qs = list(session.blocks.all())
+    block_ids = [b.id for b in block_qs]
+    is_block = session.mode in (
+        StockCountSession.Mode.BLOCK_CHECK, StockCountSession.Mode.BLOCK_DEFINE
+    ) and bool(block_ids)
+
+    report = {
+        'mode': session.mode,
+        'mode_display': session.get_mode_display(),
+        'blocks': block_qs,
         'anomalies': anomalies,
-        'counted_ok': counted_ok,
         'unknown_codes': unknown_codes,
+        'hors_bloc': [],
+        'absorbed': [],
         'scanned_total': len(scanned_products),
-        'expected_total': expected_qs.count(),
-        'missing_count': len(missing),
-        'anomaly_count': len(anomalies),
     }
+
+    if not is_block:
+        expected_qs = Product.objects.filter(status='available')
+        missing = (list(expected_qs.exclude(id__in=scanned_ids).select_related('category'))
+                   if scanned_ids else list(expected_qs.select_related('category')))
+        report.update({
+            'missing': missing,
+            'counted_ok': list(avail_scanned.values()),
+            'expected_total': expected_qs.count(),
+        })
+    else:
+        raw_member_ids = set(Product.objects.filter(blocks__id__in=block_ids).values_list('id', flat=True))
+        absorbed_ids = set(session.absorbed_products.values_list('id', flat=True))
+
+        if session.mode == StockCountSession.Mode.BLOCK_DEFINE:
+            # The scan defines the bloc; no 'missing' concept.
+            report.update({
+                'missing': [],
+                'counted_ok': list(avail_scanned.values()),
+                'expected_total': len(raw_member_ids),
+                'define_set_count': len(avail_scanned),
+            })
+        else:
+            # BLOCK_CHECK: original members = current members minus anything absorbed
+            # this session (so absorbed items still show as 'ajoutés', not members).
+            original_member_ids = raw_member_ids - absorbed_ids
+            expected_ids = set(Product.objects.filter(
+                id__in=original_member_ids, status='available'
+            ).values_list('id', flat=True))
+            missing_ids = expected_ids - scanned_ids
+            missing = list(Product.objects.filter(id__in=missing_ids).select_related('category'))
+            counted_ok = [p for pid, p in avail_scanned.items() if pid in expected_ids]
+
+            off = [(pid, p) for pid, p in avail_scanned.items() if pid not in original_member_ids]
+            if absorbed_ids:
+                # Closed session: absorbed already recorded.
+                report['absorbed'] = [p for pid, p in off if pid in absorbed_ids]
+                report['hors_bloc'] = [p for pid, p in off if pid not in absorbed_ids]
+            elif len(block_ids) == 1:
+                # Open preview (or a check that absorbed nothing): items in NO bloc
+                # would be absorbed; items in another bloc are hors bloc.
+                any_block_ids = set(Product.objects.filter(
+                    id__in=[pid for pid, _ in off], blocks__isnull=False
+                ).values_list('id', flat=True))
+                report['absorbed'] = [p for pid, p in off if pid not in any_block_ids]
+                report['hors_bloc'] = [p for pid, p in off if pid in any_block_ids]
+            else:
+                report['hors_bloc'] = [p for _, p in off]
+
+            report.update({
+                'missing': missing,
+                'counted_ok': counted_ok,
+                'expected_total': len(expected_ids),
+            })
+
+    report.update({
+        'missing_count': len(report['missing']),
+        'anomaly_count': len(anomalies),
+        'hors_bloc_count': len(report['hors_bloc']),
+        'absorbed_count': len(report['absorbed']),
+    })
+    return report
 
 
 @login_required(login_url='login')
 def stock_count_list(request):
-    sessions = StockCountSession.objects.select_related('started_by').all()[:100]
+    sessions = StockCountSession.objects.select_related('started_by').prefetch_related('blocks').all()[:100]
     open_session = StockCountSession.objects.filter(status='open').order_by('-started_at').first()
+    blocks = ProductBlock.objects.filter(is_active=True).order_by('name')
     return render(request, 'products/stock_count_list.html', {
-        'sessions': sessions, 'open_session': open_session,
+        'sessions': sessions, 'open_session': open_session, 'blocks': blocks,
     })
 
 
 @login_required(login_url='login')
 @require_http_methods(["POST"])
 def stock_count_start(request):
-    # Reuse an existing open session if any, else create one.
-    session = StockCountSession.objects.filter(status='open').order_by('-started_at').first()
-    if not session:
-        session = StockCountSession.objects.create(started_by=request.user)
+    # Only one open session at a time: resume it if present.
+    existing = StockCountSession.objects.filter(status='open').order_by('-started_at').first()
+    if existing:
+        return redirect('products:stock_count_detail', pk=existing.pk)
+
+    mode = request.POST.get('mode') or StockCountSession.Mode.FULL
+    if mode not in dict(StockCountSession.Mode.choices):
+        mode = StockCountSession.Mode.FULL
+    block_ids = [int(b) for b in request.POST.getlist('block_ids') if str(b).isdigit()]
+
+    if mode == StockCountSession.Mode.BLOCK_DEFINE and len(block_ids) != 1:
+        messages.error(request, 'Choisissez exactement un bloc à définir.')
+        return redirect('products:stock_count_list')
+    if mode == StockCountSession.Mode.BLOCK_CHECK and not block_ids:
+        messages.error(request, 'Choisissez au moins un bloc à contrôler.')
+        return redirect('products:stock_count_list')
+
+    session = StockCountSession.objects.create(started_by=request.user, mode=mode)
+    if mode in (StockCountSession.Mode.BLOCK_CHECK, StockCountSession.Mode.BLOCK_DEFINE) and block_ids:
+        session.blocks.set(ProductBlock.objects.filter(id__in=block_ids, is_active=True))
     return redirect('products:stock_count_detail', pk=session.pk)
 
 
@@ -3223,6 +3309,30 @@ def stock_count_finish(request, pk):
     from django.utils import timezone as _tz
     session = get_object_or_404(StockCountSession, pk=pk)
     if session.status == 'open':
+        # Apply bloc membership changes before closing.
+        scanned_avail_ids = set(
+            session.scans.filter(product__status='available')
+            .values_list('product_id', flat=True)
+        )
+        if session.mode == StockCountSession.Mode.BLOCK_DEFINE:
+            block = session.blocks.first()
+            if block:
+                # Re-baseline: the bloc becomes exactly the scanned available products.
+                block.products.set(Product.objects.filter(id__in=scanned_avail_ids))
+        elif session.mode == StockCountSession.Mode.BLOCK_CHECK and session.blocks.count() == 1:
+            block = session.blocks.first()
+            member_ids = set(block.products.values_list('id', flat=True))
+            any_block_ids = set(
+                Product.objects.filter(id__in=scanned_avail_ids, blocks__isnull=False)
+                .values_list('id', flat=True)
+            )
+            # Absorb scanned items that belong to NO bloc yet (newly-added stock).
+            to_absorb = [pid for pid in scanned_avail_ids
+                         if pid not in any_block_ids and pid not in member_ids]
+            if to_absorb:
+                block.products.add(*to_absorb)
+                session.absorbed_products.add(*to_absorb)
+
         session.status = 'closed'
         session.finished_at = _tz.now()
         session.save(update_fields=['status', 'finished_at'])
@@ -3232,6 +3342,86 @@ def stock_count_finish(request, pk):
             object_repr=f'Inventaire #{session.id} terminé',
         )
     return redirect('products:stock_count_detail', pk=session.pk)
+
+
+# ---------------------------------------------------------------------------
+# Blocs (zones) management
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='login')
+def block_list(request):
+    blocks = ProductBlock.objects.annotate(
+        n_products=Count('products', distinct=True)
+    ).order_by('-is_active', 'name')
+    return render(request, 'products/block_list.html', {'blocks': blocks})
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def block_create(request):
+    name = (request.POST.get('name') or '').strip()
+    if not name:
+        messages.error(request, 'Nom du bloc requis.')
+    elif ProductBlock.objects.filter(name__iexact=name).exists():
+        messages.error(request, f'Le bloc « {name} » existe déjà.')
+    else:
+        ProductBlock.objects.create(name=name, created_by=request.user)
+        messages.success(request, f'Bloc « {name} » créé.')
+    return redirect('products:block_list')
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def block_update(request, pk):
+    block = get_object_or_404(ProductBlock, pk=pk)
+    action = request.POST.get('action')
+    if action == 'rename':
+        name = (request.POST.get('name') or '').strip()
+        if not name:
+            messages.error(request, 'Nom requis.')
+        elif ProductBlock.objects.filter(name__iexact=name).exclude(pk=block.pk).exists():
+            messages.error(request, f'Le bloc « {name} » existe déjà.')
+        else:
+            block.name = name
+            block.save(update_fields=['name', 'updated_at'])
+            messages.success(request, 'Bloc renommé.')
+    elif action == 'toggle':
+        block.is_active = not block.is_active
+        block.save(update_fields=['is_active', 'updated_at'])
+        messages.success(request, 'Bloc ' + ('activé.' if block.is_active else 'désactivé.'))
+    elif action == 'delete':
+        block.delete()
+        messages.success(request, 'Bloc supprimé.')
+    return redirect('products:block_list')
+
+
+@login_required(login_url='login')
+def block_detail(request, pk):
+    block = get_object_or_404(ProductBlock, pk=pk)
+    if request.method == 'POST' and request.POST.get('action') == 'remove_product':
+        pid = request.POST.get('product_id')
+        if pid:
+            block.products.remove(pid)
+            messages.success(request, 'Produit retiré du bloc.')
+        return redirect('products:block_detail', pk=pk)
+    products = block.products.select_related('category').order_by('reference')
+    return render(request, 'products/block_detail.html', {'block': block, 'products': products})
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def block_bulk_assign(request):
+    """Assign selected products (from the product list) to a bloc."""
+    block_id = request.POST.get('block_id')
+    product_ids = [int(p) for p in request.POST.getlist('product_ids') if str(p).isdigit()]
+    if not block_id or not product_ids:
+        return JsonResponse({'ok': False, 'error': 'Bloc et produits requis.'}, status=400)
+    try:
+        block = ProductBlock.objects.get(pk=block_id, is_active=True)
+    except ProductBlock.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Bloc introuvable.'}, status=404)
+    block.products.add(*product_ids)
+    return JsonResponse({'ok': True, 'assigned': len(product_ids), 'block': block.name})
 
 
 @login_required(login_url='login')
