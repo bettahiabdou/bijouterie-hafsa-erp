@@ -3264,7 +3264,35 @@ def stock_count_detail(request, pk):
         context['scanned_count'] = session.scans.filter(product__isnull=False).values('product').distinct().count()
     else:
         context['report'] = _stock_count_report(session)
+        context['blocks'] = ProductBlock.objects.filter(is_active=True).order_by('name')
     return render(request, 'products/stock_count_detail.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def stock_count_apply_block(request, pk):
+    """Pour a finished session's scanned (available) products into a bloc.
+    action='replace' re-baselines the bloc; 'add' appends."""
+    session = get_object_or_404(StockCountSession, pk=pk)
+    action = request.POST.get('apply_action', 'add')
+    try:
+        block = ProductBlock.objects.get(pk=request.POST.get('block_id'), is_active=True)
+    except (ProductBlock.DoesNotExist, ValueError, TypeError):
+        messages.error(request, 'Bloc introuvable.')
+        return redirect('products:stock_count_detail', pk=pk)
+
+    scanned_avail_ids = list(
+        session.scans.filter(product__status='available')
+        .values_list('product_id', flat=True).distinct()
+    )
+    if action == 'replace':
+        block.products.set(Product.objects.filter(id__in=scanned_avail_ids))
+        messages.success(request, f'Bloc « {block.name} » réinitialisé avec {len(scanned_avail_ids)} produit(s) scanné(s).')
+    else:
+        if scanned_avail_ids:
+            block.products.add(*scanned_avail_ids)
+        messages.success(request, f'{len(scanned_avail_ids)} produit(s) scanné(s) ajouté(s) au bloc « {block.name} ».')
+    return redirect('products:stock_count_detail', pk=pk)
 
 
 @login_required(login_url='login')

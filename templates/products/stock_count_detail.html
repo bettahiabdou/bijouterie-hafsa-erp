@@ -75,6 +75,29 @@
         <a href="{% url 'products:stock_count_print' session.id %}" target="_blank" class="btn btn-primary"><i class="fas fa-print"></i> Imprimer A4</a>
     </div>
 
+    <!-- Initialiser un bloc à partir de ce scan -->
+    <div class="card mb-6" style="border-left:4px solid var(--primary-500,#6366f1);">
+        <div class="card-body">
+            <h3 style="margin:0 0 4px;font-size:15px;"><i class="fas fa-layer-group text-primary"></i> Initialiser un bloc à partir de ce scan</h3>
+            <p style="color:#6b7280;font-size:13px;margin:0 0 12px;">Verser les produits disponibles scannés dans cet inventaire vers un bloc.</p>
+            {% if blocks %}
+            <form method="post" action="{% url 'products:stock_count_apply_block' session.id %}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"
+                  onsubmit="return confirm(this.apply_action.value === 'replace' ? 'Remplacer le contenu du bloc par les produits scannés ?' : 'Ajouter les produits scannés au bloc ?');">
+                {% csrf_token %}
+                <select name="block_id" required style="padding:9px 12px;border:1px solid #e5e5e0;border-radius:8px;font-size:14px;">
+                    <option value="">— Choisir un bloc —</option>
+                    {% for b in blocks %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+                </select>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="apply_action" value="add" checked> Ajouter</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="apply_action" value="replace"> Remplacer (réinitialiser)</label>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-check"></i> Appliquer</button>
+            </form>
+            {% else %}
+            <p style="font-size:13px;color:#6b7280;margin:0;">Aucun bloc. <a href="{% url 'products:block_list' %}">Créez un bloc</a> d'abord.</p>
+            {% endif %}
+        </div>
+    </div>
+
     <div class="stats-grid mb-6">
         <div class="stat-card stat-info"><div class="stat-icon"><i class="fas fa-box"></i></div><div class="stat-content"><span class="stat-value">{{ report.expected_total }}</span><span class="stat-label">Attendus (Disponible)</span></div></div>
         <div class="stat-card stat-success"><div class="stat-icon"><i class="fas fa-check"></i></div><div class="stat-content"><span class="stat-value">{{ report.scanned_total }}</span><span class="stat-label">Scannés</span></div></div>
