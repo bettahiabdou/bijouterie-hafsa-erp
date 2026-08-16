@@ -315,3 +315,81 @@ def rfid_session_list(request):
     sessions = RFIDInventorySession.objects.all()[:50]
     serializer = RFIDInventorySessionSerializer(sessions, many=True)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def rfid_blocks(request):
+    """List active blocs for the block-check picker in the Android app."""
+    from django.db.models import Count
+    from .models import ProductBlock
+    blocks = ProductBlock.objects.filter(is_active=True).annotate(
+        n=Count('products', distinct=True)
+    ).order_by('name')
+    return Response({'blocks': [
+        {'id': b.id, 'name': b.name, 'product_count': b.n} for b in blocks
+    ]})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def rfid_block_check(request):
+    """
+    Check scanned EPCs against one bloc's members (read-only).
+    POST {block_id, epcs: [...]}
+    Returns present (members scanned), missing (members not scanned),
+    hors_bloc (scanned available products not in this bloc), unknown EPCs.
+    """
+    from .models import ProductBlock
+    block_id = request.data.get('block_id')
+    epcs = request.data.get('epcs', [])
+    if not block_id:
+        return Response({'error': 'block_id required'}, status=status.HTTP_400_BAD_REQUEST)
+    if not isinstance(epcs, list):
+        return Response({'error': 'epcs must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        block = ProductBlock.objects.get(pk=block_id, is_active=True)
+    except ProductBlock.DoesNotExist:
+        return Response({'error': 'bloc introuvable'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        epcs_upper = [e.strip().upper() for e in epcs if isinstance(e, str)]
+        found_map = _batch_find_products(epcs_upper)  # epc -> product
+        member_ids = set(block.products.values_list('id', flat=True))
+
+        present_products, hors_products, unknown = [], [], []
+        seen_present, seen_hors = set(), set()
+        for epc in epcs_upper:
+            p = found_map.get(epc)
+            if not p:
+                unknown.append(epc)
+            elif p.id in member_ids:
+                if p.id not in seen_present:
+                    seen_present.add(p.id); present_products.append(p)
+            else:
+                if p.id not in seen_hors:
+                    seen_hors.add(p.id); hors_products.append(p)
+
+        # Missing = bloc members (available + tagged, hence scannable) not present.
+        expected_qs = block.products.filter(status='available').exclude(
+            rfid_tag__isnull=True).exclude(rfid_tag='')
+        expected_ids = set(expected_qs.values_list('id', flat=True))
+        missing_ids = expected_ids - seen_present
+        missing_qs = Product.objects.filter(id__in=missing_ids)
+
+        LIST_CAP = 500
+        return Response({
+            'block': {'id': block.id, 'name': block.name},
+            'present': ProductRFIDLiteSerializer(present_products[:LIST_CAP], many=True).data,
+            'present_count': len(present_products),
+            'missing': ProductRFIDLiteSerializer(missing_qs[:LIST_CAP], many=True).data,
+            'missing_count': len(missing_ids),
+            'hors_bloc': ProductRFIDLiteSerializer(hors_products[:LIST_CAP], many=True).data,
+            'hors_bloc_count': len(hors_products),
+            'unknown_epcs': unknown[:LIST_CAP],
+            'unknown_count': len(unknown),
+            'expected_count': len(expected_ids),
+        })
+    except Exception as e:
+        logger.exception("rfid_block_check failed (block=%s, %d epcs)", block_id, len(epcs))
+        return Response({'error': f'Erreur: {e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
