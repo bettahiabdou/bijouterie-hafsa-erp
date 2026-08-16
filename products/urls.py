@@ -51,6 +51,7 @@ urlpatterns = [
     path('api/rfid/batch-check/', api_views.rfid_batch_check, name='rfid_batch_check'),
     path('api/rfid/blocks/', api_views.rfid_blocks, name='rfid_blocks'),
     path('api/rfid/block-check/', api_views.rfid_block_check, name='rfid_block_check'),
+    path('api/rfid/block/<int:block_id>/tags/', api_views.rfid_block_tags, name='rfid_block_tags'),
     path('api/rfid/session/', api_views.rfid_session_create, name='rfid_session_create'),
     path('api/rfid/session/<int:session_id>/save/', api_views.rfid_session_save, name='rfid_session_save'),
     path('api/rfid/session/<int:session_id>/', api_views.rfid_session_detail, name='rfid_session_detail'),

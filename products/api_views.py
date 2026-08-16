@@ -393,3 +393,24 @@ def rfid_block_check(request):
     except Exception as e:
         logger.exception("rfid_block_check failed (block=%s, %d epcs)", block_id, len(epcs))
         return Response({'error': f'Erreur: {e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def rfid_block_tags(request, block_id):
+    """
+    Return the RFID tags of a bloc's scannable members (available + tagged),
+    so the handheld can filter locally and only beep/count in-bloc tags.
+    """
+    from .models import ProductBlock
+    try:
+        block = ProductBlock.objects.get(pk=block_id, is_active=True)
+    except ProductBlock.DoesNotExist:
+        return Response({'error': 'bloc introuvable'}, status=status.HTTP_404_NOT_FOUND)
+    tags = list(
+        block.products.filter(status='available')
+        .exclude(rfid_tag__isnull=True).exclude(rfid_tag='')
+        .values_list('rfid_tag', flat=True)
+    )
+    tags = [t.upper() for t in tags if t]
+    return Response({'block': {'id': block.id, 'name': block.name}, 'tags': tags, 'count': len(tags)})
