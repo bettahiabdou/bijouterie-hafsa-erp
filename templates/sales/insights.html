@@ -95,6 +95,121 @@
         <a href="?period=all" class="period-pill {% if period == 'all' %}active{% endif %}">Tout</a>
     </div>
 
+    <!-- ===== ACTION CENTER (décisions prioritaires) ===== -->
+    {% if data.actions %}
+    <div style="margin-bottom:22px;">
+        <h2 style="font-size:18px;margin:0 0 10px;"><i class="fas fa-bolt" style="color:#d97706;"></i> Décisions prioritaires</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
+            {% for a in data.actions %}
+            <div style="background:white;border-radius:12px;border:1px solid var(--neutral-200);border-left:4px solid {% if a.sev == 'high' %}#dc2626{% elif a.sev == 'medium' %}#d97706{% else %}#2563eb{% endif %};padding:14px;">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <i class="fas {{ a.icon }}" style="font-size:18px;color:{% if a.sev == 'high' %}#dc2626{% elif a.sev == 'medium' %}#d97706{% else %}#2563eb{% endif %};margin-top:2px;"></i>
+                    <div style="flex:1;">
+                        <div style="font-weight:700;font-size:14px;line-height:1.3;">{{ a.title }}</div>
+                        <div style="font-size:12px;color:var(--neutral-500);margin-top:4px;">{{ a.detail }}</div>
+                        <a href="{{ a.link }}" style="display:inline-block;margin-top:8px;font-size:12px;font-weight:600;color:var(--primary-600);text-decoration:none;">Voir &rarr;</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===== OPERATIONAL KPIs ===== -->
+    <div class="insights-grid-3" style="grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); margin-bottom:20px;">
+        <div class="kpi-mini kpi-mini--success">
+            <div class="kpi-mini-value">{{ data.profit_totals.margin_pct }}%</div>
+            <div class="kpi-mini-label">Marge globale</div>
+            <div class="kpi-mini-sub">{{ data.profit_totals.total_margin|floatformat:0 }} DH</div>
+        </div>
+        <div class="kpi-mini kpi-mini--error">
+            <div class="kpi-mini-value">{{ data.receivables|floatformat:0 }}</div>
+            <div class="kpi-mini-label">Créances (DH)</div>
+        </div>
+        <div class="kpi-mini kpi-mini--primary">
+            <div class="kpi-mini-value">{{ data.deposits.total_held|floatformat:0 }}</div>
+            <div class="kpi-mini-label">Dépôts détenus (DH)</div>
+            <div class="kpi-mini-sub">{{ data.deposits.account_count }} comptes</div>
+        </div>
+        <div class="kpi-mini kpi-mini--warning">
+            <div class="kpi-mini-value">{{ data.circulation.out_count }}</div>
+            <div class="kpi-mini-label">En circulation</div>
+            <div class="kpi-mini-sub">{{ data.circulation.out_over_30d }} dormantes &gt;30j</div>
+        </div>
+        <div class="kpi-mini kpi-mini--warning">
+            <div class="kpi-mini-value">{{ data.aged_stock.over_365d.count }}</div>
+            <div class="kpi-mini-label">Stock &gt;365j</div>
+            <div class="kpi-mini-sub">{{ data.aged_stock.over_365d.value|floatformat:0 }} DH</div>
+        </div>
+        <div class="kpi-mini">
+            <div class="kpi-mini-value">{{ data.inventory_health.blocks_count }}</div>
+            <div class="kpi-mini-label">Blocs actifs</div>
+        </div>
+    </div>
+
+    <!-- ===== OPERATIONAL DETAIL CARDS ===== -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:24px;">
+        <!-- Circulation -->
+        <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
+            <h3 style="font-size:15px;margin:0 0 10px;"><i class="fas fa-truck" style="color:var(--primary-600);"></i> Circulation</h3>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-bottom:8px;">
+                <span><b>{{ data.circulation.out_count }}</b> en circ.</span>
+                <span><b>{{ data.circulation.sold_count }}</b> vendues</span>
+                <span><b>{{ data.circulation.returned_count }}</b> retours</span>
+                <span>Conv. <b>{{ data.circulation.conversion_pct }}%</b></span>
+            </div>
+            {% if data.circulation.by_seller %}
+            <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                {% for r in data.circulation.by_seller %}<tr><td style="padding:3px 0;color:var(--neutral-600);">{{ r.name }}</td><td style="text-align:right;font-weight:600;">{{ r.out }}</td></tr>{% endfor %}
+            </table>
+            {% endif %}
+            <a href="/sales/circulation/" style="font-size:12px;font-weight:600;color:var(--primary-600);text-decoration:none;">Ouvrir &rarr;</a>
+        </div>
+
+        <!-- Dépôts -->
+        <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
+            <h3 style="font-size:15px;margin:0 0 10px;"><i class="fas fa-piggy-bank" style="color:var(--primary-600);"></i> Dépôts clients</h3>
+            <div style="font-size:13px;margin-bottom:8px;"><b>{{ data.deposits.total_held|floatformat:2 }} DH</b> détenus · {{ data.deposits.account_count }} comptes</div>
+            {% if data.deposits.top_balances %}
+            <div style="font-size:11px;color:var(--neutral-500);margin-bottom:3px;">Soldes les plus élevés</div>
+            <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                {% for r in data.deposits.top_balances %}<tr><td style="padding:3px 0;color:var(--neutral-600);">{{ r.name }}</td><td style="text-align:right;font-weight:600;">{{ r.balance|floatformat:0 }} DH</td></tr>{% endfor %}
+            </table>
+            {% endif %}
+            <a href="/deposits/" style="font-size:12px;font-weight:600;color:var(--primary-600);text-decoration:none;">Ouvrir &rarr;</a>
+        </div>
+
+        <!-- Vendeuses -->
+        <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
+            <h3 style="font-size:15px;margin:0 0 10px;"><i class="fas fa-user-tie" style="color:var(--primary-600);"></i> Performance vendeuses</h3>
+            {% if data.sellers %}
+            <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                <tr style="color:var(--neutral-400);"><td>Vendeuse</td><td style="text-align:right;">CA</td><td style="text-align:right;">Fact.</td><td style="text-align:right;">Circ.</td></tr>
+                {% for s in data.sellers %}<tr><td style="padding:3px 0;color:var(--neutral-700);">{{ s.name }}</td><td style="text-align:right;font-weight:600;">{{ s.revenue|floatformat:0 }}</td><td style="text-align:right;">{{ s.invoices }}</td><td style="text-align:right;">{{ s.circ_sold }}</td></tr>{% endfor %}
+            </table>
+            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Vendeuse non renseignée sur les factures.</div>{% endif %}
+        </div>
+
+        <!-- Inventaire -->
+        <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
+            <h3 style="font-size:15px;margin:0 0 10px;"><i class="fas fa-clipboard-check" style="color:var(--primary-600);"></i> Santé inventaire</h3>
+            <div style="font-size:13px;margin-bottom:8px;">{{ data.inventory_health.blocks_count }} blocs · {{ data.inventory_health.available_total }} produits disponibles</div>
+            {% with il=data.inventory_health.last_session %}
+            {% if il %}
+            <div style="font-size:12px;color:var(--neutral-600);">Dernier contrôle #{{ il.id }} ({{ il.mode }}) — {{ il.date }}</div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:6px;">
+                <span>Attendus <b>{{ il.expected }}</b></span>
+                <span>Scannés <b>{{ il.scanned }}</b></span>
+                <span style="color:#d97706;">Manquants <b>{{ il.missing }}</b></span>
+                <span style="color:#dc2626;">Anomalies <b>{{ il.anomalies }}</b></span>
+            </div>
+            <a href="/products/stock-count/{{ il.id }}/" style="font-size:12px;font-weight:600;color:var(--primary-600);text-decoration:none;">Rapport &rarr;</a>
+            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Aucun contrôle terminé. <a href="/products/stock-count/">Démarrer</a></div>{% endif %}
+            {% endwith %}
+        </div>
+    </div>
+
     <!-- ===== KPI OVERVIEW ===== -->
     <div class="insights-grid-3" style="grid-template-columns: repeat(6, 1fr);">
         <div class="kpi-mini">

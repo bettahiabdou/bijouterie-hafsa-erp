@@ -355,6 +355,151 @@ def gather_business_data(period_days=None):
             'margin_pct': margin_pct,
         })
 
+    # ===== 17. CIRCULATION (vente en ligne) =====
+    from sales.models import ProductCirculation
+    circ_out = ProductCirculation.objects.filter(status='out')
+    sold_count = ProductCirculation.objects.filter(status='sold').count()
+    ret_count = ProductCirculation.objects.filter(status='returned').count()
+    out_count = circ_out.count()
+    conv_base = sold_count + ret_count
+    circulation = {
+        'out_count': out_count,
+        'sold_count': sold_count,
+        'returned_count': ret_count,
+        'conversion_pct': round(sold_count * 100 / conv_base, 1) if conv_base else 0,
+        'out_over_30d': circ_out.filter(date_out__lt=now - timedelta(days=30)).count(),
+        'out_last_7d': circ_out.filter(date_out__gte=now - timedelta(days=7)).count(),
+        'by_seller': [
+            {'name': f"{r['seller__first_name'] or ''} {r['seller__last_name'] or ''}".strip() or '—',
+             'out': r['n']}
+            for r in circ_out.values('seller__first_name', 'seller__last_name')
+            .annotate(n=Count('id')).order_by('-n')[:8]
+        ],
+    }
+
+    # ===== 18. CLIENT DEPOSITS (dépôts) =====
+    from deposits.models import DepositAccount, DepositTransaction
+    dep_total = DepositTransaction.objects.aggregate(s=Sum('amount'))['s'] or Decimal('0')
+    dep_accounts = DepositAccount.objects.count()
+    deposits_mod = {
+        'total_held': _d(dep_total),
+        'account_count': dep_accounts,
+        'by_seller': [
+            {'name': f"{r['account__managed_by__first_name'] or ''} {r['account__managed_by__last_name'] or ''}".strip() or '—',
+             'balance': _d(r['bal']), 'accounts': r['n']}
+            for r in DepositTransaction.objects.values(
+                'account__managed_by__first_name', 'account__managed_by__last_name'
+            ).annotate(bal=Sum('amount'), n=Count('account', distinct=True)).order_by('-bal')[:8]
+        ],
+        'top_balances': [
+            {'name': f"{r['client__first_name'] or ''} {r['client__last_name'] or ''}".strip() or '—',
+             'balance': _d(r['bal'])}
+            for r in DepositAccount.objects.annotate(bal=Sum('transactions__amount'))
+            .filter(bal__gt=0).order_by('-bal')
+            .values('client__first_name', 'client__last_name', 'bal')[:8]
+        ],
+    }
+
+    # ===== 19. SELLER PERFORMANCE =====
+    circ_sold_by_seller = dict(
+        ProductCirculation.objects.filter(status='sold')
+        .values_list('seller__id').annotate(n=Count('id'))
+    )
+    sellers = []
+    for s in (base_qs.filter(seller__isnull=False)
+              .values('seller__id', 'seller__first_name', 'seller__last_name')
+              .annotate(revenue=Sum('total_amount'), invoices=Count('id'))
+              .order_by('-revenue')[:12]):
+        sellers.append({
+            'name': f"{s['seller__first_name'] or ''} {s['seller__last_name'] or ''}".strip() or '—',
+            'revenue': _d(s['revenue']),
+            'invoices': s['invoices'],
+            'circ_sold': circ_sold_by_seller.get(s['seller__id'], 0),
+        })
+
+    # ===== 20. INVENTORY HEALTH (blocs & dernier contrôle) =====
+    from products.models import ProductBlock, StockCountSession
+    last_session = StockCountSession.objects.filter(status='closed').order_by('-finished_at').first()
+    inv_last = None
+    if last_session:
+        try:
+            from products.views import _stock_count_report
+            rep = _stock_count_report(last_session)
+            inv_last = {
+                'id': last_session.id,
+                'mode': last_session.get_mode_display(),
+                'date': str(last_session.finished_at.date()) if last_session.finished_at else '',
+                'expected': rep.get('expected_total', 0),
+                'scanned': rep.get('scanned_total', 0),
+                'missing': rep.get('missing_count', 0),
+                'anomalies': rep.get('anomaly_count', 0),
+            }
+        except Exception:
+            inv_last = None
+    inventory_health = {
+        'blocks_count': ProductBlock.objects.filter(is_active=True).count(),
+        'available_total': available.count(),
+        'last_session': inv_last,
+    }
+
+    # ===== 21. AGED STOCK (valorisé) + PROFIT TOTALS + RECEIVABLES =====
+    def _aged(days):
+        agg = available.filter(created_at__lt=now - timedelta(days=days)).aggregate(
+            n=Count('id'), val=Sum('selling_price'))
+        return {'count': agg['n'] or 0, 'value': _d(agg['val'])}
+    aged_stock = {'over_180d': _aged(180), 'over_365d': _aged(365)}
+
+    prof_agg = items_qs.filter(product__total_cost__gt=0).aggregate(
+        cost=Sum('product__total_cost'), rev=Sum('total_amount'))
+    p_cost = _d(prof_agg['cost'])
+    p_rev = _d(prof_agg['rev'])
+    p_margin = p_rev - p_cost
+    profit_totals = {
+        'total_cost': p_cost, 'total_revenue': p_rev, 'total_margin': p_margin,
+        'margin_pct': round(float(p_margin) * 100 / float(p_cost), 1) if p_cost > 0 else 0,
+    }
+
+    receivables = SaleInvoice.objects.filter(is_deleted=False).exclude(
+        status__in=['draft', 'cancelled', 'returned', 'exchanged']
+    ).aggregate(bal=Sum('balance_due'))['bal'] or Decimal('0')
+    receivables = _d(receivables)
+
+    # ===== 22. ACTION CENTER (décisions prioritaires) =====
+    actions = []
+    if aged_stock['over_365d']['count']:
+        actions.append({'sev': 'high', 'icon': 'fa-hourglass-end',
+            'title': f"{aged_stock['over_365d']['count']} pièces en stock depuis plus de 365 jours",
+            'detail': f"Valeur immobilisée {aged_stock['over_365d']['value']} DH. Remise ou vérifier des sorties non déclarées.",
+            'link': '/products/?min_age=365'})
+    elif aged_stock['over_180d']['count']:
+        actions.append({'sev': 'medium', 'icon': 'fa-hourglass-half',
+            'title': f"{aged_stock['over_180d']['count']} pièces en stock depuis plus de 180 jours",
+            'detail': f"Valeur {aged_stock['over_180d']['value']} DH à surveiller.",
+            'link': '/products/?min_age=180'})
+    if circulation['out_over_30d']:
+        actions.append({'sev': 'medium', 'icon': 'fa-truck',
+            'title': f"{circulation['out_over_30d']} pièces en circulation depuis plus de 30 jours",
+            'detail': "Relancer les vendeuses pour vente ou retour en vitrine.",
+            'link': '/sales/circulation/'})
+    if receivables > 0:
+        actions.append({'sev': 'medium', 'icon': 'fa-hand-holding-dollar',
+            'title': f"Créances clients : {receivables} DH",
+            'detail': "Solde dû sur factures non réglées.", 'link': '/sales/'})
+    if dep_total > 0:
+        actions.append({'sev': 'info', 'icon': 'fa-piggy-bank',
+            'title': f"Dépôts clients détenus : {_d(dep_total)} DH",
+            'detail': f"{dep_accounts} compte(s) — engagement envers les clients.", 'link': '/deposits/'})
+    if inv_last and (inv_last['missing'] or inv_last['anomalies']):
+        actions.append({'sev': 'high' if inv_last['missing'] else 'medium', 'icon': 'fa-clipboard-check',
+            'title': f"Dernier contrôle : {inv_last['missing']} manquant(s), {inv_last['anomalies']} anomalie(s)",
+            'detail': "Vérifier les écarts (démarque/vol ou statut non mis à jour).",
+            'link': f"/products/stock-count/{inv_last['id']}/"})
+    low_margin = [p for p in profitability if 0 < p['margin_pct'] < 15][:5]
+    if low_margin:
+        actions.append({'sev': 'medium', 'icon': 'fa-percent',
+            'title': f"Catégories à faible marge (<15%) : {', '.join(p['category'] for p in low_margin)}",
+            'detail': "Revoir le prix de vente ou le coût d'achat.", 'link': '/sales/insights/'})
+
     return {
         'overview': overview,
         'categories': categories,
@@ -373,6 +518,15 @@ def gather_business_data(period_days=None):
         'repeat_cat_pref': repeat_cat_pref,
         'price_distribution': price_distribution,
         'weekly_trend': weekly_trend,
+        # Operational / decision modules
+        'circulation': circulation,
+        'deposits': deposits_mod,
+        'sellers': sellers,
+        'inventory_health': inventory_health,
+        'aged_stock': aged_stock,
+        'profit_totals': profit_totals,
+        'receivables': receivables,
+        'actions': actions,
     }
 
 
@@ -474,6 +628,28 @@ def build_ai_prompt(data):
     for w in data.get('weekly_trend', []):
         week_lines.append(f"  - Sem {w['week'].strftime('%d/%m')}: {w['count']} factures, {_d(w['revenue'])} DH, panier {_d(w['avg_basket'])} DH")
 
+    # NEW: operational modules (circulation, dépôts, vendeuses, inventaire, décisions)
+    circ = data.get('circulation', {})
+    dep = data.get('deposits', {})
+    invh = data.get('inventory_health', {})
+    aged = data.get('aged_stock', {})
+    pt = data.get('profit_totals', {})
+    seller_lines = [
+        f"  - {s['name']}: {s['revenue']} DH, {s['invoices']} factures, {s['circ_sold']} ventes en circulation"
+        for s in data.get('sellers', [])[:10]
+    ]
+    circ_seller_lines = [f"  - {r['name']}: {r['out']} en circulation" for r in circ.get('by_seller', [])]
+    dep_seller_lines = [f"  - {r['name']}: {r['balance']} DH ({r['accounts']} comptes)" for r in dep.get('by_seller', [])]
+    action_lines = [f"  - [{a['sev']}] {a['title']} — {a['detail']}" for a in data.get('actions', [])]
+    _il = invh.get('last_session')
+    inv_line = (
+        f"Dernier contrôle #{_il['id']} ({_il['mode']}, {_il['date']}): attendus {_il['expected']}, "
+        f"scannés {_il['scanned']}, manquants {_il['missing']}, anomalies {_il['anomalies']}"
+        if _il else "Aucun contrôle d'inventaire terminé"
+    )
+    aged180 = aged.get('over_180d', {})
+    aged365 = aged.get('over_365d', {})
+
     prompt = f"""Tu es un expert-conseil en bijouterie or au Maroc avec 20 ans d'expérience dans le secteur.
 Tu connais parfaitement :
 - Le marché marocain de l'or : cours de l'or, impact du prix du gramme sur les marges, différence entre or 18k et 9k
@@ -538,6 +714,33 @@ Total: {sa['total_available']} | 0-30j: {sa['0_30d']} | 31-60j: {sa['31_60d']} |
 === QUALITÉ DONNÉES ===
 {dq['zero_purchase_price']}/{dq['total_sold']} ({dq['zero_price_pct']}%) sans prix d'achat
 
+=== RENTABILITÉ GLOBALE ===
+Coût {pt.get('total_cost')} DH → Vente {pt.get('total_revenue')} DH | Marge {pt.get('total_margin')} DH ({pt.get('margin_pct')}%)
+Créances (impayés): {data.get('receivables')} DH
+
+=== STOCK ÂGÉ (capital immobilisé) ===
+>180j: {aged180.get('count')} pièces / {aged180.get('value')} DH
+>365j: {aged365.get('count')} pièces / {aged365.get('value')} DH
+
+=== CIRCULATION (vente en ligne / vendeuses) ===
+En circulation: {circ.get('out_count')} | Vendues: {circ.get('sold_count')} | Retours: {circ.get('returned_count')} | Conversion: {circ.get('conversion_pct')}%
+Dormantes (sorties >30j): {circ.get('out_over_30d')}
+{chr(10).join(circ_seller_lines) if circ_seller_lines else "  Aucune en circulation"}
+
+=== DÉPÔTS CLIENTS (avances détenues) ===
+Total détenu: {dep.get('total_held')} DH sur {dep.get('account_count')} comptes
+{chr(10).join(dep_seller_lines) if dep_seller_lines else "  Aucun dépôt"}
+
+=== PERFORMANCE VENDEUSES ===
+{chr(10).join(seller_lines) if seller_lines else "  Vendeuse non renseignée sur les factures"}
+
+=== SANTÉ INVENTAIRE (blocs & contrôle) ===
+Blocs actifs: {invh.get('blocks_count')} | Produits disponibles: {invh.get('available_total')}
+{inv_line}
+
+=== DÉCISIONS DÉTECTÉES (à prioriser et développer) ===
+{chr(10).join(action_lines) if action_lines else "  Aucune alerte automatique"}
+
 === CE QUE J'ATTENDS DE TOI ===
 
 Réponds en 5 sections. Pour chaque section, je veux:
@@ -578,6 +781,15 @@ En croisant écoulement + marge + stock + saisonnalité marocaine à venir:
 - Où investir le prochain dirham en tenant compte du cours de l'or actuel?
 - Faut-il privilégier des pièces légères (accessibles, rotation rapide) ou lourdes (marge en DH, trousseau)?
 - Mini plan d'achat chiffré avec budget estimé
+
+## 6. PLAN D'ACTION PRIORISÉ (Décisions cette semaine)
+En te basant sur les DÉCISIONS DÉTECTÉES, la CIRCULATION, les DÉPÔTS, les CRÉANCES, le STOCK ÂGÉ et la SANTÉ INVENTAIRE:
+- Classe 3 à 6 actions concrètes par ORDRE DE PRIORITÉ (impact DH × urgence), chacune avec le chiffre exact et le geste précis.
+- Circulation dormante: quelles vendeuses relancer et pour combien de pièces/valeur?
+- Stock âgé: quelles catégories brader/transformer en priorité (croise avec le taux d'écoulement)?
+- Écarts d'inventaire: si des manquants, estimer le risque de démarque vs erreur de statut.
+- Créances & dépôts: trésorerie à récupérer vs engagements à honorer.
+- Termine par UNE décision n°1 à exécuter aujourd'hui.
 
 RAPPEL: Tu es un EXPERT BIJOUTIER MAROCAIN, pas un consultant retail générique.
 PAS DE CONSEILS GÉNÉRIQUES (type "améliorez votre marketing digital" ou "fidélisez vos clients").
