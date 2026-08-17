@@ -30,6 +30,122 @@ def _d(val, places='0.01'):
     return Decimal(str(val)).quantize(Decimal(places), rounding=ROUND_HALF_UP)
 
 
+def gather_decision_intelligence(period_days=None):
+    """
+    Decision-first intelligence: not metrics, but what to DO.
+    Growth momentum, cash to unlock (corrective), what to buy / stop buying
+    (growth), profit efficiency, and clients to win back.
+    """
+    from sales.models import SaleInvoice, SaleInvoiceItem, ProductCirculation
+    from products.models import Product
+
+    now = timezone.now()
+    today = now.date()
+
+    base = SaleInvoice.objects.filter(is_deleted=False).exclude(
+        status__in=['draft', 'cancelled', 'returned', 'exchanged'])
+
+    def rev_between(d1, d2):
+        agg = base.filter(date__gte=d1, date__lt=d2).aggregate(r=Sum('total_amount'), n=Count('id'))
+        return _d(agg['r']), agg['n'] or 0
+
+    # ---- Growth momentum: last 30 days vs the 30 before ----
+    cur_rev, cur_n = rev_between(today - timedelta(days=30), today + timedelta(days=1))
+    prev_rev, prev_n = rev_between(today - timedelta(days=60), today - timedelta(days=30))
+    growth_pct = (round((float(cur_rev) - float(prev_rev)) * 100 / float(prev_rev), 1)
+                  if float(prev_rev) > 0 else None)
+    growth = {
+        'cur_rev': cur_rev, 'prev_rev': prev_rev, 'cur_n': cur_n, 'prev_n': prev_n,
+        'growth_pct': growth_pct,
+        'cur_basket': _d(cur_rev / cur_n) if cur_n else Decimal('0'),
+    }
+
+    # ---- Sell-through per category -> buy / stop ----
+    available = Product.objects.filter(status='available')
+    sold = Product.objects.filter(status='sold')
+    avail_by_cat = {r['category__name']: r['n'] for r in
+                    available.values('category__name').annotate(n=Count('id'))}
+    sold_by_cat = {r['category__name']: r['n'] for r in
+                   sold.values('category__name').annotate(n=Count('id'))}
+    val_by_cat = {r['category__name']: r['v'] for r in
+                  available.values('category__name').annotate(v=Sum('total_cost'))}
+    reorder, liquidate = [], []
+    for cat in set(list(avail_by_cat) + list(sold_by_cat)):
+        if not cat:
+            continue
+        a = avail_by_cat.get(cat, 0)
+        s = sold_by_cat.get(cat, 0)
+        st = round(s * 100 / (s + a), 1) if (s + a) > 0 else 0
+        if st >= 55 and a <= max(3, int(s * 0.3)):
+            reorder.append({'cat': cat, 'sell_through': st, 'in_stock': a, 'sold': s})
+        elif st <= 25 and a >= 3:
+            liquidate.append({'cat': cat, 'sell_through': st, 'in_stock': a, 'sold': s,
+                              'capital': _d(val_by_cat.get(cat) or 0)})
+    reorder.sort(key=lambda x: -x['sell_through'])
+    liquidate.sort(key=lambda x: -float(x['capital']))
+
+    # ---- Dead stock (capital immobilisé) ----
+    dead = available.filter(created_at__lt=now - timedelta(days=180)).aggregate(
+        n=Count('id'), cap=Sum('total_cost'), val=Sum('selling_price'))
+    dead_stock = {'count': dead['n'] or 0, 'capital': _d(dead['cap']), 'retail': _d(dead['val'])}
+
+    # ---- Cash to unlock (corrective, quantified) ----
+    receivables = base.aggregate(b=Sum('balance_due'))['b'] or Decimal('0')
+    circ_out_val = ProductCirculation.objects.filter(status='out').aggregate(
+        v=Sum('product__selling_price'))['v'] or Decimal('0')
+    cash_to_unlock = {
+        'receivables': _d(receivables),
+        'dead_capital': dead_stock['capital'],
+        'circulation_value': _d(circ_out_val),
+        'total': _d((receivables or 0) + (dead['cap'] or 0) + (circ_out_val or 0)),
+    }
+
+    # ---- Profit efficiency per category (period-scoped) ----
+    inv_scope = base.filter(date__gte=today - timedelta(days=period_days)) if period_days else base
+    items = SaleInvoiceItem.objects.filter(invoice__in=inv_scope, product__total_cost__gt=0)
+    profit_efficiency = []
+    for p in items.values('product__category__name').annotate(
+            items=Count('id'), cost=Sum('product__total_cost'),
+            rev=Sum('total_amount'), w=Sum('product__net_weight')):
+        cost = _d(p['cost'])
+        rev = _d(p['rev'])
+        margin = rev - cost
+        wt = float(p['w'] or 0)
+        profit_efficiency.append({
+            'cat': p['product__category__name'] or '—',
+            'items': p['items'],
+            'margin': margin,
+            'margin_pct': round(float(margin) * 100 / float(cost), 1) if cost > 0 else 0,
+            'margin_per_gram': round(float(margin) / wt, 0) if wt > 0 else 0,
+        })
+    profit_efficiency.sort(key=lambda x: -float(x['margin']))
+
+    # ---- Clients to win back (bought before, silent > 90 days) ----
+    win_back = []
+    for c in (base.filter(client__isnull=False)
+              .values('client__first_name', 'client__last_name', 'client__phone')
+              .annotate(spend=Sum('total_amount'), n=Count('id'), last=Max('date'))):
+        if c['last'] and (today - c['last']).days > 90:
+            win_back.append({
+                'name': f"{c['client__first_name'] or ''} {c['client__last_name'] or ''}".strip() or '—',
+                'phone': c['client__phone'] or '',
+                'spend': _d(c['spend']),
+                'orders': c['n'],
+                'days': (today - c['last']).days,
+            })
+    win_back.sort(key=lambda x: -float(x['spend']))
+
+    return {
+        'growth': growth,
+        'reorder': reorder[:8],
+        'liquidate': liquidate[:8],
+        'dead_stock': dead_stock,
+        'cash_to_unlock': cash_to_unlock,
+        'profit_efficiency': profit_efficiency[:10],
+        'win_back': win_back[:10],
+    }
+
+
 def gather_business_data(period_days=None):
     """
     Gather comprehensive business metrics from sales data.
@@ -650,6 +766,15 @@ def build_ai_prompt(data):
     aged180 = aged.get('over_180d', {})
     aged365 = aged.get('over_365d', {})
 
+    # NEW: decision intelligence (buy/stop, win-back, cash to unlock)
+    di = data.get('decision_intel', {})
+    di_growth = di.get('growth', {})
+    reorder_lines = [f"  - {r['cat']}: écoulement {r['sell_through']}%, il reste {r['in_stock']} en stock ({r['sold']} vendus)" for r in di.get('reorder', [])]
+    liquidate_lines = [f"  - {r['cat']}: écoulement {r['sell_through']}%, {r['in_stock']} en stock, {r['capital']} DH de capital immobilisé" for r in di.get('liquidate', [])]
+    prof_eff_lines = [f"  - {p['cat']}: marge {p['margin']} DH ({p['margin_pct']}%), {p['margin_per_gram']} DH/g" for p in di.get('profit_efficiency', [])]
+    winback_lines = [f"  - {w['name']} ({w['phone']}): {w['spend']} DH dépensés, {w['orders']} achats, silencieux depuis {w['days']}j" for w in di.get('win_back', [])]
+    di_cash = di.get('cash_to_unlock', {})
+
     prompt = f"""Tu es un expert-conseil en bijouterie or au Maroc avec 20 ans d'expérience dans le secteur.
 Tu connais parfaitement :
 - Le marché marocain de l'or : cours de l'or, impact du prix du gramme sur les marges, différence entre or 18k et 9k
@@ -740,6 +865,24 @@ Blocs actifs: {invh.get('blocks_count')} | Produits disponibles: {invh.get('avai
 
 === DÉCISIONS DÉTECTÉES (à prioriser et développer) ===
 {chr(10).join(action_lines) if action_lines else "  Aucune alerte automatique"}
+
+=== MOMENTUM (30 derniers jours vs 30 précédents) ===
+CA: {di_growth.get('cur_rev')} DH ({di_growth.get('cur_n')} factures) vs {di_growth.get('prev_rev')} DH → {di_growth.get('growth_pct')}%
+
+=== À RÉAPPROVISIONNER (fort écoulement, stock bas) ===
+{chr(10).join(reorder_lines) if reorder_lines else "  Rien d'urgent"}
+
+=== À LIQUIDER / ARRÊTER D'ACHETER (faible écoulement, capital bloqué) ===
+{chr(10).join(liquidate_lines) if liquidate_lines else "  Aucune catégorie évidente"}
+
+=== RENTABILITÉ RÉELLE (marge par catégorie et par gramme) ===
+{chr(10).join(prof_eff_lines) if prof_eff_lines else "  Coûts d'achat insuffisants"}
+
+=== TRÉSORERIE À DÉBLOQUER ===
+Total mobilisable {di_cash.get('total')} DH = créances {di_cash.get('receivables')} + stock mort {di_cash.get('dead_capital')} + circulation {di_cash.get('circulation_value')}
+
+=== CLIENTS À RÉACTIVER (bons clients silencieux >90j) ===
+{chr(10).join(winback_lines) if winback_lines else "  Aucun"}
 
 === CE QUE J'ATTENDS DE TOI ===
 

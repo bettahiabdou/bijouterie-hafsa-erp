@@ -95,26 +95,118 @@
         <a href="?period=all" class="period-pill {% if period == 'all' %}active{% endif %}">Tout</a>
     </div>
 
-    <!-- ===== ACTION CENTER (décisions prioritaires) ===== -->
-    {% if data.actions %}
-    <div style="margin-bottom:22px;">
-        <h2 style="font-size:18px;margin:0 0 10px;"><i class="fas fa-bolt" style="color:#d97706;"></i> Décisions prioritaires</h2>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
-            {% for a in data.actions %}
-            <div style="background:white;border-radius:12px;border:1px solid var(--neutral-200);border-left:4px solid {% if a.sev == 'high' %}#dc2626{% elif a.sev == 'medium' %}#d97706{% else %}#2563eb{% endif %};padding:14px;">
-                <div style="display:flex;align-items:flex-start;gap:10px;">
-                    <i class="fas {{ a.icon }}" style="font-size:18px;color:{% if a.sev == 'high' %}#dc2626{% elif a.sev == 'medium' %}#d97706{% else %}#2563eb{% endif %};margin-top:2px;"></i>
-                    <div style="flex:1;">
-                        <div style="font-weight:700;font-size:14px;line-height:1.3;">{{ a.title }}</div>
-                        <div style="font-size:12px;color:var(--neutral-500);margin-top:4px;">{{ a.detail }}</div>
-                        <a href="{{ a.link }}" style="display:inline-block;margin-top:8px;font-size:12px;font-weight:600;color:var(--primary-600);text-decoration:none;">Voir &rarr;</a>
-                    </div>
-                </div>
+    <!-- ===== 1. GROWTH PULSE ===== -->
+    {% with g=intel.growth %}
+    <div style="background:linear-gradient(135deg,#1e1b4b,#312e81);color:white;border-radius:16px;padding:20px 22px;margin-bottom:18px;display:flex;flex-wrap:wrap;align-items:center;gap:24px;">
+        <div>
+            <div style="font-size:12px;opacity:.75;text-transform:uppercase;letter-spacing:.5px;">Chiffre d'affaires — 30 derniers jours</div>
+            <div style="font-size:34px;font-weight:800;line-height:1.1;">{{ g.cur_rev|floatformat:0 }} <span style="font-size:18px;opacity:.8;">DH</span></div>
+            <div style="font-size:12px;opacity:.75;">{{ g.cur_n }} factures · panier {{ g.cur_basket|floatformat:0 }} DH</div>
+        </div>
+        <div>
+            {% if g.growth_pct is not None %}
+            <div style="font-size:26px;font-weight:800;color:{% if g.growth_pct >= 0 %}#4ade80{% else %}#f87171{% endif %};">
+                {% if g.growth_pct >= 0 %}▲{% else %}▼{% endif %} {{ g.growth_pct }}%
             </div>
-            {% endfor %}
+            <div style="font-size:12px;opacity:.75;">vs 30 jours précédents ({{ g.prev_rev|floatformat:0 }} DH)</div>
+            {% else %}
+            <div style="font-size:14px;opacity:.8;">Pas assez d'historique pour comparer</div>
+            {% endif %}
         </div>
     </div>
-    {% endif %}
+    {% endwith %}
+
+    <!-- ===== 2. AI ACTION PLAN (central) ===== -->
+    <div class="card" style="margin-bottom:20px;border:2px solid var(--primary-200);">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3 style="margin:0;"><i class="fas fa-robot mr-2" style="color:var(--primary-600);"></i> Plan d'action IA — que faire cette semaine</h3>
+            <span class="badge badge-success" style="font-size: var(--text-xs); display: none;" id="ai-badge">Généré</span>
+        </div>
+        <div class="card-body" id="ai-container">
+            <div class="ai-loading" id="ai-loading">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-500);"></i>
+                <p style="margin-top: var(--space-3);">L'IA analyse ventes, stock, circulation, dépôts et inventaire…</p>
+                <p style="font-size: var(--text-xs); color: var(--neutral-400);">30 à 60 secondes.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 3. CASH À DÉBLOQUER (corrective) ===== -->
+    {% with c=intel.cash_to_unlock %}
+    <div style="margin-bottom:20px;">
+        <h2 style="font-size:17px;margin:0 0 4px;"><i class="fas fa-sack-dollar" style="color:#059669;"></i> Trésorerie à débloquer</h2>
+        <p style="font-size:12px;color:var(--neutral-500);margin:0 0 10px;">Capital récupérable en corrigeant impayés, stock mort et circulation.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
+            <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:16px;">
+                <div style="font-size:26px;font-weight:800;color:#047857;">{{ c.total|floatformat:0 }} DH</div>
+                <div style="font-size:12px;color:#065f46;">Total mobilisable</div>
+            </div>
+            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
+                <div style="font-size:20px;font-weight:700;">{{ c.receivables|floatformat:0 }} DH</div>
+                <div style="font-size:12px;color:var(--neutral-500);">Créances à encaisser</div>
+                <a href="/sales/" style="font-size:11px;font-weight:600;color:var(--primary-600);text-decoration:none;">Factures &rarr;</a>
+            </div>
+            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
+                <div style="font-size:20px;font-weight:700;">{{ c.dead_capital|floatformat:0 }} DH</div>
+                <div style="font-size:12px;color:var(--neutral-500);">Capital en stock mort ({{ intel.dead_stock.count }} pcs &gt;180j)</div>
+                <a href="/products/?min_age=180" style="font-size:11px;font-weight:600;color:var(--primary-600);text-decoration:none;">Voir &rarr;</a>
+            </div>
+            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
+                <div style="font-size:20px;font-weight:700;">{{ c.circulation_value|floatformat:0 }} DH</div>
+                <div style="font-size:12px;color:var(--neutral-500);">En circulation (non vendu)</div>
+                <a href="/sales/circulation/" style="font-size:11px;font-weight:600;color:var(--primary-600);text-decoration:none;">Voir &rarr;</a>
+            </div>
+        </div>
+    </div>
+    {% endwith %}
+
+    <!-- ===== 4. ACHETER / ARRÊTER (growth) ===== -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:20px;">
+        <div style="background:white;border:1px solid var(--neutral-200);border-top:4px solid #16a34a;border-radius:12px;padding:16px;">
+            <h3 style="font-size:15px;margin:0 0 4px;"><i class="fas fa-arrow-trend-up" style="color:#16a34a;"></i> À réapprovisionner</h3>
+            <p style="font-size:12px;color:var(--neutral-500);margin:0 0 8px;">Fort écoulement, stock qui s'épuise. Commander en priorité.</p>
+            {% if intel.reorder %}
+            <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                <tr style="color:var(--neutral-400);font-size:11px;"><td>Catégorie</td><td style="text-align:right;">Écoulé</td><td style="text-align:right;">En stock</td></tr>
+                {% for r in intel.reorder %}<tr><td style="padding:4px 0;font-weight:600;">{{ r.cat }}</td><td style="text-align:right;color:#16a34a;">{{ r.sell_through }}%</td><td style="text-align:right;">{{ r.in_stock }}</td></tr>{% endfor %}
+            </table>
+            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Rien d'urgent à recommander.</div>{% endif %}
+        </div>
+        <div style="background:white;border:1px solid var(--neutral-200);border-top:4px solid #dc2626;border-radius:12px;padding:16px;">
+            <h3 style="font-size:15px;margin:0 0 4px;"><i class="fas fa-arrow-trend-down" style="color:#dc2626;"></i> À liquider / arrêter d'acheter</h3>
+            <p style="font-size:12px;color:var(--neutral-500);margin:0 0 8px;">Faible écoulement, capital immobilisé. Brader/transformer.</p>
+            {% if intel.liquidate %}
+            <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                <tr style="color:var(--neutral-400);font-size:11px;"><td>Catégorie</td><td style="text-align:right;">Écoulé</td><td style="text-align:right;">Capital</td></tr>
+                {% for r in intel.liquidate %}<tr><td style="padding:4px 0;font-weight:600;">{{ r.cat }}</td><td style="text-align:right;color:#dc2626;">{{ r.sell_through }}%</td><td style="text-align:right;">{{ r.capital|floatformat:0 }} DH</td></tr>{% endfor %}
+            </table>
+            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Aucune catégorie clairement à liquider.</div>{% endif %}
+        </div>
+    </div>
+
+    <!-- ===== 5. RENTABILITÉ RÉELLE + CLIENTS À RÉACTIVER ===== -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:20px;">
+        <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
+            <h3 style="font-size:15px;margin:0 0 4px;"><i class="fas fa-coins" style="color:#d97706;"></i> Où vous gagnez vraiment</h3>
+            <p style="font-size:12px;color:var(--neutral-500);margin:0 0 8px;">Marge par catégorie et par gramme (valeur du travail, pas que l'or).</p>
+            {% if intel.profit_efficiency %}
+            <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                <tr style="color:var(--neutral-400);font-size:11px;"><td>Catégorie</td><td style="text-align:right;">Marge</td><td style="text-align:right;">%</td><td style="text-align:right;">/g</td></tr>
+                {% for p in intel.profit_efficiency %}<tr><td style="padding:4px 0;font-weight:600;">{{ p.cat }}</td><td style="text-align:right;">{{ p.margin|floatformat:0 }}</td><td style="text-align:right;color:{% if p.margin_pct >= 20 %}#16a34a{% else %}#d97706{% endif %};">{{ p.margin_pct }}%</td><td style="text-align:right;">{{ p.margin_per_gram|floatformat:0 }}</td></tr>{% endfor %}
+            </table>
+            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Renseignez les coûts d'achat pour l'analyse de marge.</div>{% endif %}
+        </div>
+        <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
+            <h3 style="font-size:15px;margin:0 0 4px;"><i class="fas fa-user-clock" style="color:#8b5cf6;"></i> Clients à réactiver</h3>
+            <p style="font-size:12px;color:var(--neutral-500);margin:0 0 8px;">Bons clients silencieux depuis &gt;90 jours. Un message peut les ramener.</p>
+            {% if intel.win_back %}
+            <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                <tr style="color:var(--neutral-400);font-size:11px;"><td>Client</td><td style="text-align:right;">Dépensé</td><td style="text-align:right;">Depuis</td></tr>
+                {% for w in intel.win_back %}<tr><td style="padding:4px 0;"><span style="font-weight:600;">{{ w.name }}</span>{% if w.phone %}<br><span style="font-size:11px;color:var(--neutral-400);">{{ w.phone }}</span>{% endif %}</td><td style="text-align:right;">{{ w.spend|floatformat:0 }} DH</td><td style="text-align:right;">{{ w.days }}j</td></tr>{% endfor %}
+            </table>
+            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Aucun client identifié inactif.</div>{% endif %}
+        </div>
+    </div>
 
     <!-- ===== OPERATIONAL KPIs ===== -->
     <div class="insights-grid-3" style="grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); margin-bottom:20px;">
@@ -468,20 +560,7 @@
     </div>
     {% endif %}
 
-    <!-- ===== AI RECOMMENDATIONS ===== -->
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-robot mr-2"></i> Recommandations IA</h3>
-            <span class="badge badge-success" style="font-size: var(--text-xs); display: none;" id="ai-badge">Genere</span>
-        </div>
-        <div class="card-body" id="ai-container">
-            <div class="ai-loading" id="ai-loading">
-                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-500);"></i>
-                <p style="margin-top: var(--space-3);">Analyse en cours... L'IA examine vos donnees de vente.</p>
-                <p style="font-size: var(--text-xs); color: var(--neutral-400);">Cela peut prendre 30 a 60 secondes.</p>
-            </div>
-        </div>
-    </div>
+    <!-- AI plan is shown at the top (#ai-container). Detailed analytics above. -->
 
 </div>
 

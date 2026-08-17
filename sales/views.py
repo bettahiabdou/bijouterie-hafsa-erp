@@ -27,13 +27,14 @@ from settings_app.models import PaymentMethod, BankAccount
 def sales_insights(request):
     """AI-powered business insights page with computed metrics. AI loads async via AJAX."""
     import json
-    from ai_services.business_insights import gather_business_data, DecimalEncoder
+    from ai_services.business_insights import gather_business_data, gather_decision_intelligence, DecimalEncoder
 
     period = request.GET.get('period', 'all')
     period_map = {'7d': 7, '30d': 30, '90d': 90, 'all': None}
     period_days = period_map.get(period)
 
     data = gather_business_data(period_days=period_days)
+    intel = gather_decision_intelligence(period_days=period_days)
 
     # Prepare chart data as JSON
     chart_categories = json.dumps(
@@ -58,6 +59,7 @@ def sales_insights(request):
 
     context = {
         'data': data,
+        'intel': intel,
         'period': period,
         'chart_categories': chart_categories,
         'chart_cat_revenue': chart_cat_revenue,
@@ -76,7 +78,7 @@ def sales_insights_ai(request):
     import json
     import logging
     from django.core.cache import cache
-    from ai_services.business_insights import gather_business_data, generate_ai_insights
+    from ai_services.business_insights import gather_business_data, gather_decision_intelligence, generate_ai_insights
 
     logger = logging.getLogger(__name__)
 
@@ -91,6 +93,7 @@ def sales_insights_ai(request):
     if not ai_insights or refresh:
         try:
             data = gather_business_data(period_days=period_days)
+            data['decision_intel'] = gather_decision_intelligence(period_days=period_days)
             ai_insights = generate_ai_insights(data)
             if ai_insights:
                 cache.set(cache_key, ai_insights, 3600 * 6)
