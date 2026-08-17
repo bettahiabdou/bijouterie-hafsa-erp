@@ -95,28 +95,52 @@
         <a href="?period=all" class="period-pill {% if period == 'all' %}active{% endif %}">Tout</a>
     </div>
 
-    <!-- ===== 1. GROWTH PULSE ===== -->
-    {% with g=intel.growth %}
-    <div style="background:linear-gradient(135deg,#1e1b4b,#312e81);color:white;border-radius:16px;padding:20px 22px;margin-bottom:18px;display:flex;flex-wrap:wrap;align-items:center;gap:24px;">
-        <div>
-            <div style="font-size:12px;opacity:.75;text-transform:uppercase;letter-spacing:.5px;">Chiffre d'affaires — 30 derniers jours</div>
-            <div style="font-size:34px;font-weight:800;line-height:1.1;">{{ g.cur_rev|floatformat:0 }} <span style="font-size:18px;opacity:.8;">DH</span></div>
-            <div style="font-size:12px;opacity:.75;">{{ g.cur_n }} factures · panier {{ g.cur_basket|floatformat:0 }} DH</div>
+    <!-- ===== SANTÉ + OBJECTIFS ===== -->
+    <div style="display:grid;grid-template-columns:minmax(210px,250px) 1fr;gap:16px;margin-bottom:18px;">
+        <div style="background:linear-gradient(135deg,#0f172a,#1e293b);color:white;border-radius:16px;padding:16px;text-align:center;display:flex;flex-direction:column;justify-content:center;">
+            <svg viewBox="0 0 120 120" style="width:140px;height:140px;margin:0 auto;">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="12"/>
+                <circle cx="60" cy="60" r="52" fill="none" stroke="{% if dash.health >= 70 %}#4ade80{% elif dash.health >= 45 %}#fbbf24{% else %}#f87171{% endif %}" stroke-width="12" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="{{ dash.health_offset }}" transform="rotate(-90 60 60)"/>
+                <text x="60" y="60" text-anchor="middle" font-size="30" font-weight="800" fill="white">{{ dash.health }}</text>
+                <text x="60" y="78" text-anchor="middle" font-size="10" fill="rgba(255,255,255,.6)">/ 100</text>
+            </svg>
+            <div style="font-size:13px;font-weight:600;margin-top:4px;">Score de santé</div>
+            <div style="font-size:11px;opacity:.7;margin-top:2px;">À corriger : {{ dash.health_weakest|join:", " }}</div>
         </div>
-        <div>
-            {% if g.growth_pct is not None %}
-            <div style="font-size:26px;font-weight:800;color:{% if g.growth_pct >= 0 %}#4ade80{% else %}#f87171{% endif %};">
-                {% if g.growth_pct >= 0 %}▲{% else %}▼{% endif %} {{ g.growth_pct }}%
+        <div style="background:white;border:1px solid var(--neutral-200);border-radius:16px;padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 style="margin:0;font-size:15px;"><i class="fas fa-bullseye" style="color:var(--primary-600);"></i> Objectifs du mois {% if not dash.targets.is_set %}<span style="font-size:11px;color:var(--neutral-400);font-weight:400;">(auto : mois précédent)</span>{% endif %}</h3>
+                <button type="button" onclick="var f=document.getElementById('targetForm');f.style.display=f.style.display==='block'?'none':'block';" style="font-size:12px;background:none;border:1px solid var(--neutral-300);border-radius:8px;padding:4px 10px;cursor:pointer;">Éditer</button>
             </div>
-            <div style="font-size:12px;opacity:.75;">vs 30 jours précédents ({{ g.prev_rev|floatformat:0 }} DH)</div>
-            {% else %}
-            <div style="font-size:14px;opacity:.8;">Pas assez d'historique pour comparer</div>
+            {% with p=dash.progress t=dash.targets %}
+            <div style="margin-bottom:12px;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>CA (30 jours)</span><span><b>{{ p.cur.revenue|floatformat:0 }}</b> / {{ t.revenue|floatformat:0 }} DH · {{ p.revenue }}%</span></div>
+                <div style="height:10px;background:var(--neutral-100);border-radius:6px;overflow:hidden;"><div style="height:100%;width:{{ p.revenue }}%;background:{% if p.revenue >= 100 %}#16a34a{% elif p.revenue >= 70 %}#f59e0b{% else %}#dc2626{% endif %};"></div></div>
+            </div>
+            <div style="margin-bottom:12px;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>Marge</span><span><b>{{ p.cur.margin }}%</b> / {{ t.margin }}% · {{ p.margin }}%</span></div>
+                <div style="height:10px;background:var(--neutral-100);border-radius:6px;overflow:hidden;"><div style="height:100%;width:{{ p.margin }}%;background:{% if p.margin >= 100 %}#16a34a{% elif p.margin >= 70 %}#f59e0b{% else %}#dc2626{% endif %};"></div></div>
+            </div>
+            {% if t.new_clients %}
+            <div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>Nouveaux clients (30j)</span><span><b>{{ p.cur.new_clients }}</b> / {{ t.new_clients }} · {{ p.new_clients }}%</span></div>
+                <div style="height:10px;background:var(--neutral-100);border-radius:6px;overflow:hidden;"><div style="height:100%;width:{{ p.new_clients }}%;background:{% if p.new_clients >= 100 %}#16a34a{% elif p.new_clients >= 70 %}#f59e0b{% else %}#dc2626{% endif %};"></div></div>
+            </div>
             {% endif %}
+            {% endwith %}
+            <form method="post" id="targetForm" style="display:none;margin-top:12px;border-top:1px solid var(--neutral-100);padding-top:12px;">
+                {% csrf_token %}<input type="hidden" name="action" value="save_targets">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <input name="revenue_target" type="number" step="1" placeholder="CA objectif (DH)" value="{{ dash.targets.revenue|floatformat:0 }}" style="flex:1;min-width:120px;padding:8px;border:1px solid var(--neutral-300);border-radius:8px;">
+                    <input name="margin_target" type="number" step="0.1" placeholder="Marge %" value="{{ dash.targets.margin }}" style="width:100px;padding:8px;border:1px solid var(--neutral-300);border-radius:8px;">
+                    <input name="new_clients_target" type="number" placeholder="Nvx clients" value="{{ dash.targets.new_clients }}" style="width:110px;padding:8px;border:1px solid var(--neutral-300);border-radius:8px;">
+                    <button class="btn btn-primary btn-sm" type="submit">Enregistrer</button>
+                </div>
+            </form>
         </div>
     </div>
-    {% endwith %}
 
-    <!-- ===== 2. AI ACTION PLAN (central) ===== -->
+    <!-- ===== AI ACTION PLAN (central) ===== -->
     <div class="card" style="margin-bottom:20px;border:2px solid var(--primary-200);">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
             <h3 style="margin:0;"><i class="fas fa-robot mr-2" style="color:var(--primary-600);"></i> Plan d'action IA — que faire cette semaine</h3>
@@ -131,116 +155,152 @@
         </div>
     </div>
 
-    <!-- ===== 3. CASH À DÉBLOQUER (corrective) ===== -->
-    {% with c=intel.cash_to_unlock %}
-    <div style="margin-bottom:20px;">
-        <h2 style="font-size:17px;margin:0 0 4px;"><i class="fas fa-sack-dollar" style="color:#059669;"></i> Trésorerie à débloquer</h2>
-        <p style="font-size:12px;color:var(--neutral-500);margin:0 0 10px;">Capital récupérable en corrigeant impayés, stock mort et circulation.</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
-            <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:16px;">
-                <div style="font-size:26px;font-weight:800;color:#047857;">{{ c.total|floatformat:0 }} DH</div>
-                <div style="font-size:12px;color:#065f46;">Total mobilisable</div>
+    <!-- ===== FILE DE DÉCISIONS ===== -->
+    {% if dash.decisions %}
+    <div style="margin-bottom:22px;">
+        <h2 style="font-size:17px;margin:0 0 10px;"><i class="fas fa-list-check" style="color:var(--primary-600);"></i> File de décisions à exécuter</h2>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            {% for d in dash.decisions %}
+            <div style="display:flex;align-items:center;gap:12px;background:white;border:1px solid var(--neutral-200);border-left:4px solid {% if d.sev == 'fix' %}#dc2626{% else %}#16a34a{% endif %};border-radius:12px;padding:12px 14px;">
+                <i class="{% if d.wa %}fab{% else %}fas{% endif %} {{ d.icon }}" style="font-size:18px;color:{% if d.wa %}#25d366{% elif d.sev == 'fix' %}#dc2626{% else %}#16a34a{% endif %};width:22px;text-align:center;"></i>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:14px;">{{ d.title }}</div>
+                    <div style="font-size:12px;color:var(--neutral-500);">{{ d.detail }}</div>
+                </div>
+                {% if d.url %}<a href="{{ d.url }}" {% if d.wa %}target="_blank"{% endif %} class="btn btn-sm {% if d.sev == 'fix' %}btn-secondary{% else %}btn-primary{% endif %}" style="white-space:nowrap;">{{ d.cta }}</a>{% endif %}
             </div>
-            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
-                <div style="font-size:20px;font-weight:700;">{{ c.receivables|floatformat:0 }} DH</div>
-                <div style="font-size:12px;color:var(--neutral-500);">Créances à encaisser</div>
-                <a href="/sales/" style="font-size:11px;font-weight:600;color:var(--primary-600);text-decoration:none;">Factures &rarr;</a>
-            </div>
-            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
-                <div style="font-size:20px;font-weight:700;">{{ c.dead_capital|floatformat:0 }} DH</div>
-                <div style="font-size:12px;color:var(--neutral-500);">Capital en stock mort ({{ intel.dead_stock.count }} pcs &gt;180j)</div>
-                <a href="/products/?min_age=180" style="font-size:11px;font-weight:600;color:var(--primary-600);text-decoration:none;">Voir &rarr;</a>
-            </div>
-            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
-                <div style="font-size:20px;font-weight:700;">{{ c.circulation_value|floatformat:0 }} DH</div>
-                <div style="font-size:12px;color:var(--neutral-500);">En circulation (non vendu)</div>
-                <a href="/sales/circulation/" style="font-size:11px;font-weight:600;color:var(--primary-600);text-decoration:none;">Voir &rarr;</a>
-            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===== POSITION FINANCIÈRE ===== -->
+    {% with m=dash.money %}
+    <div style="margin-bottom:22px;">
+        <h2 style="font-size:17px;margin:0 0 4px;"><i class="fas fa-scale-balanced" style="color:#059669;"></i> Position financière</h2>
+        <p style="font-size:12px;color:var(--neutral-500);margin:0 0 10px;">Où est votre argent et combien vous pouvez débloquer.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
+            <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:14px;"><div style="font-size:22px;font-weight:800;color:#047857;">{{ m.unlockable|floatformat:0 }} DH</div><div style="font-size:12px;color:#065f46;">Total à débloquer</div></div>
+            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:14px;"><div style="font-size:18px;font-weight:700;">{{ m.stock_capital|floatformat:0 }} DH</div><div style="font-size:12px;color:var(--neutral-500);">Capital en stock</div></div>
+            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:14px;"><div style="font-size:18px;font-weight:700;">{{ m.receivables|floatformat:0 }} DH</div><div style="font-size:12px;color:var(--neutral-500);">Créances (à encaisser)</div></div>
+            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:14px;"><div style="font-size:18px;font-weight:700;">{{ m.dead_capital|floatformat:0 }} DH</div><div style="font-size:12px;color:var(--neutral-500);">Capital en stock mort</div></div>
+            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:14px;"><div style="font-size:18px;font-weight:700;">{{ m.circulation_value|floatformat:0 }} DH</div><div style="font-size:12px;color:var(--neutral-500);">En circulation</div></div>
+            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:14px;"><div style="font-size:18px;font-weight:700;">{{ m.deposits_owed|floatformat:0 }} DH</div><div style="font-size:12px;color:var(--neutral-500);">Dépôts dus aux clients</div></div>
         </div>
     </div>
     {% endwith %}
 
-    <!-- ===== 4. ACHETER / ARRÊTER (growth) ===== -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:20px;">
+    <!-- ===== ACHETER / ARRÊTER ===== -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:22px;">
         <div style="background:white;border:1px solid var(--neutral-200);border-top:4px solid #16a34a;border-radius:12px;padding:16px;">
             <h3 style="font-size:15px;margin:0 0 4px;"><i class="fas fa-arrow-trend-up" style="color:#16a34a;"></i> À réapprovisionner</h3>
-            <p style="font-size:12px;color:var(--neutral-500);margin:0 0 8px;">Fort écoulement, stock qui s'épuise. Commander en priorité.</p>
+            <p style="font-size:12px;color:var(--neutral-500);margin:0 0 8px;">Fort écoulement, stock qui s'épuise.</p>
             {% if intel.reorder %}
             <table style="width:100%;font-size:13px;border-collapse:collapse;">
                 <tr style="color:var(--neutral-400);font-size:11px;"><td>Catégorie</td><td style="text-align:right;">Écoulé</td><td style="text-align:right;">En stock</td></tr>
                 {% for r in intel.reorder %}<tr><td style="padding:4px 0;font-weight:600;">{{ r.cat }}</td><td style="text-align:right;color:#16a34a;">{{ r.sell_through }}%</td><td style="text-align:right;">{{ r.in_stock }}</td></tr>{% endfor %}
             </table>
-            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Rien d'urgent à recommander.</div>{% endif %}
+            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Rien d'urgent.</div>{% endif %}
         </div>
         <div style="background:white;border:1px solid var(--neutral-200);border-top:4px solid #dc2626;border-radius:12px;padding:16px;">
             <h3 style="font-size:15px;margin:0 0 4px;"><i class="fas fa-arrow-trend-down" style="color:#dc2626;"></i> À liquider / arrêter d'acheter</h3>
-            <p style="font-size:12px;color:var(--neutral-500);margin:0 0 8px;">Faible écoulement, capital immobilisé. Brader/transformer.</p>
+            <p style="font-size:12px;color:var(--neutral-500);margin:0 0 8px;">Faible écoulement, capital immobilisé.</p>
             {% if intel.liquidate %}
             <table style="width:100%;font-size:13px;border-collapse:collapse;">
                 <tr style="color:var(--neutral-400);font-size:11px;"><td>Catégorie</td><td style="text-align:right;">Écoulé</td><td style="text-align:right;">Capital</td></tr>
                 {% for r in intel.liquidate %}<tr><td style="padding:4px 0;font-weight:600;">{{ r.cat }}</td><td style="text-align:right;color:#dc2626;">{{ r.sell_through }}%</td><td style="text-align:right;">{{ r.capital|floatformat:0 }} DH</td></tr>{% endfor %}
             </table>
-            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Aucune catégorie clairement à liquider.</div>{% endif %}
+            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Aucune catégorie évidente.</div>{% endif %}
         </div>
     </div>
 
-    <!-- ===== 5. RENTABILITÉ RÉELLE + CLIENTS À RÉACTIVER ===== -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:20px;">
-        <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
-            <h3 style="font-size:15px;margin:0 0 4px;"><i class="fas fa-coins" style="color:#d97706;"></i> Où vous gagnez vraiment</h3>
-            <p style="font-size:12px;color:var(--neutral-500);margin:0 0 8px;">Marge par catégorie et par gramme (valeur du travail, pas que l'or).</p>
-            {% if intel.profit_efficiency %}
+    <!-- ===== PIÈCES À ÉCOULER (SKU + photos) ===== -->
+    {% if dash.dead_skus %}
+    <div style="margin-bottom:22px;">
+        <h2 style="font-size:17px;margin:0 0 4px;"><i class="fas fa-box-open" style="color:#d97706;"></i> Pièces à écouler en priorité</h2>
+        <p style="font-size:12px;color:var(--neutral-500);margin:0 0 10px;">En stock depuis plus de 180 jours — capital immobilisé, à brader ou transformer.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">
+            {% for p in dash.dead_skus %}
+            <a href="/products/{{ p.reference }}/" style="text-decoration:none;color:inherit;background:white;border:1px solid var(--neutral-200);border-radius:12px;overflow:hidden;display:block;">
+                <div style="aspect-ratio:1;background:#f5f0e6;position:relative;display:flex;align-items:center;justify-content:center;">
+                    {% if p.image %}<img src="{{ p.image }}" style="width:100%;height:100%;object-fit:cover;" loading="lazy">{% else %}<i class="fas fa-gem" style="font-size:28px;color:#d4a528;opacity:.4;"></i>{% endif %}
+                    <span style="position:absolute;top:6px;right:6px;background:#dc2626;color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;">{{ p.days }}j</span>
+                </div>
+                <div style="padding:8px 10px;">
+                    <div style="font-family:monospace;font-size:11px;color:var(--neutral-400);">{{ p.reference }}</div>
+                    <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ p.category }}</div>
+                    <div style="font-size:13px;font-weight:700;color:var(--gold-dark,#8b6914);">{{ p.price|floatformat:0 }} DH</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===== MODÈLES QUI PARTENT (à recommander) ===== -->
+    {% if dash.restock_skus %}
+    <div style="margin-bottom:22px;">
+        <h2 style="font-size:17px;margin:0 0 4px;"><i class="fas fa-fire" style="color:#16a34a;"></i> Modèles qui partent — à recommander</h2>
+        <p style="font-size:12px;color:var(--neutral-500);margin:0 0 10px;">Récemment vendus : utilisez-les comme référence pour votre prochaine commande.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">
+            {% for p in dash.restock_skus %}
+            <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;overflow:hidden;">
+                <div style="aspect-ratio:1;background:#f5f0e6;"><img src="{{ p.image }}" style="width:100%;height:100%;object-fit:cover;" loading="lazy"></div>
+                <div style="padding:8px 10px;">
+                    <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ p.category }}</div>
+                    <div style="font-size:13px;font-weight:700;color:var(--gold-dark,#8b6914);">{{ p.price|floatformat:0 }} DH</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===== CLIENTS À RÉACTIVER (WhatsApp) ===== -->
+    {% if dash.win_back %}
+    <div style="margin-bottom:22px;">
+        <h2 style="font-size:17px;margin:0 0 4px;"><i class="fas fa-user-clock" style="color:#8b5cf6;"></i> Clients à réactiver</h2>
+        <p style="font-size:12px;color:var(--neutral-500);margin:0 0 10px;">Bons clients silencieux depuis plus de 90 jours. Un message WhatsApp peut les ramener.</p>
+        <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;overflow:hidden;">
             <table style="width:100%;font-size:13px;border-collapse:collapse;">
-                <tr style="color:var(--neutral-400);font-size:11px;"><td>Catégorie</td><td style="text-align:right;">Marge</td><td style="text-align:right;">%</td><td style="text-align:right;">/g</td></tr>
-                {% for p in intel.profit_efficiency %}<tr><td style="padding:4px 0;font-weight:600;">{{ p.cat }}</td><td style="text-align:right;">{{ p.margin|floatformat:0 }}</td><td style="text-align:right;color:{% if p.margin_pct >= 20 %}#16a34a{% else %}#d97706{% endif %};">{{ p.margin_pct }}%</td><td style="text-align:right;">{{ p.margin_per_gram|floatformat:0 }}</td></tr>{% endfor %}
+                <tr style="color:var(--neutral-400);font-size:11px;text-align:left;"><th style="padding:8px 12px;">Client</th><th style="text-align:right;">Dépensé</th><th style="text-align:right;">Silence</th><th></th></tr>
+                {% for w in dash.win_back %}
+                <tr style="border-top:1px solid var(--neutral-100);">
+                    <td style="padding:8px 12px;"><span style="font-weight:600;">{{ w.name }}</span> <span style="font-size:11px;color:var(--neutral-400);">{{ w.phone }}</span></td>
+                    <td style="text-align:right;font-weight:600;">{{ w.spend|floatformat:0 }} DH</td>
+                    <td style="text-align:right;color:var(--neutral-500);">{{ w.days }}j</td>
+                    <td style="text-align:right;padding:6px 12px;">{% if w.wa_url %}<a href="{{ w.wa_url }}" target="_blank" style="background:#25d366;color:white;font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;text-decoration:none;white-space:nowrap;"><i class="fab fa-whatsapp"></i> Relancer</a>{% endif %}</td>
+                </tr>
+                {% endfor %}
             </table>
-            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Renseignez les coûts d'achat pour l'analyse de marge.</div>{% endif %}
         </div>
+    </div>
+    {% endif %}
+
+    <!-- ===== TENDANCE & SAISONNALITÉ ===== -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:22px;">
         <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">
-            <h3 style="font-size:15px;margin:0 0 4px;"><i class="fas fa-user-clock" style="color:#8b5cf6;"></i> Clients à réactiver</h3>
-            <p style="font-size:12px;color:var(--neutral-500);margin:0 0 8px;">Bons clients silencieux depuis &gt;90 jours. Un message peut les ramener.</p>
-            {% if intel.win_back %}
-            <table style="width:100%;font-size:13px;border-collapse:collapse;">
-                <tr style="color:var(--neutral-400);font-size:11px;"><td>Client</td><td style="text-align:right;">Dépensé</td><td style="text-align:right;">Depuis</td></tr>
-                {% for w in intel.win_back %}<tr><td style="padding:4px 0;"><span style="font-weight:600;">{{ w.name }}</span>{% if w.phone %}<br><span style="font-size:11px;color:var(--neutral-400);">{{ w.phone }}</span>{% endif %}</td><td style="text-align:right;">{{ w.spend|floatformat:0 }} DH</td><td style="text-align:right;">{{ w.days }}j</td></tr>{% endfor %}
-            </table>
-            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Aucun client identifié inactif.</div>{% endif %}
+            <h3 style="font-size:15px;margin:0 0 10px;"><i class="fas fa-chart-column" style="color:var(--primary-600);"></i> Tendance mensuelle</h3>
+            {% if dash.trend %}
+            <div style="display:flex;align-items:flex-end;gap:8px;height:120px;">
+                {% for m in dash.trend %}
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+                    <div style="font-size:10px;color:var(--neutral-400);margin-bottom:2px;">{{ m.rev|floatformat:0 }}</div>
+                    <div style="width:100%;background:var(--primary-500);border-radius:4px 4px 0 0;height:{% widthratio m.rev dash.trend_max 100 %}%;min-height:3px;"></div>
+                    <div style="font-size:10px;color:var(--neutral-500);margin-top:4px;">{{ m.label }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}<div style="font-size:12px;color:var(--neutral-500);">Historique insuffisant.</div>{% endif %}
+        </div>
+        <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:1px solid #fcd34d;border-radius:12px;padding:16px;">
+            <h3 style="font-size:15px;margin:0 0 6px;color:#92400e;"><i class="fas fa-calendar-star"></i> Saison : {{ dash.seasonal.season }}</h3>
+            <div style="font-size:13px;color:#7c2d12;line-height:1.5;">{{ dash.seasonal.advice }}</div>
         </div>
     </div>
 
-    <!-- ===== OPERATIONAL KPIs ===== -->
-    <div class="insights-grid-3" style="grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); margin-bottom:20px;">
-        <div class="kpi-mini kpi-mini--success">
-            <div class="kpi-mini-value">{{ data.profit_totals.margin_pct }}%</div>
-            <div class="kpi-mini-label">Marge globale</div>
-            <div class="kpi-mini-sub">{{ data.profit_totals.total_margin|floatformat:0 }} DH</div>
-        </div>
-        <div class="kpi-mini kpi-mini--error">
-            <div class="kpi-mini-value">{{ data.receivables|floatformat:0 }}</div>
-            <div class="kpi-mini-label">Créances (DH)</div>
-        </div>
-        <div class="kpi-mini kpi-mini--primary">
-            <div class="kpi-mini-value">{{ data.deposits.total_held|floatformat:0 }}</div>
-            <div class="kpi-mini-label">Dépôts détenus (DH)</div>
-            <div class="kpi-mini-sub">{{ data.deposits.account_count }} comptes</div>
-        </div>
-        <div class="kpi-mini kpi-mini--warning">
-            <div class="kpi-mini-value">{{ data.circulation.out_count }}</div>
-            <div class="kpi-mini-label">En circulation</div>
-            <div class="kpi-mini-sub">{{ data.circulation.out_over_30d }} dormantes &gt;30j</div>
-        </div>
-        <div class="kpi-mini kpi-mini--warning">
-            <div class="kpi-mini-value">{{ data.aged_stock.over_365d.count }}</div>
-            <div class="kpi-mini-label">Stock &gt;365j</div>
-            <div class="kpi-mini-sub">{{ data.aged_stock.over_365d.value|floatformat:0 }} DH</div>
-        </div>
-        <div class="kpi-mini">
-            <div class="kpi-mini-value">{{ data.inventory_health.blocks_count }}</div>
-            <div class="kpi-mini-label">Blocs actifs</div>
-        </div>
-    </div>
-
-    <!-- ===== OPERATIONAL DETAIL CARDS ===== -->
+    <!-- ===== OPÉRATIONS (secondaire) ===== -->
+    <h2 style="font-size:17px;margin:0 0 10px;"><i class="fas fa-gears" style="color:var(--neutral-500);"></i> Opérations</h2>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:24px;">
         <!-- Circulation -->
         <div style="background:white;border:1px solid var(--neutral-200);border-radius:12px;padding:16px;">

@@ -27,7 +27,24 @@ from settings_app.models import PaymentMethod, BankAccount
 def sales_insights(request):
     """AI-powered business insights page with computed metrics. AI loads async via AJAX."""
     import json
-    from ai_services.business_insights import gather_business_data, gather_decision_intelligence, DecimalEncoder
+    from ai_services.business_insights import gather_business_data, gather_decision_intelligence, gather_dashboard, DecimalEncoder
+    from .models import SalesTarget
+
+    # Save editable targets
+    if request.method == 'POST' and request.POST.get('action') == 'save_targets':
+        from decimal import Decimal, InvalidOperation
+        def _num(v, default):
+            try:
+                return Decimal(str(v).replace(',', '.'))
+            except (InvalidOperation, ValueError, TypeError):
+                return default
+        SalesTarget.objects.create(
+            revenue_target=_num(request.POST.get('revenue_target'), Decimal('0')),
+            margin_target=_num(request.POST.get('margin_target'), Decimal('18')),
+            new_clients_target=int(request.POST.get('new_clients_target') or 0),
+        )
+        messages.success(request, 'Objectifs mis à jour.')
+        return redirect(f"{request.path}?period={request.GET.get('period', 'all')}")
 
     period = request.GET.get('period', 'all')
     period_map = {'7d': 7, '30d': 30, '90d': 90, 'all': None}
@@ -35,6 +52,7 @@ def sales_insights(request):
 
     data = gather_business_data(period_days=period_days)
     intel = gather_decision_intelligence(period_days=period_days)
+    dash = gather_dashboard(period_days=period_days)
 
     # Prepare chart data as JSON
     chart_categories = json.dumps(
@@ -60,6 +78,7 @@ def sales_insights(request):
     context = {
         'data': data,
         'intel': intel,
+        'dash': dash,
         'period': period,
         'chart_categories': chart_categories,
         'chart_cat_revenue': chart_cat_revenue,

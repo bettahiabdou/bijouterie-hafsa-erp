@@ -146,6 +146,222 @@ def gather_decision_intelligence(period_days=None):
     }
 
 
+def _wa_number(phone):
+    """Normalize a Moroccan/intl phone to wa.me digits, or '' if unusable."""
+    if not phone:
+        return ''
+    digits = ''.join(ch for ch in str(phone) if ch.isdigit())
+    if not digits:
+        return ''
+    if digits.startswith('00'):
+        digits = digits[2:]
+    if digits.startswith('0') and len(digits) == 10:      # local 06/05/07 -> 212...
+        digits = '212' + digits[1:]
+    return digits
+
+
+def _seasonal_note(today):
+    """Deterministic Moroccan-jewelry seasonal guidance by month."""
+    m = today.month
+    if m in (6, 7, 8, 9):
+        return {'season': 'Saison des mariages (été)',
+                'advice': 'Pic trousseau : privilégier Sertla, Demlij, ensembles et pièces lourdes. Ne pas tomber en rupture sur le haut de gamme mariage.'}
+    if m in (3, 4, 5):
+        return {'season': 'Pré-saison mariages',
+                'advice': 'Reconstituer le stock trousseau (Sertla, Demlij, ensembles) avant l’été. Anticiper la hausse de la demande.'}
+    if m in (11, 12):
+        return {'season': 'Fêtes de fin d’année',
+                'advice': 'Demande de cadeaux : pièces accessibles (bagues, pendentifs, boucles légères), bon moment pour écouler le stock moyen.'}
+    return {'season': 'Période plus calme (hiver)',
+            'advice': 'Écouler le stock ancien et préparer le printemps. Surveiller le calendrier lunaire pour anticiper Ramadan / Aïd (pics cadeaux).'}
+
+
+def gather_dashboard(period_days=None):
+    """
+    Decision cockpit data: health score vs targets, an actionable decision
+    queue (with links/WhatsApp), SKU-level lists (with photos), money
+    position, monthly trend, and seasonal guidance.
+    """
+    from urllib.parse import quote
+    from django.db.models.functions import TruncMonth
+    from sales.models import SaleInvoice, SaleInvoiceItem, ProductCirculation, SalesTarget
+    from products.models import Product
+    from clients.models import Client
+    from deposits.models import DepositTransaction
+
+    now = timezone.now()
+    today = now.date()
+    d30 = today - timedelta(days=30)
+    d60 = today - timedelta(days=60)
+
+    base = SaleInvoice.objects.filter(is_deleted=False).exclude(
+        status__in=['draft', 'cancelled', 'returned', 'exchanged'])
+
+    cur = base.filter(date__gte=d30).aggregate(r=Sum('total_amount'), n=Count('id'))
+    prev = base.filter(date__gte=d60, date__lt=d30).aggregate(r=Sum('total_amount'))
+    rev30 = _d(cur['r'])
+    prev30 = _d(prev['r'])
+    n30 = cur['n'] or 0
+    growth_pct = (round((float(rev30) - float(prev30)) * 100 / float(prev30), 1)
+                  if float(prev30) > 0 else None)
+
+    items30 = SaleInvoiceItem.objects.filter(invoice__in=base.filter(date__gte=d30),
+                                             product__total_cost__gt=0)
+    magg = items30.aggregate(c=Sum('product__total_cost'), r=Sum('total_amount'))
+    mcost = _d(magg['c'])
+    mrev = _d(magg['r'])
+    margin_pct = round(float(mrev - mcost) * 100 / float(mcost), 1) if mcost > 0 else 0
+    new_clients30 = Client.objects.filter(created_at__gte=d30).count()
+
+    # ---- Targets ----
+    t = SalesTarget.get_current()
+    rev_target = _d(t.revenue_target) if (t and t.revenue_target) else (prev30 if prev30 > 0 else rev30)
+    margin_target = float(t.margin_target) if t else 18.0
+    clients_target = (t.new_clients_target if (t and t.new_clients_target) else 0)
+    targets = {'revenue': rev_target, 'margin': margin_target, 'new_clients': clients_target,
+               'is_set': bool(t)}
+
+    def clamp(v):
+        return max(0, min(100, int(round(v))))
+
+    prog = {
+        'revenue': clamp(float(rev30) * 100 / float(rev_target)) if float(rev_target) > 0 else 0,
+        'margin': clamp(margin_pct * 100 / margin_target) if margin_target > 0 else 0,
+        'new_clients': (clamp(new_clients30 * 100 / clients_target) if clients_target else None),
+        'cur': {'revenue': rev30, 'margin': margin_pct, 'new_clients': new_clients30},
+    }
+
+    # ---- Money position ----
+    available = Product.objects.filter(status='available')
+    stock_capital = available.aggregate(v=Sum('total_cost'))['v'] or Decimal('0')
+    receivables = base.aggregate(b=Sum('balance_due'))['b'] or Decimal('0')
+    deposits_owed = DepositTransaction.objects.aggregate(s=Sum('amount'))['s'] or Decimal('0')
+    dead = available.filter(created_at__lt=now - timedelta(days=180)).aggregate(
+        n=Count('id'), cap=Sum('total_cost'))
+    circ_val = ProductCirculation.objects.filter(status='out').aggregate(
+        v=Sum('product__selling_price'))['v'] or Decimal('0')
+    money = {
+        'stock_capital': _d(stock_capital),
+        'receivables': _d(receivables),
+        'deposits_owed': _d(deposits_owed),
+        'dead_capital': _d(dead['cap']),
+        'circulation_value': _d(circ_val),
+        'unlockable': _d((receivables or 0) + (dead['cap'] or 0) + (circ_val or 0)),
+    }
+
+    # ---- Health score ----
+    comps = []
+    comps.append(('Marge', clamp(margin_pct * 100 / margin_target) if margin_target > 0 else 50))
+    comps.append(('CA vs objectif', clamp(float(rev30) * 100 / float(rev_target)) if float(rev_target) > 0 else 50))
+    comps.append(('Croissance', 50 if growth_pct is None else clamp(50 + growth_pct)))
+    dead_ratio = float(dead['cap'] or 0) * 100 / float(stock_capital) if stock_capital > 0 else 0
+    comps.append(('Stock sain', clamp(100 - dead_ratio * 2)))
+    recv_ratio = float(receivables) * 100 / float(rev30) if float(rev30) > 0 else 0
+    comps.append(('Encaissement', clamp(100 - recv_ratio)))
+    health = int(round(sum(s for _, s in comps) / len(comps)))
+    weakest = [name for name, _ in sorted(comps, key=lambda x: x[1])[:2]]
+
+    # ---- Decision queue (actionable) ----
+    intel = gather_decision_intelligence(period_days)
+    decisions = []
+    for r in intel['reorder'][:3]:
+        decisions.append({'sev': 'grow', 'icon': 'fa-cart-plus',
+            'title': f"Réapprovisionner {r['cat']}",
+            'detail': f"Écoulement {r['sell_through']}% — il ne reste que {r['in_stock']} en stock.",
+            'cta': 'Créer commande', 'url': '/purchases/orders/create/', 'wa': False})
+    if dead['n']:
+        decisions.append({'sev': 'fix', 'icon': 'fa-tags',
+            'title': f"Écouler {dead['n']} pièces dormantes (>180j)",
+            'detail': f"{_d(dead['cap'])} DH de capital immobilisé à débloquer.",
+            'cta': 'Voir les pièces', 'url': '/products/?min_age=180', 'wa': False})
+    if receivables and receivables > 0:
+        decisions.append({'sev': 'fix', 'icon': 'fa-hand-holding-dollar',
+            'title': f"Encaisser {_d(receivables)} DH de créances",
+            'detail': "Factures avec solde dû non réglé.",
+            'cta': 'Voir factures', 'url': '/sales/', 'wa': False})
+    for w in intel['win_back'][:3]:
+        wa = _wa_number(w['phone'])
+        msg = quote(f"Bonjour {w['name']}, c'est Bijouterie Hafsa. Nous avons de nouvelles pièces qui pourraient vous plaire. Passez nous voir !")
+        decisions.append({'sev': 'grow', 'icon': 'fa-whatsapp',
+            'title': f"Relancer {w['name']}",
+            'detail': f"{w['spend']} DH dépensés, silencieux depuis {w['days']}j.",
+            'cta': 'WhatsApp', 'url': (f"https://wa.me/{wa}?text={msg}" if wa else None), 'wa': True})
+
+    # ---- SKU-level: dead stock with photos ----
+    def _img(p):
+        try:
+            if p.main_image:
+                return p.main_image.url
+        except Exception:
+            pass
+        im = p.images.first() if hasattr(p, 'images') else None
+        try:
+            return im.image.url if im and im.image else None
+        except Exception:
+            return None
+
+    dead_skus = []
+    for p in (available.filter(created_at__lt=now - timedelta(days=180))
+              .select_related('category').prefetch_related('images')
+              .order_by('-selling_price')[:12]):
+        dead_skus.append({
+            'reference': p.reference, 'name': p.name or '',
+            'category': p.category.name if p.category else '',
+            'price': _d(p.selling_price), 'image': _img(p),
+            'days': (today - p.created_at.date()).days if p.created_at else 0,
+        })
+
+    restock_skus = []
+    for p in (Product.objects.filter(status='sold')
+              .select_related('category').prefetch_related('images')
+              .order_by('-updated_at')[:8]):
+        img = _img(p)
+        if not img:
+            continue
+        restock_skus.append({
+            'reference': p.reference, 'name': p.name or '',
+            'category': p.category.name if p.category else '',
+            'price': _d(p.selling_price), 'image': img,
+        })
+        if len(restock_skus) >= 6:
+            break
+
+    # ---- Win-back with WhatsApp links ----
+    win_back = []
+    for w in intel['win_back']:
+        wa = _wa_number(w['phone'])
+        msg = quote(f"Bonjour {w['name']}, c'est Bijouterie Hafsa. Nous avons de nouvelles pièces qui pourraient vous plaire. Passez nous voir !")
+        win_back.append({**w, 'wa_url': (f"https://wa.me/{wa}?text={msg}" if wa else None)})
+
+    # ---- Monthly trend (last ~7 months) ----
+    months = list(base.filter(date__gte=today - timedelta(days=215))
+                  .annotate(m=TruncMonth('date')).values('m')
+                  .annotate(r=Sum('total_amount')).order_by('m'))
+    trend = [{'label': mm['m'].strftime('%b'), 'rev': float(mm['r'] or 0)} for mm in months if mm['m']]
+    trend_max = max((x['rev'] for x in trend), default=0) or 1
+
+    import math
+    health_circ = 2 * math.pi * 52
+    health_offset = round(health_circ * (1 - health / 100), 1)
+
+    return {
+        'health': health,
+        'health_offset': health_offset,
+        'health_components': [{'name': n, 'score': s} for n, s in comps],
+        'health_weakest': weakest,
+        'rev30': rev30, 'prev30': prev30, 'n30': n30, 'growth_pct': growth_pct,
+        'margin_pct': margin_pct, 'new_clients30': new_clients30,
+        'targets': targets, 'progress': prog,
+        'money': money,
+        'decisions': decisions,
+        'dead_skus': dead_skus,
+        'restock_skus': restock_skus,
+        'win_back': win_back[:10],
+        'trend': trend, 'trend_max': trend_max,
+        'seasonal': _seasonal_note(today),
+    }
+
+
 def gather_business_data(period_days=None):
     """
     Gather comprehensive business metrics from sales data.

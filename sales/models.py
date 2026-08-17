@@ -1301,3 +1301,25 @@ class ProductCirculation(models.Model):
 
     def __str__(self):
         return f"{self.product.reference} - {self.get_status_display()}"
+
+
+class SalesTarget(models.Model):
+    """
+    Editable monthly business targets used by the decision dashboard's health
+    score. A single latest row is used (get_current)."""
+    revenue_target = models.DecimalField(_('Objectif CA mensuel (DH)'), max_digits=14, decimal_places=2, default=0)
+    margin_target = models.DecimalField(_('Objectif marge (%)'), max_digits=5, decimal_places=1, default=18)
+    new_clients_target = models.PositiveIntegerField(_('Objectif nouveaux clients / mois'), default=0)
+    updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('Objectif commercial')
+        verbose_name_plural = _('Objectifs commerciaux')
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Objectifs (CA {self.revenue_target}, marge {self.margin_target}%)"
+
+    @classmethod
+    def get_current(cls):
+        return cls.objects.order_by('-updated_at').first()
