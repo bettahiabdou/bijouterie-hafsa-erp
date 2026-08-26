@@ -5564,3 +5564,61 @@ def benefice_report_print(request):
         'show_images': request.GET.get('images') == '1',
     }
     return render(request, 'sales/benefice_report_print.html', context)
+
+
+# ===========================================================================
+# Plateau anti-vol (anti-theft tray monitor)
+# A dedicated screen with the CF601 reader. Pieces sit on the tray during a
+# sale; the page shows which are present, and flags any piece that left the
+# tray WITHOUT being sold.
+# ===========================================================================
+
+@login_required(login_url='login')
+def tray_monitor(request):
+    """Dedicated anti-theft tray screen (used with the CF601 in keyboard mode)."""
+    return render(request, 'sales/tray_monitor.html', {})
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def tray_resolve(request):
+    """
+    Resolve a batch of scanned EPCs to products with their CURRENT status.
+    The tray page polls this to know, for each piece it has seen, whether it is
+    still available or has been sold (so a removed-but-sold piece is fine, while
+    a removed-but-unsold piece is an alert).
+    """
+    import json as _json
+    from products.api_views import _batch_find_products
+    try:
+        data = _json.loads(request.body or '{}')
+    except ValueError:
+        data = {}
+    epcs = data.get('epcs', [])
+    epcs_u = [str(e).strip().upper() for e in epcs if e]
+    if not epcs_u:
+        return JsonResponse({'products': []})
+
+    found = _batch_find_products(epcs_u)  # {matched_epc: Product}
+    by_id = {}
+    for epc, p in found.items():
+        if p.id in by_id:
+            continue
+        try:
+            img = p.main_image.url if p.main_image else None
+        except Exception:
+            img = None
+        by_id[p.id] = {
+            'id': p.id,
+            'epc': epc,
+            'reference': p.reference,
+            'name': p.name or '',
+            'category': p.category.name if p.category else '',
+            'status': p.status,
+            'status_display': p.get_status_display(),
+            'is_sold': p.status == 'sold',
+            'is_available': p.status == 'available',
+            'image': img,
+            'price': str(p.selling_price or 0),
+        }
+    return JsonResponse({'products': list(by_id.values())})

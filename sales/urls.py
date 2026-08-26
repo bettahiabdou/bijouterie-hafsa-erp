@@ -59,6 +59,10 @@ urlpatterns = [
     path('pending/<str:reference>/api/', views.pending_invoice_detail_api, name='pending_invoice_detail_api'),
     path('pending/<str:reference>/complete/api/', views.pending_invoice_complete_api, name='pending_invoice_complete_api'),
 
+    # Plateau anti-vol (anti-theft tray monitor)
+    path('plateau/', views.tray_monitor, name='tray_monitor'),
+    path('plateau/resolve/', views.tray_resolve, name='tray_resolve'),
+
     # Circulation (online-selling flow)
     path('circulation/', views.circulation_list, name='circulation'),
     path('circulation/search/', views.circulation_product_search, name='circulation_product_search'),

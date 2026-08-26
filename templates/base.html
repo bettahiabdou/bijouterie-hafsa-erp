@@ -597,6 +597,10 @@
                             <i class="fas fa-truck text-info" style="margin-right: 6px;"></i>
                             <span class="nav-text">Livraisons</span>
                         </a>
+                        <a href="{% url 'sales:tray_monitor' %}" class="nav-link {% if 'plateau' in request.path %}active{% endif %}">
+                            <i class="fas fa-shield-halved text-danger" style="margin-right: 6px;"></i>
+                            <span class="nav-text">Plateau anti-vol</span>
+                        </a>
                     </div>
                 </div>
 

@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% block title %}Plateau anti-vol - Bijouterie Hafsa{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Plateau anti-vol</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title"><i class="fas fa-shield-halved text-primary mr-2"></i> Plateau anti-vol</h1>
+                <p class="page-subtitle" id="cycleStatus">Arrêté — posez les articles sur le plateau puis démarrez le cycle.</p>
+            </div>
+            <div class="page-actions" style="display:flex;gap:8px;">
+                <button id="btnStart" class="btn btn-primary" onclick="startCycle()"><i class="fas fa-play"></i> Démarrer le cycle</button>
+                <button id="btnStop" class="btn btn-secondary" onclick="stopCycle()" disabled><i class="fas fa-stop"></i> Terminer</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<style>
+    .tray-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:18px; }
+    .tray-stat { background:white; border:1px solid var(--neutral-200); border-radius:14px; padding:16px; text-align:center; }
+    .tray-stat .n { font-size:34px; font-weight:800; line-height:1; }
+    .tray-stat .l { font-size:13px; color:var(--neutral-500); margin-top:6px; }
+    .tray-stat.present .n { color:#16a34a; }
+    .tray-stat.soldout .n { color:var(--neutral-500); }
+    .tray-stat.alert { border:2px solid #dc2626; }
+    .tray-stat.alert .n { color:#dc2626; }
+    .tray-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; }
+    .tp-card { background:white; border:1px solid var(--neutral-200); border-radius:14px; overflow:hidden; position:relative; }
+    .tp-card .img { aspect-ratio:1; background:#f5f0e6; display:flex; align-items:center; justify-content:center; }
+    .tp-card .img img { width:100%; height:100%; object-fit:cover; }
+    .tp-card .body { padding:8px 10px; }
+    .tp-card .ref { font-family:monospace; font-size:11px; color:var(--neutral-400); }
+    .tp-card .name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .tp-badge { position:absolute; top:8px; left:8px; font-size:11px; font-weight:700; padding:3px 8px; border-radius:20px; }
+    .tp-present { border-color:#a7f3d0; }
+    .tp-present .tp-badge { background:#16a34a; color:white; }
+    .tp-soldout { opacity:.65; }
+    .tp-soldout .tp-badge { background:#6b7280; color:white; }
+    .tp-alert { border:2px solid #dc2626; animation:pulse 1s infinite; }
+    .tp-alert .tp-badge { background:#dc2626; color:white; }
+    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.4);} 50%{box-shadow:0 0 0 6px rgba(220,38,38,0);} }
+    .alert-banner { background:#fef2f2; border:2px solid #dc2626; color:#991b1b; border-radius:14px; padding:14px 18px; margin-bottom:16px; font-weight:700; display:none; }
+    .alert-banner.show { display:block; }
+    .tray-section-title { font-size:15px; font-weight:700; margin:18px 0 8px; }
+    .idle-hint { text-align:center; color:var(--neutral-400); padding:40px; }
+</style>
+
+<div class="alert-banner" id="alertBanner"></div>
+
+<div class="tray-stats">
+    <div class="tray-stat present"><div class="n" id="cPresent">0</div><div class="l">Sur le plateau</div></div>
+    <div class="tray-stat soldout"><div class="n" id="cSold">0</div><div class="l">Retirés — vendus</div></div>
+    <div class="tray-stat alert"><div class="n" id="cAlert">0</div><div class="l">⚠️ Retirés NON vendus</div></div>
+</div>
+
+<div id="trayGrid" class="tray-grid"></div>
+<div id="idleHint" class="idle-hint"><i class="fas fa-shield-halved" style="font-size:40px;opacity:.3;display:block;margin-bottom:10px;"></i>Démarrez un cycle : les articles posés sur le plateau apparaîtront ici, et vous serez alerté si un article quitte le plateau sans être vendu.</div>
+
+<script>
+const RESOLVE_URL = "{% url 'sales:tray_resolve' %}";
+const PRESENCE_MS = 4000;   // a tag not read for this long = "retiré"
+let cycleActive = false;
+let seenEpcs = new Set();      // all EPCs seen during the cycle
+let lastSeen = {};             // epc -> timestamp
+let products = [];             // resolved products (from server): {id, epc, ...}
+let renderTimer = null, pollTimer = null;
+
+function getCookie(n){ const m=document.cookie.match('(^|;)\\s*'+n+'=([^;]+)'); return m?m.pop():''; }
+
+// ---- Capture the CF601 keyboard stream (layout-independent via event.code) ----
+let buf = [];
+document.addEventListener('keydown', function(e){
+    if (!cycleActive) return;
+    const c = e.code;
+    let ch = null;
+    if (/^Digit[0-9]$/.test(c)) ch = c.slice(5);
+    else if (/^Numpad[0-9]$/.test(c)) ch = c.slice(6);
+    else if (/^Key[A-Fa-f]$/.test(c)) ch = c.slice(3).toUpperCase();
+    if (ch !== null) { buf.push(ch); e.preventDefault(); return; }
+    if (c === 'Enter' || c === 'NumpadEnter') {
+        const code = buf.join('').toUpperCase(); buf = [];
+        if (code.length >= 6) { lastSeen[code] = Date.now(); seenEpcs.add(code); }
+        e.preventDefault();
+    }
+});
+
+function startCycle(){
+    cycleActive = true;
+    seenEpcs = new Set(); lastSeen = {}; products = []; buf = [];
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+    document.getElementById('cycleStatus').textContent = "En cours — surveillance du plateau…";
+    document.getElementById('idleHint').style.display = 'none';
+    if (renderTimer) clearInterval(renderTimer);
+    if (pollTimer) clearInterval(pollTimer);
+    renderTimer = setInterval(render, 1000);
+    pollTimer = setInterval(poll, 2500);
+    poll();
+}
+
+function stopCycle(){
+    cycleActive = false;
+    if (renderTimer) clearInterval(renderTimer);
+    if (pollTimer) clearInterval(pollTimer);
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStop').disabled = true;
+    render();  // final state stays on screen
+    const alerts = products.filter(isAlert);
+    document.getElementById('cycleStatus').textContent = alerts.length
+        ? ("Cycle terminé — " + alerts.length + " article(s) retiré(s) NON vendu(s) à vérifier !")
+        : "Cycle terminé — aucun problème. ✓";
+}
+
+function poll(){
+    const epcs = Array.from(seenEpcs);
+    if (!epcs.length) { render(); return; }
+    fetch(RESOLVE_URL, { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+        body: JSON.stringify({epcs}) })
+      .then(r => r.json())
+      .then(d => { products = d.products || []; render(); })
+      .catch(()=>{});
+}
+
+function present(p){ return (Date.now() - (lastSeen[p.epc] || 0)) < PRESENCE_MS; }
+function isAlert(p){ return !present(p) && p.is_available; }   // removed AND not sold
+
+function render(){
+    let nPresent=0, nSold=0, nAlert=0;
+    const cards = products.map(p => {
+        const onTray = present(p);
+        let cls, badge;
+        if (onTray) { cls='tp-present'; badge='Sur le plateau'; nPresent++; }
+        else if (p.is_sold) { cls='tp-soldout'; badge='Retiré · Vendu'; nSold++; }
+        else { cls='tp-alert'; badge='⚠️ Retiré NON vendu'; nAlert++; }
+        const img = p.image ? `<img src="${p.image}" alt="">` : `<i class="fas fa-gem" style="font-size:24px;color:#d4a528;opacity:.4;"></i>`;
+        return `<div class="tp-card ${cls}">
+            <div class="tp-badge">${badge}</div>
+            <div class="img">${img}</div>
+            <div class="body">
+                <div class="ref">${p.reference||''}</div>
+                <div class="name">${(p.name||'')} </div>
+                <div style="font-size:12px;color:var(--gold-dark,#8b6914);font-weight:700;">${parseFloat(p.price||0).toLocaleString('fr-FR')} DH</div>
+            </div>
+        </div>`;
+    }).join('');
+    document.getElementById('trayGrid').innerHTML = cards;
+    document.getElementById('cPresent').textContent = nPresent;
+    document.getElementById('cSold').textContent = nSold;
+    document.getElementById('cAlert').textContent = nAlert;
+    const banner = document.getElementById('alertBanner');
+    if (nAlert > 0) {
+        const names = products.filter(isAlert).map(p => p.reference).join(', ');
+        banner.textContent = "⚠️ " + nAlert + " article(s) retiré(s) du plateau SANS vente : " + names;
+        banner.classList.add('show');
+    } else {
+        banner.classList.remove('show');
+    }
+}
+</script>
+{% endblock %}
