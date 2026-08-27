@@ -75,19 +75,43 @@ let renderTimer = null, pollTimer = null;
 
 function getCookie(n){ const m=document.cookie.match('(^|;)\\s*'+n+'=([^;]+)'); return m?m.pop():''; }
 
-// ---- Capture the CF601 keyboard stream (layout-independent via event.code) ----
+// ---- Capture the reader's keyboard stream, robustly across every OS ----
+// Works on Mac / Windows / Android tablet / phone. Prefers event.code (the
+// physical key, layout-independent) and falls back to event.key when a device
+// doesn't populate code (some Android HID readers). Flushes on Enter/Tab/Space
+// OR after a short idle gap, so readers that don't send Enter still work.
 let buf = [];
+let flushT = null;
+
+function flushBuf(){
+    if (flushT) { clearTimeout(flushT); flushT = null; }
+    const code = buf.join('').toUpperCase(); buf = [];
+    if (code.length >= 6 && /^[0-9A-F]+$/.test(code)) {
+        lastSeen[code] = Date.now(); seenEpcs.add(code);
+    }
+}
+function hexFromEvent(e){
+    const c = e.code || '';
+    if (/^Digit[0-9]$/.test(c)) return c.slice(5);
+    if (/^Numpad[0-9]$/.test(c)) return c.slice(6);
+    if (/^Key[A-Fa-f]$/.test(c)) return c.slice(3).toUpperCase();
+    // Fallback: the produced character, if it is a hex digit
+    const k = e.key || '';
+    if (/^[0-9a-fA-F]$/.test(k)) return k.toUpperCase();
+    return null;
+}
 document.addEventListener('keydown', function(e){
     if (!cycleActive) return;
-    const c = e.code;
-    let ch = null;
-    if (/^Digit[0-9]$/.test(c)) ch = c.slice(5);
-    else if (/^Numpad[0-9]$/.test(c)) ch = c.slice(6);
-    else if (/^Key[A-Fa-f]$/.test(c)) ch = c.slice(3).toUpperCase();
-    if (ch !== null) { buf.push(ch); e.preventDefault(); return; }
-    if (c === 'Enter' || c === 'NumpadEnter') {
-        const code = buf.join('').toUpperCase(); buf = [];
-        if (code.length >= 6) { lastSeen[code] = Date.now(); seenEpcs.add(code); }
+    const c = e.code || '';
+    if (c === 'Enter' || c === 'NumpadEnter' || c === 'Tab' || c === 'Space'
+        || e.key === 'Enter' || e.key === 'Tab') {
+        flushBuf(); e.preventDefault(); return;
+    }
+    const ch = hexFromEvent(e);
+    if (ch !== null) {
+        buf.push(ch);
+        if (flushT) clearTimeout(flushT);
+        flushT = setTimeout(flushBuf, 150);   // reader sent no terminator
         e.preventDefault();
     }
 });
@@ -95,6 +119,7 @@ document.addEventListener('keydown', function(e){
 function startCycle(){
     cycleActive = true;
     seenEpcs = new Set(); lastSeen = {}; products = []; buf = [];
+    if (flushT) { clearTimeout(flushT); flushT = null; }
     document.getElementById('btnStart').disabled = true;
     document.getElementById('btnStop').disabled = false;
     document.getElementById('cycleStatus').textContent = "En cours — surveillance du plateau…";
