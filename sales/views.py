@@ -5700,6 +5700,10 @@ def amana_reconciliation(request):
                 'mismatch': mismatch,
             })
         else:
+            # Skip deliveries with no AMANA COD to collect (expected == 0):
+            # those were paid in caisse, so there is nothing to encaisser.
+            if expected <= 0:
+                continue
             tot_pending += expected
             non_encaissees.append({'delivery': d, 'expected': expected})
 
