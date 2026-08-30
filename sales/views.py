@@ -5734,7 +5734,7 @@ def amana_statement_upload(request):
     from django.urls import reverse
     from django.contrib import messages
     from .models import AmanaStatement, AmanaStatementLine
-    from .amana_reconcile import extract_text, parse_statement_lines
+    from .amana_reconcile import extract_text, parse_statement_lines, parse_json_statement
 
     month = (request.POST.get('month') or '').strip()
     files = request.FILES.getlist('files')
@@ -5743,7 +5743,7 @@ def amana_statement_upload(request):
         messages.error(request, "Veuillez choisir un mois valide (AAAA-MM).")
         return redirect('sales:amana_reconciliation')
     if not files:
-        messages.error(request, "Veuillez sélectionner au moins un fichier PDF.")
+        messages.error(request, "Veuillez sélectionner au moins un fichier (PDF ou JSON).")
         return redirect('sales:amana_reconciliation')
 
     imported, skipped, failed = 0, 0, 0
@@ -5755,8 +5755,12 @@ def amana_statement_upload(request):
                 skipped += 1
                 continue
             import io
-            text = extract_text(io.BytesIO(data))
-            lines = parse_statement_lines(text)
+            name = (f.name or '').lower()
+            is_json = name.endswith('.json') or data.lstrip()[:1] in (b'{', b'[')
+            if is_json:
+                lines = parse_json_statement(data)
+            else:
+                lines = parse_statement_lines(extract_text(io.BytesIO(data)))
             total = sum((l['amount'] for l in lines), Decimal('0'))
             stmt = AmanaStatement.objects.create(
                 month=month,

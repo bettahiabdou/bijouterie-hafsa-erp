@@ -8,10 +8,13 @@ tracking numbers against AMANA deliveries. Read-only: never modifies deliveries.
 import re
 from decimal import Decimal, InvalidOperation
 
-# One credit line carries a parcel tracking number (QBxxxxxxxxMA) and the amount
-# AMANA remitted for it. Lump 'VIREMENT ... PAR UN CENTRE' lines carry no
-# reference and are intentionally ignored.
-_LABEL = 'VERSEMENT CONTRE REMBOURSEMENT'
+# A COD credit line carries a parcel tracking number (QBxxxxxxxxMA) and the
+# amount AMANA remitted for it. Banks label it differently:
+#   - Bank of Africa:  "VERSEMENT CONTRE REMBOURSEMENT QB…MA"
+#   - BaridBank:       "VIREMENT CONTRE REMBOURSEMENT N° QB…MA"
+# We match any 'REMBOURSEMENT' line that carries a QB…MA reference, so both
+# forms are caught. Lump lines with no reference (PAR UN CENTRE, BARID CASH) are
+# intentionally ignored.
 _DATE_RE = re.compile(r'\d{2}/\d{2}/\d{2}')
 _REF_RE = re.compile(r'QB\w+MA')
 _AMT_RE = re.compile(r'[\d  ]*\d[.,]\d{2}')
@@ -49,17 +52,59 @@ def parse_statement_lines(text):
     """
     out = []
     for line in text.split('\n'):
-        if _LABEL not in line:
+        if 'REMBOURSEMENT' not in line.upper():
             continue
         ref_m = _REF_RE.search(line)
         if not ref_m:
-            continue  # unreferenced (PAR UN CENTRE etc.) -> ignore
+            continue  # unreferenced (PAR UN CENTRE, BARID CASH etc.) -> ignore
         dates = _DATE_RE.findall(line)
         amts = _AMT_RE.findall(line)
         amount = _clean_amount(amts[-1]) if amts else Decimal('0')
         out.append({
             'operation_date': dates[0] if dates else '',
             'value_date': dates[1] if len(dates) > 1 else '',
+            'tracking_ref': ref_m.group(0).upper(),
+            'amount': amount,
+        })
+    return out
+
+
+def parse_json_statement(data_bytes):
+    """
+    Parse a BaridBank (baridbanknet.ma) JSON export.
+    Shape: {"operations": [{"amount": N, "date": <epoch ms>, "longLabel": "..."}]}
+    Returns the same {operation_date, value_date, tracking_ref, amount} dicts as
+    the PDF parser, for every credit line that carries a QB…MA reference.
+    """
+    import json
+    import datetime
+    data = json.loads(data_bytes)
+    ops = data.get('operations', []) if isinstance(data, dict) else (data or [])
+    out = []
+    for op in ops:
+        label = op.get('longLabel') or op.get('shortLabel') or ''
+        if 'REMBOURSEMENT' not in label.upper():
+            continue
+        ref_m = _REF_RE.search(label)
+        if not ref_m:
+            continue
+        amt = op.get('amount', 0)
+        try:
+            amount = Decimal(str(amt))
+        except (InvalidOperation, ValueError):
+            amount = Decimal('0')
+        if amount <= 0:
+            continue  # COD remittances are credits
+        d = ''
+        ts = op.get('date')
+        if ts:
+            try:
+                d = datetime.datetime.utcfromtimestamp(int(ts) / 1000).strftime('%d/%m/%y')
+            except (ValueError, OverflowError, OSError):
+                d = ''
+        out.append({
+            'operation_date': d,
+            'value_date': d,
             'tracking_ref': ref_m.group(0).upper(),
             'amount': amount,
         })

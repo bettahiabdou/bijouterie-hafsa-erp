@@ -82,13 +82,13 @@
             <input type="month" id="month" name="month" value="{{ month_filter }}" required>
         </div>
         <div class="fld" style="flex:1; min-width:240px;">
-            <label for="files">Fichiers PDF (plusieurs possibles)</label>
-            <input type="file" id="files" name="files" accept="application/pdf" multiple required>
+            <label for="files">Fichiers PDF ou JSON (plusieurs possibles)</label>
+            <input type="file" id="files" name="files" accept="application/pdf,application/json,.pdf,.json" multiple required>
         </div>
         <button type="submit" class="btn btn-primary"><i class="fas fa-file-import"></i> Importer</button>
     </form>
     <p style="font-size:12px; color:var(--neutral-400); margin:12px 0 0;">
-        Seules les lignes « VERSEMENT CONTRE REMBOURSEMENT QB…MA » sont extraites. Un même fichier ne peut pas être importé deux fois.
+        Accepte les relevés <strong>PDF</strong> (Bank of Africa…) et les exports <strong>JSON</strong> (BaridBank). Seules les lignes « CONTRE REMBOURSEMENT … QB…MA » sont extraites (VERSEMENT et VIREMENT). Un même fichier ne peut pas être importé deux fois.
     </p>
 
     {% if statements %}
