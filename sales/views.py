@@ -5661,10 +5661,12 @@ def amana_reconciliation(request):
             ref_to_line[key] = ln
     encaisse_refs = set(ref_to_line.keys())
 
-    # All AMANA deliveries that carry a tracking number
+    # All AMANA deliveries that carry a tracking number.
+    # Returned parcels never collect COD, so they are not reconciliation candidates.
     deliveries = list(
         Delivery.objects.filter(delivery_method_type='amana')
         .exclude(tracking_number='')
+        .exclude(status='returned')
         .select_related('invoice', 'invoice__seller')
         .order_by('-created_at')
     )
