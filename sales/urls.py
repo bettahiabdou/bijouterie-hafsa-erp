@@ -63,6 +63,11 @@ urlpatterns = [
     path('plateau/', views.tray_monitor, name='tray_monitor'),
     path('plateau/resolve/', views.tray_resolve, name='tray_resolve'),
 
+    # Rapprochement AMANA (COD statement reconciliation)
+    path('rapprochement-amana/', views.amana_reconciliation, name='amana_reconciliation'),
+    path('rapprochement-amana/upload/', views.amana_statement_upload, name='amana_statement_upload'),
+    path('rapprochement-amana/<int:pk>/supprimer/', views.amana_statement_delete, name='amana_statement_delete'),
+
     # Circulation (online-selling flow)
     path('circulation/', views.circulation_list, name='circulation'),
     path('circulation/search/', views.circulation_product_search, name='circulation_product_search'),

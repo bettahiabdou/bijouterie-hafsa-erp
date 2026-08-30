@@ -5622,3 +5622,174 @@ def tray_resolve(request):
             'price': str(p.selling_price or 0),
         }
     return JsonResponse({'products': list(by_id.values())})
+
+
+# ===========================================================================
+# Rapprochement AMANA (standalone COD reconciliation tool)
+# Upload monthly bank statements (Relevé des Opérations), extract the
+# 'VERSEMENT CONTRE REMBOURSEMENT QB…MA' credit lines, and show which AMANA
+# deliveries have actually been paid (money received) vs not yet. Read-only:
+# never modifies any Delivery.
+# ===========================================================================
+
+@login_required(login_url='login')
+def amana_reconciliation(request):
+    """Standalone AMANA COD reconciliation page."""
+    from .models import Delivery, AmanaStatement, AmanaStatementLine
+    from .amana_reconcile import normalize_ref
+    from payments.models import ClientPayment
+
+    month_filter = request.GET.get('month', '')
+
+    statements = AmanaStatement.objects.all()
+    if month_filter:
+        statements = statements.filter(month=month_filter)
+    statements = statements.prefetch_related('lines').order_by('-month', '-uploaded_at')
+
+    # Distinct months for the selector
+    all_months = list(
+        AmanaStatement.objects.values_list('month', flat=True).distinct().order_by('-month')
+    )
+
+    # Build the "encaissé" set from ALL imported statement lines (payment can land
+    # in a later month than the shipment, so we match across every statement).
+    ref_to_line = {}
+    for ln in AmanaStatementLine.objects.select_related('statement').all():
+        key = normalize_ref(ln.tracking_ref)
+        # keep the first occurrence (earliest) if duplicated across statements
+        if key not in ref_to_line:
+            ref_to_line[key] = ln
+    encaisse_refs = set(ref_to_line.keys())
+
+    # All AMANA deliveries that carry a tracking number
+    deliveries = list(
+        Delivery.objects.filter(delivery_method_type='amana')
+        .exclude(tracking_number='')
+        .select_related('invoice', 'invoice__seller')
+        .order_by('-created_at')
+    )
+
+    # Expected COD per delivery (carrier-collected payments on its invoice)
+    invoice_ids = [d.invoice_id for d in deliveries if d.invoice_id]
+    cod_rows = ClientPayment.objects.filter(
+        sale_invoice_id__in=invoice_ids,
+        payment_method__collected_by_carrier=True,
+    ).values('sale_invoice_id').annotate(t=Sum('amount'))
+    cod_by_invoice = {r['sale_invoice_id']: r['t'] for r in cod_rows}
+
+    encaissees, non_encaissees = [], []
+    tot_encaisse = Decimal('0')
+    tot_pending = Decimal('0')
+    nb_mismatch = 0
+
+    for d in deliveries:
+        key = normalize_ref(d.tracking_number)
+        expected = cod_by_invoice.get(d.invoice_id, Decimal('0'))
+        if key in encaisse_refs:
+            ln = ref_to_line[key]
+            mismatch = expected > 0 and abs(ln.amount - expected) >= Decimal('0.01')
+            if mismatch:
+                nb_mismatch += 1
+            tot_encaisse += ln.amount
+            encaissees.append({
+                'delivery': d,
+                'expected': expected,
+                'bank_amount': ln.amount,
+                'bank_date': ln.value_date or ln.operation_date,
+                'statement': ln.statement,
+                'mismatch': mismatch,
+            })
+        else:
+            tot_pending += expected
+            non_encaissees.append({'delivery': d, 'expected': expected})
+
+    context = {
+        'statements': statements,
+        'all_months': all_months,
+        'month_filter': month_filter,
+        'encaissees': encaissees,
+        'non_encaissees': non_encaissees,
+        'tot_encaisse': tot_encaisse,
+        'tot_pending': tot_pending,
+        'nb_encaisse': len(encaissees),
+        'nb_pending': len(non_encaissees),
+        'nb_mismatch': nb_mismatch,
+        'nb_statements': AmanaStatement.objects.count(),
+    }
+    return render(request, 'sales/amana_reconciliation.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def amana_statement_upload(request):
+    """Upload one or more statement PDFs, parse and store them (idempotent)."""
+    import hashlib
+    import re
+    from django.urls import reverse
+    from django.contrib import messages
+    from .models import AmanaStatement, AmanaStatementLine
+    from .amana_reconcile import extract_text, parse_statement_lines
+
+    month = (request.POST.get('month') or '').strip()
+    files = request.FILES.getlist('files')
+
+    if not month or not re.match(r'^\d{4}-\d{2}$', month):
+        messages.error(request, "Veuillez choisir un mois valide (AAAA-MM).")
+        return redirect('sales:amana_reconciliation')
+    if not files:
+        messages.error(request, "Veuillez sélectionner au moins un fichier PDF.")
+        return redirect('sales:amana_reconciliation')
+
+    imported, skipped, failed = 0, 0, 0
+    for f in files:
+        try:
+            data = f.read()
+            sha = hashlib.sha256(data).hexdigest()
+            if AmanaStatement.objects.filter(sha256=sha).exists():
+                skipped += 1
+                continue
+            import io
+            text = extract_text(io.BytesIO(data))
+            lines = parse_statement_lines(text)
+            total = sum((l['amount'] for l in lines), Decimal('0'))
+            stmt = AmanaStatement.objects.create(
+                month=month,
+                original_filename=f.name,
+                sha256=sha,
+                line_count=len(lines),
+                total_amount=total,
+                uploaded_by=request.user if request.user.is_authenticated else None,
+            )
+            AmanaStatementLine.objects.bulk_create([
+                AmanaStatementLine(
+                    statement=stmt,
+                    operation_date=l['operation_date'],
+                    value_date=l['value_date'],
+                    tracking_ref=l['tracking_ref'],
+                    amount=l['amount'],
+                ) for l in lines
+            ])
+            imported += 1
+        except Exception as e:
+            failed += 1
+            messages.error(request, f"Échec de l'import de {f.name} : {e}")
+
+    if imported:
+        messages.success(request, f"{imported} relevé(s) importé(s).")
+    if skipped:
+        messages.info(request, f"{skipped} relevé(s) déjà importé(s) (ignoré).")
+    return redirect(f"{reverse('sales:amana_reconciliation')}?month={month}")
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def amana_statement_delete(request, pk):
+    """Remove an imported statement (and its lines)."""
+    from django.urls import reverse
+    from django.contrib import messages
+    from .models import AmanaStatement
+    stmt = get_object_or_404(AmanaStatement, pk=pk)
+    month = stmt.month
+    stmt.delete()
+    messages.success(request, "Relevé supprimé.")
+    return redirect(f"{reverse('sales:amana_reconciliation')}?month={month}")

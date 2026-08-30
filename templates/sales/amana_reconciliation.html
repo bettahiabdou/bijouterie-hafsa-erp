@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% block title %}Rapprochement AMANA - Bijouterie Hafsa{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Rapprochement AMANA</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title"><i class="fas fa-money-check-dollar text-primary mr-2"></i> Rapprochement AMANA</h1>
+                <p class="page-subtitle">Importez vos relevés bancaires pour voir quelles livraisons AMANA ont été encaissées, et lesquelles restent en attente.</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .rec-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
+    .rec-stat { background:white; border:1px solid var(--neutral-200); border-radius:14px; padding:16px; }
+    .rec-stat .n { font-size:28px; font-weight:800; line-height:1; }
+    .rec-stat .l { font-size:13px; color:var(--neutral-500); margin-top:6px; }
+    .rec-stat .sub { font-size:12px; color:var(--neutral-400); margin-top:2px; }
+    .rec-stat.ok .n { color:#16a34a; }
+    .rec-stat.pending .n { color:#dc2626; }
+    .rec-stat.warn .n { color:#d97706; }
+    .rec-card { background:white; border:1px solid var(--neutral-200); border-radius:14px; padding:18px; margin-bottom:20px; }
+    .rec-card h3 { font-size:16px; font-weight:700; margin:0 0 14px; display:flex; align-items:center; gap:8px; }
+    .rec-upload { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+    .rec-upload .fld { display:flex; flex-direction:column; gap:4px; }
+    .rec-upload label { font-size:12px; color:var(--neutral-500); font-weight:600; }
+    .rec-upload input { border:1px solid var(--neutral-300); border-radius:8px; padding:8px 10px; font-size:14px; }
+    .rec-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .rec-table th { text-align:left; padding:8px 10px; background:var(--neutral-50,#f8f8f8); color:var(--neutral-600); font-weight:600; border-bottom:2px solid var(--neutral-200); white-space:nowrap; }
+    .rec-table td { padding:8px 10px; border-bottom:1px solid var(--neutral-100); }
+    .rec-table tr:hover td { background:#fafafa; }
+    .rec-table .mono { font-family:monospace; font-size:12px; }
+    .rec-table .num { text-align:right; white-space:nowrap; }
+    .badge { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; }
+    .badge.green { background:#dcfce7; color:#166534; }
+    .badge.red { background:#fee2e2; color:#991b1b; }
+    .badge.amber { background:#fef3c7; color:#92400e; }
+    .badge.grey { background:#e5e7eb; color:#374151; }
+    .rec-scroll { overflow-x:auto; }
+    .empty { text-align:center; color:var(--neutral-400); padding:26px; }
+    .stmt-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--neutral-100); font-size:13px; }
+</style>
+
+<!-- KPIs -->
+<div class="rec-stats">
+    <div class="rec-stat ok">
+        <div class="n">{{ nb_encaisse }}</div>
+        <div class="l">Livraisons encaissées</div>
+        <div class="sub">{{ tot_encaisse|floatformat:0 }} DH reçus</div>
+    </div>
+    <div class="rec-stat pending">
+        <div class="n">{{ nb_pending }}</div>
+        <div class="l">Pas encore encaissées</div>
+        <div class="sub">{{ tot_pending|floatformat:0 }} DH en attente</div>
+    </div>
+    <div class="rec-stat warn">
+        <div class="n">{{ nb_mismatch }}</div>
+        <div class="l">Montant différent</div>
+        <div class="sub">à vérifier manuellement</div>
+    </div>
+    <div class="rec-stat">
+        <div class="n">{{ nb_statements }}</div>
+        <div class="l">Relevés importés</div>
+    </div>
+</div>
+
+<!-- Upload -->
+<div class="rec-card">
+    <h3><i class="fas fa-upload text-primary"></i> Importer un relevé</h3>
+    <form method="post" action="{% url 'sales:amana_statement_upload' %}" enctype="multipart/form-data" class="rec-upload">
+        {% csrf_token %}
+        <div class="fld">
+            <label for="month">Mois du relevé</label>
+            <input type="month" id="month" name="month" value="{{ month_filter }}" required>
+        </div>
+        <div class="fld" style="flex:1; min-width:240px;">
+            <label for="files">Fichiers PDF (plusieurs possibles)</label>
+            <input type="file" id="files" name="files" accept="application/pdf" multiple required>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-file-import"></i> Importer</button>
+    </form>
+    <p style="font-size:12px; color:var(--neutral-400); margin:12px 0 0;">
+        Seules les lignes « VERSEMENT CONTRE REMBOURSEMENT QB…MA » sont extraites. Un même fichier ne peut pas être importé deux fois.
+    </p>
+
+    {% if statements %}
+    <div style="margin-top:16px;">
+        <div style="font-size:13px; font-weight:600; color:var(--neutral-600); margin-bottom:6px;">Relevés importés{% if month_filter %} — {{ month_filter }}{% endif %}</div>
+        {% for s in statements %}
+        <div class="stmt-row">
+            <div>
+                <i class="fas fa-file-pdf" style="color:#b91c1c;"></i>
+                {{ s.original_filename|default:"relevé" }}
+                <span class="badge grey">{{ s.month }}</span>
+                <span style="color:var(--neutral-400);">{{ s.line_count }} ligne(s) · {{ s.total_amount|floatformat:0 }} DH</span>
+            </div>
+            <form method="post" action="{% url 'sales:amana_statement_delete' s.pk %}" onsubmit="return confirm('Supprimer ce relevé importé ?');" style="margin:0;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer"><i class="fas fa-trash"></i></button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Pas encore encaissées (the chase list) -->
+<div class="rec-card">
+    <h3><i class="fas fa-hand-holding-usd" style="color:#dc2626;"></i> Pas encore encaissées ({{ nb_pending }})</h3>
+    <div class="rec-scroll">
+        <table class="rec-table">
+            <thead>
+                <tr><th>Livraison</th><th>Client</th><th>Suivi</th><th class="num">Montant attendu</th><th>Statut livraison</th></tr>
+            </thead>
+            <tbody>
+                {% for r in non_encaissees %}
+                <tr>
+                    <td class="mono">{{ r.delivery.reference }}</td>
+                    <td>{{ r.delivery.client_name|default:"—" }}</td>
+                    <td class="mono">{{ r.delivery.tracking_number }}</td>
+                    <td class="num">{{ r.expected|floatformat:0 }} DH</td>
+                    <td>
+                        {% if r.delivery.status == 'delivered' %}<span class="badge amber">Livré, en attente</span>
+                        {% else %}<span class="badge grey">{{ r.delivery.get_status_display }}</span>{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="empty">Aucune livraison en attente d'encaissement.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Encaissées -->
+<div class="rec-card">
+    <h3><i class="fas fa-check-circle" style="color:#16a34a;"></i> Encaissées ({{ nb_encaisse }})</h3>
+    <div class="rec-scroll">
+        <table class="rec-table">
+            <thead>
+                <tr><th>Livraison</th><th>Client</th><th>Suivi</th><th class="num">Attendu</th><th class="num">Reçu (banque)</th><th>Date</th><th>Relevé</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for r in encaissees %}
+                <tr>
+                    <td class="mono">{{ r.delivery.reference }}</td>
+                    <td>{{ r.delivery.client_name|default:"—" }}</td>
+                    <td class="mono">{{ r.delivery.tracking_number }}</td>
+                    <td class="num">{{ r.expected|floatformat:0 }} DH</td>
+                    <td class="num">{{ r.bank_amount|floatformat:0 }} DH</td>
+                    <td>{{ r.bank_date }}</td>
+                    <td style="font-size:12px; color:var(--neutral-500);">{{ r.statement.month }}</td>
+                    <td>{% if r.mismatch %}<span class="badge amber" title="Montant reçu différent du montant attendu">⚠️ Écart</span>{% else %}<span class="badge green">OK</span>{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="empty">Aucune livraison encaissée pour l'instant. Importez un relevé pour commencer.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

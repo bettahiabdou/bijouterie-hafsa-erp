@@ -4,6 +4,7 @@ Includes sales invoices, delivery tracking, and client loans
 """
 
 from django.db import models
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator
 from decimal import Decimal
@@ -1323,3 +1324,60 @@ class SalesTarget(models.Model):
     @classmethod
     def get_current(cls):
         return cls.objects.order_by('-updated_at').first()
+
+
+class AmanaStatement(models.Model):
+    """
+    An uploaded AMANA/bank account statement PDF (Relevé des Opérations).
+    Standalone reconciliation tool: parsed to extract the
+    'VERSEMENT CONTRE REMBOURSEMENT QB…MA' credit lines. Does not modify any
+    Delivery record. A file hash guarantees the same PDF can't be imported twice.
+    """
+    month = models.CharField(
+        _('Mois'),
+        max_length=7,
+        help_text=_('Format AAAA-MM, ex: 2026-06'),
+        db_index=True,
+    )
+    original_filename = models.CharField(_('Nom du fichier'), max_length=255, blank=True)
+    file = models.FileField(_('Fichier'), upload_to='amana_statements/', null=True, blank=True)
+    sha256 = models.CharField(_('Empreinte'), max_length=64, unique=True, db_index=True)
+    line_count = models.PositiveIntegerField(_('Nombre de lignes'), default=0)
+    total_amount = models.DecimalField(_('Total encaissé'), max_digits=14, decimal_places=2, default=0)
+    uploaded_at = models.DateTimeField(_('Importé le'), auto_now_add=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='amana_statements', verbose_name=_('Importé par'),
+    )
+
+    class Meta:
+        verbose_name = _('Relevé AMANA')
+        verbose_name_plural = _('Relevés AMANA')
+        ordering = ['-month', '-uploaded_at']
+
+    def __str__(self):
+        return f"{self.original_filename or self.sha256[:8]} ({self.month})"
+
+
+class AmanaStatementLine(models.Model):
+    """
+    One 'VERSEMENT CONTRE REMBOURSEMENT QB…MA' credit line extracted from a
+    statement: the parcel tracking number, the amount received, and the dates.
+    """
+    statement = models.ForeignKey(
+        AmanaStatement, on_delete=models.CASCADE,
+        related_name='lines', verbose_name=_('Relevé'),
+    )
+    operation_date = models.CharField(_('Date opération'), max_length=10, blank=True)
+    value_date = models.CharField(_('Date valeur'), max_length=10, blank=True)
+    tracking_ref = models.CharField(_('Référence colis'), max_length=40, db_index=True)
+    amount = models.DecimalField(_('Montant'), max_digits=14, decimal_places=2, default=0)
+
+    class Meta:
+        verbose_name = _('Ligne de relevé AMANA')
+        verbose_name_plural = _('Lignes de relevé AMANA')
+        ordering = ['statement', 'operation_date']
+        indexes = [models.Index(fields=['tracking_ref'])]
+
+    def __str__(self):
+        return f"{self.tracking_ref} - {self.amount}"
