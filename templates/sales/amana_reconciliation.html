@@ -88,7 +88,7 @@
         <button type="submit" class="btn btn-primary"><i class="fas fa-file-import"></i> Importer</button>
     </form>
     <p style="font-size:12px; color:var(--neutral-400); margin:12px 0 0;">
-        Accepte les relevés <strong>PDF</strong> et les exports <strong>JSON</strong> de BaridBank (Al Barid Bank). Seules les lignes « CONTRE REMBOURSEMENT … QB…MA » sont extraites (VERSEMENT et VIREMENT). Un même fichier ne peut pas être importé deux fois.
+        Accepte les relevés <strong>PDF</strong> et les exports <strong>JSON</strong> de BaridBank (Al Barid Bank). Seules les lignes « CONTRE REMBOURSEMENT » portant un numéro de suivi (…MA) sont extraites (VERSEMENT et VIREMENT, tout préfixe). Un même fichier ne peut pas être importé deux fois.
     </p>
 
     {% if statements %}

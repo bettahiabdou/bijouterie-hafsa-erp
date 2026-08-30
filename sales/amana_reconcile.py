@@ -16,7 +16,9 @@ from decimal import Decimal, InvalidOperation
 # forms are caught. Lump lines with no reference (PAR UN CENTRE, BARID CASH) are
 # intentionally ignored.
 _DATE_RE = re.compile(r'\d{2}/\d{2}/\d{2}')
-_REF_RE = re.compile(r'QB\w+MA')
+# Amana / Barid tracking numbers follow the UPU S10 form: 2 letters + digits +
+# the 'MA' country code (e.g. QB249972925MA, EE123456789MA). Not always 'QB'.
+_REF_RE = re.compile(r'[A-Z]{2}\d{6,}MA')
 _AMT_RE = re.compile(r'[\d  ]*\d[.,]\d{2}')
 
 
