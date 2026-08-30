@@ -3050,6 +3050,24 @@ def invoice_edit(request, reference):
                 inv.calculate_totals()
                 inv.save()
 
+                # Keep the linked delivery in sync with the edited invoice, so a
+                # changed tracking number / method / carrier is reflected on the
+                # Livraisons page and in the AMANA reconciliation.
+                from .models import Delivery
+                try:
+                    delivery = inv.delivery
+                except Delivery.DoesNotExist:
+                    delivery = None
+                if delivery:
+                    delivery.tracking_number = inv.tracking_number or ''
+                    delivery.delivery_method_type = inv.delivery_method_type
+                    delivery.carrier = inv.carrier
+                    delivery.total_amount = inv.total_amount
+                    if inv.client:
+                        delivery.client_name = inv.client.full_name
+                        delivery.client_phone = inv.client.phone
+                    delivery.save()
+
                 ActivityLog.objects.create(
                     user=request.user,
                     action=ActivityLog.ActionType.UPDATE,
