@@ -5878,7 +5878,7 @@ def amana_ocr_page(request):
 def amana_ocr_analyze(request):
     """OCR a scanned statement and return candidate rows (ref + amount) as JSON,
     each snapped to the closest known AMANA delivery where possible."""
-    from .amana_ocr import parse_ocr_rows, refine_rows
+    from .amana_ocr import parse_ocr_rows, ai_extract_rows, refine_rows
     from .amana_reconcile import normalize_ref
     from .models import Delivery
     from payments.models import ClientPayment
@@ -5887,7 +5887,17 @@ def amana_ocr_analyze(request):
         return JsonResponse({'error': 'Aucun fichier fourni.'}, status=400)
     try:
         data = f.read()
-        rows = parse_ocr_rows(data)
+        # Prefer the AI vision model (accurate on scans); fall back to local
+        # Tesseract OCR when the AI service isn't configured or errors.
+        method = 'ia'
+        rows = None
+        try:
+            rows = ai_extract_rows(data)
+        except Exception:
+            rows = None
+        if rows is None:
+            method = 'ocr'
+            rows = parse_ocr_rows(data)
         # Map each AMANA delivery tracking number -> its expected COD amount, so a
         # matched row can take the amount from our data instead of the scan.
         deliveries = Delivery.objects.filter(
@@ -5905,6 +5915,6 @@ def amana_ocr_analyze(request):
             if key:
                 delivery_cod[key] = cod_by_invoice.get(d['invoice_id'], Decimal('0'))
         refined = refine_rows(rows, delivery_cod)
-        return JsonResponse({'rows': refined, 'count': len(refined)})
+        return JsonResponse({'rows': refined, 'count': len(refined), 'method': method})
     except Exception as e:
-        return JsonResponse({'error': f"Échec de l'analyse OCR : {e}"}, status=500)
+        return JsonResponse({'error': f"Échec de l'analyse : {e}"}, status=500)

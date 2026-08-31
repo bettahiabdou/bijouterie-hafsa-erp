@@ -135,6 +135,81 @@ def parse_ocr_rows(data_bytes):
     return rows
 
 
+AI_PROMPT = """Tu lis un relevé bancaire marocain scanné (BaridBank / Al Barid Bank).
+
+Extrais UNIQUEMENT les lignes de type « CONTRE REMBOURSEMENT » (VERSEMENT ou
+VIREMENT) qui portent un numéro de suivi de colis au format 2 lettres + chiffres
++ « MA » (par ex. QB249644531MA), visible dans la colonne « Réf. Titre » ou dans
+le libellé de l'opération.
+
+Pour chaque ligne concernée, donne :
+- "date"   : la date de l'opération (JJ/MM/AAAA)
+- "ref"    : le numéro de suivi EXACT (ex : QB249644531MA). Lis chaque caractère
+             avec le plus grand soin, ne devine pas.
+- "amount" : le montant de la colonne CRÉDIT en dirhams (nombre, ex : 1600.00)
+
+Ignore les retraits par carte, les virements sans numéro de suivi, les frais et
+le solde.
+
+Réponds UNIQUEMENT avec un objet JSON de cette forme, sans aucun texte autour :
+{"rows": [{"date": "JJ/MM/AAAA", "ref": "QB...MA", "amount": 0}]}
+"""
+
+
+def _parse_ai_json(text):
+    import json
+    clean = (text or '').strip()
+    if clean.startswith('```'):
+        lines = clean.split('\n')
+        clean = '\n'.join(lines[1:-1] if lines[-1].strip() == '```' else lines[1:])
+    try:
+        data = json.loads(clean)
+    except (ValueError, TypeError):
+        return []
+    items = data.get('rows', data) if isinstance(data, dict) else data
+    out = []
+    for it in (items or []):
+        if not isinstance(it, dict):
+            continue
+        ref = re.sub(r'[^A-Za-z0-9]', '', str(it.get('ref', ''))).upper()
+        out.append({'date': str(it.get('date', '')), 'raw_ref': ref,
+                    'amount': _clean_amount(str(it.get('amount', '0')))})
+    return out
+
+
+def ai_extract_rows(data_bytes, dpi=200, model=None):
+    """
+    Read a scanned statement with the Scaleway vision model (much more accurate
+    than Tesseract). Returns the same row dicts as parse_ocr_rows, or None if the
+    AI service isn't configured (so the caller can fall back to Tesseract).
+    """
+    from ai_services import scaleway_client
+    if not scaleway_client.is_configured():
+        return None
+    import pymupdf
+    import io
+    from PIL import Image
+    rows = []
+    doc = pymupdf.open(stream=data_bytes, filetype='pdf')
+    for page in doc:
+        pix = page.get_pixmap(dpi=dpi)
+        # The vision client tags data URIs as JPEG, so send JPEG bytes.
+        img = Image.open(io.BytesIO(pix.tobytes('png'))).convert('RGB')
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=85)
+        jpg = buf.getvalue()
+        resp = scaleway_client.vision_completion(
+            image_data=jpg,
+            prompt=AI_PROMPT,
+            model=model or scaleway_client.MODELS['vision'],
+            temperature=0.0,
+            max_tokens=4000,
+            response_format={'type': 'json_object'},
+        )
+        rows.extend(_parse_ai_json(resp))
+    return rows
+
+
 def refine_rows(rows, delivery_cod):
     """
     Match each OCR ref to a known delivery. Only an EXACT match is trusted (and

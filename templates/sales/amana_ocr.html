@@ -63,7 +63,7 @@
                 <label for="scanfile">Relevé scanné (PDF image)</label>
                 <input type="file" id="scanfile" name="files" accept="application/pdf,.pdf,image/*" required>
             </div>
-            <button type="button" class="btn btn-primary" id="analyzeBtn" onclick="analyze()"><i class="fas fa-magic"></i> Analyser (OCR)</button>
+            <button type="button" class="btn btn-primary" id="analyzeBtn" onclick="analyze()"><i class="fas fa-magic"></i> Analyser</button>
         </div>
         <p style="font-size:12px;color:var(--neutral-400);margin:12px 0 0;">
             Les lignes <span class="badge green">livraison trouvée</span> correspondent exactement à une de vos livraisons AMANA (montant repris de vos données, fiable). Les lignes <span class="badge amber">à vérifier</span> doivent être contrôlées sur le papier ; une suggestion proche peut être proposée mais n'est jamais appliquée automatiquement (les numéros de suivi se ressemblent).
@@ -100,16 +100,17 @@ function analyze(){
     if (!fileInput.files.length){ alert('Choisissez d\'abord un fichier scanné.'); return; }
     const btn = document.getElementById('analyzeBtn');
     const status = document.getElementById('ocrStatus');
-    btn.disabled = true; status.textContent = 'Lecture du scan en cours (OCR)… cela peut prendre quelques secondes.';
+    btn.disabled = true; status.textContent = 'Lecture du scan en cours (IA)… cela peut prendre quelques secondes.';
     const fd = new FormData();
     fd.append('file', fileInput.files[0]);
     fetch(ANALYZE_URL, { method:'POST', headers:{'X-CSRFToken':getCookie('csrftoken')}, body: fd })
       .then(r => r.json().then(d => ({ok:r.ok, d})))
       .then(({ok, d}) => {
         btn.disabled = false;
-        if (!ok){ status.textContent = ''; alert(d.error || 'Erreur OCR'); return; }
+        if (!ok){ status.textContent = ''; alert(d.error || 'Erreur de lecture'); return; }
         renderRows(d.rows || []);
-        status.textContent = (d.count || 0) + ' ligne(s) lues.';
+        const via = d.method === 'ia' ? 'lecture par IA (Scaleway)' : 'OCR local';
+        status.textContent = (d.count || 0) + ' ligne(s) lues — ' + via + '.';
       })
       .catch(e => { btn.disabled = false; status.textContent=''; alert('Erreur: '+e); });
 }
