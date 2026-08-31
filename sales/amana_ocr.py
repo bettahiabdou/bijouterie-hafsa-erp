@@ -1,12 +1,18 @@
 """
 OCR for scanned (image) BaridBank statements.
 
-Scanned statements have no text layer, so we render each page to an image with
-PyMuPDF and read it with Tesseract, then extract the COD rows (tracking ref +
-credit amount). OCR is imperfect on scans, so results are meant to be REVIEWED
-and corrected by a human before import. To cut the correction work, each OCR'd
-ref is snapped to the closest real AMANA delivery tracking number when it is
-clearly the same one off by an OCR slip.
+Scanned statements have no text layer, so we render each page with PyMuPDF and
+read it with Tesseract. OCR is imperfect on scans, so we make the result
+reliable by leaning on data we trust:
+
+  * References are read with word-level confidence, the two printed copies per
+    row are voted against each other, coerced toward the QB<9 digits>MA shape,
+    and snapped to the closest real AMANA delivery tracking number.
+  * Amounts are the weakest thing OCR reads, so whenever a row's ref matches a
+    delivery we take the amount from that delivery's expected COD instead of the
+    scan. OCR amounts are only a fallback for rows with no matching delivery.
+
+The remaining uncertain rows are shown for the user to correct before import.
 
 Requires: pymupdf, pytesseract (pip) and the tesseract-ocr binary (apt/brew).
 """
@@ -14,29 +20,35 @@ import re
 import difflib
 from decimal import Decimal, InvalidOperation
 
-_REF_LOOSE = re.compile(r'[A-Z0-9]{2}\d{5,}[A-Z0-9]{2}')
 _REF_STRICT = re.compile(r'[A-Z]{2}\d{9}MA')
+_REF_LOOSE = re.compile(r'[A-Z0-9]{2}\d{5,}[A-Z0-9]{2}')
 _DATE_RE = re.compile(r'\d{2}/\d{2}/\d{4}')
 _AMT_RE = re.compile(r'\d[\d  ]*[.,]\d{2}')
 
+# OCR look-alikes for forcing the 9 middle characters to digits / the ends to letters
+_TO_DIGIT = str.maketrans({'O': '0', 'Q': '0', 'D': '0', 'I': '1', 'L': '1', 'l': '1',
+                           'Z': '2', 'S': '5', 'G': '6', 'T': '7', 'B': '8', 'g': '9'})
 
-def ocr_pdf(data_bytes, dpi=400):
-    """Render every page of a scanned PDF and OCR it. Returns the full text."""
+
+def ocr_pages(data_bytes, dpi=450):
+    """Render every page and return a list of pytesseract DICT results."""
     import pymupdf
     import pytesseract
     from PIL import Image
     import io
-    text = ''
+    out = []
     doc = pymupdf.open(stream=data_bytes, filetype='pdf')
     for page in doc:
         pix = page.get_pixmap(dpi=dpi, colorspace=pymupdf.csGRAY)
         img = Image.open(io.BytesIO(pix.tobytes('png')))
-        text += pytesseract.image_to_string(img, lang='eng', config='--psm 6') + '\n'
-    return text
+        out.append(pytesseract.image_to_data(
+            img, lang='eng', config='--psm 6',
+            output_type=pytesseract.Output.DICT))
+    return out
 
 
 def _clean_amount(raw):
-    s = raw.replace(' ', '').replace(' ', '')
+    s = str(raw).replace(' ', '').replace(' ', '')
     if re.match(r'^\d+,\d{2}$', s):
         s = s.replace(',', '.')
     else:
@@ -47,55 +59,122 @@ def _clean_amount(raw):
         return Decimal('0')
 
 
-def parse_ocr_rows(text):
+def _coerce_ref(tok):
+    """Force an OCR token toward the QB<9 digits>MA shape when it's close."""
+    s = re.sub(r'[^A-Za-z0-9]', '', str(tok)).upper()
+    if len(s) != 13:
+        return s
+    head = s[:2].replace('8', 'B').replace('0', 'Q').replace('5', 'S')
+    mid = s[2:11].translate(_TO_DIGIT)
+    tail = s[11:].replace('8', 'B').replace('0', 'O').replace('1', 'A')  # ...MA
+    cand = head + mid + tail
+    return cand if _REF_STRICT.fullmatch(cand) else s
+
+
+def _lines(dict_result):
+    """Reconstruct OCR lines: list of {tokens:[(text,conf)], text, top}."""
+    d = dict_result
+    grouped = {}
+    for i in range(len(d['text'])):
+        t = (d['text'][i] or '').strip()
+        c = int(d['conf'][i])
+        if not t or c < 0:
+            continue
+        key = (d['block_num'][i], d['par_num'][i], d['line_num'][i])
+        grouped.setdefault(key, {'tokens': [], 'top': d['top'][i]})
+        grouped[key]['tokens'].append((t, c))
+    lines = []
+    for key in sorted(grouped, key=lambda k: grouped[k]['top']):
+        g = grouped[key]
+        lines.append({'tokens': g['tokens'], 'text': ' '.join(t for t, _ in g['tokens']),
+                      'top': g['top']})
+    return lines
+
+
+def _best_ref(candidates):
+    """candidates: list of (token, conf). Return the best QB…MA guess."""
+    scored = []
+    for tok, conf in candidates:
+        coerced = _coerce_ref(tok)
+        bonus = 40 if _REF_STRICT.fullmatch(coerced) else 0
+        scored.append((conf + bonus, coerced))
+    if not scored:
+        return ''
+    scored.sort(reverse=True)
+    return scored[0][1]
+
+
+def parse_ocr_rows(data_bytes):
     """
-    Best-effort extraction of COD rows from OCR text. One dict per row:
-    {date, raw_ref, amount}. Only rows mentioning a remboursement are kept.
+    Extract candidate COD rows from a scanned statement.
+    Returns list of {date, raw_ref, amount}.
     """
     rows = []
-    for line in text.split('\n'):
-        if 'REMBOURS' not in line.upper():
-            continue
-        compact = line.replace(' ', '')
-        refs = _REF_STRICT.findall(compact) or _REF_LOOSE.findall(compact)
-        raw_ref = refs[0].upper() if refs else ''
-        dm = _DATE_RE.search(line)
-        amts = _AMT_RE.findall(line)
-        amount = _clean_amount(amts[-1]) if amts else Decimal('0')
-        rows.append({'date': dm.group(0) if dm else '', 'raw_ref': raw_ref, 'amount': amount})
+    for dr in ocr_pages(data_bytes):
+        lines = _lines(dr)
+        for idx, ln in enumerate(lines):
+            if 'REMBOURS' not in ln['text'].upper():
+                continue
+            # ref candidates: this line's ref-like tokens + a following line that
+            # is essentially just a ref (the wrapped "Réf. Titre" copy).
+            cands = [(t, c) for (t, c) in ln['tokens']
+                     if _REF_LOOSE.fullmatch(re.sub(r'[^A-Za-z0-9]', '', t))]
+            for j in (idx + 1, idx + 2):
+                if j < len(lines):
+                    nxt = lines[j]
+                    if 'REMBOURS' in nxt['text'].upper():
+                        break
+                    for (t, c) in nxt['tokens']:
+                        if _REF_LOOSE.fullmatch(re.sub(r'[^A-Za-z0-9]', '', t)):
+                            cands.append((t, c))
+            ref = _best_ref(cands)
+            dm = _DATE_RE.search(ln['text'])
+            amts = _AMT_RE.findall(ln['text'])
+            amount = _clean_amount(amts[-1]) if amts else Decimal('0')
+            rows.append({'date': dm.group(0) if dm else '', 'raw_ref': ref, 'amount': amount})
     return rows
 
 
-def refine_rows(rows, known_refs):
+def refine_rows(rows, delivery_cod):
     """
-    Add matching/confidence info to OCR rows.
-    known_refs: iterable of real AMANA delivery tracking numbers (upper, no space).
-    Each row gets: ref (best guess), status ('matched' | 'corrected' | 'uncertain'),
-    note, amount.
+    Match each OCR ref to a known delivery. Only an EXACT match is trusted (and
+    then the amount comes from that delivery's COD, since OCR amounts are weak).
+
+    Fuzzy "close" deliveries are NEVER auto-applied: these tracking numbers are
+    sequential, so a near neighbour is a different real parcel. A close delivery
+    is offered as a non-binding suggestion in the note for the user to confirm.
+
+    delivery_cod: dict {tracking_ref_upper_nospace: Decimal expected_cod}.
+    Each returned row: {date, ref, raw_ref, amount, ocr_amount, suggestion, status, note}.
     """
-    known = list({(r or '').upper().replace(' ', '') for r in known_refs if r})
+    known = list(delivery_cod.keys())
     out = []
     for r in rows:
         raw = (r['raw_ref'] or '').upper()
-        ref, status, note = raw, 'uncertain', ''
-        if raw and raw in known:
-            ref, status, note = raw, 'matched', 'Livraison trouvée'
+        ocr_amt = r['amount']
+        ref, status, note, amount, suggestion = raw, 'uncertain', '', ocr_amt, ''
+        if raw and raw in delivery_cod:
+            status, note = 'matched', 'Livraison trouvée'
+            if delivery_cod[raw] > 0:
+                amount = delivery_cod[raw]
         elif raw:
-            close = difflib.get_close_matches(raw, known, n=1, cutoff=0.85)
+            close = difflib.get_close_matches(raw, known, n=1, cutoff=0.9)
             if close:
-                ref, status = close[0], 'corrected'
-                note = f'OCR « {raw} » → livraison {close[0]}'
+                suggestion = close[0]
+                note = f'À vérifier — proche de la livraison {close[0]} ?'
             elif _REF_STRICT.fullmatch(raw):
-                status, note = 'uncertain', 'Format OK, pas de livraison correspondante'
+                note = 'Format OK, aucune livraison exacte — à vérifier sur le papier'
             else:
-                status, note = 'uncertain', 'Référence à vérifier'
+                note = 'Référence à vérifier sur le papier'
         else:
-            note = 'Référence non lue'
+            note = 'Référence non lue — à saisir'
         out.append({
             'date': r.get('date', ''),
             'ref': ref,
             'raw_ref': raw,
-            'amount': str(r['amount']),
+            'amount': str(amount),
+            'ocr_amount': str(ocr_amt),
+            'suggestion': suggestion,
             'status': status,
             'note': note,
         })

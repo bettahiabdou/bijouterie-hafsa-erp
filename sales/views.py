@@ -5878,19 +5878,33 @@ def amana_ocr_page(request):
 def amana_ocr_analyze(request):
     """OCR a scanned statement and return candidate rows (ref + amount) as JSON,
     each snapped to the closest known AMANA delivery where possible."""
-    from .amana_ocr import ocr_pdf, parse_ocr_rows, refine_rows
+    from .amana_ocr import parse_ocr_rows, refine_rows
+    from .amana_reconcile import normalize_ref
     from .models import Delivery
+    from payments.models import ClientPayment
     f = request.FILES.get('file')
     if not f:
         return JsonResponse({'error': 'Aucun fichier fourni.'}, status=400)
     try:
         data = f.read()
-        text = ocr_pdf(data)
-        rows = parse_ocr_rows(text)
-        known = Delivery.objects.filter(
+        rows = parse_ocr_rows(data)
+        # Map each AMANA delivery tracking number -> its expected COD amount, so a
+        # matched row can take the amount from our data instead of the scan.
+        deliveries = Delivery.objects.filter(
             delivery_method_type='amana'
-        ).exclude(tracking_number='').values_list('tracking_number', flat=True)
-        refined = refine_rows(rows, known)
+        ).exclude(tracking_number='').values('tracking_number', 'invoice_id')
+        inv_ids = [d['invoice_id'] for d in deliveries if d['invoice_id']]
+        cod_rows = ClientPayment.objects.filter(
+            sale_invoice_id__in=inv_ids,
+            payment_method__collected_by_carrier=True,
+        ).values('sale_invoice_id').annotate(t=Sum('amount'))
+        cod_by_invoice = {r['sale_invoice_id']: r['t'] for r in cod_rows}
+        delivery_cod = {}
+        for d in deliveries:
+            key = normalize_ref(d['tracking_number'])
+            if key:
+                delivery_cod[key] = cod_by_invoice.get(d['invoice_id'], Decimal('0'))
+        refined = refine_rows(rows, delivery_cod)
         return JsonResponse({'rows': refined, 'count': len(refined)})
     except Exception as e:
         return JsonResponse({'error': f"Échec de l'analyse OCR : {e}"}, status=500)

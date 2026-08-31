@@ -46,6 +46,7 @@
     .ocr-scroll { overflow-x:auto; }
     #ocrStatus { font-size:13px; color:var(--neutral-500); }
     .del-btn { color:#dc2626; cursor:pointer; background:none; border:none; }
+    .sugg-btn { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; cursor:pointer; margin-left:4px; }
 </style>
 
 <form method="post" action="{% url 'sales:amana_statement_upload' %}" enctype="multipart/form-data" id="ocrForm">
@@ -65,7 +66,7 @@
             <button type="button" class="btn btn-primary" id="analyzeBtn" onclick="analyze()"><i class="fas fa-magic"></i> Analyser (OCR)</button>
         </div>
         <p style="font-size:12px;color:var(--neutral-400);margin:12px 0 0;">
-            L'OCR n'est pas parfait sur les scans : les lignes <span class="badge amber">à vérifier</span> doivent être contrôlées sur le papier. Les lignes <span class="badge green">livraison trouvée</span> et <span class="badge blue">corrigées</span> sont fiables.
+            Les lignes <span class="badge green">livraison trouvée</span> correspondent exactement à une de vos livraisons AMANA (montant repris de vos données, fiable). Les lignes <span class="badge amber">à vérifier</span> doivent être contrôlées sur le papier ; une suggestion proche peut être proposée mais n'est jamais appliquée automatiquement (les numéros de suivi se ressemblent).
         </p>
         <div id="ocrStatus" style="margin-top:10px;"></div>
     </div>
@@ -115,16 +116,20 @@ function analyze(){
 
 function badgeFor(st){
     if (st==='matched') return '<span class="badge green">Livraison trouvée</span>';
-    if (st==='corrected') return '<span class="badge blue">Corrigée</span>';
     return '<span class="badge amber">À vérifier</span>';
 }
+function esc(s){ return (s||'').replace(/"/g,'&quot;'); }
 function rowHtml(r){
-    const cls = r.status==='matched'?'row-matched':(r.status==='corrected'?'row-corrected':'row-uncertain');
+    const cls = r.status==='matched'?'row-matched':'row-uncertain';
+    let noteHtml = r.note||'';
+    if (r.suggestion){
+        noteHtml += ` <button type="button" class="sugg-btn" onclick="this.closest('tr').querySelector('.ref').value='${esc(r.suggestion)}';this.closest('tr').className='row-corrected';">Utiliser ${esc(r.suggestion)}</button>`;
+    }
     return `<tr class="${cls}">
-        <td><input type="text" class="date" value="${r.date||''}" placeholder="jj/mm/aaaa"></td>
-        <td><input type="text" class="ref" value="${r.ref||''}"></td>
+        <td><input type="text" class="date" value="${esc(r.date)}" placeholder="jj/mm/aaaa"></td>
+        <td><input type="text" class="ref" value="${esc(r.ref)}"></td>
         <td><input type="number" step="0.01" class="amt" value="${parseFloat(r.amount||0)||''}"></td>
-        <td>${badgeFor(r.status)}<div class="note">${r.note||''}</div></td>
+        <td>${badgeFor(r.status)}<div class="note">${noteHtml}</div></td>
         <td><button type="button" class="del-btn" onclick="this.closest('tr').remove();recount()"><i class="fas fa-trash"></i></button></td>
     </tr>`;
 }
