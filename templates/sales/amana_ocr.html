@@ -127,8 +127,8 @@ function analyze(){
 
 function pollStatus(jobId){
     pollTries++;
-    if (pollTries > 100){ clearInterval(pollTimer); document.getElementById('analyzeBtn').disabled=false;
-        document.getElementById('ocrStatus').textContent=''; alert('Délai dépassé. Réessayez avec un scan plus léger (niveaux de gris).'); return; }
+    if (pollTries > 200){ clearInterval(pollTimer); document.getElementById('analyzeBtn').disabled=false;
+        document.getElementById('ocrStatus').textContent=''; alert('Délai dépassé. Réessayez avec un scan plus léger (niveaux de gris) ou moins de pages.'); return; }
     fetch(STATUS_URL + '?job=' + jobId)
       .then(r => r.json())
       .then(d => {

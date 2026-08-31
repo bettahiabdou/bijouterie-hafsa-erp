@@ -189,12 +189,17 @@ def ai_extract_rows(data_bytes, dpi=200, model=None):
     import pymupdf
     import io
     from PIL import Image
+    MAX_SIDE = 1800  # small vision models degenerate on oversized images
     rows = []
     doc = pymupdf.open(stream=data_bytes, filetype='pdf')
     for page in doc:
         pix = page.get_pixmap(dpi=dpi)
         # The vision client tags data URIs as JPEG, so send JPEG bytes.
         img = Image.open(io.BytesIO(pix.tobytes('png'))).convert('RGB')
+        if max(img.size) > MAX_SIDE:
+            ratio = MAX_SIDE / max(img.size)
+            img = img.resize((max(1, int(img.width * ratio)),
+                              max(1, int(img.height * ratio))))
         buf = io.BytesIO()
         img.save(buf, format='JPEG', quality=85)
         jpg = buf.getvalue()
@@ -203,11 +208,21 @@ def ai_extract_rows(data_bytes, dpi=200, model=None):
             prompt=AI_PROMPT,
             model=model or scaleway_client.MODELS['vision'],
             temperature=0.0,
-            max_tokens=4000,
+            max_tokens=3000,
             response_format={'type': 'json_object'},
         )
         rows.extend(_parse_ai_json(resp))
-    return rows
+    # A tracking ref = one payment. Collapse duplicates (and any model repetition)
+    # by keeping the first occurrence of each ref.
+    seen, uniq = set(), []
+    for r in rows:
+        k = r.get('raw_ref') or ''
+        if k and k in seen:
+            continue
+        if k:
+            seen.add(k)
+        uniq.append(r)
+    return uniq
 
 
 def refine_rows(rows, delivery_cod):
