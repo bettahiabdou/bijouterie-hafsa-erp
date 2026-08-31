@@ -3695,14 +3695,13 @@ def pending_invoice_complete(request, reference):
                                                              'reprise_value': Decimal(str(si['reprise_value']))})
                                 except (ValueError, KeyError, TypeError, _json.JSONDecodeError):
                                     selected = []
-                            if not selected:
-                                # No usable item selection -> whole invoice
-                                selected = [{'item_id': it.id,
-                                             'reprise_value': it.total_amount or Decimal('0')}
-                                            for it in inv.items.all()]
-                            credit = sum((si['reprise_value'] for si in selected), Decimal('0'))
-                            exchange_credit += credit
-                            exchange_entries.append({'invoice': inv, 'selected': selected, 'credit': credit})
+                            # No explicit item selection -> do NOT default to the
+                            # whole invoice (that silently exchanged every item).
+                            # Only record an entry when specific items were chosen.
+                            if selected:
+                                credit = sum((si['reprise_value'] for si in selected), Decimal('0'))
+                                exchange_credit += credit
+                                exchange_entries.append({'invoice': inv, 'selected': selected, 'credit': credit})
 
                 # Handle dynamic payments (N payments)
                 from payments.models import ClientPayment
