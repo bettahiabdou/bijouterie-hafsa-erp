@@ -188,7 +188,7 @@ def _parse_ai_json(text):
     return out
 
 
-def ai_extract_rows(data_bytes, dpi=200, model=None):
+def ai_extract_rows(data_bytes, dpi=150, model=None):
     """
     Read a scanned statement with the Scaleway vision model (much more accurate
     than Tesseract). Returns the same row dicts as parse_ocr_rows, or None if the
@@ -208,12 +208,15 @@ def ai_extract_rows(data_bytes, dpi=200, model=None):
     import pymupdf
     import io
     from PIL import Image
+    from concurrent.futures import ThreadPoolExecutor
     MAX_SIDE = 1800  # small vision models degenerate on oversized images
-    rows = []
+
+    # 1) Render every page to a small JPEG. Sequential: PyMuPDF is not safe to
+    #    share a document across threads. Rendering is fast; the API call is slow.
+    images = []
     doc = pymupdf.open(stream=data_bytes, filetype='pdf')
     for page in doc:
         pix = page.get_pixmap(dpi=dpi)
-        # The vision client tags data URIs as JPEG, so send JPEG bytes.
         img = Image.open(io.BytesIO(pix.tobytes('png'))).convert('RGB')
         if max(img.size) > MAX_SIDE:
             ratio = MAX_SIDE / max(img.size)
@@ -221,18 +224,32 @@ def ai_extract_rows(data_bytes, dpi=200, model=None):
                               max(1, int(img.height * ratio))))
         buf = io.BytesIO()
         img.save(buf, format='JPEG', quality=85)
-        jpg = buf.getvalue()
-        resp = scaleway_client.vision_completion(
-            image_data=jpg,
-            prompt=AI_PROMPT,
-            model=model,
-            temperature=0.0,
-            max_tokens=8000,
-            response_format={'type': 'json_object'},
-        )
-        rows.extend(_parse_ai_json(resp))
-    # A tracking ref = one payment. Collapse duplicates (and any model repetition)
-    # by keeping the first occurrence of each ref.
+        images.append(buf.getvalue())
+
+    # 2) Read the pages with the vision model IN PARALLEL, so a multi-page scan
+    #    takes about as long as one page instead of the sum of all pages.
+    def _ocr_one(jpg):
+        for attempt in range(2):  # one retry on transient failure / rate limit
+            try:
+                resp = scaleway_client.vision_completion(
+                    image_data=jpg, prompt=AI_PROMPT, model=model,
+                    temperature=0.0, max_tokens=8000,
+                    response_format={'type': 'json_object'})
+                return _parse_ai_json(resp)
+            except Exception:
+                if attempt == 0:
+                    continue
+                return []
+        return []
+
+    rows = []
+    if images:
+        with ThreadPoolExecutor(max_workers=min(6, len(images))) as ex:
+            for page_rows in ex.map(_ocr_one, images):
+                rows.extend(page_rows)
+
+    # 3) A tracking ref = one payment. Collapse duplicates (and any model
+    #    repetition) by keeping the first occurrence of each ref.
     seen, uniq = set(), []
     for r in rows:
         k = r.get('raw_ref') or ''
