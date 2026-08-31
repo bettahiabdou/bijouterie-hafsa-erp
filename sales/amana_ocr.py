@@ -245,6 +245,11 @@ def refine_rows(rows, delivery_cod):
     delivery_cod: dict {tracking_ref_upper_nospace: Decimal expected_cod}.
     Each returned row: {date, ref, raw_ref, amount, ocr_amount, suggestion, status, note}.
     """
+    def _close_amount(a, b):
+        # equal or close: within 5% of the expected amount (min 2 DH)
+        tol = max(Decimal('2'), (b or Decimal('0')) * Decimal('0.05'))
+        return abs((a or Decimal('0')) - (b or Decimal('0'))) <= tol
+
     known = list(delivery_cod.keys())
     out = []
     for r in rows:
@@ -252,12 +257,27 @@ def refine_rows(rows, delivery_cod):
         ocr_amt = r['amount']
         ref, status, note, amount, suggestion = raw, 'uncertain', '', ocr_amt, ''
         if raw and raw in delivery_cod:
-            status, note = 'matched', 'Livraison trouvée'
-            if delivery_cod[raw] > 0:
-                amount = delivery_cod[raw]
+            expected = delivery_cod[raw]
+            if expected > 0:
+                if _close_amount(ocr_amt, expected):
+                    # ref matches AND amount agrees -> trusted, use the exact
+                    # expected amount from our data.
+                    status, note, amount = 'matched', 'Livraison trouvée — montant OK', expected
+                else:
+                    # ref matches but the amount read doesn't match what we expect
+                    # to collect -> verify (OCR slip, or a different parcel).
+                    status = 'uncertain'
+                    note = f'⚠️ Montant lu {ocr_amt} ≠ encaissement attendu {expected} — à vérifier'
+                    amount = ocr_amt
+            else:
+                # ref matches but we have no expected COD to check against.
+                status, note = 'matched', 'Livraison trouvée (montant non vérifiable)'
         elif raw:
             close = difflib.get_close_matches(raw, known, n=1, cutoff=0.9)
-            if close:
+            if close and _close_amount(ocr_amt, delivery_cod.get(close[0], Decimal('0'))):
+                suggestion = close[0]
+                note = f'À vérifier — proche de {close[0]}, montant concordant ({delivery_cod[close[0]]})'
+            elif close:
                 suggestion = close[0]
                 note = f'À vérifier — proche de la livraison {close[0]} ?'
             elif _REF_STRICT.fullmatch(raw):
