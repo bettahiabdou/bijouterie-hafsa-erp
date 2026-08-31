@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block title %}Relevé scanné (OCR) - Rapprochement AMANA{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:amana_reconciliation' %}" class="breadcrumb-item">Rapprochement AMANA</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Relevé scanné</span>
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-header">
+        <div class="page-header-inner">
+            <div>
+                <h1 class="page-title"><i class="fas fa-file-image text-primary mr-2"></i> Relevé scanné (OCR)</h1>
+                <p class="page-subtitle">Pour les relevés papier scannés : le texte est lu automatiquement, puis vous vérifiez et corrigez avant d'importer.</p>
+            </div>
+            <div class="page-actions">
+                <a href="{% url 'sales:amana_reconciliation' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Retour</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<style>
+    .ocr-card { background:white; border:1px solid var(--neutral-200); border-radius:14px; padding:18px; margin-bottom:18px; }
+    .ocr-up { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+    .ocr-up .fld { display:flex; flex-direction:column; gap:4px; }
+    .ocr-up label { font-size:12px; color:var(--neutral-500); font-weight:600; }
+    .ocr-up input { border:1px solid var(--neutral-300); border-radius:8px; padding:8px 10px; font-size:14px; }
+    .ocr-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .ocr-table th { text-align:left; padding:8px; background:var(--neutral-50,#f8f8f8); border-bottom:2px solid var(--neutral-200); font-weight:600; color:var(--neutral-600); }
+    .ocr-table td { padding:6px 8px; border-bottom:1px solid var(--neutral-100); }
+    .ocr-table input { border:1px solid var(--neutral-200); border-radius:6px; padding:6px 8px; font-size:13px; width:100%; }
+    .ocr-table input.ref { font-family:monospace; }
+    .row-matched { background:#f0fdf4; }
+    .row-corrected { background:#eff6ff; }
+    .row-uncertain { background:#fff7ed; }
+    .badge { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; white-space:nowrap; }
+    .badge.green { background:#dcfce7; color:#166534; }
+    .badge.blue { background:#dbeafe; color:#1e40af; }
+    .badge.amber { background:#fef3c7; color:#92400e; }
+    .note { font-size:11px; color:var(--neutral-500); }
+    .ocr-scroll { overflow-x:auto; }
+    #ocrStatus { font-size:13px; color:var(--neutral-500); }
+    .del-btn { color:#dc2626; cursor:pointer; background:none; border:none; }
+</style>
+
+<form method="post" action="{% url 'sales:amana_statement_upload' %}" enctype="multipart/form-data" id="ocrForm">
+    {% csrf_token %}
+    <input type="hidden" name="reviewed_rows" id="reviewedRows">
+
+    <div class="ocr-card">
+        <div class="ocr-up">
+            <div class="fld">
+                <label for="month">Mois du relevé</label>
+                <input type="month" id="month" name="month" required>
+            </div>
+            <div class="fld" style="flex:1; min-width:240px;">
+                <label for="scanfile">Relevé scanné (PDF image)</label>
+                <input type="file" id="scanfile" name="files" accept="application/pdf,.pdf,image/*" required>
+            </div>
+            <button type="button" class="btn btn-primary" id="analyzeBtn" onclick="analyze()"><i class="fas fa-magic"></i> Analyser (OCR)</button>
+        </div>
+        <p style="font-size:12px;color:var(--neutral-400);margin:12px 0 0;">
+            L'OCR n'est pas parfait sur les scans : les lignes <span class="badge amber">à vérifier</span> doivent être contrôlées sur le papier. Les lignes <span class="badge green">livraison trouvée</span> et <span class="badge blue">corrigées</span> sont fiables.
+        </p>
+        <div id="ocrStatus" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="ocr-card" id="resultCard" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0;font-size:16px;font-weight:700;">Lignes détectées <span id="rowCount" style="color:var(--neutral-400);"></span></h3>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="addRow()"><i class="fas fa-plus"></i> Ajouter une ligne</button>
+        </div>
+        <div class="ocr-scroll">
+            <table class="ocr-table">
+                <thead>
+                    <tr><th style="width:110px;">Date</th><th>Référence (QB…MA)</th><th style="width:140px;">Montant (DH)</th><th>État</th><th style="width:40px;"></th></tr>
+                </thead>
+                <tbody id="ocrBody"></tbody>
+            </table>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;">
+            <button type="button" class="btn btn-primary" onclick="doImport()"><i class="fas fa-file-import"></i> Importer les lignes</button>
+            <span class="note">Vérifiez surtout les montants (l'OCR se trompe souvent sur les chiffres) avant d'importer.</span>
+        </div>
+    </div>
+</form>
+
+<script>
+const ANALYZE_URL = "{% url 'sales:amana_ocr_analyze' %}";
+function getCookie(n){ const m=document.cookie.match('(^|;)\\s*'+n+'=([^;]+)'); return m?m.pop():''; }
+
+function analyze(){
+    const fileInput = document.getElementById('scanfile');
+    if (!fileInput.files.length){ alert('Choisissez d\'abord un fichier scanné.'); return; }
+    const btn = document.getElementById('analyzeBtn');
+    const status = document.getElementById('ocrStatus');
+    btn.disabled = true; status.textContent = 'Lecture du scan en cours (OCR)… cela peut prendre quelques secondes.';
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+    fetch(ANALYZE_URL, { method:'POST', headers:{'X-CSRFToken':getCookie('csrftoken')}, body: fd })
+      .then(r => r.json().then(d => ({ok:r.ok, d})))
+      .then(({ok, d}) => {
+        btn.disabled = false;
+        if (!ok){ status.textContent = ''; alert(d.error || 'Erreur OCR'); return; }
+        renderRows(d.rows || []);
+        status.textContent = (d.count || 0) + ' ligne(s) lues.';
+      })
+      .catch(e => { btn.disabled = false; status.textContent=''; alert('Erreur: '+e); });
+}
+
+function badgeFor(st){
+    if (st==='matched') return '<span class="badge green">Livraison trouvée</span>';
+    if (st==='corrected') return '<span class="badge blue">Corrigée</span>';
+    return '<span class="badge amber">À vérifier</span>';
+}
+function rowHtml(r){
+    const cls = r.status==='matched'?'row-matched':(r.status==='corrected'?'row-corrected':'row-uncertain');
+    return `<tr class="${cls}">
+        <td><input type="text" class="date" value="${r.date||''}" placeholder="jj/mm/aaaa"></td>
+        <td><input type="text" class="ref" value="${r.ref||''}"></td>
+        <td><input type="number" step="0.01" class="amt" value="${parseFloat(r.amount||0)||''}"></td>
+        <td>${badgeFor(r.status)}<div class="note">${r.note||''}</div></td>
+        <td><button type="button" class="del-btn" onclick="this.closest('tr').remove();recount()"><i class="fas fa-trash"></i></button></td>
+    </tr>`;
+}
+function renderRows(rows){
+    const body = document.getElementById('ocrBody');
+    body.innerHTML = rows.map(rowHtml).join('');
+    document.getElementById('resultCard').style.display='block';
+    recount();
+}
+function addRow(){
+    document.getElementById('ocrBody').insertAdjacentHTML('beforeend',
+        rowHtml({date:'',ref:'',amount:'',status:'uncertain',note:'Ajout manuel'}));
+    recount();
+}
+function recount(){
+    document.getElementById('rowCount').textContent = '('+document.querySelectorAll('#ocrBody tr').length+')';
+}
+function doImport(){
+    const rows = [];
+    document.querySelectorAll('#ocrBody tr').forEach(tr => {
+        const ref = tr.querySelector('.ref').value.trim().toUpperCase();
+        const amt = tr.querySelector('.amt').value;
+        const date = tr.querySelector('.date').value.trim();
+        if (ref) rows.push({ref, amount: amt||'0', date});
+    });
+    if (!rows.length){ alert('Aucune ligne à importer.'); return; }
+    if (!document.getElementById('month').value){ alert('Choisissez le mois.'); return; }
+    document.getElementById('reviewedRows').value = JSON.stringify(rows);
+    document.getElementById('ocrForm').submit();
+}
+</script>
+{% endblock %}

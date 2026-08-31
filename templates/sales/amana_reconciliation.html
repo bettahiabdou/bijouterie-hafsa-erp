@@ -90,6 +90,10 @@
     <p style="font-size:12px; color:var(--neutral-400); margin:12px 0 0;">
         Accepte les relevés <strong>PDF</strong> et les exports <strong>JSON</strong> de BaridBank (Al Barid Bank). Seules les lignes « CONTRE REMBOURSEMENT » portant un numéro de suivi (…MA) sont extraites (VERSEMENT et VIREMENT, tout préfixe). Un même fichier ne peut pas être importé deux fois.
     </p>
+    <p style="font-size:13px; margin:10px 0 0;">
+        <i class="fas fa-file-image" style="color:#b45309;"></i>
+        Relevé <strong>papier scanné</strong> (image) ? <a href="{% url 'sales:amana_ocr_page' %}">Importer via OCR</a> (lecture automatique + vérification).
+    </p>
 
     {% if statements %}
     <div style="margin-top:16px;">

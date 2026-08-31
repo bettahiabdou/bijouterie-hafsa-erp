@@ -5748,6 +5748,7 @@ def amana_statement_upload(request):
     """Upload one or more statement PDFs, parse and store them (idempotent)."""
     import hashlib
     import re
+    import json
     from django.urls import reverse
     from django.contrib import messages
     from .models import AmanaStatement, AmanaStatementLine
@@ -5762,6 +5763,31 @@ def amana_statement_upload(request):
     if not files:
         messages.error(request, "Veuillez sélectionner au moins un fichier (PDF ou JSON).")
         return redirect('sales:amana_reconciliation')
+
+    # Reviewed OCR rows: a human-corrected [{ref, amount}] list from the scanned
+    # -statement review screen. When present, use it as the authoritative lines
+    # for the single uploaded scan (no re-parsing).
+    reviewed_json = request.POST.get('reviewed_rows', '')
+    reviewed_lines = None
+    if reviewed_json:
+        try:
+            reviewed_lines = []
+            for row in json.loads(reviewed_json):
+                ref = normalize_ref(row.get('ref', ''))
+                if not ref:
+                    continue
+                try:
+                    amt = Decimal(str(row.get('amount', '0')))
+                except (InvalidOperation, ValueError):
+                    amt = Decimal('0')
+                reviewed_lines.append({
+                    'operation_date': row.get('date', ''),
+                    'value_date': row.get('date', ''),
+                    'tracking_ref': ref,
+                    'amount': amt,
+                })
+        except (ValueError, TypeError):
+            reviewed_lines = None
 
     imported, skipped, failed, dup_total = 0, 0, 0, 0
     # References already stored across ALL statements. A tracking ref = one
@@ -5780,7 +5806,9 @@ def amana_statement_upload(request):
             import io
             name = (f.name or '').lower()
             is_json = name.endswith('.json') or data.lstrip()[:1] in (b'{', b'[')
-            if is_json:
+            if reviewed_lines is not None:
+                lines = reviewed_lines
+            elif is_json:
                 lines = parse_json_statement(data)
             else:
                 lines = parse_statement_lines(extract_text(io.BytesIO(data)))
@@ -5837,3 +5865,32 @@ def amana_statement_delete(request, pk):
     stmt.delete()
     messages.success(request, "Relevé supprimé.")
     return redirect(f"{reverse('sales:amana_reconciliation')}?month={month}")
+
+
+@login_required(login_url='login')
+def amana_ocr_page(request):
+    """Review screen for importing a scanned (image) statement via OCR."""
+    return render(request, 'sales/amana_ocr.html', {})
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def amana_ocr_analyze(request):
+    """OCR a scanned statement and return candidate rows (ref + amount) as JSON,
+    each snapped to the closest known AMANA delivery where possible."""
+    from .amana_ocr import ocr_pdf, parse_ocr_rows, refine_rows
+    from .models import Delivery
+    f = request.FILES.get('file')
+    if not f:
+        return JsonResponse({'error': 'Aucun fichier fourni.'}, status=400)
+    try:
+        data = f.read()
+        text = ocr_pdf(data)
+        rows = parse_ocr_rows(text)
+        known = Delivery.objects.filter(
+            delivery_method_type='amana'
+        ).exclude(tracking_number='').values_list('tracking_number', flat=True)
+        refined = refine_rows(rows, known)
+        return JsonResponse({'rows': refined, 'count': len(refined)})
+    except Exception as e:
+        return JsonResponse({'error': f"Échec de l'analyse OCR : {e}"}, status=500)

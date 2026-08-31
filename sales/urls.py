@@ -66,6 +66,8 @@ urlpatterns = [
     # Rapprochement AMANA (COD statement reconciliation)
     path('rapprochement-amana/', views.amana_reconciliation, name='amana_reconciliation'),
     path('rapprochement-amana/upload/', views.amana_statement_upload, name='amana_statement_upload'),
+    path('rapprochement-amana/scan/', views.amana_ocr_page, name='amana_ocr_page'),
+    path('rapprochement-amana/scan/analyze/', views.amana_ocr_analyze, name='amana_ocr_analyze'),
     path('rapprochement-amana/<int:pk>/supprimer/', views.amana_statement_delete, name='amana_statement_delete'),
 
     # Circulation (online-selling flow)
