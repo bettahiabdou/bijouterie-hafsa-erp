@@ -79,14 +79,14 @@
         <div class="ocr-scroll">
             <table class="ocr-table">
                 <thead>
-                    <tr><th style="width:110px;">Date</th><th>Référence (QB…MA)</th><th style="width:140px;">Montant (DH)</th><th>État</th><th style="width:40px;"></th></tr>
+                    <tr><th style="width:36px;"><input type="checkbox" id="checkAll" onclick="toggleAll(this)" title="Tout cocher"></th><th style="width:110px;">Date</th><th>Référence (…MA)</th><th style="width:140px;">Montant (DH)</th><th>État</th><th style="width:40px;"></th></tr>
                 </thead>
                 <tbody id="ocrBody"></tbody>
             </table>
         </div>
-        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;">
-            <button type="button" class="btn btn-primary" onclick="doImport()"><i class="fas fa-file-import"></i> Importer les lignes</button>
-            <span class="note">Vérifiez surtout les montants (l'OCR se trompe souvent sur les chiffres) avant d'importer.</span>
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" onclick="doImport()"><i class="fas fa-file-import"></i> Importer les lignes cochées</button>
+            <span class="note">Les lignes <span class="badge green">sûres</span> sont cochées d'avance. Importez-les maintenant ; les lignes décochées (à vérifier) restent à l'écran pour plus tard. Vous pouvez réimporter autant de fois que nécessaire (aucun doublon).</span>
         </div>
     </div>
 </form>
@@ -94,6 +94,7 @@
 <script>
 const ANALYZE_URL = "{% url 'sales:amana_ocr_analyze' %}";
 const STATUS_URL = "{% url 'sales:amana_ocr_status' %}";
+const IMPORT_URL = "{% url 'sales:amana_ocr_import' %}";
 function getCookie(n){ const m=document.cookie.match('(^|;)\\s*'+n+'=([^;]+)'); return m?m.pop():''; }
 
 let pollTimer = null, pollTries = 0;
@@ -156,6 +157,7 @@ function rowHtml(r){
         noteHtml += ` <button type="button" class="sugg-btn" onclick="this.closest('tr').querySelector('.ref').value='${esc(r.suggestion)}';this.closest('tr').className='row-corrected';">Utiliser ${esc(r.suggestion)}</button>`;
     }
     return `<tr class="${cls}">
+        <td style="text-align:center;"><input type="checkbox" class="imp" onchange="recount()" ${r.status==='matched'?'checked':''}></td>
         <td><input type="text" class="date" value="${esc(r.date)}" placeholder="jj/mm/aaaa"></td>
         <td><input type="text" class="ref" value="${esc(r.ref)}"></td>
         <td><input type="number" step="0.01" class="amt" value="${parseFloat(r.amount||0)||''}"></td>
@@ -175,20 +177,44 @@ function addRow(){
     recount();
 }
 function recount(){
-    document.getElementById('rowCount').textContent = '('+document.querySelectorAll('#ocrBody tr').length+')';
+    const total = document.querySelectorAll('#ocrBody tr').length;
+    const checked = document.querySelectorAll('#ocrBody .imp:checked').length;
+    document.getElementById('rowCount').textContent = '('+checked+' cochée(s) / '+total+')';
+}
+function toggleAll(master){
+    document.querySelectorAll('#ocrBody .imp').forEach(c => c.checked = master.checked);
+    recount();
 }
 function doImport(){
-    const rows = [];
+    const rows = [], trs = [];
     document.querySelectorAll('#ocrBody tr').forEach(tr => {
+        const chk = tr.querySelector('.imp');
+        if (!chk || !chk.checked) return;
         const ref = tr.querySelector('.ref').value.trim().toUpperCase();
         const amt = tr.querySelector('.amt').value;
         const date = tr.querySelector('.date').value.trim();
-        if (ref) rows.push({ref, amount: amt||'0', date});
+        if (ref){ rows.push({ref, amount: amt||'0', date}); trs.push(tr); }
     });
-    if (!rows.length){ alert('Aucune ligne à importer.'); return; }
-    if (!document.getElementById('month').value){ alert('Choisissez le mois.'); return; }
-    document.getElementById('reviewedRows').value = JSON.stringify(rows);
-    document.getElementById('ocrForm').submit();
+    if (!rows.length){ alert('Cochez au moins une ligne à importer.'); return; }
+    const month = document.getElementById('month').value;
+    if (!month){ alert('Choisissez le mois du relevé.'); return; }
+    const body = new URLSearchParams();
+    body.append('month', month);
+    body.append('rows', JSON.stringify(rows));
+    fetch(IMPORT_URL, { method:'POST',
+        headers:{'X-CSRFToken':getCookie('csrftoken'),'Content-Type':'application/x-www-form-urlencoded'},
+        body })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error){ alert(d.error); return; }
+        trs.forEach(tr => tr.remove());   // banked rows leave the list
+        recount();
+        let msg = d.imported + ' ligne(s) importée(s).';
+        if (d.duplicates) msg += ' ' + d.duplicates + ' déjà importée(s) (ignorée(s)).';
+        msg += ' Les lignes non cochées restent ici pour vérification.';
+        alert(msg);
+      })
+      .catch(e => alert('Erreur: ' + e));
 }
 </script>
 {% endblock %}

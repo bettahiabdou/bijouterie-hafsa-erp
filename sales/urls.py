@@ -69,6 +69,7 @@ urlpatterns = [
     path('rapprochement-amana/scan/', views.amana_ocr_page, name='amana_ocr_page'),
     path('rapprochement-amana/scan/analyze/', views.amana_ocr_analyze, name='amana_ocr_analyze'),
     path('rapprochement-amana/scan/status/', views.amana_ocr_status, name='amana_ocr_status'),
+    path('rapprochement-amana/scan/import/', views.amana_ocr_import, name='amana_ocr_import'),
     path('rapprochement-amana/<int:pk>/supprimer/', views.amana_statement_delete, name='amana_statement_delete'),
 
     # Circulation (online-selling flow)

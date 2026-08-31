@@ -5971,3 +5971,60 @@ def amana_ocr_status(request):
         except Exception:
             pass
     return JsonResponse(d)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def amana_ocr_import(request):
+    """
+    Import a chosen subset of reviewed scan rows (AJAX, no page reload), so the
+    user can bank the sure lines now and come back to the uncertain ones later.
+    Deduplicates by tracking ref, so repeated/partial imports never double-count.
+    """
+    import re as _re
+    import json as _json
+    import uuid
+    from .models import AmanaStatement, AmanaStatementLine
+    from .amana_reconcile import normalize_ref
+
+    month = (request.POST.get('month') or '').strip()
+    if not _re.match(r'^\d{4}-\d{2}$', month or ''):
+        return JsonResponse({'error': 'Choisissez un mois valide (AAAA-MM).'}, status=400)
+    try:
+        rows = _json.loads(request.POST.get('rows', '[]'))
+    except (ValueError, TypeError):
+        rows = []
+
+    seen = set(normalize_ref(r) for r in AmanaStatementLine.objects.values_list('tracking_ref', flat=True))
+    to_add, dup = [], 0
+    for row in rows:
+        ref = normalize_ref(row.get('ref', '') if isinstance(row, dict) else '')
+        if not ref:
+            continue
+        if ref in seen:
+            dup += 1
+            continue
+        seen.add(ref)
+        try:
+            amt = Decimal(str(row.get('amount', '0')))
+        except (InvalidOperation, ValueError):
+            amt = Decimal('0')
+        to_add.append({'ref': ref, 'amount': amt, 'date': row.get('date', '')})
+
+    if not to_add:
+        return JsonResponse({'imported': 0, 'duplicates': dup})
+
+    stmt = AmanaStatement.objects.create(
+        month=month,
+        original_filename='Relevé scanné (OCR)',
+        sha256=(uuid.uuid4().hex + uuid.uuid4().hex)[:64],
+        line_count=len(to_add),
+        total_amount=sum((x['amount'] for x in to_add), Decimal('0')),
+        uploaded_by=request.user if request.user.is_authenticated else None,
+    )
+    AmanaStatementLine.objects.bulk_create([
+        AmanaStatementLine(statement=stmt, operation_date=x['date'],
+                           value_date=x['date'], tracking_ref=x['ref'], amount=x['amount'])
+        for x in to_add
+    ])
+    return JsonResponse({'imported': len(to_add), 'duplicates': dup})
