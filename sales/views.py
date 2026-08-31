@@ -5873,22 +5873,23 @@ def amana_ocr_page(request):
     return render(request, 'sales/amana_ocr.html', {})
 
 
-@login_required(login_url='login')
-@require_http_methods(["POST"])
-def amana_ocr_analyze(request):
-    """OCR a scanned statement and return candidate rows (ref + amount) as JSON,
-    each snapped to the closest known AMANA delivery where possible."""
+def _ocr_job_path(job_id):
+    import os
+    import tempfile
+    return os.path.join(tempfile.gettempdir(), f'amana_ocr_{job_id}.json')
+
+
+def _run_ocr_job(data, path):
+    """Background worker: OCR/AI-read the scan, refine, write result to `path`.
+    Runs in a thread so the web request returns immediately (Cloudflare caps
+    request time ~100s; a big multi-page scan can exceed that)."""
+    import json as _json
+    from django.db import connection
     from .amana_ocr import parse_ocr_rows, ai_extract_rows, refine_rows
     from .amana_reconcile import normalize_ref
     from .models import Delivery
     from payments.models import ClientPayment
-    f = request.FILES.get('file')
-    if not f:
-        return JsonResponse({'error': 'Aucun fichier fourni.'}, status=400)
     try:
-        data = f.read()
-        # Prefer the AI vision model (accurate on scans); fall back to local
-        # Tesseract OCR when the AI service isn't configured or errors.
         method = 'ia'
         rows = None
         try:
@@ -5898,8 +5899,6 @@ def amana_ocr_analyze(request):
         if rows is None:
             method = 'ocr'
             rows = parse_ocr_rows(data)
-        # Map each AMANA delivery tracking number -> its expected COD amount, so a
-        # matched row can take the amount from our data instead of the scan.
         deliveries = Delivery.objects.filter(
             delivery_method_type='amana'
         ).exclude(tracking_number='').values('tracking_number', 'invoice_id')
@@ -5915,6 +5914,60 @@ def amana_ocr_analyze(request):
             if key:
                 delivery_cod[key] = cod_by_invoice.get(d['invoice_id'], Decimal('0'))
         refined = refine_rows(rows, delivery_cod)
-        return JsonResponse({'rows': refined, 'count': len(refined), 'method': method})
+        with open(path, 'w') as fh:
+            _json.dump({'status': 'done', 'rows': refined, 'count': len(refined), 'method': method}, fh)
     except Exception as e:
-        return JsonResponse({'error': f"Échec de l'analyse : {e}"}, status=500)
+        with open(path, 'w') as fh:
+            _json.dump({'status': 'error', 'error': str(e)}, fh)
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def amana_ocr_analyze(request):
+    """Start a background OCR/AI read of the scan; returns a job id to poll."""
+    import json as _json
+    import uuid
+    import threading
+    f = request.FILES.get('file')
+    if not f:
+        return JsonResponse({'error': 'Aucun fichier fourni.'}, status=400)
+    data = f.read()
+    job_id = uuid.uuid4().hex
+    path = _ocr_job_path(job_id)
+    try:
+        with open(path, 'w') as fh:
+            _json.dump({'status': 'pending'}, fh)
+    except Exception:
+        pass
+    threading.Thread(target=_run_ocr_job, args=(data, path), daemon=True).start()
+    return JsonResponse({'job_id': job_id})
+
+
+@login_required(login_url='login')
+def amana_ocr_status(request):
+    """Poll the result of a background OCR job."""
+    import os
+    import re as _re
+    import json as _json
+    job = request.GET.get('job', '')
+    if not _re.fullmatch(r'[0-9a-f]{32}', job or ''):
+        return JsonResponse({'status': 'error', 'error': 'job invalide'}, status=400)
+    path = _ocr_job_path(job)
+    if not os.path.exists(path):
+        return JsonResponse({'status': 'pending'})
+    try:
+        with open(path) as fh:
+            d = _json.load(fh)
+    except Exception:
+        return JsonResponse({'status': 'pending'})
+    if d.get('status') in ('done', 'error'):
+        try:
+            os.remove(path)
+        except Exception:
+            pass
+    return JsonResponse(d)

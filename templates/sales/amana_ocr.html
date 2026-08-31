@@ -93,14 +93,17 @@
 
 <script>
 const ANALYZE_URL = "{% url 'sales:amana_ocr_analyze' %}";
+const STATUS_URL = "{% url 'sales:amana_ocr_status' %}";
 function getCookie(n){ const m=document.cookie.match('(^|;)\\s*'+n+'=([^;]+)'); return m?m.pop():''; }
+
+let pollTimer = null, pollTries = 0;
 
 function analyze(){
     const fileInput = document.getElementById('scanfile');
     if (!fileInput.files.length){ alert('Choisissez d\'abord un fichier scanné.'); return; }
     const btn = document.getElementById('analyzeBtn');
     const status = document.getElementById('ocrStatus');
-    btn.disabled = true; status.textContent = 'Lecture du scan en cours (IA)… cela peut prendre quelques secondes.';
+    btn.disabled = true; status.textContent = 'Envoi du scan…';
     const fd = new FormData();
     fd.append('file', fileInput.files[0]);
     fetch(ANALYZE_URL, { method:'POST', headers:{'X-CSRFToken':getCookie('csrftoken')}, body: fd })
@@ -108,22 +111,37 @@ function analyze(){
         const ct = r.headers.get('content-type') || '';
         if (!ct.includes('application/json')) {
             await r.text();
-            let msg = 'Le serveur a renvoyé une erreur (HTTP ' + r.status + ').';
-            if (r.status===502 || r.status===504 || r.status===0) {
-                msg += ' Le traitement IA a probablement dépassé le délai du serveur (timeout). Augmentez le timeout de gunicorn.';
-            }
-            throw new Error(msg);
+            throw new Error('Le serveur a renvoyé une erreur (HTTP ' + r.status + ').');
         }
         return { ok: r.ok, d: await r.json() };
       })
       .then(({ok, d}) => {
-        btn.disabled = false;
-        if (!ok){ status.textContent = ''; alert(d.error || 'Erreur de lecture'); return; }
+        if (!ok || !d.job_id){ btn.disabled=false; status.textContent=''; alert(d.error || 'Erreur au démarrage.'); return; }
+        status.textContent = 'Lecture du scan en cours (IA)… cela peut prendre jusqu\'à une minute pour un gros fichier.';
+        pollTries = 0;
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(() => pollStatus(d.job_id), 3000);
+      })
+      .catch(e => { btn.disabled = false; status.textContent=''; alert(e.message || ('Erreur: '+e)); });
+}
+
+function pollStatus(jobId){
+    pollTries++;
+    if (pollTries > 100){ clearInterval(pollTimer); document.getElementById('analyzeBtn').disabled=false;
+        document.getElementById('ocrStatus').textContent=''; alert('Délai dépassé. Réessayez avec un scan plus léger (niveaux de gris).'); return; }
+    fetch(STATUS_URL + '?job=' + jobId)
+      .then(r => r.json())
+      .then(d => {
+        if (d.status === 'pending') return;  // keep polling
+        clearInterval(pollTimer);
+        const btn = document.getElementById('analyzeBtn'); btn.disabled = false;
+        const status = document.getElementById('ocrStatus');
+        if (d.status === 'error'){ status.textContent=''; alert(d.error || 'Erreur de lecture.'); return; }
         renderRows(d.rows || []);
         const via = d.method === 'ia' ? 'lecture par IA (Scaleway)' : 'OCR local';
         status.textContent = (d.count || 0) + ' ligne(s) lues — ' + via + '.';
       })
-      .catch(e => { btn.disabled = false; status.textContent=''; alert(e.message || ('Erreur: '+e)); });
+      .catch(() => { /* transient; keep polling */ });
 }
 
 function badgeFor(st){
