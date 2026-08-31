@@ -162,16 +162,27 @@ def _parse_ai_json(text):
     if clean.startswith('```'):
         lines = clean.split('\n')
         clean = '\n'.join(lines[1:-1] if lines[-1].strip() == '```' else lines[1:])
+    items = None
     try:
         data = json.loads(clean)
+        items = data.get('rows', data) if isinstance(data, dict) else data
     except (ValueError, TypeError):
-        return []
-    items = data.get('rows', data) if isinstance(data, dict) else data
+        # The output was likely truncated at the token limit -> the whole array
+        # won't parse. Salvage every COMPLETE {…} row object instead of losing
+        # the entire page.
+        items = []
+        for m in re.finditer(r'\{[^{}]*\}', clean):
+            try:
+                items.append(json.loads(m.group(0)))
+            except (ValueError, TypeError):
+                continue
     out = []
     for it in (items or []):
         if not isinstance(it, dict):
             continue
         ref = re.sub(r'[^A-Za-z0-9]', '', str(it.get('ref', ''))).upper()
+        if not ref:
+            continue
         out.append({'date': str(it.get('date', '')), 'raw_ref': ref,
                     'amount': _clean_amount(str(it.get('amount', '0')))})
     return out
@@ -216,7 +227,7 @@ def ai_extract_rows(data_bytes, dpi=200, model=None):
             prompt=AI_PROMPT,
             model=model,
             temperature=0.0,
-            max_tokens=3000,
+            max_tokens=8000,
             response_format={'type': 'json_object'},
         )
         rows.extend(_parse_ai_json(resp))
