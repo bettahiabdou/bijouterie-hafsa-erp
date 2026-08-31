@@ -183,9 +183,17 @@ def ai_extract_rows(data_bytes, dpi=200, model=None):
     than Tesseract). Returns the same row dicts as parse_ocr_rows, or None if the
     AI service isn't configured (so the caller can fall back to Tesseract).
     """
+    import os
     from ai_services import scaleway_client
     if not scaleway_client.is_configured():
         return None
+    # Default to the larger vision model (Qwen-VL based, far better at dense
+    # document text than pixtral). Override with the AMANA_OCR_MODEL env var,
+    # e.g. "mistral-medium-3.5-128b".
+    if model is None:
+        model = (os.getenv('AMANA_OCR_MODEL')
+                 or scaleway_client.MODELS.get('vision_large')
+                 or scaleway_client.MODELS['vision'])
     import pymupdf
     import io
     from PIL import Image
@@ -206,7 +214,7 @@ def ai_extract_rows(data_bytes, dpi=200, model=None):
         resp = scaleway_client.vision_completion(
             image_data=jpg,
             prompt=AI_PROMPT,
-            model=model or scaleway_client.MODELS['vision'],
+            model=model,
             temperature=0.0,
             max_tokens=3000,
             response_format={'type': 'json_object'},
