@@ -5752,7 +5752,7 @@ def amana_statement_upload(request):
     from django.urls import reverse
     from django.contrib import messages
     from .models import AmanaStatement, AmanaStatementLine
-    from .amana_reconcile import extract_text, parse_statement_lines, parse_json_statement
+    from .amana_reconcile import extract_text, parse_statement_lines, parse_json_statement, normalize_ref
 
     month = (request.POST.get('month') or '').strip()
     files = request.FILES.getlist('files')
@@ -5764,7 +5764,13 @@ def amana_statement_upload(request):
         messages.error(request, "Veuillez sélectionner au moins un fichier (PDF ou JSON).")
         return redirect('sales:amana_reconciliation')
 
-    imported, skipped, failed = 0, 0, 0
+    imported, skipped, failed, dup_total = 0, 0, 0, 0
+    # References already stored across ALL statements. A tracking ref = one
+    # parcel = one COD remittance, so a ref seen again (overlapping periods) is a
+    # duplicate and is dropped, so no total ever counts the same payment twice.
+    seen_refs = set(
+        normalize_ref(r) for r in AmanaStatementLine.objects.values_list('tracking_ref', flat=True)
+    )
     for f in files:
         try:
             data = f.read()
@@ -5779,12 +5785,21 @@ def amana_statement_upload(request):
                 lines = parse_json_statement(data)
             else:
                 lines = parse_statement_lines(extract_text(io.BytesIO(data)))
-            total = sum((l['amount'] for l in lines), Decimal('0'))
+            # Drop payments already imported (deduplicate by tracking ref).
+            unique_lines = []
+            for l in lines:
+                k = normalize_ref(l['tracking_ref'])
+                if k in seen_refs:
+                    dup_total += 1
+                    continue
+                seen_refs.add(k)
+                unique_lines.append(l)
+            total = sum((l['amount'] for l in unique_lines), Decimal('0'))
             stmt = AmanaStatement.objects.create(
                 month=month,
                 original_filename=f.name,
                 sha256=sha,
-                line_count=len(lines),
+                line_count=len(unique_lines),
                 total_amount=total,
                 uploaded_by=request.user if request.user.is_authenticated else None,
             )
@@ -5795,7 +5810,7 @@ def amana_statement_upload(request):
                     value_date=l['value_date'],
                     tracking_ref=l['tracking_ref'],
                     amount=l['amount'],
-                ) for l in lines
+                ) for l in unique_lines
             ])
             imported += 1
         except Exception as e:
@@ -5804,6 +5819,8 @@ def amana_statement_upload(request):
 
     if imported:
         messages.success(request, f"{imported} relevé(s) importé(s).")
+    if dup_total:
+        messages.info(request, f"{dup_total} paiement(s) en double ignoré(s) (déjà présents dans un autre relevé).")
     if skipped:
         messages.info(request, f"{skipped} relevé(s) déjà importé(s) (ignoré).")
     return redirect(f"{reverse('sales:amana_reconciliation')}?month={month}")
