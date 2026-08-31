@@ -104,7 +104,18 @@ function analyze(){
     const fd = new FormData();
     fd.append('file', fileInput.files[0]);
     fetch(ANALYZE_URL, { method:'POST', headers:{'X-CSRFToken':getCookie('csrftoken')}, body: fd })
-      .then(r => r.json().then(d => ({ok:r.ok, d})))
+      .then(async r => {
+        const ct = r.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+            await r.text();
+            let msg = 'Le serveur a renvoyé une erreur (HTTP ' + r.status + ').';
+            if (r.status===502 || r.status===504 || r.status===0) {
+                msg += ' Le traitement IA a probablement dépassé le délai du serveur (timeout). Augmentez le timeout de gunicorn.';
+            }
+            throw new Error(msg);
+        }
+        return { ok: r.ok, d: await r.json() };
+      })
       .then(({ok, d}) => {
         btn.disabled = false;
         if (!ok){ status.textContent = ''; alert(d.error || 'Erreur de lecture'); return; }
@@ -112,7 +123,7 @@ function analyze(){
         const via = d.method === 'ia' ? 'lecture par IA (Scaleway)' : 'OCR local';
         status.textContent = (d.count || 0) + ' ligne(s) lues — ' + via + '.';
       })
-      .catch(e => { btn.disabled = false; status.textContent=''; alert('Erreur: '+e); });
+      .catch(e => { btn.disabled = false; status.textContent=''; alert(e.message || ('Erreur: '+e)); });
 }
 
 function badgeFor(st){
