@@ -5680,13 +5680,26 @@ def amana_reconciliation(request):
 
     # All AMANA deliveries that carry a tracking number.
     # Returned parcels never collect COD, so they are not reconciliation candidates.
-    deliveries = list(
+    import re as _re
+    base_deliveries = (
         Delivery.objects.filter(delivery_method_type='amana')
         .exclude(tracking_number='')
         .exclude(status='returned')
-        .select_related('invoice', 'invoice__seller')
-        .order_by('-created_at')
     )
+    # Optional filter by the delivery's month (created_at), so a huge backlog can
+    # be worked through one month at a time.
+    dmonth = request.GET.get('dmonth', '')
+    deliveries_qs = base_deliveries
+    if _re.match(r'^\d{4}-\d{2}$', dmonth or ''):
+        y, m = dmonth.split('-')
+        deliveries_qs = deliveries_qs.filter(created_at__year=int(y), created_at__month=int(m))
+    deliveries = list(
+        deliveries_qs.select_related('invoice', 'invoice__seller').order_by('-created_at')
+    )
+    delivery_months = [
+        dt.strftime('%Y-%m')
+        for dt in base_deliveries.dates('created_at', 'month', order='DESC')
+    ]
 
     # Expected COD per delivery (carrier-collected payments on its invoice)
     invoice_ids = [d.invoice_id for d in deliveries if d.invoice_id]
@@ -5738,8 +5751,51 @@ def amana_reconciliation(request):
         'nb_pending': len(non_encaissees),
         'nb_mismatch': nb_mismatch,
         'nb_statements': AmanaStatement.objects.count(),
+        'delivery_months': delivery_months,
+        'dmonth': dmonth,
     }
     return render(request, 'sales/amana_reconciliation.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def amana_mark_encaisse(request):
+    """Manually mark a pending AMANA delivery as encaissé (money received),
+    without a bank statement. Creates a line in a per-month 'Encaissement manuel'
+    statement so it moves to the encaissées bucket. Deduped by tracking ref."""
+    import hashlib
+    from .models import Delivery, AmanaStatement, AmanaStatementLine
+    from .amana_reconcile import normalize_ref
+    from payments.models import ClientPayment
+
+    delivery = get_object_or_404(Delivery, pk=request.POST.get('delivery_id'))
+    ref = normalize_ref(delivery.tracking_number)
+    if not ref:
+        return JsonResponse({'error': 'Livraison sans numéro de suivi.'}, status=400)
+    if AmanaStatementLine.objects.filter(tracking_ref=ref).exists():
+        return JsonResponse({'ok': True, 'already': True})
+
+    expected = Decimal('0')
+    if delivery.invoice_id:
+        expected = ClientPayment.objects.filter(
+            sale_invoice_id=delivery.invoice_id,
+            payment_method__collected_by_carrier=True,
+        ).aggregate(t=Sum('amount'))['t'] or Decimal('0')
+
+    month = delivery.created_at.strftime('%Y-%m') if delivery.created_at else '0000-00'
+    sha = hashlib.sha256(f'manual-encaisse-{month}'.encode()).hexdigest()
+    stmt, _ = AmanaStatement.objects.get_or_create(
+        sha256=sha,
+        defaults={'month': month, 'original_filename': 'Encaissement manuel',
+                  'uploaded_by': request.user if request.user.is_authenticated else None},
+    )
+    AmanaStatementLine.objects.create(
+        statement=stmt, operation_date='', value_date='', tracking_ref=ref, amount=expected)
+    agg = stmt.lines.aggregate(t=Sum('amount'), n=Count('id'))
+    stmt.total_amount = agg['t'] or Decimal('0')
+    stmt.line_count = agg['n'] or 0
+    stmt.save(update_fields=['total_amount', 'line_count'])
+    return JsonResponse({'ok': True})
 
 
 @login_required(login_url='login')
