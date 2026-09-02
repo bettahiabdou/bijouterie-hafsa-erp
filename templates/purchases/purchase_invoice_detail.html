@@ -30,6 +30,31 @@
     <div class="detail-layout">
         <!-- Main Content -->
         <div class="detail-main">
+            <!-- Top payment summary (paid vs owed) -->
+            <div class="card animate-slide-up">
+                <div class="card-body">
+                    <div style="display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:space-between;">
+                        <div style="display:flex; gap:28px; flex-wrap:wrap;">
+                            <div>
+                                <div class="info-label">Total facture</div>
+                                <div style="font-size:22px; font-weight:800; color:var(--neutral-800);">{{ dynamic_total|floatformat:2 }} DH</div>
+                            </div>
+                            <div>
+                                <div class="info-label">Payé</div>
+                                <div style="font-size:22px; font-weight:800; color:var(--success-600);">{{ invoice.amount_paid|floatformat:2 }} DH</div>
+                            </div>
+                            <div>
+                                <div class="info-label">Reste dû</div>
+                                <div style="font-size:22px; font-weight:800; color:{% if dynamic_balance > 0 %}var(--error-600){% else %}var(--success-600){% endif %};">{{ dynamic_balance|floatformat:2 }} DH</div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-success btn-sm" onclick="document.getElementById('paymentModal').classList.add('active')">
+                            <i class="fas fa-plus mr-1"></i> Ajouter un paiement
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Supplier Info -->
             <div class="card animate-slide-up">
                 <div class="card-header">
@@ -69,6 +94,10 @@
                         <button type="button" class="btn btn-primary btn-sm" onclick="openBulkCreateModal()">
                             <i class="fas fa-plus"></i>
                             <span>Créer en Lot</span>
+                        </button>
+                        <button type="button" class="btn btn-warning btn-sm" onclick="document.getElementById('goldModal').classList.add('active')" title="Acheter de l'or au gramme (ligne de coût, sans produit)">
+                            <i class="fas fa-coins"></i>
+                            <span>Acheter Or (g)</span>
                         </button>
                     </div>
                 </div>
@@ -1851,6 +1880,58 @@
     </div>
 
     <!-- Payment Modal -->
+    <!-- Gold (grams) purchase modal -->
+    <div id="goldModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-coins mr-2"></i> Acheter de l'or (au gramme)</h3>
+                <button type="button" class="modal-close" onclick="document.getElementById('goldModal').classList.remove('active')">&times;</button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_gold_grams">
+                <div class="modal-body">
+                    <p class="text-muted" style="font-size:13px; margin-bottom:12px;">Achat d'or brut au gramme : une simple ligne de coût sur la facture (aucun produit créé).</p>
+                    <div class="form-group">
+                        <label class="form-label">Pureté (titre)</label>
+                        <select name="gold_purity" id="goldPurity" class="form-select" required>
+                            <option value="">-- Sélectionner --</option>
+                            {% for p in purities %}
+                            <option value="{{ p.id }}">{{ p.metal_type.name }} - {{ p.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Poids (grammes)</label>
+                        <input type="number" name="gold_weight" id="goldWeight" step="0.001" min="0.001" class="form-input" oninput="updateGoldTotal()" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Prix par gramme (DH)</label>
+                        <input type="number" name="gold_price_per_gram" id="goldPricePg" step="0.01" min="0.01" class="form-input" oninput="updateGoldTotal()" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Note (facultatif)</label>
+                        <input type="text" name="gold_note" class="form-input" placeholder="ex: Or 18K de M. Driouch">
+                    </div>
+                    <div style="background:var(--neutral-50,#f8f8f8); border-radius:8px; padding:10px 12px; font-weight:700;">
+                        Total : <span id="goldTotal">0,00</span> DH
+                    </div>
+                </div>
+                <div class="modal-footer" style="display:flex; gap:8px; justify-content:flex-end; padding:14px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('goldModal').classList.remove('active')">Annuler</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-coins"></i> Ajouter à la facture</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    function updateGoldTotal(){
+        var w = parseFloat(document.getElementById('goldWeight').value) || 0;
+        var p = parseFloat(document.getElementById('goldPricePg').value) || 0;
+        document.getElementById('goldTotal').textContent = (w*p).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
+    </script>
+
     <div id="paymentModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 500px; max-height: 90vh;">
             <div class="modal-header">

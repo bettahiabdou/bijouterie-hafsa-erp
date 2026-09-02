@@ -607,6 +607,37 @@ def purchase_invoice_detail(request, reference):
 
             return redirect('purchases:purchase_invoice_detail', reference=invoice.reference)
 
+        # Handle buying raw gold by the gram: a cost line only (no product, no
+        # inventory). Weight + purity + price/gram -> total added to the invoice.
+        elif action == 'add_gold_grams':
+            from settings_app.models import MetalPurity, ProductCategory
+            try:
+                weight = Decimal(request.POST.get('gold_weight', '0') or '0')
+                price_pg = Decimal(request.POST.get('gold_price_per_gram', '0') or '0')
+            except (InvalidOperation, ValueError, TypeError):
+                weight = price_pg = Decimal('0')
+            purity = MetalPurity.objects.filter(
+                pk=request.POST.get('gold_purity', '') or 0
+            ).select_related('metal_type').first()
+            note = (request.POST.get('gold_note', '') or '').strip()
+            if weight <= 0 or price_pg <= 0 or not purity:
+                messages.error(request, "Poids, prix/g et pureté sont requis pour l'achat d'or.")
+            else:
+                total = (weight * price_pg).quantize(Decimal('0.01'))
+                cat, _ = ProductCategory.objects.get_or_create(
+                    name='Or (grammes)', defaults={'code': 'OR-GRAMMES'})
+                PurchaseInvoiceItem.objects.create(
+                    invoice=invoice, product=None,
+                    description=note or f"Or {purity.name} — {weight} g",
+                    category=cat, metal_type=purity.metal_type, metal_purity=purity,
+                    gross_weight=weight, net_weight=weight, price_per_gram=price_pg,
+                    metal_cost=total, total_amount=total,
+                )
+                invoice.calculate_totals()
+                invoice.save()
+                messages.success(request, f"Or ajouté : {weight} g × {price_pg} DH/g = {total} DH.")
+            return redirect('purchases:purchase_invoice_detail', reference=invoice.reference)
+
         # Handle remove item action (just remove from invoice, product back to available)
         elif action == 'remove_item':
             item_id = request.POST.get('item_id')
