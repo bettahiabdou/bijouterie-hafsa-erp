@@ -1893,6 +1893,10 @@
                 <div class="modal-body">
                     <p class="text-muted" style="font-size:13px; margin-bottom:12px;">Achat d'or brut au gramme : une simple ligne de coût sur la facture (aucun produit créé).</p>
                     <div class="form-group">
+                        <label class="form-label">Date d'achat</label>
+                        <input type="date" name="gold_date" class="form-input" value="{{ today|date:'Y-m-d' }}">
+                    </div>
+                    <div class="form-group">
                         <label class="form-label">Pureté (titre)</label>
                         <select name="gold_purity" id="goldPurity" class="form-select" required>
                             <option value="">-- Sélectionner --</option>
@@ -1908,6 +1912,10 @@
                     <div class="form-group">
                         <label class="form-label">Prix par gramme (DH)</label>
                         <input type="number" name="gold_price_per_gram" id="goldPricePg" step="0.01" min="0.01" class="form-input" oninput="updateGoldTotal()" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Main d'œuvre (DH) <span class="text-muted" style="font-weight:400;">— facultatif</span></label>
+                        <input type="number" name="gold_labor" id="goldLabor" step="0.01" min="0" class="form-input" placeholder="0.00" oninput="updateGoldTotal()">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Note (facultatif)</label>
@@ -1928,7 +1936,8 @@
     function updateGoldTotal(){
         var w = parseFloat(document.getElementById('goldWeight').value) || 0;
         var p = parseFloat(document.getElementById('goldPricePg').value) || 0;
-        document.getElementById('goldTotal').textContent = (w*p).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
+        var l = parseFloat(document.getElementById('goldLabor').value) || 0;
+        document.getElementById('goldTotal').textContent = (w*p + l).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
     </script>
 
