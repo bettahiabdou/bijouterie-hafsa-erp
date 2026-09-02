@@ -135,12 +135,13 @@
             </select>
         </span>
     </h3>
+    <input type="text" id="pendSearch" onkeyup="filterTable('pendSearch','pendTbody')" placeholder="Rechercher (référence, client, suivi)…" style="width:100%; max-width:360px; margin-bottom:12px; padding:8px 10px; border:1px solid var(--neutral-300); border-radius:8px; font-size:14px;">
     <div class="rec-scroll">
         <table class="rec-table">
             <thead>
                 <tr><th>Livraison</th><th>Client</th><th>Suivi</th><th class="num">Montant attendu</th><th>Statut livraison</th><th></th></tr>
             </thead>
-            <tbody>
+            <tbody id="pendTbody">
                 {% for r in non_encaissees %}
                 <tr id="pending-{{ r.delivery.id }}">
                     <td class="mono">{{ r.delivery.reference }}</td>
@@ -161,15 +162,20 @@
     </div>
 </div>
 
-<!-- Encaissées -->
+<!-- Encaissées (collapsible) -->
 <div class="rec-card">
-    <h3><i class="fas fa-check-circle" style="color:#16a34a;"></i> Encaissées ({{ nb_encaisse }})</h3>
+    <h3 style="cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:space-between; margin:0;" onclick="toggleEncaisse()">
+        <span><i class="fas fa-check-circle" style="color:#16a34a;"></i> Encaissées ({{ nb_encaisse }})</span>
+        <i id="encChevron" class="fas fa-chevron-down" style="font-size:13px; color:var(--neutral-400);"></i>
+    </h3>
+    <div id="encBody" style="display:none; margin-top:14px;">
+    <input type="text" id="encSearch" onkeyup="filterTable('encSearch','encTbody')" placeholder="Rechercher (référence, client, suivi)…" style="width:100%; max-width:360px; margin-bottom:12px; padding:8px 10px; border:1px solid var(--neutral-300); border-radius:8px; font-size:14px;">
     <div class="rec-scroll">
         <table class="rec-table">
             <thead>
                 <tr><th>Livraison</th><th>Client</th><th>Suivi</th><th class="num">Attendu</th><th class="num">Reçu (banque)</th><th>Date</th><th>Relevé</th><th></th></tr>
             </thead>
-            <tbody>
+            <tbody id="encTbody">
                 {% for r in encaissees %}
                 <tr>
                     <td class="mono">{{ r.delivery.reference }}</td>
@@ -187,6 +193,7 @@
             </tbody>
         </table>
     </div>
+    </div><!-- /encBody -->
 </div>
 
 <script>
@@ -202,6 +209,24 @@ function toggleImport(){
 }
 // Restore last state; default collapsed.
 try { if (localStorage.getItem('amanaImportOpen') === '1') toggleImport(); } catch(e){}
+
+function toggleEncaisse(){
+    const body = document.getElementById('encBody');
+    const chev = document.getElementById('encChevron');
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    chev.className = 'fas fa-chevron-' + (open ? 'down' : 'up');
+    try { localStorage.setItem('amanaEncOpen', open ? '0' : '1'); } catch(e){}
+}
+try { if (localStorage.getItem('amanaEncOpen') === '1') toggleEncaisse(); } catch(e){}
+
+function filterTable(inputId, tbodyId){
+    const q = (document.getElementById(inputId).value || '').toLowerCase();
+    document.querySelectorAll('#' + tbodyId + ' tr').forEach(tr => {
+        if (tr.querySelector('.empty')) return;
+        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
 
 function markEncaisse(id, btn){
     if (!confirm('Marquer cette livraison comme encaissée (argent reçu) ?')) return;
