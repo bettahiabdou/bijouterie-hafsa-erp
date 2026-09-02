@@ -1882,7 +1882,7 @@
     <!-- Payment Modal -->
     <!-- Gold (grams) purchase modal -->
     <div id="goldModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 480px;">
+        <div class="modal-content" style="max-width: 480px; max-height: 90vh;">
             <div class="modal-header">
                 <h3><i class="fas fa-coins mr-2"></i> Acheter de l'or (au gramme)</h3>
                 <button type="button" class="modal-close" onclick="document.getElementById('goldModal').classList.remove('active')">&times;</button>
@@ -1890,7 +1890,7 @@
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="add_gold_grams">
-                <div class="modal-body">
+                <div class="modal-body" style="max-height:60vh; overflow-y:auto;">
                     <p class="text-muted" style="font-size:13px; margin-bottom:12px;">Achat d'or brut au gramme : une simple ligne de coût sur la facture (aucun produit créé).</p>
                     <div class="form-group">
                         <label class="form-label">Date d'achat</label>
