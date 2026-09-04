@@ -3347,11 +3347,12 @@ def stock_count_scan(request, pk):
 
     product = _resolve_product_by_code(code)
     if product:
-        already = session.scans.filter(product=product).exists()
-        if already:
+        existing = session.scans.filter(product=product).first()
+        if existing:
             result = 'duplicate'
+            scan_obj = existing
         else:
-            StockCountScan.objects.create(session=session, product=product, code=code)
+            scan_obj = StockCountScan.objects.create(session=session, product=product, code=code)
             result = 'counted'
         img = ''
         if product.main_image:
@@ -3369,15 +3370,38 @@ def stock_count_scan(request, pk):
                 'metal': product.metal_type.name if product.metal_type else '',
                 'weight': f'{product.gross_weight:.2f}' if product.gross_weight is not None else '',
             },
+            'scan_id': scan_obj.id,
         }
     else:
-        StockCountScan.objects.create(session=session, product=None, code=code)
-        payload = {'ok': True, 'result': 'unknown', 'code': code}
+        scan_obj = StockCountScan.objects.create(session=session, product=None, code=code)
+        payload = {'ok': True, 'result': 'unknown', 'code': code, 'scan_id': scan_obj.id}
 
     payload['scanned_count'] = session.scans.filter(product__isnull=False).values('product').distinct().count()
     _g = session.scans.filter(product__isnull=False).aggregate(g=Sum('product__gross_weight'))['g'] or 0
     payload['scanned_grams'] = f'{_g:.2f}'
     return JsonResponse(payload)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def stock_count_scan_remove(request, pk):
+    """Remove a single scan from an open session (undo a scanned line)."""
+    import json as _json
+    session = get_object_or_404(StockCountSession, pk=pk)
+    if session.status != 'open':
+        return JsonResponse({'ok': False, 'error': 'Session terminée.'}, status=409)
+    try:
+        data = _json.loads(request.body or '{}')
+    except ValueError:
+        data = {}
+    scan_id = data.get('scan_id')
+    deleted = 0
+    if scan_id:
+        deleted, _ = session.scans.filter(id=scan_id).delete()
+    scanned_count = session.scans.filter(product__isnull=False).values('product').distinct().count()
+    _g = session.scans.filter(product__isnull=False).aggregate(g=Sum('product__gross_weight'))['g'] or 0
+    return JsonResponse({'ok': True, 'deleted': deleted, 'scanned_count': scanned_count,
+                         'scanned_grams': f'{_g:.2f}'})
 
 
 @login_required(login_url='login')

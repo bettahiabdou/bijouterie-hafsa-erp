@@ -48,13 +48,14 @@
         <div class="card-body">
             <div id="sc-list">
                 {% for sc in scans %}
-                    <div class="sc-row {% if sc.product %}{% if sc.product.status == 'available' %}sc-ok{% else %}sc-err{% endif %}{% else %}sc-err{% endif %}">
+                    <div class="sc-row {% if sc.product %}{% if sc.product.status == 'available' %}sc-ok{% else %}sc-err{% endif %}{% else %}sc-err{% endif %}" data-scan-id="{{ sc.id }}">
                         <span class="sc-label">{% if sc.product %}✓{% else %}?{% endif %}</span>
                         {% if sc.product %}{% if sc.product.main_image %}<img class="sc-thumb" src="{{ sc.product.main_image.url }}" alt="">{% elif sc.product.images.first %}<img class="sc-thumb" src="{{ sc.product.images.first.image.url }}" alt="">{% else %}<span class="sc-thumb sc-thumb-empty"><i class="fas fa-gem"></i></span>{% endif %}{% endif %}
                         <div class="sc-row-body">
                             <div><strong>{% if sc.product %}{{ sc.product.reference }}{% else %}{{ sc.code }}{% endif %}</strong> {{ sc.product.name|default:'' }}</div>
                             {% if sc.product %}<div class="sc-row-meta">{{ sc.product.metal_type.name|default:'-' }} · {{ sc.product.gross_weight|floatformat:2 }} g</div>{% endif %}
                         </div>
+                        <button type="button" class="sc-remove" title="Retirer du scan">&times;</button>
                     </div>
                 {% empty %}
                     <p class="text-muted" id="sc-empty">Aucun scan pour l'instant.</p>
@@ -294,6 +295,8 @@
     .sc-row .sc-label { font-weight:700; font-size:var(--text-sm); }
     .sc-row-body { display:flex; flex-direction:column; gap:2px; min-width:0; }
     .sc-row-meta { font-size:12px; color:var(--neutral-500,#6b7280); }
+    .sc-remove { margin-left:auto; flex-shrink:0; width:34px; height:34px; border:1px solid var(--neutral-200,#e5e7eb); background:#fff; color:var(--error-600,#dc2626); border-radius:8px; font-size:22px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .sc-remove:hover { background:var(--error-50,#fef2f2); border-color:var(--error-300,#fca5a5); }
     .sc-block-thumb { width:120px; height:120px; object-fit:cover; border-radius:12px; border:1px solid var(--neutral-200,#e5e7eb); margin:12px auto 0; }
     .sc-block-meta { font-size:14px; margin-top:8px; color:var(--neutral-700,#374151); font-weight:600; }
     .sc-row.sc-ok { background:var(--success-50,#f0fdf4); }
@@ -332,6 +335,7 @@
 <script>
 (function(){
     const scanUrl = "{% url 'products:stock_count_scan' session.id %}";
+    const removeUrl = "{% url 'products:stock_count_scan_remove' session.id %}";
     const csrf = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
     const input = document.getElementById('sc-input');
     const list = document.getElementById('sc-list');
@@ -380,6 +384,26 @@
     function resumeScan(){ paused = false; blockModal.style.display='none'; try{ input.value=''; input.focus(); }catch(e){} }
     document.getElementById('sc-block-continue').addEventListener('click', resumeScan);
 
+    // Remove a scanned line (undo).
+    function removeScan(scanId, rowEl){
+        if(!scanId){ if(rowEl) rowEl.remove(); return; }
+        fetch(removeUrl, { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body:JSON.stringify({scan_id: scanId}) })
+            .then(r => r.json()).then(d => {
+                if(!d.ok){ showHint(d.error || 'Erreur', 'err'); return; }
+                counter.textContent = d.scanned_count;
+                if(grams && d.scanned_grams !== undefined) grams.textContent = d.scanned_grams;
+                if(rowEl) rowEl.remove();
+                showHint('Ligne retirée', 'warn');
+            }).catch(()=>{ showHint('Erreur de connexion', 'err'); });
+    }
+    list.addEventListener('click', function(e){
+        const btn = e.target.closest('.sc-remove');
+        if(!btn) return;
+        e.preventDefault();
+        const row = btn.closest('.sc-row');
+        if(row) removeScan(row.getAttribute('data-scan-id'), row);
+    });
+
     function scanCode(code){
         if(paused) return;
         code = (code||'').trim();
@@ -411,7 +435,9 @@
                         : '<span class="sc-thumb sc-thumb-empty"><i class="fas fa-gem"></i></span>';
                     meta = '<div class="sc-row-meta">' + (d.product.metal || '-') + ' · ' + (d.product.weight || '0.00') + ' g</div>';
                 }
-                list.insertAdjacentHTML('afterbegin', '<div class="sc-row ' + cls + '"><span class="sc-label">' + label + '</span>' + thumb + '<div class="sc-row-body"><div><strong>' + ref + '</strong> ' + name + extra + '</div>' + meta + '</div></div>');
+                const sid = (d.scan_id !== undefined && d.scan_id !== null) ? d.scan_id : '';
+                const rmBtn = sid !== '' ? '<button type="button" class="sc-remove" title="Retirer du scan">&times;</button>' : '';
+                list.insertAdjacentHTML('afterbegin', '<div class="sc-row ' + cls + '" data-scan-id="' + sid + '"><span class="sc-label">' + label + '</span>' + thumb + '<div class="sc-row-body"><div><strong>' + ref + '</strong> ' + name + extra + '</div>' + meta + '</div>' + rmBtn + '</div>');
 
                 // Blocking anomalies: duplicate, sold/not-available, or unknown tag.
                 if(d.result === 'duplicate'){
