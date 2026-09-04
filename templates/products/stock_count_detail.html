@@ -64,6 +64,19 @@
         </div>
     </div>
 
+    <!-- Blocking anomaly overlay: stops scanning until the operator clicks Continuer -->
+    <div id="sc-block" class="sc-block-modal" style="display:none;">
+        <div class="sc-block-card">
+            <div id="sc-block-icon" class="sc-block-icon">⚠️</div>
+            <div id="sc-block-title" class="sc-block-title">Arrêt</div>
+            <div id="sc-block-ref" class="sc-block-ref"></div>
+            <div id="sc-block-msg" class="sc-block-msg"></div>
+            <button type="button" id="sc-block-continue" class="btn btn-primary btn-lg" style="width:100%;margin-top:18px;">
+                <i class="fas fa-arrow-right"></i> Continuer
+            </button>
+        </div>
+    </div>
+
 {% else %}
     <!-- ============ REPORT MODE ============ -->
     <div class="page-actions" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-4); flex-wrap:wrap; gap:8px;">
@@ -97,6 +110,26 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- Réinitialiser le stock (magasin complet uniquement) -->
+    {% if report.mode == 'full' %}
+    <div class="card mb-6" style="border-left:4px solid var(--error-500,#ef4444);">
+        <div class="card-body">
+            <h3 style="margin:0 0 4px;font-size:15px;"><i class="fas fa-rotate text-danger"></i> Réinitialiser le stock à partir de ce scan</h3>
+            {% if session.deactivated_products.count %}
+                <p style="color:#6b7280;font-size:13px;margin:0 0 12px;">Cet inventaire a désactivé <strong>{{ session.deactivated_products.count }}</strong> pièce(s) disponibles non scannées. Elles ne sont plus comptées nulle part dans l'application.</p>
+                <form method="post" action="{% url 'products:stock_count_reset_undo' session.id %}"
+                      onsubmit="return confirm('Réactiver les {{ session.deactivated_products.count }} pièce(s) désactivée(s) par cette réinitialisation ?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary btn-sm"><i class="fas fa-rotate-left"></i> Annuler la réinitialisation ({{ session.deactivated_products.count }})</button>
+                </form>
+            {% else %}
+                <p style="color:#6b7280;font-size:13px;margin:0 0 12px;">Les <strong>{{ report.counted_ok|length }}</strong> pièce(s) disponibles scannées restent disponibles. Les <strong>{{ report.missing_count }}</strong> pièce(s) disponibles <u>non scannées</u> seront <strong>désactivées</strong> (elles ne seront plus comptées nulle part). Les pièces vendues, réservées ou en réparation ne sont pas touchées.</p>
+                <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('reset-modal').style.display='flex';"><i class="fas fa-rotate"></i> Réinitialiser le stock…</button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     <div class="stats-grid mb-6">
         <div class="stat-card stat-info"><div class="stat-icon"><i class="fas fa-box"></i></div><div class="stat-content"><span class="stat-value">{{ report.expected_total }}</span><span class="stat-label">Attendus (Disponible)</span></div></div>
@@ -176,6 +209,32 @@
         <div class="card-body"><p>{% for c in report.unknown_codes %}<span class="badge badge-neutral" style="margin:2px;">{{ c }}</span>{% endfor %}</p></div>
     </div>
     {% endif %}
+
+    <!-- Reset confirmation modal -->
+    {% if report.mode == 'full' and not session.deactivated_products.count %}
+    <div id="reset-modal" class="reset-modal" style="display:none;">
+        <div class="reset-card">
+            <h3 style="margin:0 0 8px;color:#b91c1c;"><i class="fas fa-triangle-exclamation"></i> Réinitialiser le stock</h3>
+            <p style="font-size:14px;color:#374151;margin:0 0 6px;">Vous allez <strong>désactiver {{ report.missing_count }} pièce(s)</strong> disponibles qui n'ont pas été scannées. Elles ne seront plus comptées nulle part dans l'application. Action réversible.</p>
+            <p style="font-size:14px;color:#374151;margin:0 0 14px;"><strong>{{ report.counted_ok|length }}</strong> pièce(s) scannées restent disponibles.</p>
+            <form method="post" action="{% url 'products:stock_count_reset_stock' session.id %}">
+                {% csrf_token %}
+                <label style="font-size:13px;color:#6b7280;">Tapez <strong>REINITIALISER</strong> pour confirmer :</label>
+                <input type="text" name="confirm" id="reset-confirm" autocomplete="off" class="form-input" style="margin:6px 0 14px;" placeholder="REINITIALISER">
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('reset-modal').style.display='none';">Annuler</button>
+                    <button type="submit" id="reset-submit" class="btn btn-danger btn-sm" disabled><i class="fas fa-rotate"></i> Confirmer la désactivation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    (function(){
+        var inp=document.getElementById('reset-confirm'), btn=document.getElementById('reset-submit');
+        if(inp&&btn){ inp.addEventListener('input', function(){ btn.disabled = inp.value.trim().toUpperCase() !== 'REINITIALISER'; }); }
+    })();
+    </script>
+    {% endif %}
 {% endif %}
 
 <style>
@@ -208,6 +267,20 @@
     .sc-bottombar { padding:16px calc(16px + env(safe-area-inset-bottom)); display:flex; gap:12px; justify-content:center; background:#000; }
     .sc-bottombar .btn { flex:1; max-width:220px; padding:14px; font-size:16px; }
     #sc-capture { flex:2; max-width:none; font-weight:700; }
+
+    /* Blocking anomaly overlay */
+    .sc-block-modal { position:fixed; inset:0; z-index:100002; background:rgba(15,15,20,.72); backdrop-filter:blur(2px); display:flex; align-items:center; justify-content:center; padding:20px; }
+    .sc-block-card { background:#fff; border-radius:18px; padding:28px 24px; width:100%; max-width:440px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.4); border-top:8px solid var(--warning-500,#f59e0b); animation:scPop .16s ease-out; }
+    .sc-block-card.err { border-top-color:var(--error-500,#ef4444); }
+    @keyframes scPop { from{ transform:scale(.9); opacity:0; } to{ transform:scale(1); opacity:1; } }
+    .sc-block-icon { font-size:48px; line-height:1; }
+    .sc-block-title { font-size:22px; font-weight:800; margin-top:10px; color:var(--neutral-900,#111); }
+    .sc-block-ref { font-size:20px; font-weight:700; margin-top:8px; color:var(--primary-700,#4338ca); word-break:break-all; }
+    .sc-block-msg { font-size:15px; margin-top:6px; color:var(--neutral-600,#4b5563); }
+
+    /* Reset confirmation modal */
+    .reset-modal { position:fixed; inset:0; z-index:100002; background:rgba(15,15,20,.6); display:flex; align-items:center; justify-content:center; padding:20px; }
+    .reset-card { background:#fff; border-radius:14px; padding:22px; width:100%; max-width:460px; box-shadow:0 20px 60px rgba(0,0,0,.4); border-top:6px solid var(--error-500,#ef4444); }
 </style>
 
 {% if session.status == 'open' %}
@@ -219,11 +292,44 @@
     const list = document.getElementById('sc-list');
     const counter = document.getElementById('sc-counter');
     const hint = document.getElementById('sc-hint');
-    let busy = false, lastCode = '', lastTime = 0;
+    const blockModal = document.getElementById('sc-block');
+    let busy = false, lastCode = '', lastTime = 0, paused = false;
 
     function showHint(m, k){ hint.textContent = m; hint.className = 'sc-hint ' + (k||''); hint.style.display='block'; }
 
+    // Short alert tone (WebAudio) for anomalies.
+    let _audioCtx = null;
+    function beep(){
+        try{
+            _audioCtx = _audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+            const o = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+            o.type='square'; o.frequency.value=880; o.connect(g); g.connect(_audioCtx.destination);
+            g.gain.setValueAtTime(0.0001, _audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.25, _audioCtx.currentTime+0.01);
+            g.gain.exponentialRampToValueAtTime(0.0001, _audioCtx.currentTime+0.35);
+            o.start(); o.stop(_audioCtx.currentTime+0.36);
+        }catch(e){}
+    }
+
+    // Stop scanning and show a blocking overlay until the operator clicks Continuer.
+    function blockScan(kind, ref, msg){
+        paused = true;
+        const card = blockModal.querySelector('.sc-block-card');
+        const isErr = (kind === 'unknown');
+        card.className = 'sc-block-card' + (isErr ? ' err' : '');
+        document.getElementById('sc-block-icon').textContent = isErr ? '⛔' : '⚠️';
+        const titles = { duplicate:'Déjà scanné', sold:'Pièce vendue', anomaly:'Pièce non disponible', unknown:'Code inconnu' };
+        document.getElementById('sc-block-title').textContent = titles[kind] || 'Arrêt';
+        document.getElementById('sc-block-ref').textContent = ref || '';
+        document.getElementById('sc-block-msg').textContent = msg || '';
+        blockModal.style.display = 'flex';
+        beep(); try{ if(navigator.vibrate) navigator.vibrate([120,60,120]); }catch(e){}
+    }
+    function resumeScan(){ paused = false; blockModal.style.display='none'; try{ input.value=''; input.focus(); }catch(e){} }
+    document.getElementById('sc-block-continue').addEventListener('click', resumeScan);
+
     function scanCode(code){
+        if(paused) return;
         code = (code||'').trim();
         if(!code) return;
         const now = Date.now();
@@ -246,6 +352,16 @@
                 const ref = d.product ? d.product.reference : (d.code || code);
                 const name = d.product ? (d.product.name || '') : '';
                 list.insertAdjacentHTML('afterbegin', '<div class="sc-row ' + cls + '"><span class="sc-label">' + label + '</span> <strong>' + ref + '</strong> ' + name + extra + '</div>');
+
+                // Blocking anomalies: duplicate, sold/not-available, or unknown tag.
+                if(d.result === 'duplicate'){
+                    blockScan('duplicate', d.product.reference, 'Cette pièce a déjà été scannée dans cet inventaire.');
+                } else if(d.result === 'unknown'){
+                    blockScan('unknown', (d.code || code), 'Ce code ne correspond à aucune pièce.');
+                } else if(d.product && !d.product.is_available){
+                    const kind = (d.product.status || '').toLowerCase().indexOf('vendu') >= 0 ? 'sold' : 'anomaly';
+                    blockScan(kind, d.product.reference, 'Statut en base : ' + d.product.status + '.');
+                }
             }).catch(()=>{ busy = false; showHint('Erreur de connexion', 'err'); });
     }
 
@@ -272,6 +388,7 @@
     }
     function resetScan(){ scBuf=''; scFast=false; }
     document.addEventListener('keydown', function(e){
+        if(paused){ resetScan(); return; }
         if(e.ctrlKey||e.metaKey||e.altKey) return;
         const now = Date.now(), gap = now - scLast; scLast = now;
         if(e.code==='Enter'||e.code==='NumpadEnter'||e.key==='Enter'){

@@ -16,12 +16,22 @@
                 <h1 class="page-title">{{ product.name }}</h1>
                 <p class="page-subtitle">
                     Reference: <strong class="text-primary">{{ product.reference }}</strong>
-                    <span class="badge {% if product.status == 'available' %}badge-success{% elif product.status == 'sold' %}badge-neutral{% elif product.status == 'in_repair' %}badge-warning{% else %}badge-info{% endif %}" style="margin-left: var(--space-2);">
+                    <span class="badge {% if product.status == 'available' %}badge-success{% elif product.status == 'sold' %}badge-neutral{% elif product.status == 'in_repair' %}badge-warning{% elif product.status == 'inactive' %}badge-error{% else %}badge-info{% endif %}" style="margin-left: var(--space-2);">
                         {{ product.get_status_display }}
                     </span>
                 </p>
             </div>
             <div class="page-actions">
+                {% if product.status == 'inactive' %}
+                <form method="post" action="{% url 'products:reactivate' product.reference %}" style="display:inline;"
+                      onsubmit="return confirm('Réactiver cette pièce (Disponible) ?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-rotate-left"></i>
+                        <span>Réactiver</span>
+                    </button>
+                </form>
+                {% endif %}
                 <button type="button" class="btn btn-success" onclick="printLabel()">
                     <i class="fas fa-print"></i>
                     <span>Imprimer</span>

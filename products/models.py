@@ -24,6 +24,7 @@ class Product(models.Model):
         CONSIGNED_OUT = 'consigned_out', _('En consignation (prêté)')
         RETURNED = 'returned', _('Retourné')
         CUSTOM_ORDER = 'custom_order', _('Commande sur mesure')
+        INACTIVE = 'inactive', _('Désactivé')
 
     class ProductType(models.TextChoices):
         FINISHED = 'finished', _('Bijou fini')
@@ -1111,6 +1112,11 @@ class StockCountSession(models.Model):
     # Products absorbed into a bloc during a single-bloc check (they were unassigned).
     absorbed_products = models.ManyToManyField(
         'Product', blank=True, related_name='+', verbose_name=_('Produits ajoutés au bloc'),
+    )
+    # Products deactivated when this FULL session was used to "réinitialiser le stock"
+    # (available pieces that were not scanned). Recorded so the reset can be undone.
+    deactivated_products = models.ManyToManyField(
+        'Product', blank=True, related_name='+', verbose_name=_('Produits désactivés (réinitialisation)'),
     )
     notes = models.TextField(_('Notes'), blank=True)
     started_at = models.DateTimeField(_('Démarré le'), auto_now_add=True)

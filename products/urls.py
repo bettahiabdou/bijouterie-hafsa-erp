@@ -26,6 +26,8 @@ urlpatterns = [
     path('stock-count/<int:pk>/finish/', views.stock_count_finish, name='stock_count_finish'),
     path('stock-count/<int:pk>/print/', views.stock_count_report_print, name='stock_count_print'),
     path('stock-count/<int:pk>/apply-block/', views.stock_count_apply_block, name='stock_count_apply_block'),
+    path('stock-count/<int:pk>/reset-stock/', views.stock_count_reset_stock, name='stock_count_reset_stock'),
+    path('stock-count/<int:pk>/reset-undo/', views.stock_count_reset_undo, name='stock_count_reset_undo'),
 
     # Blocs (zones) — static prefix, before <reference>
     path('blocks/', views.block_list, name='block_list'),
@@ -89,5 +91,6 @@ urlpatterns = [
     path('<str:reference>/', views.product_detail, name='detail'),
     path('<str:reference>/edit/', views.product_edit, name='edit'),
     path('<str:reference>/delete/', views.product_delete, name='delete'),
+    path('<str:reference>/reactivate/', views.product_reactivate, name='reactivate'),
     path('<str:reference>/print/', views.print_label, name='print_label'),
 ]

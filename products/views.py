@@ -144,10 +144,13 @@ def product_list(request):
             Q(rfid_tag__icontains=search_query)
         )
 
-    # Filter by status
+    # Filter by status. Deactivated ('inactive') pieces are hidden by default and
+    # only shown when explicitly filtered on (the "Désactivé" option).
     status_filter = request.GET.get('status', '')
     if status_filter:
         products = products.filter(status=status_filter)
+    else:
+        products = products.exclude(status=Product.Status.INACTIVE)
 
     # Filter by category
     category_filter = request.GET.get('category', '')
@@ -200,10 +203,11 @@ def product_list(request):
 
     # Statistics
     stats = {
-        'total': Product.objects.count(),
+        'total': Product.objects.exclude(status=Product.Status.INACTIVE).count(),
         'available': Product.objects.filter(status='available').count(),
         'sold': Product.objects.filter(status='sold').count(),
         'in_repair': Product.objects.filter(status='in_repair').count(),
+        'inactive': Product.objects.filter(status=Product.Status.INACTIVE).count(),
     }
 
     context = {
@@ -877,6 +881,25 @@ def product_delete(request, reference):
     return render(request, 'products/product_delete.html', context)
 
 
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def product_reactivate(request, reference):
+    """Réactiver une pièce désactivée (status 'inactive' -> 'available')."""
+    product = get_object_or_404(Product, reference=reference)
+    if product.status == Product.Status.INACTIVE:
+        product.status = Product.Status.AVAILABLE
+        product.save(update_fields=['status'])
+        ActivityLog.objects.create(
+            user=request.user, action=ActivityLog.ActionType.UPDATE,
+            model_name='Product', object_id=str(product.id),
+            object_repr=f'Réactivation {product.reference}',
+        )
+        messages.success(request, f'{product.reference} réactivé (Disponible).')
+    else:
+        messages.info(request, f'{product.reference} n’est pas désactivé.')
+    return redirect('products:detail', reference=product.reference)
+
+
 # Statuses considered physically in stock (owned, unsold)
 INSTOCK_STATUSES = ['available', 'reserved', 'in_repair', 'custom_order']
 
@@ -901,6 +924,9 @@ def _inventory_scope_qs(scope):
     qs = Product.objects.all()
     if statuses is not None:
         qs = qs.filter(status__in=statuses)
+    else:
+        # 'all' scope: never count deactivated pieces.
+        qs = qs.exclude(status=Product.Status.INACTIVE)
     return qs
 
 
@@ -3370,6 +3396,73 @@ def stock_count_finish(request, pk):
             object_repr=f'Inventaire #{session.id} terminé',
         )
     return redirect('products:stock_count_detail', pk=session.pk)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def stock_count_reset_stock(request, pk):
+    """Réinitialiser le stock à partir d'un inventaire complet terminé.
+
+    The physical scan becomes the source of truth: every product currently
+    'Disponible' that was NOT scanned in this session gets DEACTIVATED
+    (status -> 'inactive') so it stops being counted anywhere. Scanned
+    available pieces stay available. Sold / reserved / repair pieces are never
+    touched. The deactivated set is recorded on the session so the reset can be
+    undone.
+    """
+    session = get_object_or_404(StockCountSession, pk=pk)
+    if session.mode != StockCountSession.Mode.FULL or session.status != 'closed':
+        messages.error(request, 'La réinitialisation n’est possible que sur un inventaire « Magasin complet » terminé.')
+        return redirect('products:stock_count_detail', pk=pk)
+    if (request.POST.get('confirm') or '').strip().upper() != 'REINITIALISER':
+        messages.error(request, 'Réinitialisation annulée : confirmation manquante.')
+        return redirect('products:stock_count_detail', pk=pk)
+
+    scanned_ids = set(
+        session.scans.filter(product__isnull=False).values_list('product_id', flat=True)
+    )
+    to_deactivate = list(
+        Product.objects.filter(status='available').exclude(id__in=scanned_ids)
+        .values_list('id', flat=True)
+    )
+    if to_deactivate:
+        Product.objects.filter(id__in=to_deactivate).update(status=Product.Status.INACTIVE)
+        session.deactivated_products.add(*to_deactivate)
+
+    ActivityLog.objects.create(
+        user=request.user, action=ActivityLog.ActionType.UPDATE,
+        model_name='StockCountSession', object_id=str(session.id),
+        object_repr=f'Réinitialisation stock (inventaire #{session.id}) : {len(to_deactivate)} pièce(s) désactivée(s)',
+    )
+    messages.success(
+        request,
+        f'Stock réinitialisé : {len(to_deactivate)} pièce(s) disponibles non scannées ont été désactivées.'
+        if to_deactivate else
+        'Stock réinitialisé : toutes les pièces disponibles avaient été scannées, aucune désactivation.'
+    )
+    return redirect('products:stock_count_detail', pk=pk)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def stock_count_reset_undo(request, pk):
+    """Annuler la réinitialisation : réactiver les pièces désactivées par ce
+    scan (status 'inactive' -> 'available')."""
+    session = get_object_or_404(StockCountSession, pk=pk)
+    ids = list(session.deactivated_products.values_list('id', flat=True))
+    reactivated = 0
+    if ids:
+        reactivated = Product.objects.filter(
+            id__in=ids, status=Product.Status.INACTIVE
+        ).update(status='available')
+        session.deactivated_products.clear()
+    ActivityLog.objects.create(
+        user=request.user, action=ActivityLog.ActionType.UPDATE,
+        model_name='StockCountSession', object_id=str(session.id),
+        object_repr=f'Annulation réinitialisation (inventaire #{session.id}) : {reactivated} pièce(s) réactivée(s)',
+    )
+    messages.success(request, f'{reactivated} pièce(s) réactivée(s).')
+    return redirect('products:stock_count_detail', pk=pk)
 
 
 # ---------------------------------------------------------------------------
