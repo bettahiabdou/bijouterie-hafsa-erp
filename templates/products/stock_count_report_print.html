@@ -41,29 +41,29 @@
 
     <h2>Manquants — attendus mais non scannés ({{ report.missing_count }})</h2>
     {% if report.missing %}
-        <table><thead><tr><th>Référence</th><th>Nom</th><th>Catégorie</th><th class="num">Prix</th></tr></thead><tbody>
-            {% for p in report.missing %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td><td>{{ p.category.name|default:'-' }}</td><td class="num">{{ p.selling_price|floatformat:2 }}</td></tr>{% endfor %}
+        <table><thead><tr><th>Référence</th><th>Nom</th><th>Métal</th><th class="num">Poids (g)</th><th>Catégorie</th><th class="num">Prix</th></tr></thead><tbody>
+            {% for p in report.missing %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td><td>{{ p.metal_type.name|default:'-' }}</td><td class="num">{{ p.gross_weight|floatformat:2 }}</td><td>{{ p.category.name|default:'-' }}</td><td class="num">{{ p.selling_price|floatformat:2 }}</td></tr>{% endfor %}
         </tbody></table>
     {% else %}<div class="empty">Aucun manquant.</div>{% endif %}
 
     <h2>Anomalies — scannés mais non « Disponible » ({{ report.anomaly_count }})</h2>
     {% if report.anomalies %}
-        <table><thead><tr><th>Référence</th><th>Nom</th><th>Statut en base</th></tr></thead><tbody>
-            {% for p in report.anomalies %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td><td>{{ p.get_status_display }}</td></tr>{% endfor %}
+        <table><thead><tr><th>Référence</th><th>Nom</th><th>Métal</th><th class="num">Poids (g)</th><th>Statut en base</th></tr></thead><tbody>
+            {% for p in report.anomalies %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td><td>{{ p.metal_type.name|default:'-' }}</td><td class="num">{{ p.gross_weight|floatformat:2 }}</td><td>{{ p.get_status_display }}</td></tr>{% endfor %}
         </tbody></table>
     {% else %}<div class="empty">Aucune anomalie.</div>{% endif %}
 
     {% if report.mode == 'block_check' %}
     <h2>Hors bloc — scannés mais appartenant à un autre bloc ({{ report.hors_bloc_count }})</h2>
     {% if report.hors_bloc %}
-        <table><thead><tr><th>Référence</th><th>Nom</th><th>Bloc(s) réel(s)</th></tr></thead><tbody>
-            {% for p in report.hors_bloc %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td><td>{% for b in p.blocks.all %}{{ b.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td></tr>{% endfor %}
+        <table><thead><tr><th>Référence</th><th>Nom</th><th>Métal</th><th class="num">Poids (g)</th><th>Bloc(s) réel(s)</th></tr></thead><tbody>
+            {% for p in report.hors_bloc %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td><td>{{ p.metal_type.name|default:'-' }}</td><td class="num">{{ p.gross_weight|floatformat:2 }}</td><td>{% for b in p.blocks.all %}{{ b.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td></tr>{% endfor %}
         </tbody></table>
     {% else %}<div class="empty">Aucun article mal placé.</div>{% endif %}
     {% if report.absorbed %}
     <h2>Ajoutés au bloc — nouveaux produits absorbés ({{ report.absorbed_count }})</h2>
-        <table><thead><tr><th>Référence</th><th>Nom</th></tr></thead><tbody>
-            {% for p in report.absorbed %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td></tr>{% endfor %}
+        <table><thead><tr><th>Référence</th><th>Nom</th><th>Métal</th><th class="num">Poids (g)</th></tr></thead><tbody>
+            {% for p in report.absorbed %}<tr><td>{{ p.reference }}</td><td>{{ p.name }}</td><td>{{ p.metal_type.name|default:'-' }}</td><td class="num">{{ p.gross_weight|floatformat:2 }}</td></tr>{% endfor %}
         </tbody></table>
     {% endif %}
     {% endif %}
