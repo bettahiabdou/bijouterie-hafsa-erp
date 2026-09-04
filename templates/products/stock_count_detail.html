@@ -16,9 +16,15 @@
     <div class="card mb-6">
         <div class="card-body">
             <div class="sc-head">
-                <div>
-                    <div class="sc-counter-num" id="sc-counter">{{ scanned_count }}</div>
-                    <div class="sc-counter-lbl">produits scannés</div>
+                <div style="display:flex; gap:28px; align-items:flex-start; flex-wrap:wrap;">
+                    <div>
+                        <div class="sc-counter-num" id="sc-counter">{{ scanned_count }}</div>
+                        <div class="sc-counter-lbl">produits scannés</div>
+                    </div>
+                    <div>
+                        <div class="sc-counter-num" id="sc-grams">{{ scanned_grams|floatformat:2 }}</div>
+                        <div class="sc-counter-lbl">grammes comptés</div>
+                    </div>
                 </div>
                 <form method="post" action="{% url 'products:stock_count_finish' session.id %}"
                       onsubmit="return confirm('Terminer l\'inventaire et générer le rapport ?');">
@@ -330,6 +336,7 @@
     const input = document.getElementById('sc-input');
     const list = document.getElementById('sc-list');
     const counter = document.getElementById('sc-counter');
+    const grams = document.getElementById('sc-grams');
     const hint = document.getElementById('sc-hint');
     const blockModal = document.getElementById('sc-block');
     let busy = false, lastCode = '', lastTime = 0, paused = false;
@@ -386,6 +393,7 @@
                 busy = false;
                 if(!d.ok){ showHint(d.error || 'Erreur', 'err'); return; }
                 counter.textContent = d.scanned_count;
+                if(grams && d.scanned_grams !== undefined) grams.textContent = d.scanned_grams;
                 try{ if(navigator.vibrate) navigator.vibrate(60); }catch(e){}
                 const em = document.getElementById('sc-empty'); if(em) em.remove();
                 let cls, label;

@@ -3293,6 +3293,10 @@ def stock_count_detail(request, pk):
             'product', 'product__metal_type'
         ).prefetch_related('product__images').all()[:500]
         context['scanned_count'] = session.scans.filter(product__isnull=False).values('product').distinct().count()
+        context['scanned_grams'] = (
+            session.scans.filter(product__isnull=False)
+            .aggregate(g=Sum('product__gross_weight'))['g'] or 0
+        )
     else:
         context['report'] = _stock_count_report(session)
         context['blocks'] = ProductBlock.objects.filter(is_active=True).order_by('name')
@@ -3371,6 +3375,8 @@ def stock_count_scan(request, pk):
         payload = {'ok': True, 'result': 'unknown', 'code': code}
 
     payload['scanned_count'] = session.scans.filter(product__isnull=False).values('product').distinct().count()
+    _g = session.scans.filter(product__isnull=False).aggregate(g=Sum('product__gross_weight'))['g'] or 0
+    payload['scanned_grams'] = f'{_g:.2f}'
     return JsonResponse(payload)
 
 
