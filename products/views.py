@@ -3152,7 +3152,9 @@ def _stock_count_report(session):
                          a single-bloc check, items of another bloc are 'hors bloc'.
       * BLOCK_DEFINE  -> the scan becomes the bloc; report shows what was set.
     """
-    scans = session.scans.select_related('product').all()
+    scans = session.scans.select_related(
+        'product', 'product__category', 'product__metal_type'
+    ).prefetch_related('product__images').all()
     scanned_products = {}   # product_id -> product
     unknown_codes = []
     for s in scans:
@@ -3184,8 +3186,8 @@ def _stock_count_report(session):
 
     if not is_block:
         expected_qs = Product.objects.filter(status='available')
-        missing = (list(expected_qs.exclude(id__in=scanned_ids).select_related('category'))
-                   if scanned_ids else list(expected_qs.select_related('category')))
+        _mqs = (expected_qs.exclude(id__in=scanned_ids) if scanned_ids else expected_qs)
+        missing = list(_mqs.select_related('category', 'metal_type').prefetch_related('images'))
         report.update({
             'missing': missing,
             'counted_ok': list(avail_scanned.values()),
@@ -3211,7 +3213,8 @@ def _stock_count_report(session):
                 id__in=original_member_ids, status='available'
             ).values_list('id', flat=True))
             missing_ids = expected_ids - scanned_ids
-            missing = list(Product.objects.filter(id__in=missing_ids).select_related('category'))
+            missing = list(Product.objects.filter(id__in=missing_ids)
+                           .select_related('category', 'metal_type').prefetch_related('images'))
             counted_ok = [p for pid, p in avail_scanned.items() if pid in expected_ids]
 
             off = [(pid, p) for pid, p in avail_scanned.items() if pid not in original_member_ids]
