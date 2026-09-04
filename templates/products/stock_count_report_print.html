@@ -6,7 +6,10 @@
     <style>
         @page { size: A4; margin: 12mm; }
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color:#111; font-size:11px; margin:0; }
+        body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color:#111; font-size:11px; margin:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        .pimg { width:38px; height:38px; object-fit:cover; border:1px solid #ccc; border-radius:4px; display:block; }
+        .pimg-empty { width:38px; height:38px; display:inline-block; border:1px solid #eee; border-radius:4px; background:#f7f7f5; }
+        td.pcell, th.pcell { width:46px; }
         .toolbar { text-align:center; margin-bottom:14px; }
         .toolbar button { padding:8px 18px; font-size:13px; cursor:pointer; background:#111; color:#fff; border:none; border-radius:6px; }
         .head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #111; padding-bottom:8px; margin-bottom:10px; }
@@ -38,6 +41,16 @@
         <span>Anomalies : <b>{{ report.anomaly_count }}</b></span>
         {% if report.mode == 'block_check' %}<span>Hors bloc : <b>{{ report.hors_bloc_count }}</b></span>{% endif %}
     </div>
+
+    <h2>Produits disponibles ({{ available_count }}) — total {{ available_grams|floatformat:2 }} g</h2>
+    {% if available_products %}
+        <table><thead><tr><th class="pcell">Photo</th><th>Référence</th><th>Nom</th><th>Métal</th><th class="num">Poids (g)</th></tr></thead><tbody>
+            {% for p in available_products %}<tr>
+                <td class="pcell">{% if p.main_image %}<img class="pimg" src="{{ p.main_image.url }}">{% elif p.images.first %}<img class="pimg" src="{{ p.images.first.image.url }}">{% else %}<span class="pimg-empty"></span>{% endif %}</td>
+                <td>{{ p.reference }}</td><td>{{ p.name }}</td><td>{{ p.metal_type.name|default:'-' }}</td><td class="num">{{ p.gross_weight|floatformat:2 }}</td>
+            </tr>{% endfor %}
+        </tbody></table>
+    {% else %}<div class="empty">Aucun produit disponible.</div>{% endif %}
 
     <h2>Manquants — attendus mais non scannés ({{ report.missing_count }})</h2>
     {% if report.missing %}

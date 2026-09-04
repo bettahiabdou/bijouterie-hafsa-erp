@@ -3596,7 +3596,16 @@ def block_bulk_assign(request):
 def stock_count_report_print(request, pk):
     from django.utils import timezone as _tz
     session = get_object_or_404(StockCountSession, pk=pk)
+    available_products = list(
+        Product.objects.filter(status='available')
+        .select_related('metal_type', 'category').prefetch_related('images')
+        .order_by('reference')
+    )
+    available_grams = sum((p.gross_weight or 0) for p in available_products)
     return render(request, 'products/stock_count_report_print.html', {
         'session': session, 'report': _stock_count_report(session),
         'now': _tz.now(), 'user': request.user,
+        'available_products': available_products,
+        'available_count': len(available_products),
+        'available_grams': available_grams,
     })
