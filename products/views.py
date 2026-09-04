@@ -3289,7 +3289,9 @@ def stock_count_detail(request, pk):
     session = get_object_or_404(StockCountSession, pk=pk)
     context = {'session': session}
     if session.status == 'open':
-        context['scans'] = session.scans.select_related('product').all()[:500]
+        context['scans'] = session.scans.select_related(
+            'product', 'product__metal_type'
+        ).prefetch_related('product__images').all()[:500]
         context['scanned_count'] = session.scans.filter(product__isnull=False).values('product').distinct().count()
     else:
         context['report'] = _stock_count_report(session)
@@ -3347,10 +3349,22 @@ def stock_count_scan(request, pk):
         else:
             StockCountScan.objects.create(session=session, product=product, code=code)
             result = 'counted'
+        img = ''
+        if product.main_image:
+            img = product.main_image.url
+        else:
+            _pi = product.images.first()
+            if _pi and _pi.image:
+                img = _pi.image.url
         payload = {
             'ok': True, 'result': result,
-            'product': {'reference': product.reference, 'name': product.name or '',
-                        'status': product.get_status_display(), 'is_available': product.status == 'available'},
+            'product': {
+                'reference': product.reference, 'name': product.name or '',
+                'status': product.get_status_display(), 'is_available': product.status == 'available',
+                'image': img,
+                'metal': product.metal_type.name if product.metal_type else '',
+                'weight': f'{product.gross_weight:.2f}' if product.gross_weight is not None else '',
+            },
         }
     else:
         StockCountScan.objects.create(session=session, product=None, code=code)

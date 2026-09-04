@@ -44,8 +44,11 @@
                 {% for sc in scans %}
                     <div class="sc-row {% if sc.product %}{% if sc.product.status == 'available' %}sc-ok{% else %}sc-err{% endif %}{% else %}sc-err{% endif %}">
                         <span class="sc-label">{% if sc.product %}✓{% else %}?{% endif %}</span>
-                        <strong>{% if sc.product %}{{ sc.product.reference }}{% else %}{{ sc.code }}{% endif %}</strong>
-                        {{ sc.product.name|default:'' }}
+                        {% if sc.product %}{% if sc.product.main_image %}<img class="sc-thumb" src="{{ sc.product.main_image.url }}" alt="">{% elif sc.product.images.first %}<img class="sc-thumb" src="{{ sc.product.images.first.image.url }}" alt="">{% else %}<span class="sc-thumb sc-thumb-empty"><i class="fas fa-gem"></i></span>{% endif %}{% endif %}
+                        <div class="sc-row-body">
+                            <div><strong>{% if sc.product %}{{ sc.product.reference }}{% else %}{{ sc.code }}{% endif %}</strong> {{ sc.product.name|default:'' }}</div>
+                            {% if sc.product %}<div class="sc-row-meta">{{ sc.product.metal_type.name|default:'-' }} · {{ sc.product.gross_weight|floatformat:2 }} g</div>{% endif %}
+                        </div>
                     </div>
                 {% empty %}
                     <p class="text-muted" id="sc-empty">Aucun scan pour l'instant.</p>
@@ -69,7 +72,9 @@
         <div class="sc-block-card">
             <div id="sc-block-icon" class="sc-block-icon">⚠️</div>
             <div id="sc-block-title" class="sc-block-title">Arrêt</div>
+            <img id="sc-block-thumb" class="sc-block-thumb" alt="" style="display:none;">
             <div id="sc-block-ref" class="sc-block-ref"></div>
+            <div id="sc-block-meta" class="sc-block-meta"></div>
             <div id="sc-block-msg" class="sc-block-msg"></div>
             <button type="button" id="sc-block-continue" class="btn btn-primary btn-lg" style="width:100%;margin-top:18px;">
                 <i class="fas fa-arrow-right"></i> Continuer
@@ -281,6 +286,10 @@
     .sc-hint.err { background:var(--error-50,#fef2f2); color:var(--error-700,#b91c1c); }
     .sc-row { padding:8px 10px; border-bottom:1px solid var(--neutral-100); display:flex; align-items:center; gap:8px; }
     .sc-row .sc-label { font-weight:700; font-size:var(--text-sm); }
+    .sc-row-body { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .sc-row-meta { font-size:12px; color:var(--neutral-500,#6b7280); }
+    .sc-block-thumb { width:120px; height:120px; object-fit:cover; border-radius:12px; border:1px solid var(--neutral-200,#e5e7eb); margin:12px auto 0; }
+    .sc-block-meta { font-size:14px; margin-top:8px; color:var(--neutral-700,#374151); font-weight:600; }
     .sc-row.sc-ok { background:var(--success-50,#f0fdf4); }
     .sc-row.sc-ok .sc-label { color:var(--success-700,#15803d); }
     .sc-row.sc-warn { background:var(--warning-50,#fffbeb); }
@@ -342,7 +351,7 @@
     }
 
     // Stop scanning and show a blocking overlay until the operator clicks Continuer.
-    function blockScan(kind, ref, msg){
+    function blockScan(kind, ref, msg, product){
         paused = true;
         const card = blockModal.querySelector('.sc-block-card');
         const isErr = (kind === 'unknown');
@@ -351,6 +360,12 @@
         const titles = { duplicate:'Déjà scanné', sold:'Pièce vendue', anomaly:'Pièce non disponible', unknown:'Code inconnu' };
         document.getElementById('sc-block-title').textContent = titles[kind] || 'Arrêt';
         document.getElementById('sc-block-ref').textContent = ref || '';
+        const thumbEl = document.getElementById('sc-block-thumb');
+        const metaEl = document.getElementById('sc-block-meta');
+        if(product && product.image){ thumbEl.src = product.image; thumbEl.style.display = 'block'; }
+        else { thumbEl.removeAttribute('src'); thumbEl.style.display = 'none'; }
+        if(product && (product.metal || product.weight)){ metaEl.textContent = (product.name ? product.name + ' — ' : '') + (product.metal || '-') + ' · ' + (product.weight || '0.00') + ' g'; }
+        else { metaEl.textContent = ''; }
         document.getElementById('sc-block-msg').textContent = msg || '';
         blockModal.style.display = 'flex';
         beep(); try{ if(navigator.vibrate) navigator.vibrate([120,60,120]); }catch(e){}
@@ -381,16 +396,23 @@
                 if(d.product && d.result !== 'unknown' && !d.product.is_available){ extra = ' <span class="badge badge-warning">' + d.product.status + '</span>'; }
                 const ref = d.product ? d.product.reference : (d.code || code);
                 const name = d.product ? (d.product.name || '') : '';
-                list.insertAdjacentHTML('afterbegin', '<div class="sc-row ' + cls + '"><span class="sc-label">' + label + '</span> <strong>' + ref + '</strong> ' + name + extra + '</div>');
+                let thumb = '', meta = '';
+                if(d.product){
+                    thumb = d.product.image
+                        ? '<img class="sc-thumb" src="' + d.product.image + '" alt="">'
+                        : '<span class="sc-thumb sc-thumb-empty"><i class="fas fa-gem"></i></span>';
+                    meta = '<div class="sc-row-meta">' + (d.product.metal || '-') + ' · ' + (d.product.weight || '0.00') + ' g</div>';
+                }
+                list.insertAdjacentHTML('afterbegin', '<div class="sc-row ' + cls + '"><span class="sc-label">' + label + '</span>' + thumb + '<div class="sc-row-body"><div><strong>' + ref + '</strong> ' + name + extra + '</div>' + meta + '</div></div>');
 
                 // Blocking anomalies: duplicate, sold/not-available, or unknown tag.
                 if(d.result === 'duplicate'){
-                    blockScan('duplicate', d.product.reference, 'Cette pièce a déjà été scannée dans cet inventaire.');
+                    blockScan('duplicate', d.product.reference, 'Cette pièce a déjà été scannée dans cet inventaire.', d.product);
                 } else if(d.result === 'unknown'){
-                    blockScan('unknown', (d.code || code), 'Ce code ne correspond à aucune pièce.');
+                    blockScan('unknown', (d.code || code), 'Ce code ne correspond à aucune pièce.', null);
                 } else if(d.product && !d.product.is_available){
                     const kind = (d.product.status || '').toLowerCase().indexOf('vendu') >= 0 ? 'sold' : 'anomaly';
-                    blockScan(kind, d.product.reference, 'Statut en base : ' + d.product.status + '.');
+                    blockScan(kind, d.product.reference, 'Statut en base : ' + d.product.status + '.', d.product);
                 }
             }).catch(()=>{ busy = false; showHint('Erreur de connexion', 'err'); });
     }
