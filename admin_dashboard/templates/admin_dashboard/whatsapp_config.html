@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}Configuration WhatsApp - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'admin_dashboard:home' %}" class="breadcrumb-item">Panneau Admin</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">WhatsApp</span>
+{% endblock %}
+
+{% block content %}
+<h2 style="margin:0 0 4px;"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp — Groupe « retour »</h2>
+<p style="color:#6b7280;margin:0 0 18px;font-size:14px;">Notifications automatiques (photo + infos) envoyées au groupe WhatsApp quand un retour est réceptionné.</p>
+
+<!-- Effective status -->
+<div class="card mb-6">
+    <div class="card-header"><h3 class="card-title">État actuel</h3></div>
+    <div class="card-body">
+        <div class="wa-grid">
+            <div><span class="wa-lbl">Activé</span><span class="wa-val {% if effective.enabled %}ok{% else %}off{% endif %}">{% if effective.enabled %}Oui{% else %}Non{% endif %}</span></div>
+            <div><span class="wa-lbl">Token</span><span class="wa-val {% if effective.token %}ok{% else %}off{% endif %}">{% if effective.token %}Défini{% else %}Manquant{% endif %}</span></div>
+            <div><span class="wa-lbl">Phone Number ID</span><span class="wa-val">{{ effective.phone_id|default:'—' }}</span></div>
+            <div><span class="wa-lbl">Groupe retour</span><span class="wa-val">{{ effective.group_id|default:'—' }}</span></div>
+            <div><span class="wa-lbl">Version API</span><span class="wa-val">{{ effective.version }}</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- Config form -->
+<div class="card mb-6">
+    <div class="card-header"><h3 class="card-title">Paramètres</h3></div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save">
+            <label class="wa-field">
+                <span>Token d'accès (Meta)</span>
+                <input type="password" name="token" value="{{ masked_token }}" autocomplete="off" placeholder="Collez le token ici" class="form-input">
+                <small>Laissez « ******** » pour garder le token déjà enregistré.</small>
+            </label>
+            <label class="wa-field">
+                <span>Phone Number ID</span>
+                <input type="text" name="phone_number_id" value="{{ cfg.phone_number_id }}" placeholder="616428491544123" class="form-input">
+            </label>
+            <label class="wa-field">
+                <span>ID du groupe « retour »</span>
+                <input type="text" name="retour_group_id" value="{{ cfg.retour_group_id }}" placeholder="rempli automatiquement à la création du groupe" class="form-input">
+            </label>
+            <label class="wa-field">
+                <span>Version API</span>
+                <input type="text" name="api_version" value="{{ cfg.api_version }}" placeholder="v25.0" class="form-input">
+            </label>
+            <label class="wa-check">
+                <input type="checkbox" name="enabled" {% if cfg.enabled %}checked{% endif %}> Activer l'envoi des notifications
+            </label>
+            <div style="margin-top:14px;"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer</button></div>
+        </form>
+    </div>
+</div>
+
+<!-- Create group -->
+<div class="card mb-6">
+    <div class="card-header"><h3 class="card-title">Créer le groupe « retour »</h3></div>
+    <div class="card-body">
+        <p style="color:#6b7280;font-size:13px;margin:0 0 12px;">Numéros des personnes à ajouter (max 8), chiffres uniquement séparés par des virgules. Ex : <code>212664030509,212600000000</code></p>
+        <form method="post" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_group">
+            <label class="wa-field" style="flex:1;min-width:240px;margin:0;">
+                <span>Participants</span>
+                <input type="text" name="participants" placeholder="212664030509,212600000000" class="form-input">
+            </label>
+            <label class="wa-field" style="width:160px;margin:0;">
+                <span>Nom du groupe</span>
+                <input type="text" name="subject" value="retour" class="form-input">
+            </label>
+            <button type="submit" class="btn btn-secondary"><i class="fas fa-users"></i> Créer le groupe</button>
+        </form>
+    </div>
+</div>
+
+<!-- Test -->
+<div class="card mb-6">
+    <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div><strong>Envoyer un message test</strong><br><small style="color:#6b7280;">Vérifie que le groupe reçoit bien les messages.</small></div>
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="test"><button type="submit" class="btn btn-success"><i class="fas fa-paper-plane"></i> Tester</button></form>
+    </div>
+</div>
+
+{% if result_json %}
+<div class="card mb-6">
+    <div class="card-header"><h3 class="card-title">Réponse Meta</h3></div>
+    <div class="card-body"><pre style="background:#0f172a;color:#e2e8f0;padding:14px;border-radius:8px;overflow:auto;font-size:12px;">{{ result_json }}</pre></div>
+</div>
+{% endif %}
+
+<style>
+    .wa-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; }
+    .wa-grid > div { display:flex; flex-direction:column; gap:3px; }
+    .wa-lbl { font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:.3px; }
+    .wa-val { font-weight:700; font-size:14px; word-break:break-all; }
+    .wa-val.ok { color:#15803d; } .wa-val.off { color:#b91c1c; }
+    .wa-field { display:block; margin-bottom:14px; max-width:520px; }
+    .wa-field > span { display:block; font-size:13px; font-weight:600; margin-bottom:5px; }
+    .wa-field small { display:block; color:#9ca3af; font-size:12px; margin-top:4px; }
+    .wa-check { display:flex; align-items:center; gap:8px; font-size:14px; }
+    .form-input { width:100%; }
+</style>
+{% endblock %}

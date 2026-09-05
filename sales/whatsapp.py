@@ -24,13 +24,36 @@ logger = logging.getLogger(__name__)
 GRAPH = 'https://graph.facebook.com'
 
 
-def _cfg():
+def _env_cfg():
     return {
         'enabled': os.getenv('WHATSAPP_ENABLED', 'false').lower() == 'true',
         'token': os.getenv('WHATSAPP_TOKEN', '').strip(),
         'phone_id': os.getenv('WHATSAPP_PHONE_NUMBER_ID', '').strip(),
         'group_id': os.getenv('WHATSAPP_RETOUR_GROUP_ID', '').strip(),
         'version': os.getenv('WHATSAPP_API_VERSION', 'v25.0').strip(),
+    }
+
+
+def _cfg():
+    """Merge DB config (admin UI) over environment variables. A non-empty DB
+    field wins; empty DB fields fall back to the WHATSAPP_* env vars."""
+    env = _env_cfg()
+    try:
+        from sales.models import WhatsAppConfig
+        db = WhatsAppConfig.get_solo()
+    except Exception:
+        db = None
+    if db is None:
+        return env
+    def pick(dbv, envv):
+        dbv = (dbv or '').strip()
+        return dbv if dbv else envv
+    return {
+        'enabled': bool(db.enabled) or env['enabled'],
+        'token': pick(db.token, env['token']),
+        'phone_id': pick(db.phone_number_id, env['phone_id']),
+        'group_id': pick(db.retour_group_id, env['group_id']),
+        'version': pick(db.api_version, env['version']) or 'v25.0',
     }
 
 

@@ -1137,6 +1137,36 @@ class DeliveryPhoto(models.Model):
         return f"{self.delivery_id} - {self.get_photo_type_display()}"
 
 
+class WhatsAppConfig(models.Model):
+    """Singleton config for WhatsApp Cloud API 'retour' group notifications,
+    editable from the admin UI (so no SSH/.env editing needed). Empty fields
+    fall back to the WHATSAPP_* environment variables."""
+    enabled = models.BooleanField(_('Activé'), default=False)
+    token = models.TextField(_('Token d\'accès'), blank=True)
+    phone_number_id = models.CharField(_('Phone Number ID'), max_length=64, blank=True)
+    retour_group_id = models.CharField(_('ID du groupe retour'), max_length=128, blank=True)
+    api_version = models.CharField(_('Version API'), max_length=16, default='v25.0')
+    updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='+', verbose_name=_('Modifié par'),
+    )
+
+    class Meta:
+        verbose_name = _('Configuration WhatsApp')
+        verbose_name_plural = _('Configuration WhatsApp')
+
+    def __str__(self):
+        return 'Configuration WhatsApp'
+
+    @classmethod
+    def get_solo(cls):
+        obj = cls.objects.first()
+        if obj is None:
+            obj = cls.objects.create()
+        return obj
+
+
 class SaleInvoiceAction(models.Model):
     """
     Track returns and exchanges on sales invoices

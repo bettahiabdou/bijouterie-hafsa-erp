@@ -1105,3 +1105,70 @@ def ai_chat_api(request):
         logger = logging.getLogger(__name__)
         logger.exception(f'AI chat error: {e}')
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# ============================================================================
+# WhatsApp "retour" group configuration
+# ============================================================================
+
+@login_required(login_url='login')
+@staff_required
+def whatsapp_config(request):
+    """Admin page to set the WhatsApp Cloud API config, create the retour
+    group, and send a test, all from the UI (no SSH/.env needed)."""
+    from sales.models import WhatsAppConfig
+    from sales import whatsapp as wa
+
+    cfg = WhatsAppConfig.get_solo()
+    result = None
+
+    if request.method == 'POST':
+        action = request.POST.get('action', 'save')
+
+        if action == 'save':
+            cfg.enabled = bool(request.POST.get('enabled'))
+            token = (request.POST.get('token') or '').strip()
+            # Keep the existing token when the field is left blank (masked).
+            if token and token != '********':
+                cfg.token = token
+            cfg.phone_number_id = (request.POST.get('phone_number_id') or '').strip()
+            cfg.retour_group_id = (request.POST.get('retour_group_id') or '').strip()
+            cfg.api_version = (request.POST.get('api_version') or 'v25.0').strip() or 'v25.0'
+            cfg.updated_by = request.user
+            cfg.save()
+            messages.success(request, 'Configuration WhatsApp enregistrée.')
+            return redirect('admin_dashboard:whatsapp_config')
+
+        elif action == 'create_group':
+            parts = [p.strip() for p in (request.POST.get('participants') or '').replace(' ', '').split(',') if p.strip()]
+            subject = (request.POST.get('subject') or 'retour').strip()
+            if not parts:
+                messages.error(request, 'Indiquez au moins un numéro (chiffres uniquement, ex. 212664030509).')
+            else:
+                result = wa.create_group(subject, parts)
+                gid = ''
+                if isinstance(result, dict):
+                    gid = result.get('id') or (result.get('group') or {}).get('id') or ''
+                if gid:
+                    cfg.retour_group_id = gid
+                    cfg.updated_by = request.user
+                    cfg.save(update_fields=['retour_group_id', 'updated_by', 'updated_at'])
+                    messages.success(request, f'Groupe créé. ID enregistré : {gid}')
+                else:
+                    messages.warning(request, "Réponse reçue mais aucun ID de groupe détecté (voir le détail ci-dessous).")
+
+        elif action == 'test':
+            result = wa.send_group_text('✅ Test Poste Livraison — notification retour')
+            if isinstance(result, dict) and result.get('messages'):
+                messages.success(request, 'Message test envoyé au groupe.')
+            else:
+                messages.warning(request, "Le test n'a pas abouti (voir le détail ci-dessous).")
+
+    import json as _json
+    masked_token = '********' if cfg.token else ''
+    return render(request, 'admin_dashboard/whatsapp_config.html', {
+        'cfg': cfg,
+        'masked_token': masked_token,
+        'effective': wa._cfg(),
+        'result_json': _json.dumps(result, indent=2, ensure_ascii=False) if result is not None else '',
+    })

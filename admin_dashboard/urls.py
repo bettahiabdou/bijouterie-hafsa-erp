@@ -19,6 +19,9 @@ urlpatterns = [
     path('users/<int:user_id>/edit/', views.user_edit, name='user_edit'),
     path('users/<int:user_id>/deactivate/', views.user_deactivate, name='user_deactivate'),
 
+    # WhatsApp "retour" group configuration
+    path('whatsapp/', views.whatsapp_config, name='whatsapp_config'),
+
     # System Configuration
     path('configuration/', views.system_configuration, name='configuration'),
     path('system-config/', views.system_config_edit, name='system_config'),
