@@ -85,6 +85,9 @@ urlpatterns = [
     path('benefice/', views.benefice_report, name='benefice'),
     path('benefice/print/', views.benefice_report_print, name='benefice_print'),
 
+    # WhatsApp Cloud API webhook (public; optional)
+    path('whatsapp/webhook/', views.whatsapp_webhook, name='whatsapp_webhook'),
+
     # Poste Livraison (responsable AMANA workspace)
     path('poste-livraison/', views.delivery_desk, name='delivery_desk'),
     path('poste-livraison/<str:reference>/receptionner-retour/', views.delivery_desk_receive_return, name='delivery_desk_receive_return'),

@@ -4841,6 +4841,36 @@ def delivery_desk_update_code(request, reference):
     return JsonResponse({'ok': True, 'tracking_number': new_code})
 
 
+from django.views.decorators.csrf import csrf_exempt
+
+
+@csrf_exempt
+def whatsapp_webhook(request):
+    """Public WhatsApp Cloud API webhook. GET answers Meta's verification
+    challenge; POST accepts events (logged) and returns 200. Optional — only
+    needed if you want delivery/read receipts or incoming messages."""
+    import os as _os
+    from .models import WhatsAppConfig
+    cfg = WhatsAppConfig.get_solo()
+    verify = (cfg.webhook_verify_token or _os.getenv('WHATSAPP_VERIFY_TOKEN', '')).strip()
+
+    if request.method == 'GET':
+        mode = request.GET.get('hub.mode')
+        token = request.GET.get('hub.verify_token')
+        challenge = request.GET.get('hub.challenge', '')
+        if mode == 'subscribe' and verify and token == verify:
+            return HttpResponse(challenge, content_type='text/plain')
+        return HttpResponse('forbidden', status=403)
+
+    # POST: event notifications (message status, incoming messages). Log only.
+    try:
+        import logging
+        logging.getLogger(__name__).info('WhatsApp webhook: %s', request.body[:2000])
+    except Exception:
+        pass
+    return HttpResponse('ok')
+
+
 @_delivery_desk_access
 def delivery_desk_papers(request, reference):
     """Return the Telegram sales papers (invoice photos) attached to the

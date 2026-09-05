@@ -1145,6 +1145,7 @@ class WhatsAppConfig(models.Model):
     token = models.TextField(_('Token d\'accès'), blank=True)
     phone_number_id = models.CharField(_('Phone Number ID'), max_length=64, blank=True)
     retour_group_id = models.CharField(_('ID du groupe retour'), max_length=128, blank=True)
+    webhook_verify_token = models.CharField(_('Verify token (webhook)'), max_length=128, blank=True)
     api_version = models.CharField(_('Version API'), max_length=16, default='v25.0')
     updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
     updated_by = models.ForeignKey(

@@ -87,6 +87,19 @@
     </div>
 </div>
 
+<!-- Webhook (optional) -->
+<div class="card mb-6">
+    <div class="card-header"><h3 class="card-title">Webhook (optionnel)</h3></div>
+    <div class="card-body">
+        <p style="color:#6b7280;font-size:13px;margin:0 0 12px;">Non requis pour envoyer au groupe. À configurer seulement si vous voulez les accusés de réception/lecture ou les messages entrants. Dans Meta → <strong>Étape 2 → Configurer des webhooks</strong>, collez :</p>
+        <label class="wa-field"><span>URL de rappel (Callback URL)</span>
+            <input type="text" readonly value="{{ webhook_url }}" onclick="this.select()" class="form-input"></label>
+        <label class="wa-field"><span>Vérifier le token (Verify token)</span>
+            <input type="text" readonly value="{{ cfg.webhook_verify_token }}" onclick="this.select()" class="form-input"></label>
+        <p style="color:#6b7280;font-size:12px;margin:0;">Cliquez « Vérifier et enregistrer » dans Meta ; il doit passer au vert. Puis abonnez-vous aux champs <code>messages</code> et <code>message_status</code>.</p>
+    </div>
+</div>
+
 {% if result_json %}
 <div class="card mb-6">
     <div class="card-header"><h3 class="card-title">Réponse Meta</h3></div>

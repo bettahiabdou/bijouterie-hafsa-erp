@@ -1122,6 +1122,12 @@ def whatsapp_config(request):
     cfg = WhatsAppConfig.get_solo()
     result = None
 
+    # Ensure a webhook verify token exists (so it can be copied into Meta).
+    if not cfg.webhook_verify_token:
+        import secrets
+        cfg.webhook_verify_token = secrets.token_urlsafe(24)
+        cfg.save(update_fields=['webhook_verify_token'])
+
     if request.method == 'POST':
         action = request.POST.get('action', 'save')
 
@@ -1166,9 +1172,15 @@ def whatsapp_config(request):
 
     import json as _json
     masked_token = '********' if cfg.token else ''
+    try:
+        from django.urls import reverse
+        webhook_url = request.build_absolute_uri(reverse('sales:whatsapp_webhook'))
+    except Exception:
+        webhook_url = ''
     return render(request, 'admin_dashboard/whatsapp_config.html', {
         'cfg': cfg,
         'masked_token': masked_token,
         'effective': wa._cfg(),
+        'webhook_url': webhook_url,
         'result_json': _json.dumps(result, indent=2, ensure_ascii=False) if result is not None else '',
     })
