@@ -4743,11 +4743,54 @@ def delivery_desk_receive_return(request, reference):
     delivery.return_received_at = timezone.now()
     delivery.return_received_by = request.user
     delivery.save(update_fields=['return_received_at', 'return_received_by', 'updated_at'])
-    DeliveryPhoto.objects.create(
+    photo_obj = DeliveryPhoto.objects.create(
         delivery=delivery, image=photo,
         photo_type=DeliveryPhoto.PhotoType.RETURN_RECEPTION, uploaded_by=request.user)
     _delivery_log(delivery, request, 'Retour réceptionné (physique, photo jointe) par le responsable livraison')
+    _notify_retour_group(delivery, photo_obj, request.user)
     return JsonResponse({'ok': True})
+
+
+def _notify_retour_group(delivery, photo_obj, user):
+    """Post the received return (photo + info) to the WhatsApp 'retour' group.
+    Runs in a background thread; any failure is swallowed."""
+    from . import whatsapp
+    if not (whatsapp.is_configured() and photo_obj):
+        return
+    try:
+        img_path = photo_obj.image.path
+    except Exception:
+        img_path = None
+    who = (user.get_full_name() or user.username) if user else '—'
+    when = timezone.now().strftime('%d/%m/%Y %H:%M')
+    inv_ref = delivery.invoice.reference if delivery.invoice_id else ''
+    lines = [
+        f"🔴 Retour réceptionné — {delivery.client_name or '—'}",
+        f"Code AMANA : {delivery.tracking_number or '—'}",
+    ]
+    detail = ' · '.join([x for x in [delivery.product, delivery.weight] if x])
+    if detail:
+        lines.append(detail)
+    dates = ' · '.join([x for x in [
+        f"Envoyé le {delivery.deposit_date}" if delivery.deposit_date else '',
+        f"Retour le {delivery.return_date}" if delivery.return_date else '',
+    ] if x])
+    if dates:
+        lines.append(dates)
+    if inv_ref:
+        lines.append(f"Facture : {inv_ref}")
+    lines.append(f"Réceptionné par {who} le {when}")
+    caption = '\n'.join(lines)
+
+    def _run():
+        try:
+            mid = whatsapp.upload_media(img_path) if img_path else None
+            whatsapp.send_group_image(caption, media_id=mid)
+        except Exception:
+            pass
+
+    import threading
+    threading.Thread(target=_run, daemon=True).start()
 
 
 @_delivery_desk_access
