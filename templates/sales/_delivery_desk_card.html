@@ -12,6 +12,9 @@
             {% if kind != 'retours' %} · COD : {{ d.cod_amount|floatformat:2 }} DH{% endif %}
             {% if d.current_position %} · {{ d.current_position }}{% endif %}
         </div>
+        {% if d.invoice_id %}
+        <div class="dl-meta"><button type="button" class="dl-papers-btn" data-ref="{{ d.reference }}"><i class="fas fa-file-invoice"></i> Bon de vente (Telegram)</button></div>
+        {% endif %}
         {% if d.photos.all %}
         <div class="dl-photos">
             {% for ph in d.photos.all|slice:":4" %}<a href="{{ ph.image.url }}" target="_blank" title="{{ ph.get_photo_type_display }}"><img src="{{ ph.image.url }}" alt=""></a>{% endfor %}

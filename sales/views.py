@@ -4756,6 +4756,37 @@ def delivery_desk_update_code(request, reference):
     return JsonResponse({'ok': True, 'tracking_number': new_code})
 
 
+@_delivery_desk_access
+def delivery_desk_papers(request, reference):
+    """Return the Telegram sales papers (invoice photos) attached to the
+    delivery's invoice, so the responsable can see the bon de vente."""
+    from .models import Delivery
+    delivery = get_object_or_404(
+        Delivery.objects.select_related('invoice', 'invoice__client'),
+        reference=reference, delivery_method_type='amana')
+    inv = delivery.invoice
+    photos = []
+    if inv:
+        for p in inv.photos.all():
+            try:
+                url = p.image.url
+            except Exception:
+                url = ''
+            if url:
+                photos.append({
+                    'url': url,
+                    'type': p.get_photo_type_display(),
+                    'caption': p.caption or '',
+                })
+    client = delivery.client_name or (inv.client.full_name if inv and inv.client_id else '')
+    return JsonResponse({
+        'ok': True,
+        'invoice_ref': inv.reference if inv else '',
+        'client': client,
+        'photos': photos,
+    })
+
+
 @login_required(login_url='login')
 @require_http_methods(["POST"])
 def ai_extract_sales_photo(request):

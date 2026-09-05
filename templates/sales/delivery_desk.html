@@ -81,6 +81,17 @@
     </div></div>
 </div>
 
+<!-- Bon de vente (Telegram photos) lightbox -->
+<div id="dl-papers-modal" class="dl-modal" hidden>
+    <div class="dl-modal-inner">
+        <div class="dl-modal-head">
+            <span id="dl-papers-title">Bon de vente</span>
+            <button type="button" id="dl-papers-close" class="dl-modal-close">&times;</button>
+        </div>
+        <div id="dl-papers-body" class="dl-modal-body"></div>
+    </div>
+</div>
+
 <style>
     .dl-tabs { display:flex; gap:6px; border-bottom:2px solid var(--neutral-200,#e5e7eb); margin-bottom:16px; flex-wrap:wrap; }
     .dl-tab { background:none; border:none; padding:12px 18px; font-size:15px; font-weight:600; color:var(--neutral-500,#6b7280); cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; }
@@ -104,6 +115,15 @@
     .dl-photos { display:flex; gap:4px; margin-top:6px; }
     .dl-photos img { width:34px; height:34px; object-fit:cover; border-radius:6px; border:1px solid var(--neutral-200,#e5e7eb); }
     .dl-pager { display:flex; gap:12px; align-items:center; justify-content:center; margin-top:12px; color:var(--neutral-500,#6b7280); font-size:13px; }
+    .dl-papers-btn { background:none; border:none; color:var(--primary-600,#4f46e5); font-size:13px; cursor:pointer; padding:2px 0; text-decoration:underline; }
+    .dl-modal { position:fixed; inset:0; z-index:100002; background:rgba(15,15,20,.75); display:flex; align-items:center; justify-content:center; padding:16px; }
+    .dl-modal-inner { background:#fff; border-radius:14px; width:100%; max-width:720px; max-height:90vh; display:flex; flex-direction:column; overflow:hidden; }
+    .dl-modal-head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--neutral-200,#e5e7eb); font-weight:700; }
+    .dl-modal-close { background:none; border:none; font-size:26px; line-height:1; cursor:pointer; color:var(--neutral-500,#6b7280); }
+    .dl-modal-body { padding:14px 16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+    .dl-paper { text-align:center; }
+    .dl-paper img { max-width:100%; border-radius:10px; border:1px solid var(--neutral-200,#e5e7eb); }
+    .dl-paper-lbl { font-size:12px; color:var(--neutral-500,#6b7280); margin-top:4px; }
     @media (max-width:640px){ .dl-actions{ width:100%; } .dl-actions .btn{ flex:1; } .dl-editbox{ max-width:none; } }
 </style>
 
@@ -134,8 +154,35 @@
         }
     }
 
+    // --- Bon de vente lightbox ---
+    const papersModal = document.getElementById('dl-papers-modal');
+    const papersBody = document.getElementById('dl-papers-body');
+    const papersTitle = document.getElementById('dl-papers-title');
+    function closePapers(){ papersModal.hidden = true; papersBody.innerHTML=''; }
+    document.getElementById('dl-papers-close').addEventListener('click', closePapers);
+    papersModal.addEventListener('click', function(e){ if(e.target === papersModal) closePapers(); });
+
     document.addEventListener('click', function(e){
         const card = e.target.closest('.dl-card');
+
+        // --- open bon de vente (Telegram photos) ---
+        if(e.target.closest('.dl-papers-btn')){
+            const ref = e.target.closest('.dl-papers-btn').getAttribute('data-ref');
+            papersTitle.textContent = 'Bon de vente';
+            papersBody.innerHTML = '<p class="text-muted">Chargement…</p>';
+            papersModal.hidden = false;
+            fetch(base + encodeURIComponent(ref) + '/papiers/', { headers:{'X-CSRFToken':csrf} })
+                .then(r=>r.json()).then(d=>{
+                    if(!d.ok){ papersBody.innerHTML = '<p class="text-muted">Erreur.</p>'; return; }
+                    papersTitle.textContent = 'Bon de vente' + (d.invoice_ref ? ' — ' + d.invoice_ref : '') + (d.client ? ' · ' + d.client : '');
+                    if(!d.photos.length){ papersBody.innerHTML = '<p class="text-muted">Aucun bon de vente joint à cette facture.</p>'; return; }
+                    papersBody.innerHTML = d.photos.map(function(p){
+                        return '<div class="dl-paper"><a href="'+p.url+'" target="_blank"><img src="'+p.url+'" alt=""></a>'
+                            + '<div class="dl-paper-lbl">'+(p.type||'')+(p.caption ? ' — '+p.caption : '')+'</div></div>';
+                    }).join('');
+                }).catch(()=>{ papersBody.innerHTML = '<p class="text-muted">Erreur de connexion.</p>'; });
+            return;
+        }
 
         // --- open code editor ---
         if(e.target.closest('.dl-code-edit')){
