@@ -164,6 +164,32 @@ def get_client_ip(request):
     return ip
 
 
+def web_manifest(request):
+    """Role-aware PWA manifest. The delivery responsable's installed app opens
+    straight to the Poste Livraison workspace instead of the dashboard."""
+    from django.http import JsonResponse
+    role = getattr(getattr(request, 'user', None), 'role', None)
+    start_url = '/sales/poste-livraison/' if role == 'delivery' else '/'
+    name = 'Poste Livraison - Hafsa' if role == 'delivery' else 'Bijouterie Hafsa ERP'
+    short = 'Livraison' if role == 'delivery' else 'Hafsa ERP'
+    sizes = [72, 96, 128, 144, 152, 192, 384, 512]
+    icons = [{
+        'src': f'/static/icons/icon-{s}x{s}.png',
+        'sizes': f'{s}x{s}', 'type': 'image/png', 'purpose': 'any maskable',
+    } for s in sizes]
+    data = {
+        'name': name, 'short_name': short,
+        'description': 'Systeme de gestion pour Bijouterie Hafsa',
+        'start_url': start_url, 'display': 'standalone',
+        'background_color': '#ffffff', 'theme_color': '#b8860b',
+        'orientation': 'any', 'scope': '/', 'icons': icons,
+        'categories': ['business', 'productivity'], 'lang': 'fr',
+    }
+    resp = JsonResponse(data)
+    resp['Cache-Control'] = 'no-cache'
+    return resp
+
+
 def service_worker(request):
     """Serve service worker from root scope"""
     from django.conf import settings

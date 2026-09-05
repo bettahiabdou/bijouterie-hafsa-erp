@@ -31,6 +31,7 @@ urlpatterns = [
 
     # PWA Service Worker (must be at root for proper scope)
     path('sw.js', views.service_worker, name='service_worker'),
+    path('manifest.webmanifest', views.web_manifest, name='web_manifest'),
 
     # Authentication
     path('login/', views.login_view, name='login'),
