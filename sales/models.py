@@ -1146,6 +1146,11 @@ class WhatsAppConfig(models.Model):
     phone_number_id = models.CharField(_('Phone Number ID'), max_length=64, blank=True)
     retour_group_id = models.CharField(_('ID du groupe retour'), max_length=128, blank=True)
     webhook_verify_token = models.CharField(_('Verify token (webhook)'), max_length=128, blank=True)
+    # Individual-recipients mode (no OBA needed): send an approved template to each staff number.
+    recipients = models.TextField(_('Destinataires (numéros)'), blank=True,
+                                  help_text=_('Numéros WhatsApp, chiffres uniquement, séparés par des virgules'))
+    template_name = models.CharField(_('Nom du modèle'), max_length=128, blank=True, default='retour_recu')
+    template_lang = models.CharField(_('Langue du modèle'), max_length=12, blank=True, default='fr')
     api_version = models.CharField(_('Version API'), max_length=16, default='v25.0')
     updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)
     updated_by = models.ForeignKey(

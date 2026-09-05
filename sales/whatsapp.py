@@ -31,6 +31,9 @@ def _env_cfg():
         'phone_id': os.getenv('WHATSAPP_PHONE_NUMBER_ID', '').strip(),
         'group_id': os.getenv('WHATSAPP_RETOUR_GROUP_ID', '').strip(),
         'version': os.getenv('WHATSAPP_API_VERSION', 'v25.0').strip(),
+        'recipients': [x.strip() for x in os.getenv('WHATSAPP_RECIPIENTS', '').replace(' ', '').split(',') if x.strip()],
+        'template_name': os.getenv('WHATSAPP_TEMPLATE_NAME', 'retour_recu').strip(),
+        'template_lang': os.getenv('WHATSAPP_TEMPLATE_LANG', 'fr').strip(),
     }
 
 
@@ -48,12 +51,16 @@ def _cfg():
     def pick(dbv, envv):
         dbv = (dbv or '').strip()
         return dbv if dbv else envv
+    recips = [x.strip() for x in (db.recipients or '').replace(' ', '').split(',') if x.strip()]
     return {
         'enabled': bool(db.enabled) or env['enabled'],
         'token': pick(db.token, env['token']),
         'phone_id': pick(db.phone_number_id, env['phone_id']),
         'group_id': pick(db.retour_group_id, env['group_id']),
         'version': pick(db.api_version, env['version']) or 'v25.0',
+        'recipients': recips,
+        'template_name': (db.template_name or 'retour_recu').strip(),
+        'template_lang': (db.template_lang or 'fr').strip(),
     }
 
 
@@ -189,6 +196,56 @@ def send_group_image(caption, media_id=None, image_url=None, group_id=None):
     except Exception as e:  # never break the caller
         logger.warning('WhatsApp send error: %s', e)
         return {'error': str(e)}
+
+
+def send_template(to, name, lang, components=None):
+    """Send an approved template message to one recipient number."""
+    c = _cfg()
+    if not is_configured():
+        return {'skipped': 'not_configured'}
+    tpl = {'name': name, 'language': {'code': lang}}
+    if components:
+        tpl['components'] = components
+    payload = {'messaging_product': 'whatsapp', 'to': str(to), 'type': 'template', 'template': tpl}
+    try:
+        r = requests.post(_messages_url(c), headers=_headers(c), json=payload, timeout=25)
+        data = r.json() if r.content else {}
+        if r.status_code >= 400:
+            logger.warning('WhatsApp template send failed (%s): %s', r.status_code, data)
+        return data
+    except Exception as e:
+        logger.warning('WhatsApp template send error: %s', e)
+        return {'error': str(e)}
+
+
+def send_test_template(to=None):
+    """Send the built-in 'hello_world' template (exists on every WABA) to check
+    connectivity for individual sends. If `to` is None, sends to all recipients."""
+    c = _cfg()
+    targets = [to] if to else c['recipients']
+    if not targets:
+        return {'skipped': 'no_recipients'}
+    return [{'to': t, 'resp': send_template(t, 'hello_world', 'en_US')} for t in targets]
+
+
+def notify_return_recipients(image_path, params):
+    """On a received return, send the retour template (image header + body vars)
+    to each configured staff number. `params` is an ordered list of body values.
+    No-op unless enabled + configured + recipients set."""
+    c = _cfg()
+    if not c['enabled'] or not is_configured() or not c['recipients']:
+        return {'skipped': True}
+    media_id = upload_media(image_path) if image_path else None
+    components = []
+    if media_id:
+        components.append({'type': 'header',
+                           'parameters': [{'type': 'image', 'image': {'id': media_id}}]})
+    components.append({'type': 'body',
+                       'parameters': [{'type': 'text', 'text': (str(v) or '-')[:512]} for v in params]})
+    out = []
+    for to in c['recipients']:
+        out.append(send_template(to, c['template_name'], c['template_lang'], components))
+    return out
 
 
 def send_group_text(body, group_id=None):

@@ -4752,8 +4752,11 @@ def delivery_desk_receive_return(request, reference):
 
 
 def _notify_retour_group(delivery, photo_obj, user):
-    """Post the received return (photo + info) to the WhatsApp 'retour' group.
-    Runs in a background thread; any failure is swallowed."""
+    """Send the received return (photo + info) to each configured staff number
+    via the approved WhatsApp template. Runs in a background thread; any
+    failure is swallowed. Body variables (in order) must match the template:
+      {{1}} client, {{2}} code AMANA, {{3}} envoyé le, {{4}} retour le,
+      {{5}} reçu par."""
     from . import whatsapp
     if not (whatsapp.is_configured() and photo_obj):
         return
@@ -4761,31 +4764,18 @@ def _notify_retour_group(delivery, photo_obj, user):
         img_path = photo_obj.image.path
     except Exception:
         img_path = None
-    who = (user.get_full_name() or user.username) if user else '—'
-    when = timezone.now().strftime('%d/%m/%Y %H:%M')
-    inv_ref = delivery.invoice.reference if delivery.invoice_id else ''
-    lines = [
-        f"🔴 Retour réceptionné — {delivery.client_name or '—'}",
-        f"Code AMANA : {delivery.tracking_number or '—'}",
+    who = (user.get_full_name() or user.username) if user else '-'
+    params = [
+        delivery.client_name or '-',
+        delivery.tracking_number or '-',
+        delivery.deposit_date or '-',
+        delivery.return_date or '-',
+        who or '-',
     ]
-    detail = ' · '.join([x for x in [delivery.product, delivery.weight] if x])
-    if detail:
-        lines.append(detail)
-    dates = ' · '.join([x for x in [
-        f"Envoyé le {delivery.deposit_date}" if delivery.deposit_date else '',
-        f"Retour le {delivery.return_date}" if delivery.return_date else '',
-    ] if x])
-    if dates:
-        lines.append(dates)
-    if inv_ref:
-        lines.append(f"Facture : {inv_ref}")
-    lines.append(f"Réceptionné par {who} le {when}")
-    caption = '\n'.join(lines)
 
     def _run():
         try:
-            mid = whatsapp.upload_media(img_path) if img_path else None
-            whatsapp.send_group_image(caption, media_id=mid)
+            whatsapp.notify_return_recipients(img_path, params)
         except Exception:
             pass
 

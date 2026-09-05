@@ -1139,6 +1139,9 @@ def whatsapp_config(request):
                 cfg.token = token
             cfg.phone_number_id = (request.POST.get('phone_number_id') or '').strip()
             cfg.retour_group_id = (request.POST.get('retour_group_id') or '').strip()
+            cfg.recipients = (request.POST.get('recipients') or '').strip()
+            cfg.template_name = (request.POST.get('template_name') or 'retour_recu').strip() or 'retour_recu'
+            cfg.template_lang = (request.POST.get('template_lang') or 'fr').strip() or 'fr'
             cfg.api_version = (request.POST.get('api_version') or 'v25.0').strip() or 'v25.0'
             cfg.updated_by = request.user
             cfg.save()
@@ -1171,11 +1174,16 @@ def whatsapp_config(request):
                 messages.info(request, 'Diagnostic récupéré (voir ci-dessous).')
 
         elif action == 'test':
-            result = wa.send_group_text('✅ Test Poste Livraison — notification retour')
-            if isinstance(result, dict) and result.get('messages'):
-                messages.success(request, 'Message test envoyé au groupe.')
+            # Send the built-in hello_world template to each recipient (connectivity check).
+            result = wa.send_test_template()
+            if isinstance(result, list) and result:
+                ok = any((isinstance(r.get('resp'), dict) and r['resp'].get('messages')) for r in result)
+                if ok:
+                    messages.success(request, 'Test envoyé (hello_world) aux destinataires.')
+                else:
+                    messages.warning(request, "Le test n'a pas abouti (voir le détail ci-dessous).")
             else:
-                messages.warning(request, "Le test n'a pas abouti (voir le détail ci-dessous).")
+                messages.warning(request, "Aucun destinataire configuré, ou envoi impossible (voir ci-dessous).")
 
     import json as _json
     masked_token = '********' if cfg.token else ''
