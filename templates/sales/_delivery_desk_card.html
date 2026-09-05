@@ -1,15 +1,17 @@
-{% comment %}One delivery card. Vars: d, kind (attente|tous|retours){% endcomment %}
+{% comment %}One delivery card. Vars: d, kind (attente|tous|retours|return_done).
+Reception controls are driven by the delivery's real state (status +
+return_received_at), so a return is actionable from any tab.{% endcomment %}
 <div class="dl-card" data-ref="{{ d.reference }}">
     <div class="dl-main">
         <div class="dl-title">
             {{ d.client_name|default:'—' }}<span class="dl-sub">{{ d.invoice.reference|default:d.reference }}</span>
-            {% if kind == 'tous' %}<span class="dl-badge-status">{{ d.get_status_display }}</span>{% endif %}
+            {% if kind == 'tous' or kind == 'return_done' %}<span class="dl-badge-status">{{ d.get_status_display }}</span>{% endif %}
         </div>
         <div class="dl-meta dl-code">Code AMANA : <strong class="code-val">{{ d.tracking_number|default:'—' }}</strong> <button type="button" class="dl-code-edit">Modifier</button></div>
         <div class="dl-meta">
             {% if d.product %}{{ d.product }}{% endif %}
             {% if d.weight %} · {{ d.weight }}{% endif %}
-            {% if kind != 'retours' %} · COD : {{ d.cod_amount|floatformat:2 }} DH{% endif %}
+            {% if d.status != 'returned' %} · COD : {{ d.cod_amount|floatformat:2 }} DH{% endif %}
             {% if d.current_position %} · {{ d.current_position }}{% endif %}
         </div>
         {% if d.invoice_id %}
@@ -20,18 +22,21 @@
             {% for ph in d.photos.all|slice:":4" %}<a href="{{ ph.image.url }}" target="_blank" title="{{ ph.get_photo_type_display }}"><img src="{{ ph.image.url }}" alt=""></a>{% endfor %}
         </div>
         {% endif %}
-        {% if kind == 'retours' %}
-        <div class="dl-receive-box dl-editbox" hidden>
-            <label class="dl-file">Photo du retour réceptionné : <input type="file" accept="image/*" capture="environment" class="dl-receive-photo"></label>
-            <div><button type="button" class="btn btn-success btn-sm dl-receive-confirm"><i class="fas fa-check"></i> Valider la réception</button></div>
-        </div>
-        {% elif kind == 'return_done' %}
-        <div class="dl-meta dl-received"><i class="fas fa-circle-check"></i> Réceptionné le {{ d.return_received_at|date:"d/m/Y H:i" }}{% if d.return_received_by %} par {{ d.return_received_by.get_full_name|default:d.return_received_by.username }}{% endif %}</div>
-        <div class="dl-meta"><button type="button" class="dl-undo-return">Annuler la réception (remettre à réceptionner)</button></div>
+
+        {% if d.status == 'returned' %}
+            {% if d.return_received_at %}
+            <div class="dl-meta dl-received"><i class="fas fa-circle-check"></i> Réceptionné le {{ d.return_received_at|date:"d/m/Y H:i" }}{% if d.return_received_by %} par {{ d.return_received_by.get_full_name|default:d.return_received_by.username }}{% endif %}</div>
+            <div class="dl-meta"><button type="button" class="dl-undo-return">Annuler la réception (remettre à réceptionner)</button></div>
+            {% else %}
+            <div class="dl-receive-box dl-editbox" hidden>
+                <label class="dl-file">Photo du retour réceptionné : <input type="file" accept="image/*" capture="environment" class="dl-receive-photo"></label>
+                <div><button type="button" class="btn btn-success btn-sm dl-receive-confirm"><i class="fas fa-check"></i> Valider la réception</button></div>
+            </div>
+            {% endif %}
         {% endif %}
     </div>
     <div class="dl-actions">
-        {% if kind == 'retours' %}
+        {% if d.status == 'returned' and not d.return_received_at %}
             <button type="button" class="btn btn-success btn-sm dl-receive"><i class="fas fa-box-open"></i> Confirmer réception</button>
         {% endif %}
     </div>
