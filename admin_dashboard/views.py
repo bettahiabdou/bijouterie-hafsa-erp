@@ -1163,6 +1163,13 @@ def whatsapp_config(request):
                 else:
                     messages.warning(request, "Réponse reçue mais aucun ID de groupe détecté (voir le détail ci-dessous).")
 
+        elif action == 'diagnostic':
+            result = wa.get_phone_info()
+            if isinstance(result, dict) and result.get('is_official_business_account') is False:
+                messages.warning(request, "Ce numéro n'est PAS un Official Business Account (OBA) : l'API Groupes sera refusée. Voir platform_type et is_official_business_account ci-dessous.")
+            else:
+                messages.info(request, 'Diagnostic récupéré (voir ci-dessous).')
+
         elif action == 'test':
             result = wa.send_group_text('✅ Test Poste Livraison — notification retour')
             if isinstance(result, dict) and result.get('messages'):

@@ -83,7 +83,10 @@
 <div class="card mb-6">
     <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
         <div><strong>Envoyer un message test</strong><br><small style="color:#6b7280;">Vérifie que le groupe reçoit bien les messages.</small></div>
+        <div style="display:flex;gap:8px;">
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="diagnostic"><button type="submit" class="btn btn-secondary"><i class="fas fa-stethoscope"></i> Diagnostic (statut OBA)</button></form>
         <form method="post">{% csrf_token %}<input type="hidden" name="action" value="test"><button type="submit" class="btn btn-success"><i class="fas fa-paper-plane"></i> Tester</button></form>
+        </div>
     </div>
 </div>
 

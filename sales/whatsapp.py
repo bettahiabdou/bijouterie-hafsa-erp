@@ -96,6 +96,22 @@ def create_group(subject, participants):
         return {'status_code': r.status_code, 'text': r.text}
 
 
+def get_phone_info():
+    """Diagnostic: fetch the business number's status incl. OBA flags."""
+    c = _cfg()
+    if not is_configured():
+        return {'error': 'WhatsApp not configured.'}
+    url = f"{GRAPH}/{c['version']}/{c['phone_id']}"
+    fields = ('id,display_phone_number,verified_name,code_verification_status,'
+              'quality_rating,platform_type,is_official_business_account,'
+              'name_status,messaging_limit_tier,whatsapp_business_api_data')
+    try:
+        r = requests.get(url, headers=_headers(c), params={'fields': fields}, timeout=25)
+        return r.json() if r.content else {'status_code': r.status_code}
+    except Exception as e:
+        return {'error': str(e)}
+
+
 def get_group(group_id):
     """Fetch group info (includes invite link when available)."""
     c = _cfg()
