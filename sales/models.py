@@ -1102,6 +1102,40 @@ class DeliveryTimelineEvent(models.Model):
         return f"{self.event_number} - {self.event_date} {self.event_time} - {self.description[:50]}"
 
 
+class DeliveryPhoto(models.Model):
+    """Photo evidence attached to a delivery by the responsable livraison:
+    the modified AMANA sheet when a code is changed, or the received return."""
+
+    class PhotoType(models.TextChoices):
+        CODE_CHANGE = 'code_change', _('Bordereau (code modifié)')
+        RETURN_RECEPTION = 'return_reception', _('Retour réceptionné')
+
+    delivery = models.ForeignKey(
+        Delivery, on_delete=models.CASCADE, related_name='photos',
+        verbose_name=_('Livraison'),
+    )
+    image = models.ImageField(_('Photo'), upload_to='delivery_photos/%Y/%m/%d/')
+    photo_type = models.CharField(
+        _('Type'), max_length=20, choices=PhotoType.choices,
+        default=PhotoType.CODE_CHANGE,
+    )
+    note = models.CharField(_('Note'), max_length=200, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='delivery_photos', verbose_name=_('Ajouté par'),
+    )
+    created_at = models.DateTimeField(_('Ajouté le'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('Photo livraison')
+        verbose_name_plural = _('Photos livraison')
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['delivery', '-created_at'])]
+
+    def __str__(self):
+        return f"{self.delivery_id} - {self.get_photo_type_display()}"
+
+
 class SaleInvoiceAction(models.Model):
     """
     Track returns and exchanges on sales invoices

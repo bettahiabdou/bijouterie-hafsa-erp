@@ -87,7 +87,6 @@ urlpatterns = [
 
     # Poste Livraison (responsable AMANA workspace)
     path('poste-livraison/', views.delivery_desk, name='delivery_desk'),
-    path('poste-livraison/<str:reference>/deposer/', views.delivery_desk_deposit, name='delivery_desk_deposit'),
     path('poste-livraison/<str:reference>/receptionner-retour/', views.delivery_desk_receive_return, name='delivery_desk_receive_return'),
     path('poste-livraison/<str:reference>/code/', views.delivery_desk_update_code, name='delivery_desk_update_code'),
 

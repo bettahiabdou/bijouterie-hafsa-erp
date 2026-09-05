@@ -4653,97 +4653,92 @@ def _cod_by_invoice(deliveries):
 
 @_delivery_desk_access
 def delivery_desk(request):
-    """AMANA delivery responsable board: to-deposit, in-transit, returns to receive."""
+    """AMANA delivery responsable board, three tabs: En attente / Tous / Retours."""
     from .models import Delivery
 
-    base = Delivery.objects.filter(delivery_method_type='amana').select_related(
-        'invoice', 'invoice__seller', 'deposited_by', 'return_received_by')
-
+    active_tab = request.GET.get('tab', 'attente')
+    if active_tab not in ('attente', 'tous', 'retours'):
+        active_tab = 'attente'
     search = (request.GET.get('search') or '').strip()
-    if search:
-        base = base.filter(
-            Q(reference__icontains=search) | Q(tracking_number__icontains=search) |
-            Q(client_name__icontains=search) | Q(invoice__reference__icontains=search))
 
-    to_deposit = list(base.filter(status='pending', deposited_at__isnull=True).order_by('created_at'))
-    in_transit = list(base.filter(status__in=['in_transit', 'to_pickup']).order_by('-updated_at'))
-    returns_todo = list(base.filter(status='returned', return_received_at__isnull=True).order_by('-updated_at'))
-    returns_done = list(base.filter(status='returned', return_received_at__isnull=False).order_by('-return_received_at')[:30])
+    base = Delivery.objects.filter(delivery_method_type='amana').select_related(
+        'invoice', 'invoice__seller', 'return_received_by')
 
-    cod = _cod_by_invoice(to_deposit + in_transit)
-    for d in to_deposit + in_transit:
+    def _search(qs):
+        if search:
+            return qs.filter(
+                Q(reference__icontains=search) | Q(tracking_number__icontains=search) |
+                Q(client_name__icontains=search) | Q(invoice__reference__icontains=search))
+        return qs
+
+    pending = list(_search(base.filter(status='pending')).order_by('-created_at'))
+    returns_todo = list(_search(base.filter(status='returned', return_received_at__isnull=True)).order_by('-updated_at'))
+
+    all_qs = _search(base).order_by('-created_at')
+    paginator = Paginator(all_qs, 40)
+    all_page = paginator.get_page(request.GET.get('page', 1))
+
+    cod = _cod_by_invoice(list(pending) + list(all_page))
+    for d in pending:
+        d.cod_amount = cod.get(d.invoice_id, Decimal('0'))
+    for d in all_page:
         d.cod_amount = cod.get(d.invoice_id, Decimal('0'))
 
     return render(request, 'sales/delivery_desk.html', {
-        'to_deposit': to_deposit,
-        'in_transit': in_transit,
-        'returns_todo': returns_todo,
-        'returns_done': returns_done,
+        'active_tab': active_tab,
         'search': search,
+        'pending': pending,
+        'returns_todo': returns_todo,
+        'all_page': all_page,
         'counts': {
-            'to_deposit': len(to_deposit),
-            'in_transit': len(in_transit),
-            'returns_todo': len(returns_todo),
+            'attente': len(pending),
+            'retours': len(returns_todo),
+            'tous': paginator.count,
         },
     })
 
 
 @_delivery_desk_access
 @require_http_methods(["POST"])
-def delivery_desk_deposit(request, reference):
-    """Responsable hands the parcel to AMANA: mark deposited (-> in_transit)."""
-    from .models import Delivery
-    delivery = get_object_or_404(Delivery, reference=reference, delivery_method_type='amana')
-    if delivery.deposited_at:
-        return JsonResponse({'ok': False, 'error': 'Déjà déposé.'}, status=409)
-    delivery.deposited_at = timezone.now()
-    delivery.deposited_by = request.user
-    if delivery.status == 'pending':
-        delivery.status = 'in_transit'
-    delivery.save(update_fields=['deposited_at', 'deposited_by', 'status', 'updated_at'])
-    if delivery.invoice_id:
-        delivery.invoice.delivery_status = 'in_transit'
-        delivery.invoice.save(update_fields=['delivery_status'])
-    _delivery_log(delivery, request, 'Déposé chez AMANA par le responsable livraison')
-    return JsonResponse({'ok': True})
-
-
-@_delivery_desk_access
-@require_http_methods(["POST"])
 def delivery_desk_receive_return(request, reference):
-    """Responsable confirms physical reception of a returned parcel from AMANA.
-    Logistical acknowledgment only: does NOT restock the product or touch the
-    invoice (another operator finalizes the return)."""
-    from .models import Delivery
+    """Responsable confirms physical reception of a returned parcel from AMANA,
+    with a photo of the received return. Logistical acknowledgment only: does
+    NOT restock the product or touch the invoice (another operator finalizes)."""
+    from .models import Delivery, DeliveryPhoto
     delivery = get_object_or_404(Delivery, reference=reference, delivery_method_type='amana')
     if delivery.status != 'returned':
         return JsonResponse({'ok': False, 'error': "Cette livraison n'est pas un retour."}, status=400)
     if delivery.return_received_at:
         return JsonResponse({'ok': False, 'error': 'Retour déjà réceptionné.'}, status=409)
+    photo = request.FILES.get('photo')
+    if not photo:
+        return JsonResponse({'ok': False, 'error': 'Photo du retour réceptionné requise.'}, status=400)
     delivery.return_received_at = timezone.now()
     delivery.return_received_by = request.user
     delivery.save(update_fields=['return_received_at', 'return_received_by', 'updated_at'])
-    _delivery_log(delivery, request, 'Retour réceptionné (physique) par le responsable livraison')
+    DeliveryPhoto.objects.create(
+        delivery=delivery, image=photo,
+        photo_type=DeliveryPhoto.PhotoType.RETURN_RECEPTION, uploaded_by=request.user)
+    _delivery_log(delivery, request, 'Retour réceptionné (physique, photo jointe) par le responsable livraison')
     return JsonResponse({'ok': True})
 
 
 @_delivery_desk_access
 @require_http_methods(["POST"])
 def delivery_desk_update_code(request, reference):
-    """Responsable changes the AMANA tracking code (recoded at the counter)."""
-    import json as _json
-    from .models import Delivery
+    """Responsable changes the AMANA tracking code (recoded at the counter),
+    with a photo of the modified sheet."""
+    from .models import Delivery, DeliveryPhoto
     delivery = get_object_or_404(Delivery, reference=reference, delivery_method_type='amana')
-    try:
-        data = _json.loads(request.body or '{}')
-    except ValueError:
-        data = {}
-    new_code = (data.get('tracking_number') or '').strip()
+    new_code = (request.POST.get('tracking_number') or '').strip()
     if not new_code:
         return JsonResponse({'ok': False, 'error': 'Code vide.'}, status=400)
     old_code = delivery.tracking_number or '(vide)'
     if new_code == delivery.tracking_number:
         return JsonResponse({'ok': True, 'unchanged': True, 'tracking_number': new_code})
+    photo = request.FILES.get('photo')
+    if not photo:
+        return JsonResponse({'ok': False, 'error': 'Photo du bordereau modifié requise.'}, status=400)
     delivery.tracking_number = new_code
     delivery.save(update_fields=['tracking_number', 'updated_at'])
     # Keep the invoice's tracking in sync when present.
@@ -4753,7 +4748,11 @@ def delivery_desk_update_code(request, reference):
             delivery.invoice.save(update_fields=['tracking_number'])
         except Exception:
             pass
-    _delivery_log(delivery, request, f'Code AMANA modifié : {old_code} → {new_code}')
+    DeliveryPhoto.objects.create(
+        delivery=delivery, image=photo,
+        photo_type=DeliveryPhoto.PhotoType.CODE_CHANGE,
+        note=f'{old_code} → {new_code}', uploaded_by=request.user)
+    _delivery_log(delivery, request, f'Code AMANA modifié : {old_code} → {new_code} (photo jointe)')
     return JsonResponse({'ok': True, 'tracking_number': new_code})
 
 
