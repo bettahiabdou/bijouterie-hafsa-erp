@@ -4381,6 +4381,9 @@ def delivery_update_status(request, reference):
     # Set delivery date if marking as delivered
     if new_status == 'delivered' and not delivery.delivery_date:
         delivery.delivery_date = timezone.now().strftime('%d/%m/%Y')
+    # Set return date if marking as returned
+    if new_status == 'returned' and not delivery.return_date:
+        delivery.return_date = timezone.now().strftime('%d/%m/%Y')
 
     delivery.save()
 
@@ -4576,10 +4579,22 @@ def delivery_update_from_client(request, reference):
 
     delivery.status = detect_status_from_timeline(timeline_data, data.get('delivery_date'))
 
+    # Capture the return date from the timeline event that triggered the return.
+    if delivery.status == 'returned' and not delivery.return_date:
+        _ret_ev = None
+        for _e in (timeline_data or []):
+            if 'retour' in (_e.get('description', '') or '').lower():
+                _ret_ev = _e
+                break
+        if _ret_ev is None and timeline_data:
+            _ret_ev = timeline_data[0]
+        if _ret_ev and _ret_ev.get('date'):
+            delivery.return_date = _ret_ev.get('date')
+
     delivery.save(update_fields=[
         'status', 'product', 'weight', 'amount_cod',
         'current_position', 'destination', 'origin',
-        'deposit_date', 'delivery_date', 'last_checked_at'
+        'deposit_date', 'delivery_date', 'return_date', 'last_checked_at'
     ])
 
     # Update invoice delivery status if different

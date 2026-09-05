@@ -1010,6 +1010,7 @@ class Delivery(models.Model):
     origin = models.CharField(_('Origine'), max_length=200, blank=True)
     deposit_date = models.CharField(_('Date de dépôt'), max_length=50, blank=True)
     delivery_date = models.CharField(_('Date de livraison'), max_length=50, blank=True)
+    return_date = models.CharField(_('Date de retour'), max_length=50, blank=True)
 
     # Tracking timestamps
     last_checked_at = models.DateTimeField(

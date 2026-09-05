@@ -14,6 +14,10 @@ return_received_at), so a return is actionable from any tab.{% endcomment %}
             {% if d.status != 'returned' %} · COD : {{ d.cod_amount|floatformat:2 }} DH{% endif %}
             {% if d.current_position %} · {{ d.current_position }}{% endif %}
         </div>
+        <div class="dl-meta dl-dates">
+            {% if d.deposit_date %}<span><i class="fas fa-paper-plane"></i> Envoyé le {{ d.deposit_date }}</span>{% endif %}
+            {% if d.return_date %}<span><i class="fas fa-rotate-left"></i> Retour le {{ d.return_date }}</span>{% endif %}
+        </div>
         {% if d.invoice_id %}
         <div class="dl-meta"><button type="button" class="dl-papers-btn" data-ref="{{ d.reference }}"><i class="fas fa-file-invoice"></i> Bon de vente (Telegram)</button></div>
         {% endif %}
