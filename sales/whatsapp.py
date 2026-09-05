@@ -104,7 +104,7 @@ def get_phone_info():
     url = f"{GRAPH}/{c['version']}/{c['phone_id']}"
     fields = ('id,display_phone_number,verified_name,code_verification_status,'
               'quality_rating,platform_type,is_official_business_account,'
-              'name_status,messaging_limit_tier,whatsapp_business_api_data')
+              'name_status,account_mode')
     try:
         r = requests.get(url, headers=_headers(c), params={'fields': fields}, timeout=25)
         return r.json() if r.content else {'status_code': r.status_code}
