@@ -11,6 +11,7 @@ from django.db import IntegrityError
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
+from datetime import date as _dt_date
 from decimal import Decimal, InvalidOperation
 from .models import (
     SaleInvoice, SaleInvoiceItem, SaleInvoiceAction, ClientLoan, Layaway,
@@ -4651,6 +4652,11 @@ def _cod_by_invoice(deliveries):
     return {r['sale_invoice_id']: r['t'] for r in rows}
 
 
+# Returns reception starts from this date: older returns (from before the
+# Poste Livraison feature existed) are ignored in the "à réceptionner" queue.
+RETURNS_RECEPTION_START = _dt_date(2026, 8, 1)
+
+
 @_delivery_desk_access
 def delivery_desk(request):
     """AMANA delivery responsable board, three tabs: En attente / Tous / Retours."""
@@ -4672,7 +4678,11 @@ def delivery_desk(request):
         return qs
 
     pending = list(_search(base.filter(status='pending')).order_by('-created_at'))
-    returns_todo = list(_search(base.filter(status='returned', return_received_at__isnull=True)).order_by('-updated_at'))
+    # Only unconfirmed returns from the reception start date onward (ignore old months).
+    returns_todo = list(_search(base.filter(
+        status='returned', return_received_at__isnull=True,
+        created_at__date__gte=RETURNS_RECEPTION_START,
+    )).order_by('-updated_at'))
     returns_done = list(_search(base.filter(status='returned', return_received_at__isnull=False)).order_by('-return_received_at')[:50])
 
     all_qs = _search(base).order_by('-created_at')
