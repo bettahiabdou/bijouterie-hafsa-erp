@@ -27,6 +27,7 @@
         </div>
         {% elif kind == 'return_done' %}
         <div class="dl-meta dl-received"><i class="fas fa-circle-check"></i> Réceptionné le {{ d.return_received_at|date:"d/m/Y H:i" }}{% if d.return_received_by %} par {{ d.return_received_by.get_full_name|default:d.return_received_by.username }}{% endif %}</div>
+        <div class="dl-meta"><button type="button" class="dl-undo-return">Annuler la réception (remettre à réceptionner)</button></div>
         {% endif %}
     </div>
     <div class="dl-actions">

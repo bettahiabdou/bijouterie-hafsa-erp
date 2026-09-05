@@ -4727,6 +4727,21 @@ def delivery_desk_receive_return(request, reference):
 
 @_delivery_desk_access
 @require_http_methods(["POST"])
+def delivery_desk_undo_return(request, reference):
+    """Undo a mistaken return reception: put it back in the à-réceptionner queue."""
+    from .models import Delivery
+    delivery = get_object_or_404(Delivery, reference=reference, delivery_method_type='amana')
+    if not delivery.return_received_at:
+        return JsonResponse({'ok': False, 'error': "Ce retour n'est pas marqué réceptionné."}, status=400)
+    delivery.return_received_at = None
+    delivery.return_received_by = None
+    delivery.save(update_fields=['return_received_at', 'return_received_by', 'updated_at'])
+    _delivery_log(delivery, request, 'Réception du retour annulée (remis à réceptionner)')
+    return JsonResponse({'ok': True})
+
+
+@_delivery_desk_access
+@require_http_methods(["POST"])
 def delivery_desk_update_code(request, reference):
     """Responsable changes the AMANA tracking code (recoded at the counter),
     with a photo of the modified sheet."""
