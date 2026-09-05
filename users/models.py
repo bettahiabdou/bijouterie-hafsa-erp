@@ -44,6 +44,7 @@ class User(AbstractUser):
         MANAGER = 'manager', _('Gérant')
         SELLER = 'seller', _('Vendeur')
         CASHIER = 'cashier', _('Caissier')
+        DELIVERY = 'delivery', _('Responsable livraison')
 
     # Basic info
     role = models.CharField(
@@ -183,6 +184,20 @@ class User(AbstractUser):
             self.can_manage_users = False
             self.can_view_reports = False
             self.can_manage_stock = False
+        elif self.role == self.Role.DELIVERY:
+            # Delivery responsable: no access to prices, sales or stock. Menu and
+            # URLs are restricted to the Poste Livraison workspace (see middleware).
+            self.is_staff = False
+            self.can_view_purchase_cost = False
+            self.can_give_discount = False
+            self.max_discount_percent = 0
+            self.can_sell_below_cost = False
+            self.can_create_purchase_order = False
+            self.can_approve_discount = False
+            self.can_delete_invoices = False
+            self.can_manage_users = False
+            self.can_view_reports = False
+            self.can_manage_stock = False
 
         super().save(*args, **kwargs)
 
@@ -201,6 +216,10 @@ class User(AbstractUser):
     @property
     def is_cashier(self):
         return self.role == self.Role.CASHIER
+
+    @property
+    def is_delivery(self):
+        return self.role == self.Role.DELIVERY
 
     def can_approve_discount_amount(self, discount_percent):
         """Check if user can approve a specific discount percentage"""

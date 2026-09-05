@@ -503,6 +503,18 @@
 
         <!-- Sidebar Navigation -->
         <nav class="sidebar-nav">
+            {% if user.role == 'delivery' %}
+            <!-- Restricted menu: delivery responsable only -->
+            <div class="nav-section">
+                <div class="nav-section-title">Livraison</div>
+                <div class="nav-item">
+                    <a href="{% url 'sales:delivery_desk' %}" class="nav-link {% if 'poste-livraison' in request.path %}active{% endif %}">
+                        <i class="fas fa-truck nav-icon"></i>
+                        <span class="nav-text">Poste Livraison</span>
+                    </a>
+                </div>
+            </div>
+            {% else %}
             <!-- Main Section -->
             <div class="nav-section">
                 <div class="nav-section-title">Menu Principal</div>
@@ -596,6 +608,10 @@
                         <a href="{% url 'sales:delivery_list' %}" class="nav-link {% if 'livraisons' in request.path %}active{% endif %}">
                             <i class="fas fa-truck text-info" style="margin-right: 6px;"></i>
                             <span class="nav-text">Livraisons</span>
+                        </a>
+                        <a href="{% url 'sales:delivery_desk' %}" class="nav-link {% if 'poste-livraison' in request.path %}active{% endif %}">
+                            <i class="fas fa-dolly text-info" style="margin-right: 6px;"></i>
+                            <span class="nav-text">Poste Livraison</span>
                         </a>
                         <a href="{% url 'sales:tray_monitor' %}" class="nav-link {% if 'plateau' in request.path %}active{% endif %}">
                             <i class="fas fa-shield-halved text-danger" style="margin-right: 6px;"></i>
@@ -767,6 +783,7 @@
                 </div>
             </div>
             {% endif %}
+            {% endif %}{# end delivery-role menu switch #}
         </nav>
 
         <!-- Sidebar Footer -->

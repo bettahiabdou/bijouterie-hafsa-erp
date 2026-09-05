@@ -85,6 +85,12 @@ urlpatterns = [
     path('benefice/', views.benefice_report, name='benefice'),
     path('benefice/print/', views.benefice_report_print, name='benefice_print'),
 
+    # Poste Livraison (responsable AMANA workspace)
+    path('poste-livraison/', views.delivery_desk, name='delivery_desk'),
+    path('poste-livraison/<str:reference>/deposer/', views.delivery_desk_deposit, name='delivery_desk_deposit'),
+    path('poste-livraison/<str:reference>/receptionner-retour/', views.delivery_desk_receive_return, name='delivery_desk_receive_return'),
+    path('poste-livraison/<str:reference>/code/', views.delivery_desk_update_code, name='delivery_desk_update_code'),
+
     # Livraisons (Delivery Tracking)
     path('livraisons/', views.delivery_list, name='delivery_list'),
     path('livraisons/bulk-check/', views.delivery_bulk_check, name='delivery_bulk_check'),

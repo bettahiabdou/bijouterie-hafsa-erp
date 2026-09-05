@@ -1018,6 +1018,21 @@ class Delivery(models.Model):
         blank=True
     )
 
+    # Poste Livraison (responsable) confirmations
+    # Outbound: parcel physically handed to AMANA by the responsable.
+    deposited_at = models.DateTimeField(_('Déposé chez AMANA le'), null=True, blank=True)
+    deposited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='deposited_deliveries', verbose_name=_('Déposé par'),
+    )
+    # Inbound: return parcel physically received back from AMANA by the responsable
+    # (logistical acknowledgment only; product restock / invoice is handled elsewhere).
+    return_received_at = models.DateTimeField(_('Retour réceptionné le'), null=True, blank=True)
+    return_received_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='received_return_deliveries', verbose_name=_('Retour réceptionné par'),
+    )
+
     # Timestamps
     created_at = models.DateTimeField(_('Créé le'), auto_now_add=True)
     updated_at = models.DateTimeField(_('Modifié le'), auto_now=True)

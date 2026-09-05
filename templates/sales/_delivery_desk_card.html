@@ -1,0 +1,20 @@
+{% comment %}One delivery card for the Poste Livraison board. Vars: d, kind (deposit|return|transit){% endcomment %}
+<div class="dl-card" data-ref="{{ d.reference }}">
+    <div class="dl-main">
+        <div class="dl-title">{{ d.client_name|default:'—' }}<span class="dl-sub">{{ d.invoice.reference|default:d.reference }}</span></div>
+        <div class="dl-meta dl-code">Code AMANA : <strong class="code-val">{{ d.tracking_number|default:'—' }}</strong> <button type="button" class="dl-code-edit">Modifier</button></div>
+        <div class="dl-meta">
+            {% if d.product %}{{ d.product }}{% endif %}
+            {% if d.weight %} · {{ d.weight }}{% endif %}
+            {% if kind != 'return' %} · COD : {{ d.cod_amount|floatformat:2 }} DH{% endif %}
+            {% if d.current_position %} · <span title="Position AMANA">{{ d.current_position }}</span>{% endif %}
+        </div>
+    </div>
+    <div class="dl-actions">
+        {% if kind == 'deposit' %}
+            <button type="button" class="btn btn-primary btn-sm dl-deposit"><i class="fas fa-paper-plane"></i> Déposé / Envoyé</button>
+        {% elif kind == 'return' %}
+            <button type="button" class="btn btn-success btn-sm dl-receive"><i class="fas fa-check"></i> Confirmer réception</button>
+        {% endif %}
+    </div>
+</div>

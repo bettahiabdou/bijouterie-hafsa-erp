@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% block title %}Poste Livraison - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Poste Livraison</span>
+{% endblock %}
+
+{% block content %}
+<form id="dl-csrf" style="display:none;">{% csrf_token %}</form>
+
+<div class="dl-head">
+    <h2 style="margin:0;"><i class="fas fa-dolly"></i> Poste Livraison AMANA</h2>
+    <form method="get" class="dl-search">
+        <input type="text" name="search" value="{{ search }}" placeholder="Rechercher (client, code, facture)..." class="form-input">
+        <button class="btn btn-secondary btn-sm" type="submit"><i class="fas fa-search"></i></button>
+    </form>
+</div>
+
+<div class="dl-kpis">
+    <div class="dl-kpi"><span class="dl-kpi-num">{{ counts.to_deposit }}</span><span class="dl-kpi-lbl">À déposer</span></div>
+    <div class="dl-kpi"><span class="dl-kpi-num">{{ counts.in_transit }}</span><span class="dl-kpi-lbl">En transit</span></div>
+    <div class="dl-kpi"><span class="dl-kpi-num">{{ counts.returns_todo }}</span><span class="dl-kpi-lbl">Retours à réceptionner</span></div>
+</div>
+
+<!-- À déposer -->
+<div class="card mb-6">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-box text-primary mr-2"></i> À déposer chez AMANA (<span data-count="to_deposit">{{ counts.to_deposit }}</span>)</h3></div>
+    <div class="card-body" data-section="to_deposit">
+        {% for d in to_deposit %}
+            {% include 'sales/_delivery_desk_card.html' with d=d kind='deposit' %}
+        {% empty %}
+            <p class="text-muted dl-empty">Aucune livraison à déposer. ✓</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Retours à réceptionner -->
+<div class="card mb-6" style="border-left:4px solid var(--warning-500,#f59e0b);">
+    <div class="card-header"><h3 class="card-title text-warning"><i class="fas fa-rotate-left mr-2"></i> Retours à réceptionner (<span data-count="returns_todo">{{ counts.returns_todo }}</span>)</h3></div>
+    <div class="card-body" data-section="returns_todo">
+        {% for d in returns_todo %}
+            {% include 'sales/_delivery_desk_card.html' with d=d kind='return' %}
+        {% empty %}
+            <p class="text-muted dl-empty">Aucun retour en attente de réception. ✓</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- En transit -->
+<div class="card mb-6">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-truck-fast text-info mr-2"></i> En transit / à suivre ({{ counts.in_transit }})</h3></div>
+    <div class="card-body" data-section="in_transit">
+        {% for d in in_transit %}
+            {% include 'sales/_delivery_desk_card.html' with d=d kind='transit' %}
+        {% empty %}
+            <p class="text-muted dl-empty">Rien en transit.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Retours réceptionnés (historique) -->
+{% if returns_done %}
+<div class="card mb-6">
+    <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('dl-done').hidden = !document.getElementById('dl-done').hidden;">
+        <h3 class="card-title"><i class="fas fa-clock-rotate-left mr-2"></i> Retours réceptionnés (récents)</h3>
+    </div>
+    <div class="card-body" id="dl-done" hidden>
+        {% for d in returns_done %}
+            <div class="dl-card">
+                <div class="dl-main">
+                    <div class="dl-title">{{ d.client_name|default:'—' }} <span class="dl-sub">{{ d.invoice.reference|default:d.reference }}</span></div>
+                    <div class="dl-meta">Code : <strong>{{ d.tracking_number|default:'—' }}</strong></div>
+                    <div class="dl-meta">Réceptionné le {{ d.return_received_at|date:"d/m/Y H:i" }}{% if d.return_received_by %} par {{ d.return_received_by.get_full_name|default:d.return_received_by.username }}{% endif %}</div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<style>
+    .dl-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+    .dl-search { display:flex; gap:6px; }
+    .dl-search .form-input { min-width:220px; }
+    .dl-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+    .dl-kpi { background:#fff; border:1px solid var(--neutral-200,#e5e7eb); border-radius:12px; padding:14px 16px; }
+    .dl-kpi-num { display:block; font-size:2rem; font-weight:800; color:var(--primary-700,#4338ca); line-height:1; }
+    .dl-kpi-lbl { color:var(--neutral-500,#6b7280); font-size:13px; }
+    .dl-card { display:flex; gap:12px; align-items:flex-start; justify-content:space-between; padding:14px; border:1px solid var(--neutral-200,#e5e7eb); border-radius:12px; margin-bottom:10px; background:#fff; flex-wrap:wrap; }
+    .dl-main { min-width:0; flex:1; }
+    .dl-title { font-weight:700; font-size:15px; }
+    .dl-sub { color:var(--neutral-400,#9ca3af); font-weight:500; font-size:13px; margin-left:6px; }
+    .dl-meta { color:var(--neutral-600,#4b5563); font-size:13px; margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .dl-code-edit, .dl-code-save, .dl-code-cancel { background:none; border:none; color:var(--primary-600,#4f46e5); font-size:12px; cursor:pointer; padding:2px 4px; text-decoration:underline; }
+    .dl-code-input { padding:4px 8px; border:1px solid var(--primary-300,#a5b4fc); border-radius:6px; font-size:13px; width:180px; max-width:60vw; }
+    .dl-actions { display:flex; gap:8px; align-items:center; }
+    @media (max-width:640px){ .dl-actions{ width:100%; } .dl-actions .btn{ flex:1; } }
+</style>
+
+<script>
+(function(){
+    const csrf = document.querySelector('#dl-csrf [name=csrfmiddlewaretoken]').value;
+    const base = "/sales/poste-livraison/";
+
+    function post(url, body){
+        return fetch(url, { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body: JSON.stringify(body||{}) })
+            .then(r => r.json().then(d => ({ok:r.ok, d})));
+    }
+    function decr(name){
+        document.querySelectorAll('[data-count="'+name+'"]').forEach(el=>{
+            const n = Math.max(0, (parseInt(el.textContent,10)||0) - 1); el.textContent = n;
+        });
+        document.querySelectorAll('.dl-kpi').forEach(()=>{});
+    }
+    function removeCard(card, sectionName){
+        const section = card.closest('[data-section]');
+        card.remove();
+        if(sectionName) decr(sectionName);
+        if(section && !section.querySelector('.dl-card')){
+            const p = document.createElement('p'); p.className='text-muted dl-empty'; p.textContent='Terminé. ✓';
+            section.appendChild(p);
+        }
+    }
+
+    document.addEventListener('click', function(e){
+        const card = e.target.closest('.dl-card');
+
+        // Deposit
+        if(e.target.closest('.dl-deposit')){
+            const ref = card.getAttribute('data-ref');
+            const btn = e.target.closest('.dl-deposit'); btn.disabled = true;
+            post(base + encodeURIComponent(ref) + '/deposer/', {}).then(({ok,d})=>{
+                if(ok && d.ok){ removeCard(card, 'to_deposit'); }
+                else { btn.disabled=false; alert(d.error || 'Erreur'); }
+            }).catch(()=>{ btn.disabled=false; alert('Erreur de connexion'); });
+            return;
+        }
+        // Receive return
+        if(e.target.closest('.dl-receive')){
+            const ref = card.getAttribute('data-ref');
+            if(!confirm('Confirmer la réception physique de ce retour depuis AMANA ?')) return;
+            const btn = e.target.closest('.dl-receive'); btn.disabled = true;
+            post(base + encodeURIComponent(ref) + '/receptionner-retour/', {}).then(({ok,d})=>{
+                if(ok && d.ok){ removeCard(card, 'returns_todo'); }
+                else { btn.disabled=false; alert(d.error || 'Erreur'); }
+            }).catch(()=>{ btn.disabled=false; alert('Erreur de connexion'); });
+            return;
+        }
+        // Edit code -> show input
+        if(e.target.closest('.dl-code-edit')){
+            const wrap = e.target.closest('.dl-code');
+            const cur = wrap.querySelector('.code-val').textContent.trim();
+            wrap.dataset.prev = cur;
+            wrap.innerHTML = '<input class="dl-code-input" value="'+(cur==='—'?'':cur)+'"> '
+                + '<button type="button" class="dl-code-save">Enregistrer</button>'
+                + '<button type="button" class="dl-code-cancel">Annuler</button>';
+            wrap.querySelector('.dl-code-input').focus();
+            return;
+        }
+        // Save code
+        if(e.target.closest('.dl-code-save')){
+            const wrap = e.target.closest('.dl-code');
+            const ref = card.getAttribute('data-ref');
+            const val = wrap.querySelector('.dl-code-input').value.trim();
+            if(!val){ alert('Code vide.'); return; }
+            post(base + encodeURIComponent(ref) + '/code/', {tracking_number: val}).then(({ok,d})=>{
+                if(ok && d.ok){ wrap.innerHTML = 'Code AMANA : <strong class="code-val">'+(d.tracking_number||val)+'</strong> <button type="button" class="dl-code-edit">Modifier</button>'; }
+                else { alert(d.error || 'Erreur'); }
+            }).catch(()=>alert('Erreur de connexion'));
+            return;
+        }
+        // Cancel code edit
+        if(e.target.closest('.dl-code-cancel')){
+            const wrap = e.target.closest('.dl-code');
+            const prev = wrap.dataset.prev || '—';
+            wrap.innerHTML = 'Code AMANA : <strong class="code-val">'+prev+'</strong> <button type="button" class="dl-code-edit">Modifier</button>';
+            return;
+        }
+    });
+})();
+</script>
+{% endblock %}
