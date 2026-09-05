@@ -78,6 +78,7 @@
         <button class="btn btn-secondary" type="submit"><i class="fas fa-search"></i> Rechercher</button>
         {% if search %}<a href="?tab=retours" class="btn btn-ghost">Effacer</a>{% endif %}
     </form>
+    <div class="dl-subhead">À réceptionner ({{ returns_todo|length }})</div>
     <div class="card"><div class="card-body" data-section>
         {% for d in returns_todo %}
             {% include 'sales/_delivery_desk_card.html' with d=d kind='retours' %}
@@ -85,6 +86,15 @@
             <p class="text-muted dl-empty">Aucun retour à réceptionner. ✓</p>
         {% endfor %}
     </div></div>
+
+    {% if returns_done %}
+    <div class="dl-subhead">Déjà réceptionnés ({{ returns_done|length }})</div>
+    <div class="card"><div class="card-body">
+        {% for d in returns_done %}
+            {% include 'sales/_delivery_desk_card.html' with d=d kind='return_done' %}
+        {% endfor %}
+    </div></div>
+    {% endif %}
 </div>
 
 <!-- Bon de vente (Telegram photos) lightbox -->
@@ -137,6 +147,8 @@
     .dl-pager { display:flex; gap:12px; align-items:center; justify-content:center; margin-top:12px; color:var(--neutral-500,#6b7280); font-size:14px; }
     .dl-papers-btn { background:none; border:none; color:var(--primary-600,#4f46e5); font-size:14px; cursor:pointer; padding:6px 0; text-decoration:underline; font-weight:600; text-align:left; }
     .dl-empty { padding:20px 14px; text-align:center; }
+    .dl-subhead { font-size:13px; font-weight:700; color:var(--neutral-500,#6b7280); text-transform:uppercase; letter-spacing:.3px; margin:14px 2px 6px; }
+    .dl-received { color:var(--success-700,#15803d); font-weight:600; }
 
     .dl-modal { position:fixed; inset:0; z-index:100002; background:rgba(15,15,20,.8); display:flex; align-items:center; justify-content:center; padding:12px; }
     .dl-modal-inner { background:#fff; border-radius:14px; width:100%; max-width:720px; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; }

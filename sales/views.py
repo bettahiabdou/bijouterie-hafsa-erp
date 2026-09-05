@@ -4673,6 +4673,7 @@ def delivery_desk(request):
 
     pending = list(_search(base.filter(status='pending')).order_by('-created_at'))
     returns_todo = list(_search(base.filter(status='returned', return_received_at__isnull=True)).order_by('-updated_at'))
+    returns_done = list(_search(base.filter(status='returned', return_received_at__isnull=False)).order_by('-return_received_at')[:50])
 
     all_qs = _search(base).order_by('-created_at')
     paginator = Paginator(all_qs, 40)
@@ -4689,6 +4690,7 @@ def delivery_desk(request):
         'search': search,
         'pending': pending,
         'returns_todo': returns_todo,
+        'returns_done': returns_done,
         'all_page': all_page,
         'counts': {
             'attente': len(pending),

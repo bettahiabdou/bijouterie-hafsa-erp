@@ -25,6 +25,8 @@
             <label class="dl-file">Photo du retour réceptionné : <input type="file" accept="image/*" capture="environment" class="dl-receive-photo"></label>
             <div><button type="button" class="btn btn-success btn-sm dl-receive-confirm"><i class="fas fa-check"></i> Valider la réception</button></div>
         </div>
+        {% elif kind == 'return_done' %}
+        <div class="dl-meta dl-received"><i class="fas fa-circle-check"></i> Réceptionné le {{ d.return_received_at|date:"d/m/Y H:i" }}{% if d.return_received_by %} par {{ d.return_received_by.get_full_name|default:d.return_received_by.username }}{% endif %}</div>
         {% endif %}
     </div>
     <div class="dl-actions">
