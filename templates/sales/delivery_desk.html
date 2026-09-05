@@ -110,8 +110,9 @@
 
 <style>
     /* ---- Poste Livraison : mobile-first ---- */
-    .dl-topbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .dl-topbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
     .dl-h2 { margin:0; font-size:1.2rem; }
+    #dl-install { flex-shrink:0; }
     .dl-ios-hint { background:var(--primary-50,#eef2ff); color:var(--primary-800,#3730a3); border:1px solid var(--primary-100,#e0e7ff); border-radius:10px; padding:10px 12px; font-size:13px; margin-bottom:12px; }
 
     /* Sticky segmented tabs */
@@ -121,9 +122,10 @@
     .dl-badge { background:var(--neutral-200,#e5e7eb); color:var(--neutral-600,#4b5563); border-radius:999px; padding:0 8px; font-size:12px; font-weight:700; }
     .dl-tab.active .dl-badge { background:var(--primary-100,#e0e7ff); color:var(--primary-700,#4338ca); }
 
-    .dl-search { display:flex; gap:6px; margin-bottom:12px; }
-    .dl-search .form-input { flex:1; min-width:0; font-size:16px; padding:11px 12px; }
-    .dl-search .btn { flex-shrink:0; }
+    .dl-search { display:flex; gap:6px; margin-bottom:12px; flex-wrap:nowrap; align-items:stretch; }
+    .dl-search .form-input { flex:1 1 auto; width:auto; min-width:0; font-size:16px; padding:11px 12px; }
+    .dl-search .btn { flex:0 0 auto; width:auto; white-space:nowrap; align-self:stretch; }
+    .dl-search .btn.btn-ghost { padding-left:10px; padding-right:10px; }
 
     .dl-card { display:flex; flex-direction:column; gap:8px; padding:14px; border-bottom:8px solid var(--neutral-50,#f9fafb); }
     .dl-card:last-child { border-bottom:none; }
