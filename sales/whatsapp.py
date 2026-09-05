@@ -84,7 +84,11 @@ def create_group(subject, participants):
     c = _cfg()
     if not is_configured():
         return {'error': 'WhatsApp not configured (WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID).'}
-    payload = {'subject': subject, 'participants': list(participants)}
+    payload = {
+        'messaging_product': 'whatsapp',
+        'subject': subject,
+        'participants': [{'user': str(p).strip()} for p in participants if str(p).strip()],
+    }
     r = requests.post(_groups_url(c), headers=_headers(c), json=payload, timeout=25)
     try:
         return r.json()
