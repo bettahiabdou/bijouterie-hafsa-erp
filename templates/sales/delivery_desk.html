@@ -33,10 +33,10 @@
 <div class="dl-panel" data-panel="attente" {% if active_tab != 'attente' %}hidden{% endif %}>
     <form method="get" class="dl-search">
         <input type="hidden" name="tab" value="attente">
-        <input type="text" name="search" value="{{ search }}" placeholder="Rechercher (client, code, facture)..." class="form-input">
+        <input type="search" name="search" value="{{ search }}" placeholder="Rechercher (client, code, facture)..." class="form-input">
         <button class="btn btn-secondary" type="submit"><i class="fas fa-search"></i> Rechercher</button>
-        {% if search %}<a href="?tab=attente" class="btn btn-ghost">Effacer</a>{% endif %}
     </form>
+    {% if search %}<a href="?tab=attente" class="dl-clear"><i class="fas fa-xmark"></i> Effacer la recherche</a>{% endif %}
     <div class="card"><div class="card-body" data-section>
         {% for d in pending %}
             {% include 'sales/_delivery_desk_card.html' with d=d kind='attente' %}
@@ -50,10 +50,10 @@
 <div class="dl-panel" data-panel="tous" {% if active_tab != 'tous' %}hidden{% endif %}>
     <form method="get" class="dl-search">
         <input type="hidden" name="tab" value="tous">
-        <input type="text" name="search" value="{{ search }}" placeholder="Rechercher (client, code, facture)..." class="form-input">
+        <input type="search" name="search" value="{{ search }}" placeholder="Rechercher (client, code, facture)..." class="form-input">
         <button class="btn btn-secondary" type="submit"><i class="fas fa-search"></i> Rechercher</button>
-        {% if search %}<a href="?tab=tous" class="btn btn-ghost">Effacer</a>{% endif %}
     </form>
+    {% if search %}<a href="?tab=tous" class="dl-clear"><i class="fas fa-xmark"></i> Effacer la recherche</a>{% endif %}
     <div class="card"><div class="card-body" data-section>
         {% for d in all_page %}
             {% include 'sales/_delivery_desk_card.html' with d=d kind='tous' %}
@@ -74,10 +74,10 @@
 <div class="dl-panel" data-panel="retours" {% if active_tab != 'retours' %}hidden{% endif %}>
     <form method="get" class="dl-search">
         <input type="hidden" name="tab" value="retours">
-        <input type="text" name="search" value="{{ search }}" placeholder="Rechercher (client, code, facture)..." class="form-input">
+        <input type="search" name="search" value="{{ search }}" placeholder="Rechercher (client, code, facture)..." class="form-input">
         <button class="btn btn-secondary" type="submit"><i class="fas fa-search"></i> Rechercher</button>
-        {% if search %}<a href="?tab=retours" class="btn btn-ghost">Effacer</a>{% endif %}
     </form>
+    {% if search %}<a href="?tab=retours" class="dl-clear"><i class="fas fa-xmark"></i> Effacer la recherche</a>{% endif %}
     <div class="dl-subhead">À réceptionner ({{ returns_todo|length }})</div>
     <div class="card"><div class="card-body" data-section>
         {% for d in returns_todo %}
@@ -125,7 +125,8 @@
     .dl-search { display:flex; gap:6px; margin-bottom:12px; flex-wrap:nowrap; align-items:stretch; }
     .dl-search .form-input { flex:1 1 auto; width:auto; min-width:0; font-size:16px; padding:11px 12px; }
     .dl-search .btn { flex:0 0 auto; width:auto; white-space:nowrap; align-self:stretch; }
-    .dl-search .btn.btn-ghost { padding-left:10px; padding-right:10px; }
+    .dl-clear { display:inline-block; margin:-4px 2px 12px; font-size:13px; color:var(--error-600,#dc2626); text-decoration:none; }
+    .dl-clear:hover { text-decoration:underline; }
 
     .dl-card { display:flex; flex-direction:column; gap:8px; padding:14px; border-bottom:8px solid var(--neutral-50,#f9fafb); }
     .dl-card:last-child { border-bottom:none; }
