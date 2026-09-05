@@ -1173,6 +1173,26 @@ def whatsapp_config(request):
             else:
                 messages.info(request, 'Diagnostic récupéré (voir ci-dessous).')
 
+        elif action == 'test_return':
+            # Replay the most recent received return through the real retour template.
+            from sales.models import Delivery, DeliveryPhoto
+            d = (Delivery.objects.filter(delivery_method_type='amana', return_received_at__isnull=False)
+                 .order_by('-return_received_at').first())
+            if not d:
+                messages.warning(request, "Aucun retour réceptionné trouvé pour le test.")
+            else:
+                photo = d.photos.filter(photo_type=DeliveryPhoto.PhotoType.RETURN_RECEPTION).order_by('-created_at').first()
+                img_path = None
+                if photo:
+                    try:
+                        img_path = photo.image.path
+                    except Exception:
+                        img_path = None
+                who = (d.return_received_by.get_full_name() or d.return_received_by.username) if d.return_received_by_id else '-'
+                params = [d.client_name or '-', d.tracking_number or '-', d.deposit_date or '-', d.return_date or '-', who or '-']
+                result = wa.notify_return_recipients(img_path, params)
+                messages.info(request, f"Test « retour réel » envoyé pour {d.reference} (voir la réponse ci-dessous).")
+
         elif action == 'test':
             # Send the built-in hello_world template to each recipient (connectivity check).
             result = wa.send_test_template()

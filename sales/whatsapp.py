@@ -219,13 +219,14 @@ def send_template(to, name, lang, components=None):
 
 
 def send_test_template(to=None):
-    """Send the built-in 'hello_world' template (exists on every WABA) to check
-    connectivity for individual sends. If `to` is None, sends to all recipients."""
+    """Connectivity check: send the app's integration test template (approved and
+    sendable from a real number, unlike hello_world). If `to` is None, sends to
+    all recipients."""
     c = _cfg()
     targets = [to] if to else c['recipients']
     if not targets:
         return {'skipped': 'no_recipients'}
-    return [{'to': t, 'resp': send_template(t, 'hello_world', 'en_US')} for t in targets]
+    return [{'to': t, 'resp': send_template(t, '3p_direct_integration_test_template', 'en_US')} for t in targets]
 
 
 def notify_return_recipients(image_path, params):
