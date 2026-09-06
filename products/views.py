@@ -948,18 +948,19 @@ def _inventory_breakdown(qs, group_field):
     return rows
 
 
-def _daily_grams_series(days=90):
+def _daily_grams_series(days=90, in_stock=None):
     """Reconstruct total grams in stock per day over the last `days` days.
     IN event  = product entered stock (created_at, +gross_weight).
-    OUT event = product left stock (sold -> sale date; other non-in-stock
-    statuses -> updated_at, -gross_weight). Products still in an in-stock
-    status keep contributing to the running total."""
+    OUT event = product left the target `in_stock` set (sold -> sale date;
+    otherwise -> updated_at, -gross_weight). The end of the curve equals the
+    current total for those statuses, so it matches the KPI for the scope.
+    `in_stock` defaults to just 'available' (to match the Disponible KPI)."""
     import bisect
     from collections import defaultdict
     from datetime import timedelta
     from django.utils import timezone as _tz
 
-    IN_STOCK = {'available', 'reserved', 'in_repair', 'custom_order', 'consigned_in'}
+    IN_STOCK = set(in_stock) if in_stock else {'available'}
 
     # Latest sale date per product (for the OUT timing of sold items).
     from sales.models import SaleInvoiceItem
@@ -1048,7 +1049,13 @@ def inventory_dashboard(request):
         _days = 90
     if _days not in (30, 90, 180, 365):
         _days = 90
-    grams_labels, grams_values = _daily_grams_series(_days)
+    # Match the chart's "in stock" definition to the selected scope so the end
+    # of the curve equals the KPI shown above it.
+    if scope == 'available':
+        _grams_statuses = {'available'}
+    else:  # 'instock' or 'all' -> physical stock
+        _grams_statuses = set(INSTOCK_STATUSES)
+    grams_labels, grams_values = _daily_grams_series(_days, _grams_statuses)
 
     context = {
         'scope': scope,
