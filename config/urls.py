@@ -33,6 +33,9 @@ urlpatterns = [
     path('sw.js', views.service_worker, name='service_worker'),
     path('manifest.webmanifest', views.web_manifest, name='web_manifest'),
 
+    # Public pages
+    path('privacy/', views.privacy_policy, name='privacy'),
+
     # Authentication
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),

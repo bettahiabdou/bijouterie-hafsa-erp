@@ -164,6 +164,12 @@ def get_client_ip(request):
     return ip
 
 
+def privacy_policy(request):
+    """Public privacy policy page (needed to publish the Meta app / go Live)."""
+    from django.shortcuts import render
+    return render(request, 'privacy.html')
+
+
 def web_manifest(request):
     """Role-aware PWA manifest. The delivery responsable's installed app opens
     straight to the Poste Livraison workspace instead of the dashboard."""
