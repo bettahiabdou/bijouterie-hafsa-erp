@@ -86,6 +86,23 @@
         </div>
     </div>
 
+    <!-- Grams-in-stock trend -->
+    <div class="card mb-6">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3 class="card-title"><i class="fas fa-chart-line mr-2"></i> Évolution des grammes en stock</h3>
+            <div style="display:flex;gap:6px;">
+                <a href="?scope={{ scope }}&days=30" class="btn btn-sm {% if grams_days == 30 %}btn-primary{% else %}btn-ghost{% endif %}">30 j</a>
+                <a href="?scope={{ scope }}&days=90" class="btn btn-sm {% if grams_days == 90 %}btn-primary{% else %}btn-ghost{% endif %}">90 j</a>
+                <a href="?scope={{ scope }}&days=180" class="btn btn-sm {% if grams_days == 180 %}btn-primary{% else %}btn-ghost{% endif %}">6 mois</a>
+                <a href="?scope={{ scope }}&days=365" class="btn btn-sm {% if grams_days == 365 %}btn-primary{% else %}btn-ghost{% endif %}">1 an</a>
+            </div>
+        </div>
+        <div class="card-body">
+            <canvas id="gramsTrendChart" height="90"></canvas>
+            <p style="color:#6b7280;font-size:12px;margin:10px 0 0;">Poids total (g) des pièces en stock chaque jour. Reconstruit à partir des dates d'ajout (entrée) et de vente / sortie de stock.</p>
+        </div>
+    </div>
+
     <!-- Breakdowns -->
     {% include 'products/_inventory_breakdown.html' with title="Par métal" icon="fa-ring" rows=metal_breakdown report="metal" scope=scope %}
     {% include 'products/_inventory_breakdown.html' with title="Par pureté / carat" icon="fa-certificate" rows=purity_breakdown report="purity" scope=scope %}
@@ -129,4 +146,44 @@
     <p class="text-muted" style="font-size: var(--text-xs);">
         <i class="fas fa-info-circle"></i> « Valeur matière » = poids net × prix d'achat par gramme (ou poids brut si le net n'est pas renseigné), sans la façon, les pierres ni la marge.
     </p>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+    var el = document.getElementById('gramsTrendChart');
+    if(!el || typeof Chart === 'undefined') return;
+    var labels = {{ grams_labels_json|safe }};
+    var values = {{ grams_values_json|safe }};
+    new Chart(el, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Grammes en stock',
+                data: values,
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99,102,241,0.12)',
+                fill: true,
+                tension: 0.25,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: function(c){ return c.parsed.y.toLocaleString('fr-FR') + ' g'; } } }
+            },
+            scales: {
+                y: { beginAtZero: false, ticks: { callback: function(v){ return v.toLocaleString('fr-FR') + ' g'; } } },
+                x: { ticks: { maxTicksLimit: 12, autoSkip: true } }
+            }
+        }
+    });
+})();
+</script>
 {% endblock %}

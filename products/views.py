@@ -11,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse, HttpResponse
 from decimal import Decimal, InvalidOperation
 import csv
+import json
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from .models import Product, ProductImage, ProductStone, ProductVideo, StockCountSession, StockCountScan, ProductBlock
 from .video_utils import convert_video_to_mp4
@@ -947,6 +948,63 @@ def _inventory_breakdown(qs, group_field):
     return rows
 
 
+def _daily_grams_series(days=90):
+    """Reconstruct total grams in stock per day over the last `days` days.
+    IN event  = product entered stock (created_at, +gross_weight).
+    OUT event = product left stock (sold -> sale date; other non-in-stock
+    statuses -> updated_at, -gross_weight). Products still in an in-stock
+    status keep contributing to the running total."""
+    import bisect
+    from collections import defaultdict
+    from datetime import timedelta
+    from django.utils import timezone as _tz
+
+    IN_STOCK = {'available', 'reserved', 'in_repair', 'custom_order', 'consigned_in'}
+
+    # Latest sale date per product (for the OUT timing of sold items).
+    from sales.models import SaleInvoiceItem
+    sale_date = {}
+    for r in (SaleInvoiceItem.objects.filter(product__isnull=False, invoice__date__isnull=False)
+              .values('product_id', 'invoice__date').order_by('invoice__date')):
+        sale_date[r['product_id']] = r['invoice__date']
+
+    deltas = defaultdict(float)
+    for p in Product.objects.values('id', 'gross_weight', 'status', 'created_at', 'updated_at'):
+        w = float(p['gross_weight'] or 0)
+        if not w:
+            continue
+        cin = p['created_at'].date() if p['created_at'] else None
+        if cin:
+            deltas[cin] += w
+        if p['status'] not in IN_STOCK:
+            out = sale_date.get(p['id']) if p['status'] == 'sold' else None
+            if out is None:
+                out = p['updated_at'].date() if p['updated_at'] else cin
+            if out:
+                deltas[out] -= w
+
+    if not deltas:
+        return [], []
+
+    ev_dates = sorted(deltas.keys())
+    ev_cum, running = [], 0.0
+    for d in ev_dates:
+        running += deltas[d]
+        ev_cum.append(running)
+
+    today = _tz.localdate()
+    start = today - timedelta(days=days - 1)
+    labels, values = [], []
+    day = start
+    while day <= today:
+        idx = bisect.bisect_right(ev_dates, day) - 1
+        val = ev_cum[idx] if idx >= 0 else 0.0
+        labels.append(day.strftime('%d/%m'))
+        values.append(round(max(val, 0.0), 1))
+        day += timedelta(days=1)
+    return labels, values
+
+
 @login_required(login_url='login')
 def inventory_dashboard(request):
     """Cost-based inventory dashboard (material value = poids × prix/g, sans marge)."""
@@ -984,10 +1042,21 @@ def inventory_dashboard(request):
     for r in status_rows:
         r['status_label'] = status_map.get(r['status'], r['status'])
 
+    try:
+        _days = int(request.GET.get('days', 90))
+    except (TypeError, ValueError):
+        _days = 90
+    if _days not in (30, 90, 180, 365):
+        _days = 90
+    grams_labels, grams_values = _daily_grams_series(_days)
+
     context = {
         'scope': scope,
         'scope_label': INVENTORY_SCOPES[scope][1],
         'scopes': [(k, v[1]) for k, v in INVENTORY_SCOPES.items()],
+        'grams_days': _days,
+        'grams_labels_json': json.dumps(grams_labels),
+        'grams_values_json': json.dumps(grams_values),
         # KPIs
         'stock_count': kpis['count'] or 0,
         'gross_weight': kpis['gross'] or Decimal('0'),
