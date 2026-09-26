@@ -97,7 +97,7 @@
         </div>
         <div id="ms-pays"></div>
         <button type="button" class="btn btn-secondary ms-wide" id="ms-add-pay"><i class="fas fa-plus"></i> Ajouter un paiement</button>
-        <button type="button" class="btn btn-primary ms-wide" id="ms-add-cod" hidden><i class="fas fa-truck"></i> Contre-remboursement AMANA (reste)</button>
+        <button type="button" class="btn btn-primary ms-wide" id="ms-add-cod" hidden><i class="fas fa-truck"></i> Le reste est payé à la livraison (AMANA)</button>
     </section>
 
     <!-- STEP 4: photos -->
@@ -311,6 +311,10 @@
         $('#ms-bar-count').textContent = state.items.length + (state.items.length > 1 ? ' articles' : ' article');
         $('#ms-t-total').textContent = money(t); $('#ms-t-paid').textContent = money(p); $('#ms-t-rest').textContent = money(t - p);
         $('#ms-t-rest').style.color = (t - p) > 0.009 ? '#b45309' : '#15803d';
+        // Cash-on-delivery shortcut: only for AMANA, only while something is left
+        // to pay, and only if no carrier-collected line exists yet.
+        const hasCod = state.payments.some(x => (METHODS.find(m => String(m.id) === String(x.method_id)) || {}).cod);
+        $('#ms-add-cod').hidden = !(state.delivery.type === 'amana' && METHODS.some(m => m.cod) && (t - p) > 0.009 && !hasCod);
     }
 
     // ---------- step 1: items ----------
@@ -430,7 +434,7 @@
         $('#ms-carrier').value = state.delivery.carrier_id || '';
         $('#ms-client-req').textContent = t === 'magasin' ? '(facultatif en magasin)' : '(obligatoire)';
         $('#ms-deliv-req').hidden = !(t === 'amana' || t === 'transporteur');
-        $('#ms-add-cod').hidden = !(t === 'amana' && METHODS.some(m => m.cod));
+        refreshTotals();
     }
     $('#ms-dtype').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.delivery.type = b.dataset.v; save(); renderDelivery(); });
     $('#ms-track').addEventListener('input', e => { state.delivery.tracking_number = e.target.value.toUpperCase().replace(/\s+/g, ''); save(); });
