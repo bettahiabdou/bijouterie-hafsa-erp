@@ -90,6 +90,16 @@ def _method_fields(m):
     return {'show_ref': True, 'need_ref': False, 'show_bank': False, 'need_bank': False}
 
 
+CASH_NAMES = {'espèces', 'especes', 'espèce', 'espece', 'cash'}
+
+
+def _needs_proof(m):
+    """A payment proof photo is required for every method except plain cash
+    and carrier cash-on-delivery (AMANA collects; its statement is the proof).
+    Mixed methods like "Achat or + espèces" still need a proof."""
+    return not m.collected_by_carrier and (m.name or '').strip().lower() not in CASH_NAMES
+
+
 def _bank_accounts():
     from settings_app.models import BankAccount
     return list(BankAccount.objects.filter(is_active=True).order_by('bank_name'))
@@ -184,6 +194,7 @@ def mobile_sale(request, reference=None):
         'prefill_json': json.dumps(prefill) if prefill else 'null',
         'methods_json': json.dumps([dict({
             'id': m.id, 'name': m.name, 'cod': bool(m.collected_by_carrier),
+            'proof': _needs_proof(m),
         }, **_method_fields(m)) for m in methods]),
         'banks_json': json.dumps([{
             'id': b.id, 'name': b.bank_name + (f' · {b.account_name}' if b.account_name else ''),
@@ -399,6 +410,11 @@ def mobile_sale_submit(request):
             return fail('La photo de la facture manuscrite est obligatoire.')
         if dtype in ('amana', 'transporteur') and not has[InvoicePhoto.PhotoType.DELIVERY]:
             return fail('La photo du bordereau de livraison est obligatoire.')
+        if not has[InvoicePhoto.PhotoType.PRODUCT]:
+            return fail('Les photos des produits sont obligatoires.')
+        proof_for = [methods[p['method_id']].name for p in payments if _needs_proof(methods[p['method_id']])]
+        if proof_for and not has[InvoicePhoto.PhotoType.PAYMENT]:
+            return fail(f'La preuve de paiement est obligatoire ({", ".join(proof_for)}).')
 
         if not invoice:
             invoice = SaleInvoice.objects.create(

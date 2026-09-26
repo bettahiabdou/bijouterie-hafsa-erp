@@ -113,12 +113,12 @@
             <div class="ms-thumbs"></div>
         </div>
         <div class="ms-card ms-photo" data-slot="photos_product">
-            <div class="ms-ph-head"><span><i class="fas fa-gem"></i> Photos des produits</span>
+            <div class="ms-ph-head"><span><i class="fas fa-gem"></i> Photos des produits <em class="ms-req">obligatoire</em></span>
                 <label class="btn btn-primary btn-sm ms-ph-btn"><i class="fas fa-camera"></i> Ajouter<input type="file" accept="image/*" multiple hidden></label></div>
             <div class="ms-thumbs"></div>
         </div>
         <div class="ms-card ms-photo" data-slot="photos_payment">
-            <div class="ms-ph-head"><span><i class="fas fa-receipt"></i> Preuve de paiement</span>
+            <div class="ms-ph-head"><span><i class="fas fa-receipt"></i> Preuve de paiement <em class="ms-req" id="ms-proof-req" hidden>obligatoire</em></span>
                 <label class="btn btn-primary btn-sm ms-ph-btn"><i class="fas fa-camera"></i> Ajouter<input type="file" accept="image/*" multiple hidden></label></div>
             <div class="ms-thumbs"></div>
         </div>
@@ -560,6 +560,13 @@
         photos[b.dataset.slot].splice(+b.dataset.i, 1); renderPhotos();
     });
 
+    // Methods (with an amount) that need a payment-proof photo.
+    function proofMethods(){
+        const out = [];
+        state.payments.forEach(p => { const m = METHODS.find(x => String(x.id) === String(p.method_id)); if (m && m.proof && num(p.amount) > 0 && !out.includes(m.name)) out.push(m.name); });
+        return out;
+    }
+
     // ---------- validation per step ----------
     function check(s){
         const t = state.delivery.type;
@@ -584,6 +591,9 @@
         if (s >= 4){
             if (!photos.photos_invoice.length && !existing.invoice) return [4, 'Ajoutez la photo de la facture manuscrite.'];
             if ((t === 'amana' || t === 'transporteur') && !photos.photos_delivery.length && !existing.delivery) return [4, 'Ajoutez la photo du bordereau de livraison.'];
+            if (!photos.photos_product.length && !existing.product) return [4, 'Ajoutez les photos des produits.'];
+            const pf = proofMethods();
+            if (pf.length && !photos.photos_payment.length && !existing.payment) return [4, 'Ajoutez la preuve de paiement (' + pf.join(', ') + ').'];
         }
         return null;
     }
@@ -595,7 +605,6 @@
         const warns = [];
         state.items.forEach(i => { if (num(i.minimum_price) > 0 && num(i.price) < num(i.minimum_price)) warns.push(`${esc(i.reference)} vendu sous le prix minimum.`); });
         if (rest > 0.009) warns.push(`Reste à payer : ${money(rest)} DH (vente partiellement payée).`);
-        if (!photos.photos_product.length && !existing.product) warns.push('Aucune photo des produits.');
         $('#ms-summary').innerHTML =
             (warns.length ? `<div class="ms-sum-warn">${warns.map(w => '• ' + w).join('<br>')}</div>` : '') +
             `<div class="ms-card">
@@ -620,6 +629,7 @@
         $$('.ms-stepdot').forEach(b => { const v = +b.dataset.go; b.classList.toggle('on', v === step); b.classList.toggle('done', v < step); });
         $('#ms-prev').style.visibility = step === 1 ? 'hidden' : 'visible';
         $('#ms-next').style.display = step === 5 ? 'none' : '';
+        if (step === 4) $('#ms-proof-req').hidden = !proofMethods().length;
         if (step === 5) renderSummary();
         window.scrollTo({top: 0, behavior: 'smooth'});
     }
