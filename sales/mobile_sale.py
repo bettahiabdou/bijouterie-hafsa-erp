@@ -184,6 +184,67 @@ def mobile_sale_lookup(request):
 
 
 @login_required(login_url='login')
+def mobile_sale_search(request):
+    """Live product search for the phone form, all criteria combined:
+      1. exact code (barcode / reference / RFID / digits) -> that piece first
+      2. every word must match one of: reference, name, name (AR), barcode,
+         RFID, category, metal, purity, jewelry type
+      3. a number with a decimal ("3.1", "3,10") also matches the weight
+      4. nothing found -> semantic (AI) search fallback
+    Available pieces come first; others are returned flagged so the seller
+    sees a piece is already sold instead of "not found"."""
+    import re
+    from products.views import _resolve_product_by_code
+    q = (request.GET.get('q') or '').strip()
+    if len(q) < 2:
+        return JsonResponse({'ok': True, 'results': []})
+
+    base = Product.objects.select_related('metal_type', 'category')
+    found, ids = [], set()
+
+    def add(qs):
+        for p in qs:
+            if p.id not in ids:
+                ids.add(p.id)
+                found.append(p)
+
+    exact = _resolve_product_by_code(q)
+    if exact:
+        add([exact])
+
+    cond = Q()
+    for word in q.split():
+        w = Q(reference__icontains=word) | Q(name__icontains=word) | Q(name_ar__icontains=word) \
+            | Q(barcode__icontains=word) | Q(rfid_tag__icontains=word) \
+            | Q(category__name__icontains=word) | Q(metal_type__name__icontains=word) \
+            | Q(metal_purity__name__icontains=word) | Q(jewelry_type__name__icontains=word)
+        m = re.fullmatch(r'(\d+)[.,](\d{1,3})', word)
+        if m:
+            val = Decimal(f'{m.group(1)}.{m.group(2)}')
+            tol = Decimal('0.5') / (Decimal(10) ** len(m.group(2)))
+            w |= Q(gross_weight__gte=val - tol, gross_weight__lt=val + tol) \
+                | Q(net_weight__gte=val - tol, net_weight__lt=val + tol)
+        cond &= w
+    add(base.filter(cond, status='available').order_by('-created_at')[:25])
+    if len(found) < 25:
+        add(base.filter(cond).exclude(status='available').order_by('-updated_at')[:25 - len(found)])
+
+    kind = 'keyword'
+    if not found:
+        try:
+            from ai_services.embeddings import search_products as semantic_search
+            hits = semantic_search(q, top_k=15, min_score=0.3) or []
+            byid = {p.id: p for p in base.filter(id__in=[h['product_id'] for h in hits])}
+            add([byid[h['product_id']] for h in hits if h['product_id'] in byid])
+            kind = 'semantic' if found else 'none'
+        except Exception:
+            kind = 'none'
+
+    found.sort(key=lambda p: (p.status != 'available',))
+    return JsonResponse({'ok': True, 'kind': kind, 'results': [_product_json(p) for p in found[:30]]})
+
+
+@login_required(login_url='login')
 @require_http_methods(["POST"])
 def mobile_sale_submit(request):
     """Validate the seller's sale, reserve the pieces, store photos, and queue

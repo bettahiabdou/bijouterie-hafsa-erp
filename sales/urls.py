@@ -58,6 +58,7 @@ urlpatterns = [
     # Mobile sale entry (seller on phone -> admin validation)
     path('vente/', mobile_sale.mobile_sale, name='mobile_sale'),
     path('vente/produit/', mobile_sale.mobile_sale_lookup, name='mobile_sale_lookup'),
+    path('vente/recherche/', mobile_sale.mobile_sale_search, name='mobile_sale_search'),
     path('vente/soumettre/', mobile_sale.mobile_sale_submit, name='mobile_sale_submit'),
     path('vente/mes-ventes/', mobile_sale.mobile_sale_mine, name='mobile_sale_mine'),
     path('vente/corriger/<str:reference>/', mobile_sale.mobile_sale, name='mobile_sale_edit'),

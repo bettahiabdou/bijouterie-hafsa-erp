@@ -29,13 +29,14 @@
     <!-- STEP 1: articles + prices -->
     <section class="ms-step" data-step="1">
         <div class="ms-card">
-            <label class="ms-label">Scanner ou saisir le code de l'étiquette</label>
+            <label class="ms-label" for="ms-code">Rechercher un produit</label>
             <div class="ms-row">
-                <input id="ms-code" class="ms-input" type="text" inputmode="text" autocomplete="off" placeholder="Code-barres ou référence">
-                <button type="button" class="btn btn-secondary ms-sq" id="ms-add-code" aria-label="Ajouter"><i class="fas fa-plus"></i></button>
+                <input id="ms-code" class="ms-input" type="search" inputmode="search" autocomplete="off" enterkeyhint="search"
+                       placeholder="Référence, nom, code-barres, poids (3.1), métal…">
+                <button type="button" class="btn btn-primary ms-sq" data-scan="item" aria-label="Scanner avec la caméra"><i class="fas fa-barcode"></i></button>
             </div>
-            <button type="button" class="btn btn-primary ms-wide" data-scan="item"><i class="fas fa-barcode"></i> Scanner avec la caméra</button>
             <div id="ms-code-msg" class="ms-msg" hidden></div>
+            <div id="ms-results"></div>
         </div>
         <div id="ms-items"></div>
         <p id="ms-items-empty" class="ms-empty">Aucun article pour l'instant.</p>
@@ -180,6 +181,17 @@
     .ms .ms-big { padding:16px; font-size:17px; }
     .ms-msg { margin-top:8px; padding:8px 10px; border-radius:8px; font-size:13px; }
     .ms-msg.err { background:#fef2f2; color:#b91c1c; } .ms-msg.ok { background:#f0fdf4; color:#15803d; }
+    #ms-results { margin-top:8px; max-height:60vh; overflow-y:auto; }
+    .ms .ms-hit { display:flex; gap:10px; align-items:center; width:100%; text-align:left; background:#fff !important; color:var(--neutral-800,#1f2937) !important; border:1px solid var(--neutral-200,#e5e7eb); border-radius:12px; padding:8px; margin-bottom:6px; }
+    .ms .ms-hit img, .ms .ms-hit .ms-noimg { width:48px; height:48px; border-radius:8px; object-fit:cover; flex-shrink:0; }
+    .ms-hit-main { flex:1; min-width:0; font-size:13px; line-height:1.3; word-break:break-word; }
+    .ms-hit-main span { color:var(--neutral-500,#6b7280); }
+    .ms-hit-side { text-align:right; font-size:13px; font-weight:700; white-space:nowrap; }
+    .ms-hit-side em { font-style:normal; font-weight:600; font-size:11px; color:var(--primary-600,#4f46e5); }
+    .ms .ms-hit.in { border-color:var(--success-300,#86efac); background:#f0fdf4 !important; }
+    .ms .ms-hit.in em { color:var(--success-700,#15803d); }
+    .ms .ms-hit.off { opacity:.55; }
+    .ms .ms-hit.off em { color:var(--error-600,#dc2626); }
     .ms-empty { text-align:center; color:var(--neutral-400,#9ca3af); padding:18px; }
     .ms-item { display:flex; gap:10px; background:#fff; border:1px solid var(--neutral-200,#e5e7eb); border-radius:14px; padding:12px; margin-bottom:10px; }
     .ms-item img, .ms-noimg { width:64px; height:64px; border-radius:10px; object-fit:cover; flex-shrink:0; background:#f7f7f5; display:flex; align-items:center; justify-content:center; color:#9ca3af; }
@@ -234,6 +246,7 @@
 (function(){
     const URLS = {
         lookup: "{% url 'sales:mobile_sale_lookup' %}",
+        search: "{% url 'sales:mobile_sale_search' %}",
         submit: "{% url 'sales:mobile_sale_submit' %}",
         clientSearch: "{% url 'clients:api_search' %}",
         clientCreate: "{% url 'sales:quick_create_client' %}",
@@ -312,24 +325,59 @@
         const c = e.target.closest('[data-cat]'); if (c){ const i = c.getAttribute('data-cat'); state.items[i].price = state.items[i].selling_price; save(); renderItems(); return; }
         const d = e.target.closest('[data-del]'); if (d){ state.items.splice(+d.getAttribute('data-del'), 1); save(); renderItems(); }
     });
+    function addProduct(p){
+        if (state.items.some(i => i.id === p.id)) return msg(p.reference + ' est déjà dans la vente.', 'err');
+        if (!p.available) return msg(p.reference + ' : ' + p.status_display + ', impossible de le vendre.', 'err');
+        state.items.push(Object.assign({}, p, {price:''})); save(); renderItems();
+        msg('✓ ' + p.reference + ' ajouté. Saisissez son prix.', 'ok');
+        try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
+        $('#ms-code').value = ''; $('#ms-results').innerHTML = '';
+    }
+    // Exact code (camera scan): add straight away.
     async function addByCode(code){
         code = (code || '').trim(); if (!code) return;
         msg('Recherche…', 'ok');
         try{
-            const r = await fetch(URLS.lookup + '?code=' + encodeURIComponent(code), {credentials:'same-origin'});
-            const d = await r.json();
-            if (!d.ok) return msg(d.error || 'Introuvable', 'err');
-            const p = d.product;
-            if (state.items.some(i => i.id === p.id)) return msg(p.reference + ' est déjà dans la vente.', 'err');
-            if (!p.available) return msg(p.reference + ' : ' + p.status_display + ', impossible de le vendre.', 'err');
-            state.items.push(Object.assign(p, {price:''})); save(); renderItems();
-            msg('✓ ' + p.reference + ' ajouté. Saisissez son prix.', 'ok');
-            try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
-            $('#ms-code').value = '';
+            const d = await (await fetch(URLS.lookup + '?code=' + encodeURIComponent(code), {credentials:'same-origin'})).json();
+            if (!d.ok){ $('#ms-code').value = code; return runSearch(code); }
+            addProduct(d.product);
         }catch(e){ msg('Erreur de connexion.', 'err'); }
     }
-    $('#ms-add-code').addEventListener('click', () => addByCode($('#ms-code').value));
-    $('#ms-code').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); addByCode(e.target.value); } });
+    // Live search across all criteria.
+    let lastResults = [], sTimer = null, sSeq = 0;
+    async function runSearch(q){
+        q = (q || '').trim();
+        if (q.length < 2){ $('#ms-results').innerHTML = ''; msg('', ''); return; }
+        const seq = ++sSeq;
+        try{
+            const d = await (await fetch(URLS.search + '?q=' + encodeURIComponent(q), {credentials:'same-origin'})).json();
+            if (seq !== sSeq) return;
+            lastResults = d.results || [];
+            if (!lastResults.length){ $('#ms-results').innerHTML = ''; return msg('Aucun produit trouvé pour « ' + q + ' ».', 'err'); }
+            msg(d.kind === 'semantic' ? 'Résultats approchants (recherche intelligente) :' : '', d.kind === 'semantic' ? 'ok' : '');
+            $('#ms-results').innerHTML = lastResults.map((p, i) => {
+                const inCart = state.items.some(x => x.id === p.id);
+                const cls = !p.available ? 'off' : (inCart ? 'in' : '');
+                return `<button type="button" class="ms-hit ${cls}" data-hit="${i}">
+                    ${p.image ? `<img src="${esc(p.image)}" alt="">` : `<span class="ms-noimg"><i class="fas fa-gem"></i></span>`}
+                    <span class="ms-hit-main"><strong>${esc(p.reference)}</strong><br>
+                        <span>${esc(p.name)} · ${esc(p.metal || '-')} · ${esc(p.weight)} g</span></span>
+                    <span class="ms-hit-side">${esc(p.selling_price)}<br>
+                        <em>${!p.available ? esc(p.status_display) : (inCart ? 'Ajouté' : 'Ajouter')}</em></span>
+                </button>`;
+            }).join('');
+        }catch(e){ if (seq === sSeq) msg('Erreur de connexion.', 'err'); }
+    }
+    $('#ms-code').addEventListener('input', e => { clearTimeout(sTimer); const v = e.target.value; sTimer = setTimeout(() => runSearch(v), 250); });
+    $('#ms-code').addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault(); clearTimeout(sTimer);
+        const avail = lastResults.filter(p => p.available);
+        if (avail.length === 1) addProduct(avail[0]); else runSearch(e.target.value);
+    });
+    $('#ms-results').addEventListener('click', e => {
+        const b = e.target.closest('[data-hit]'); if (b) addProduct(lastResults[+b.dataset.hit]);
+    });
 
     // ---------- step 2: delivery + client ----------
     function renderDelivery(){
