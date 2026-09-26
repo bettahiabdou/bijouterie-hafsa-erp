@@ -221,6 +221,7 @@
     .ms-pay { background:#fff; border:1px solid var(--neutral-200,#e5e7eb); border-radius:14px; padding:12px; margin-bottom:10px; }
     .ms-pay-row { display:flex; gap:8px; align-items:center; }
     .ms-pay-row .ms-input { margin:0; }
+    .ms-sub { display:block; font-size:12px; font-weight:600; color:var(--neutral-600,#4b5563); margin:10px 0 4px; }
     .ms-photo .ms-ph-head { display:flex; justify-content:space-between; align-items:center; gap:8px; font-weight:600; font-size:14px; }
     .ms-req { font-style:normal; color:var(--error-600,#dc2626); font-size:11px; margin-left:4px; }
     .ms-thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
@@ -263,6 +264,7 @@
     });
     const CSRF = document.querySelector('#ms-csrf [name=csrfmiddlewaretoken]').value;
     const METHODS = {{ methods_json|safe }};
+    const BANKS = {{ banks_json|safe }};
     const PREFILL = {{ prefill_json|safe }};
     const EXISTING_REF = "{{ invoice.reference|default:'' }}";
     const STORE_KEY = 'hafsa_ms_v1_{{ request.user.id }}' + (EXISTING_REF ? '_' + EXISTING_REF : '');
@@ -285,7 +287,7 @@
             state.items = (PREFILL.items || []).map(p => Object.assign({}, p, {price: p.price || ''}));
             state.client = PREFILL.client || null;
             state.delivery = Object.assign(state.delivery, PREFILL.delivery || {});
-            state.payments = (PREFILL.payments || []).map(p => ({method_id: String(p.method_id), amount: p.amount, reference: p.reference || ''}));
+            state.payments = (PREFILL.payments || []).map(p => ({method_id: String(p.method_id), amount: p.amount, reference: p.reference || '', bank_account_id: p.bank_account_id ? String(p.bank_account_id) : ''}));
             existing = PREFILL.existing_photos || existing;
             return;
         }
@@ -488,8 +490,13 @@
                     <select class="ms-input" data-pm="${i}">${METHODS.map(x => `<option value="${x.id}" ${String(x.id) === String(p.method_id) ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
                     <button type="button" class="ms-x" data-pdel="${i}" aria-label="Supprimer">&times;</button>
                 </div>
-                <input class="ms-input" inputmode="decimal" placeholder="Montant (DH)" value="${esc(p.amount)}" data-pa="${i}" style="margin-top:8px;">
-                ${m && m.needs_ref ? `<input class="ms-input" placeholder="Référence (obligatoire)" value="${esc(p.reference)}" data-pr="${i}">` : ''}
+                <label class="ms-sub">Montant (DH)</label>
+                <input class="ms-input" inputmode="decimal" placeholder="0,00" value="${esc(p.amount)}" data-pa="${i}">
+                ${m && m.show_bank ? `<label class="ms-sub">Compte bancaire${m.need_bank ? ' <em class="ms-req">obligatoire</em>' : ''}</label>
+                    ${BANKS.length ? `<select class="ms-input" data-pb="${i}"><option value="">Choisir le compte…</option>${BANKS.map(b => `<option value="${b.id}" ${String(b.id) === String(p.bank_account_id || '') ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>`
+                                   : `<p class="ms-warn">Aucun compte bancaire configuré (Configuration → Comptes bancaires).</p>`}` : ''}
+                ${m && m.show_ref ? `<label class="ms-sub">Référence${m.need_ref ? ' <em class="ms-req">obligatoire</em>' : ' <span class="ms-muted">(n° chèque, virement…)</span>'}</label>
+                    <input class="ms-input" autocomplete="off" placeholder="Référence" value="${esc(p.reference)}" data-pr="${i}">` : ''}
             </div>`;
         }).join('');
         refreshTotals();
@@ -499,7 +506,11 @@
         if (a !== null){ state.payments[a].amount = e.target.value; save(); refreshTotals(); }
         if (r !== null){ state.payments[r].reference = e.target.value; save(); }
     });
-    $('#ms-pays').addEventListener('change', e => { const m = e.target.getAttribute('data-pm'); if (m !== null){ state.payments[m].method_id = e.target.value; save(); renderPays(); } });
+    $('#ms-pays').addEventListener('change', e => {
+        const m = e.target.getAttribute('data-pm'), b = e.target.getAttribute('data-pb');
+        if (b !== null){ state.payments[b].bank_account_id = e.target.value; save(); }
+        if (m !== null){ state.payments[m].method_id = e.target.value; save(); renderPays(); }
+    });
     $('#ms-pays').addEventListener('click', e => { const d = e.target.closest('[data-pdel]'); if (d){ state.payments.splice(+d.dataset.pdel, 1); save(); renderPays(); } });
     function restAmount(){ const r = total() - paid(); return r > 0 ? r.toFixed(2) : ''; }
     $('#ms-add-pay').addEventListener('click', () => {
@@ -559,8 +570,12 @@
         }
         if (s >= 3){
             if (paid() - total() > 0.009) return [3, 'Les paiements dépassent le total.'];
-            const noref = state.payments.find(p => { const m = METHODS.find(x => String(x.id) === String(p.method_id)); return m && m.needs_ref && num(p.amount) > 0 && !String(p.reference || '').trim(); });
-            if (noref) return [3, 'Une référence de paiement est obligatoire.'];
+            for (const p of state.payments){
+                const m = METHODS.find(x => String(x.id) === String(p.method_id));
+                if (!m || num(p.amount) <= 0) continue;
+                if (m.need_ref && !String(p.reference || '').trim()) return [3, `La référence est obligatoire pour « ${m.name} ».`];
+                if (m.need_bank && !p.bank_account_id) return [3, `Choisissez le compte bancaire pour « ${m.name} ».`];
+            }
         }
         if (s >= 4){
             if (!photos.photos_invoice.length && !existing.invoice) return [4, 'Ajoutez la photo de la facture manuscrite.'];
@@ -587,7 +602,7 @@
                 <div class="ms-sum-row"><span>N° facture</span><span>${esc(state.ref) || '<span class="ms-muted">auto</span>'}</span></div>
                 <div class="ms-sum-row"><span>Client</span><span>${state.client ? esc(state.client.name) + ' · ' + esc(state.client.phone) : '<span class="ms-muted">aucun</span>'}</span></div>
                 <div class="ms-sum-row"><span>Livraison</span><span>${DL[d.type] || d.type}${d.tracking_number ? ' · ' + esc(d.tracking_number) : ''}</span></div>
-                ${state.payments.filter(x => num(x.amount) > 0).map(x => { const m = METHODS.find(y => String(y.id) === String(x.method_id)); return `<div class="ms-sum-row"><span>${esc(m ? m.name : '?')}</span><span>${money(num(x.amount))} DH</span></div>`; }).join('')}
+                ${state.payments.filter(x => num(x.amount) > 0).map(x => { const m = METHODS.find(y => String(y.id) === String(x.method_id)); const bk = m && m.show_bank ? BANKS.find(b => String(b.id) === String(x.bank_account_id || '')) : null; return `<div class="ms-sum-row"><span>${esc(m ? m.name : '?')}${bk ? ' · ' + esc(bk.name) : ''}${m && m.show_ref && x.reference ? ' <span class="ms-muted">(' + esc(x.reference) + ')</span>' : ''}</span><span>${money(num(x.amount))} DH</span></div>`; }).join('')}
                 <div class="ms-sum-row"><span>Reste</span><strong>${money(Math.max(rest, 0))} DH</strong></div>
                 <div class="ms-sum-row"><span>Photos</span><span>${Object.values(photos).reduce((a, x) => a + x.length, 0)} nouvelle(s)</span></div>
             </div>`;
@@ -618,7 +633,12 @@
             items: state.items.map(i => ({product_id: i.id, selling_price: num(i.price)})),
             delivery: {type: state.delivery.type, tracking_number: state.delivery.tracking_number, carrier_id: state.delivery.carrier_id || null},
             client: state.client ? {id: state.client.id} : null,
-            payments: state.payments.filter(p => num(p.amount) > 0).map(p => ({method_id: +p.method_id, amount: num(p.amount), reference: p.reference || ''})),
+            payments: state.payments.filter(p => num(p.amount) > 0).map(p => {
+                const m = METHODS.find(x => String(x.id) === String(p.method_id)) || {};
+                return {method_id: +p.method_id, amount: num(p.amount),
+                        reference: m.show_ref ? (p.reference || '') : '',
+                        bank_account_id: m.show_bank && p.bank_account_id ? +p.bank_account_id : null};
+            }),
         }));
         Object.entries(photos).forEach(([k, arr]) => arr.forEach(f => fd.append(k, f, f.name || 'photo.jpg')));
         try{

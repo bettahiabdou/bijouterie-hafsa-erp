@@ -5426,13 +5426,22 @@ def _complete_draft(invoice, data, user):
                     pay_date = _dt.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
                 except ValueError:
                     pay_date = timezone.now().date()
-                pref_pay = (pay.get('reference') or '').strip() or f"PAY-{invoice.reference}-{i + 1}"
-                ClientPayment.objects.create(
-                    reference=pref_pay, date=pay_date,
-                    payment_type=ClientPayment.PaymentType.INVOICE,
-                    client=invoice.client, amount=amount, payment_method=pm,
-                    sale_invoice=invoice, created_by=user,
-                )
+                # Blank reference -> the model generates a unique PAY-*
+                # (a fixed PAY-<ref>-<n> collides when a sale is re-completed).
+                pref_pay = (pay.get('reference') or '').strip()
+                bank_id = pay.get('bank_account_id') or None
+                if bank_id and not BankAccount.objects.filter(pk=bank_id).exists():
+                    bank_id = None
+                try:
+                    ClientPayment.objects.create(
+                        reference=pref_pay, date=pay_date,
+                        payment_type=ClientPayment.PaymentType.INVOICE,
+                        client=invoice.client, amount=amount, payment_method=pm,
+                        bank_account_id=bank_id,
+                        sale_invoice=invoice, created_by=user,
+                    )
+                except ValueError as e:   # duplicate payment reference
+                    return err(400, 'duplicate_payment_reference', str(e))
                 total_paid += amount
 
             # --- Reconcile arithmetic ---

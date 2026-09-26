@@ -42,7 +42,7 @@
             <div class="rv-row"><span>Client</span><span>{% if client %}{{ client.full_name }} · {{ client.phone }}{% else %}<span class="text-muted">aucun</span>{% endif %}</span></div>
             <div class="rv-row"><span>Livraison</span><span>{{ delivery.type|default:"magasin"|capfirst }}{% if carrier %} · {{ carrier.name }}{% endif %}{% if delivery.tracking_number %} · <strong>{{ delivery.tracking_number }}</strong>{% endif %}</span></div>
             {% for p in payments %}
-            <div class="rv-row"><span>{{ p.method.name|default:"?" }}{% if p.reference %} <span class="text-muted">({{ p.reference }})</span>{% endif %}</span><span>{{ p.amount|floatformat:2 }} DH</span></div>
+            <div class="rv-row"><span>{{ p.method.name|default:"?" }}{% if p.bank %} · {{ p.bank.bank_name }}{% endif %}{% if p.reference %} <span class="text-muted">({{ p.reference }})</span>{% endif %}</span><span>{{ p.amount|floatformat:2 }} DH</span></div>
             {% empty %}
             <div class="rv-row"><span>Paiements</span><span class="text-muted">aucun</span></div>
             {% endfor %}

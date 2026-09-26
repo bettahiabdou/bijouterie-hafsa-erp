@@ -74,6 +74,27 @@ def _product_json(p):
     }
 
 
+def _method_fields(m):
+    """Which extra fields a payment method needs, same rules as the admin
+    completion page: the Configuration flags first; for methods with no flags,
+    the old name-based behaviour (virement = reference + bank, espèces = none,
+    anything else = reference)."""
+    name = (m.name or '').lower()
+    if m.requires_reference or m.requires_bank_account:
+        return {'show_ref': m.requires_reference, 'need_ref': m.requires_reference,
+                'show_bank': m.requires_bank_account, 'need_bank': m.requires_bank_account}
+    if 'virement' in name:
+        return {'show_ref': True, 'need_ref': False, 'show_bank': True, 'need_bank': True}
+    if 'espèce' in name or 'espece' in name or name == 'cash':
+        return {'show_ref': False, 'need_ref': False, 'show_bank': False, 'need_bank': False}
+    return {'show_ref': True, 'need_ref': False, 'show_bank': False, 'need_bank': False}
+
+
+def _bank_accounts():
+    from settings_app.models import BankAccount
+    return list(BankAccount.objects.filter(is_active=True).order_by('bank_name'))
+
+
 def _payment_methods():
     # Dépôt client needs the deposit-account debit flow of the classic page;
     # keep it out of the phone form for now.
@@ -161,10 +182,12 @@ def mobile_sale(request, reference=None):
     return render(request, 'sales/mobile_sale.html', {
         'invoice': invoice,
         'prefill_json': json.dumps(prefill) if prefill else 'null',
-        'methods_json': json.dumps([{
+        'methods_json': json.dumps([dict({
             'id': m.id, 'name': m.name, 'cod': bool(m.collected_by_carrier),
-            'needs_ref': bool(m.requires_reference),
-        } for m in methods]),
+        }, **_method_fields(m)) for m in methods]),
+        'banks_json': json.dumps([{
+            'id': b.id, 'name': b.bank_name + (f' · {b.account_name}' if b.account_name else ''),
+        } for b in _bank_accounts()]),
         'carriers': Carrier.objects.filter(is_active=True).order_by('name'),
         'returned_count': returned_count,
     })
@@ -302,23 +325,38 @@ def mobile_sale_submit(request):
         return fail('Le client (nom + téléphone) est obligatoire pour cette livraison.')
 
     # --- Payments ---
+    from payments.models import ClientPayment
     methods = {m.id: m for m in _payment_methods()}
-    payments, paid = [], Decimal('0')
+    banks = {b.id for b in _bank_accounts()}
+    payments, paid, refs = [], Decimal('0'), set()
     today = timezone.localdate().isoformat()
     for p in data.get('payments') or []:
         try:
             amount = Decimal(str(p.get('amount') or '0'))
-        except InvalidOperation:
-            return fail('Montant de paiement invalide.')
+            m = methods.get(int(p.get('method_id') or 0))
+            bank_id = int(p.get('bank_account_id') or 0) or None
+        except (InvalidOperation, TypeError, ValueError):
+            return fail('Paiement invalide.')
         if amount <= 0:
             continue
-        m = methods.get(int(p.get('method_id') or 0))
         if not m:
             return fail('Mode de paiement invalide.')
-        pref = (p.get('reference') or '').strip()
-        if m.requires_reference and not pref:
+        f = _method_fields(m)
+        pref = (p.get('reference') or '').strip() if f['show_ref'] else ''
+        if f['need_ref'] and not pref:
             return fail(f'La référence est obligatoire pour « {m.name} ».')
-        payments.append({'method_id': m.id, 'amount': str(amount), 'reference': pref, 'date': today})
+        if pref:
+            if pref.lower() in refs or ClientPayment.objects.filter(reference__iexact=pref).exists():
+                return fail(f'La référence de paiement « {pref} » existe déjà.')
+            refs.add(pref.lower())
+        if not f['show_bank']:
+            bank_id = None
+        elif bank_id and bank_id not in banks:
+            return fail('Compte bancaire invalide.')
+        if f['need_bank'] and not bank_id:
+            return fail(f'Choisissez le compte bancaire pour « {m.name} ».')
+        payments.append({'method_id': m.id, 'amount': str(amount), 'reference': pref,
+                         'bank_account_id': bank_id, 'date': today})
         paid += amount
     if paid > total:
         return fail(f'Les paiements ({paid} DH) dépassent le total ({total} DH).')
@@ -435,9 +473,12 @@ def _review_context(invoice):
             'p': p, 'price': price, 'image': _product_image(p) if p else '',
             'below_min': bool(p and p.minimum_price and price < p.minimum_price),
         })
+    from settings_app.models import BankAccount
     methods = {m.id: m for m in PaymentMethod.objects.all()}
+    banks = {b.id: b for b in BankAccount.objects.all()}
     pays = [{'method': methods.get(p['method_id']), 'amount': Decimal(p['amount']),
-             'reference': p.get('reference', '')} for p in sub.get('payments') or []]
+             'reference': p.get('reference', ''), 'bank': banks.get(p.get('bank_account_id'))}
+            for p in sub.get('payments') or []]
     cid = (sub.get('client') or {}).get('id')
     carrier = None
     d = sub.get('delivery') or {}
