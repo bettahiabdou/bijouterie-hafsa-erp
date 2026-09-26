@@ -1,0 +1,579 @@
+{% extends 'base.html' %}
+{% block title %}Nouvelle vente - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Nouvelle vente</span>
+{% endblock %}
+
+{% block content %}
+<form id="ms-csrf" style="display:none;">{% csrf_token %}</form>
+<div class="ms">
+
+    <div class="ms-top">
+        <h2 class="ms-h">{% if invoice %}Corriger la vente <span class="ms-muted">{{ invoice.reference }}</span>{% else %}Nouvelle vente{% endif %}</h2>
+        <a href="{% url 'sales:mobile_sale_mine' %}" class="ms-mine">Mes ventes{% if returned_count %} <span class="ms-dot">{{ returned_count }}</span>{% endif %}</a>
+    </div>
+    {% if invoice and invoice.review_note %}
+    <div class="ms-alert"><strong>À corriger :</strong> {{ invoice.review_note }}</div>
+    {% endif %}
+
+    <div class="ms-steps">
+        <button type="button" class="ms-stepdot" data-go="1"><span>1</span>Articles</button>
+        <button type="button" class="ms-stepdot" data-go="2"><span>2</span>Client</button>
+        <button type="button" class="ms-stepdot" data-go="3"><span>3</span>Paiement</button>
+        <button type="button" class="ms-stepdot" data-go="4"><span>4</span>Photos</button>
+        <button type="button" class="ms-stepdot" data-go="5"><span>5</span>Valider</button>
+    </div>
+
+    <!-- STEP 1: articles + prices -->
+    <section class="ms-step" data-step="1">
+        <div class="ms-card">
+            <label class="ms-label">Scanner ou saisir le code de l'étiquette</label>
+            <div class="ms-row">
+                <input id="ms-code" class="ms-input" type="text" inputmode="text" autocomplete="off" placeholder="Code-barres ou référence">
+                <button type="button" class="btn btn-secondary ms-sq" id="ms-add-code" aria-label="Ajouter"><i class="fas fa-plus"></i></button>
+            </div>
+            <button type="button" class="btn btn-primary ms-wide" data-scan="item"><i class="fas fa-barcode"></i> Scanner avec la caméra</button>
+            <div id="ms-code-msg" class="ms-msg" hidden></div>
+        </div>
+        <div id="ms-items"></div>
+        <p id="ms-items-empty" class="ms-empty">Aucun article pour l'instant.</p>
+    </section>
+
+    <!-- STEP 2: reference, delivery, client -->
+    <section class="ms-step" data-step="2" hidden>
+        <div class="ms-card">
+            <label class="ms-label" for="ms-ref">N° de la facture manuscrite <span class="ms-muted">(facultatif)</span></label>
+            <input id="ms-ref" class="ms-input" type="text" autocomplete="off" placeholder="Ex : 2345">
+        </div>
+        <div class="ms-card">
+            <label class="ms-label">Livraison</label>
+            <div class="ms-seg" id="ms-dtype">
+                <button type="button" data-v="magasin">Magasin</button>
+                <button type="button" data-v="amana">AMANA</button>
+                <button type="button" data-v="transporteur">Transporteur</button>
+                <button type="button" data-v="en_stock">En stock</button>
+            </div>
+            <div id="ms-carrier-wrap" hidden>
+                <label class="ms-label" for="ms-carrier">Transporteur</label>
+                <select id="ms-carrier" class="ms-input">
+                    <option value="">Choisir…</option>
+                    {% for c in carriers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div id="ms-track-wrap" hidden>
+                <label class="ms-label" for="ms-track">Code AMANA / suivi</label>
+                <div class="ms-row">
+                    <input id="ms-track" class="ms-input" type="text" autocomplete="off" autocapitalize="characters" placeholder="QB123456789MA">
+                    <button type="button" class="btn btn-secondary ms-sq" data-scan="tracking" aria-label="Scanner le code"><i class="fas fa-barcode"></i></button>
+                </div>
+            </div>
+        </div>
+        <div class="ms-card">
+            <label class="ms-label">Client <span class="ms-muted" id="ms-client-req">(facultatif en magasin)</span></label>
+            <div id="ms-client-chip" hidden></div>
+            <div id="ms-client-search-wrap">
+                <input id="ms-client-q" class="ms-input" type="search" autocomplete="off" placeholder="Nom ou téléphone…">
+                <div id="ms-client-results"></div>
+                <button type="button" class="ms-link" id="ms-client-new-toggle"><i class="fas fa-user-plus"></i> Nouveau client</button>
+                <div id="ms-client-new" hidden>
+                    <input id="ms-cn-first" class="ms-input" type="text" placeholder="Prénom">
+                    <input id="ms-cn-last" class="ms-input" type="text" placeholder="Nom">
+                    <input id="ms-cn-phone" class="ms-input" type="tel" inputmode="tel" placeholder="Téléphone">
+                    <button type="button" class="btn btn-primary ms-wide" id="ms-cn-create">Créer le client</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- STEP 3: payments -->
+    <section class="ms-step" data-step="3" hidden>
+        <div class="ms-card ms-totals">
+            <div><span>Total</span><strong id="ms-t-total">0,00</strong></div>
+            <div><span>Payé</span><strong id="ms-t-paid">0,00</strong></div>
+            <div><span>Reste</span><strong id="ms-t-rest">0,00</strong></div>
+        </div>
+        <div id="ms-pays"></div>
+        <button type="button" class="btn btn-secondary ms-wide" id="ms-add-pay"><i class="fas fa-plus"></i> Ajouter un paiement</button>
+        <button type="button" class="btn btn-primary ms-wide" id="ms-add-cod" hidden><i class="fas fa-truck"></i> Contre-remboursement AMANA (reste)</button>
+    </section>
+
+    <!-- STEP 4: photos -->
+    <section class="ms-step" data-step="4" hidden>
+        <div class="ms-card ms-photo" data-slot="photos_invoice">
+            <div class="ms-ph-head"><span><i class="fas fa-file-invoice"></i> Facture manuscrite <em class="ms-req">obligatoire</em></span>
+                <label class="btn btn-primary btn-sm ms-ph-btn"><i class="fas fa-camera"></i> Ajouter<input type="file" accept="image/*" multiple hidden></label></div>
+            <div class="ms-thumbs"></div>
+        </div>
+        <div class="ms-card ms-photo" data-slot="photos_delivery">
+            <div class="ms-ph-head"><span><i class="fas fa-truck"></i> Bordereau AMANA / livraison <em class="ms-req" id="ms-deliv-req" hidden>obligatoire</em></span>
+                <label class="btn btn-primary btn-sm ms-ph-btn"><i class="fas fa-camera"></i> Ajouter<input type="file" accept="image/*" multiple hidden></label></div>
+            <div class="ms-thumbs"></div>
+        </div>
+        <div class="ms-card ms-photo" data-slot="photos_product">
+            <div class="ms-ph-head"><span><i class="fas fa-gem"></i> Photos des produits</span>
+                <label class="btn btn-primary btn-sm ms-ph-btn"><i class="fas fa-camera"></i> Ajouter<input type="file" accept="image/*" multiple hidden></label></div>
+            <div class="ms-thumbs"></div>
+        </div>
+        <div class="ms-card ms-photo" data-slot="photos_payment">
+            <div class="ms-ph-head"><span><i class="fas fa-receipt"></i> Preuve de paiement</span>
+                <label class="btn btn-primary btn-sm ms-ph-btn"><i class="fas fa-camera"></i> Ajouter<input type="file" accept="image/*" multiple hidden></label></div>
+            <div class="ms-thumbs"></div>
+        </div>
+    </section>
+
+    <!-- STEP 5: summary + confirm -->
+    <section class="ms-step" data-step="5" hidden>
+        <div id="ms-summary"></div>
+        <button type="button" class="btn btn-success ms-wide ms-big" id="ms-submit"><i class="fas fa-paper-plane"></i> Confirmer et envoyer</button>
+        <p class="ms-muted ms-center">La vente sera vérifiée par un administrateur. Les pièces sont réservées dès l'envoi.</p>
+    </section>
+
+    <!-- Success -->
+    <section id="ms-done" hidden>
+        <div class="ms-card ms-center">
+            <div class="ms-ok"><i class="fas fa-circle-check"></i></div>
+            <h3 style="margin:6px 0;">Vente envoyée</h3>
+            <p id="ms-done-text" class="ms-muted"></p>
+            <a href="{% url 'sales:mobile_sale' %}" class="btn btn-primary ms-wide">Nouvelle vente</a>
+            <a href="{% url 'sales:mobile_sale_mine' %}" class="btn btn-secondary ms-wide">Mes ventes</a>
+        </div>
+    </section>
+
+    <div class="ms-bar" id="ms-bar">
+        <button type="button" class="btn btn-secondary" id="ms-prev">Précédent</button>
+        <div class="ms-bar-total"><span id="ms-bar-count">0 article</span><strong id="ms-bar-total">0,00 DH</strong></div>
+        <button type="button" class="btn btn-primary" id="ms-next">Suivant</button>
+    </div>
+</div>
+
+<!-- Camera scanner -->
+<div id="ms-cam" class="ms-cam" hidden>
+    <div class="ms-cam-stage"><video id="ms-video" playsinline autoplay muted></video><div class="ms-reticle"></div></div>
+    <div class="ms-cam-top" id="ms-cam-status">Visez le code-barres</div>
+    <div class="ms-cam-bottom">
+        <button type="button" class="btn btn-danger" id="ms-cam-close">Fermer</button>
+    </div>
+</div>
+
+<style>
+    .ms { max-width: 640px; margin: 0 auto; padding-bottom: 150px; }
+    .ms-top { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; }
+    .ms-h { margin:0; font-size:1.25rem; }
+    .ms-muted { color: var(--neutral-500,#6b7280); font-weight:400; font-size:13px; }
+    .ms-mine { font-size:14px; font-weight:600; white-space:nowrap; }
+    .ms-dot { background:var(--error-500,#ef4444); color:#fff; border-radius:999px; padding:0 7px; font-size:12px; }
+    .ms-alert { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px 12px; border-radius:10px; margin-bottom:10px; font-size:14px; }
+    .ms-steps { display:flex; gap:4px; margin-bottom:12px; position:sticky; top:0; z-index:15; background:var(--neutral-100,#f3f4f6); padding:4px; border-radius:12px; }
+    .ms .ms-stepdot { flex:1; background:transparent !important; color:var(--neutral-500,#6b7280) !important; border:none; border-radius:9px; padding:6px 2px; font-size:11px; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:2px; min-height:44px; }
+    .ms .ms-stepdot span { width:20px; height:20px; border-radius:50%; background:var(--neutral-300,#d1d5db); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:11px; }
+    .ms .ms-stepdot.on { background:#fff !important; color:var(--primary-700,#4338ca) !important; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+    .ms .ms-stepdot.on span, .ms .ms-stepdot.done span { background:var(--primary-600,#4f46e5); }
+    .ms-card { background:#fff; border:1px solid var(--neutral-200,#e5e7eb); border-radius:14px; padding:14px; margin-bottom:12px; }
+    .ms-label { display:block; font-size:13px; font-weight:600; margin:0 0 6px; color:var(--neutral-700,#374151); }
+    .ms-input { width:100%; padding:12px; font-size:16px; border:1px solid var(--neutral-300,#d1d5db); border-radius:10px; background:#fff; margin-bottom:8px; }
+    .ms-row { display:flex; gap:8px; align-items:flex-start; }
+    .ms-row .ms-input { flex:1 1 auto; width:auto; min-width:0; }
+    .ms .ms-sq { flex:0 0 48px; width:48px; height:48px; padding:0; display:flex; align-items:center; justify-content:center; }
+    .ms .ms-wide { width:100%; padding:13px; font-size:15px; margin-top:4px; display:flex; justify-content:center; align-items:center; gap:8px; }
+    .ms .ms-big { padding:16px; font-size:17px; }
+    .ms-msg { margin-top:8px; padding:8px 10px; border-radius:8px; font-size:13px; }
+    .ms-msg.err { background:#fef2f2; color:#b91c1c; } .ms-msg.ok { background:#f0fdf4; color:#15803d; }
+    .ms-empty { text-align:center; color:var(--neutral-400,#9ca3af); padding:18px; }
+    .ms-item { display:flex; gap:10px; background:#fff; border:1px solid var(--neutral-200,#e5e7eb); border-radius:14px; padding:12px; margin-bottom:10px; }
+    .ms-item img, .ms-noimg { width:64px; height:64px; border-radius:10px; object-fit:cover; flex-shrink:0; background:#f7f7f5; display:flex; align-items:center; justify-content:center; color:#9ca3af; }
+    .ms-item-main { flex:1; min-width:0; }
+    .ms-item-ref { font-weight:700; font-size:14px; word-break:break-all; }
+    .ms-item-meta { font-size:12px; color:var(--neutral-500,#6b7280); margin:2px 0 6px; }
+    .ms-price { display:flex; gap:6px; align-items:center; }
+    .ms-price .ms-input { margin:0; font-weight:700; }
+    .ms .ms-cat { background:var(--primary-50,#eef2ff) !important; color:var(--primary-700,#4338ca) !important; border:1px solid var(--primary-100,#e0e7ff); border-radius:8px; font-size:12px; padding:8px 8px; white-space:nowrap; }
+    .ms .ms-x { background:transparent !important; color:var(--error-600,#dc2626) !important; border:none; font-size:22px; line-height:1; padding:0 4px; align-self:flex-start; }
+    .ms-warn { font-size:12px; color:#b45309; margin-top:4px; }
+    .ms-seg { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px; }
+    .ms .ms-seg button { background:#fff !important; color:var(--neutral-700,#374151) !important; border:1px solid var(--neutral-300,#d1d5db); border-radius:10px; padding:12px 6px; font-weight:600; font-size:14px; }
+    .ms .ms-seg button.on { background:var(--primary-600,#4f46e5) !important; color:#fff !important; border-color:var(--primary-600,#4f46e5); }
+    .ms .ms-link { background:transparent !important; color:var(--primary-600,#4f46e5) !important; border:none; padding:6px 0; font-weight:600; font-size:14px; }
+    .ms-res { display:block; width:100%; text-align:left; padding:10px; border-bottom:1px solid var(--neutral-100,#f3f4f6); font-size:14px; }
+    .ms .ms-res { background:#fff !important; color:var(--neutral-800,#1f2937) !important; border:none; border-bottom:1px solid var(--neutral-100,#f3f4f6); }
+    .ms-chip { display:flex; justify-content:space-between; align-items:center; background:var(--primary-50,#eef2ff); border-radius:10px; padding:10px 12px; font-size:14px; }
+    .ms-totals { display:grid; grid-template-columns:repeat(3,1fr); text-align:center; gap:4px; }
+    .ms-totals span { display:block; font-size:12px; color:var(--neutral-500,#6b7280); }
+    .ms-totals strong { font-size:17px; }
+    .ms-pay { background:#fff; border:1px solid var(--neutral-200,#e5e7eb); border-radius:14px; padding:12px; margin-bottom:10px; }
+    .ms-pay-row { display:flex; gap:8px; align-items:center; }
+    .ms-pay-row .ms-input { margin:0; }
+    .ms-photo .ms-ph-head { display:flex; justify-content:space-between; align-items:center; gap:8px; font-weight:600; font-size:14px; }
+    .ms-req { font-style:normal; color:var(--error-600,#dc2626); font-size:11px; margin-left:4px; }
+    .ms-thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .ms-thumb { position:relative; width:72px; height:72px; }
+    .ms-thumb img { width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--neutral-200,#e5e7eb); }
+    .ms .ms-thumb button { position:absolute; top:-6px; right:-6px; width:24px; height:24px; border-radius:50%; background:var(--error-600,#dc2626) !important; color:#fff !important; border:none; font-size:14px; line-height:1; padding:0; }
+    .ms-existing { font-size:12px; color:var(--success-700,#15803d); margin-top:8px; }
+    .ms-sum-row { display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid var(--neutral-100,#f3f4f6); font-size:14px; }
+    .ms-sum-warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:10px; padding:10px 12px; font-size:13px; margin-bottom:10px; }
+    .ms-center { text-align:center; }
+    .ms-ok { font-size:54px; color:var(--success-600,#16a34a); }
+    .ms-bar { position:fixed; left:0; right:0; bottom:calc(64px + env(safe-area-inset-bottom)); z-index:40; display:flex; gap:8px; align-items:center; padding:10px 12px; background:#fff; border-top:1px solid var(--neutral-200,#e5e7eb); box-shadow:0 -4px 12px rgba(0,0,0,.06); }
+    .ms-bar .btn { padding:12px 14px; font-size:15px; }
+    .ms-bar-total { flex:1; text-align:center; line-height:1.15; }
+    .ms-bar-total span { display:block; font-size:11px; color:var(--neutral-500,#6b7280); }
+    .ms-bar-total strong { font-size:16px; }
+    @media (min-width: 768px) { .ms-bar { bottom:0; left:auto; right:auto; width:640px; margin:0 auto; left:0; right:0; border-radius:14px 14px 0 0; } }
+    .ms-cam { position:fixed; inset:0; z-index:100001; background:#000; display:flex; flex-direction:column; }
+    .ms-cam-stage { position:relative; flex:1; overflow:hidden; }
+    #ms-video { width:100%; height:100%; object-fit:cover; }
+    .ms-reticle { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:min(80vw,420px); height:min(40vw,200px); border:3px solid #fff; border-radius:14px; box-shadow:0 0 0 100vmax rgba(0,0,0,.45); }
+    .ms-cam-top { position:absolute; top:0; left:0; right:0; padding:18px; color:#fff; text-align:center; font-weight:600; }
+    .ms-cam-bottom { padding:16px calc(16px + env(safe-area-inset-bottom)); display:flex; justify-content:center; background:#000; }
+    .ms-cam-bottom .btn { width:60%; padding:14px; }
+</style>
+
+<script>
+(function(){
+    const URLS = {
+        lookup: "{% url 'sales:mobile_sale_lookup' %}",
+        submit: "{% url 'sales:mobile_sale_submit' %}",
+        clientSearch: "{% url 'clients:api_search' %}",
+        clientCreate: "{% url 'sales:quick_create_client' %}",
+    };
+    const CSRF = document.querySelector('#ms-csrf [name=csrfmiddlewaretoken]').value;
+    const METHODS = {{ methods_json|safe }};
+    const PREFILL = {{ prefill_json|safe }};
+    const EXISTING_REF = "{{ invoice.reference|default:'' }}";
+    const STORE_KEY = 'hafsa_ms_v1_{{ request.user.id }}' + (EXISTING_REF ? '_' + EXISTING_REF : '');
+    const $ = (s, r=document) => r.querySelector(s);
+    const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const num = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return isNaN(n) ? 0 : n; };
+    const money = n => n.toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+    let state = { ref:'', items:[], delivery:{type:'magasin', tracking_number:'', carrier_id:''}, client:null, payments:[] };
+    const photos = { photos_invoice:[], photos_delivery:[], photos_product:[], photos_payment:[] };
+    let existing = {invoice:0, delivery:0, product:0, payment:0};
+    let step = 1;
+
+    // ---------- persistence ----------
+    function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){} }
+    function load(){
+        if (PREFILL) {
+            state.ref = PREFILL.reference || '';
+            state.items = (PREFILL.items || []).map(p => Object.assign({}, p, {price: p.price || ''}));
+            state.client = PREFILL.client || null;
+            state.delivery = Object.assign(state.delivery, PREFILL.delivery || {});
+            state.payments = (PREFILL.payments || []).map(p => ({method_id: String(p.method_id), amount: p.amount, reference: p.reference || ''}));
+            existing = PREFILL.existing_photos || existing;
+            return;
+        }
+        try{ const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); if (s && s.items) state = Object.assign(state, s); }catch(e){}
+    }
+
+    // ---------- totals ----------
+    const total = () => state.items.reduce((a, i) => a + num(i.price), 0);
+    const paid = () => state.payments.reduce((a, p) => a + num(p.amount), 0);
+    function refreshTotals(){
+        const t = total(), p = paid();
+        $('#ms-bar-total').textContent = money(t) + ' DH';
+        $('#ms-bar-count').textContent = state.items.length + (state.items.length > 1 ? ' articles' : ' article');
+        $('#ms-t-total').textContent = money(t); $('#ms-t-paid').textContent = money(p); $('#ms-t-rest').textContent = money(t - p);
+        $('#ms-t-rest').style.color = (t - p) > 0.009 ? '#b45309' : '#15803d';
+    }
+
+    // ---------- step 1: items ----------
+    function msg(text, kind){ const m = $('#ms-code-msg'); m.textContent = text; m.className = 'ms-msg ' + kind; m.hidden = !text; }
+    function renderItems(){
+        const box = $('#ms-items');
+        $('#ms-items-empty').hidden = state.items.length > 0;
+        box.innerHTML = state.items.map((it, i) => {
+            const below = num(it.price) > 0 && num(it.minimum_price) > 0 && num(it.price) < num(it.minimum_price);
+            return `<div class="ms-item">
+                ${it.image ? `<img src="${esc(it.image)}" alt="">` : `<div class="ms-noimg"><i class="fas fa-gem"></i></div>`}
+                <div class="ms-item-main">
+                    <div class="ms-item-ref">${esc(it.reference)}</div>
+                    <div class="ms-item-meta">${esc(it.name)} · ${esc(it.metal || '-')} · ${esc(it.weight)} g</div>
+                    <div class="ms-price">
+                        <input class="ms-input" inputmode="decimal" placeholder="Prix de vente (DH)" value="${esc(it.price)}" data-price="${i}">
+                        <button type="button" class="ms-cat" data-cat="${i}">= ${esc(it.selling_price)}</button>
+                    </div>
+                    ${below ? `<div class="ms-warn"><i class="fas fa-triangle-exclamation"></i> Sous le prix minimum (${esc(it.minimum_price)} DH)</div>` : ''}
+                </div>
+                <button type="button" class="ms-x" data-del="${i}" aria-label="Retirer">&times;</button>
+            </div>`;
+        }).join('');
+        refreshTotals();
+    }
+    $('#ms-items').addEventListener('input', e => {
+        const i = e.target.getAttribute('data-price'); if (i === null) return;
+        state.items[i].price = e.target.value; save(); refreshTotals();
+    });
+    $('#ms-items').addEventListener('change', e => { if (e.target.hasAttribute('data-price')) renderItems(); });
+    $('#ms-items').addEventListener('click', e => {
+        const c = e.target.closest('[data-cat]'); if (c){ const i = c.getAttribute('data-cat'); state.items[i].price = state.items[i].selling_price; save(); renderItems(); return; }
+        const d = e.target.closest('[data-del]'); if (d){ state.items.splice(+d.getAttribute('data-del'), 1); save(); renderItems(); }
+    });
+    async function addByCode(code){
+        code = (code || '').trim(); if (!code) return;
+        msg('Recherche…', 'ok');
+        try{
+            const r = await fetch(URLS.lookup + '?code=' + encodeURIComponent(code), {credentials:'same-origin'});
+            const d = await r.json();
+            if (!d.ok) return msg(d.error || 'Introuvable', 'err');
+            const p = d.product;
+            if (state.items.some(i => i.id === p.id)) return msg(p.reference + ' est déjà dans la vente.', 'err');
+            if (!p.available) return msg(p.reference + ' : ' + p.status_display + ', impossible de le vendre.', 'err');
+            state.items.push(Object.assign(p, {price:''})); save(); renderItems();
+            msg('✓ ' + p.reference + ' ajouté. Saisissez son prix.', 'ok');
+            try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
+            $('#ms-code').value = '';
+        }catch(e){ msg('Erreur de connexion.', 'err'); }
+    }
+    $('#ms-add-code').addEventListener('click', () => addByCode($('#ms-code').value));
+    $('#ms-code').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); addByCode(e.target.value); } });
+
+    // ---------- step 2: delivery + client ----------
+    function renderDelivery(){
+        const t = state.delivery.type;
+        $$('#ms-dtype button').forEach(b => b.classList.toggle('on', b.dataset.v === t));
+        $('#ms-track-wrap').hidden = !(t === 'amana' || t === 'transporteur');
+        $('#ms-carrier-wrap').hidden = t !== 'transporteur';
+        $('#ms-track').value = state.delivery.tracking_number || '';
+        $('#ms-carrier').value = state.delivery.carrier_id || '';
+        $('#ms-client-req').textContent = t === 'magasin' ? '(facultatif en magasin)' : '(obligatoire)';
+        $('#ms-deliv-req').hidden = !(t === 'amana' || t === 'transporteur');
+        $('#ms-add-cod').hidden = !(t === 'amana' && METHODS.some(m => m.cod));
+    }
+    $('#ms-dtype').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.delivery.type = b.dataset.v; save(); renderDelivery(); });
+    $('#ms-track').addEventListener('input', e => { state.delivery.tracking_number = e.target.value.toUpperCase().replace(/\s+/g, ''); save(); });
+    $('#ms-carrier').addEventListener('change', e => { state.delivery.carrier_id = e.target.value; save(); });
+    $('#ms-ref').addEventListener('input', e => { state.ref = e.target.value; save(); });
+
+    function renderClient(){
+        const has = !!state.client;
+        $('#ms-client-chip').hidden = !has; $('#ms-client-search-wrap').hidden = has;
+        if (has) $('#ms-client-chip').innerHTML = `<div class="ms-chip"><span><i class="fas fa-user"></i> <strong>${esc(state.client.name)}</strong> · ${esc(state.client.phone)}</span><button type="button" class="ms-link" id="ms-client-clear">Changer</button></div>`;
+    }
+    $('#ms-client-chip').addEventListener('click', e => { if (e.target.id === 'ms-client-clear'){ state.client = null; save(); renderClient(); } });
+    let qTimer = null;
+    $('#ms-client-q').addEventListener('input', e => {
+        clearTimeout(qTimer); const q = e.target.value.trim();
+        if (q.length < 2){ $('#ms-client-results').innerHTML = ''; return; }
+        qTimer = setTimeout(async () => {
+            try{
+                const d = await (await fetch(URLS.clientSearch + '?q=' + encodeURIComponent(q), {credentials:'same-origin'})).json();
+                const res = (d.results || []).slice(0, 8);
+                $('#ms-client-results').innerHTML = res.length ? res.map(c => `<button type="button" class="ms-res" data-cid="${c.id}" data-name="${esc(c.name)}" data-phone="${esc(c.phone || '')}"><strong>${esc(c.name)}</strong> · ${esc(c.phone || '')}</button>`).join('') : '<p class="ms-muted" style="padding:8px 0;">Aucun client trouvé.</p>';
+            }catch(err){}
+        }, 250);
+    });
+    $('#ms-client-results').addEventListener('click', e => {
+        const b = e.target.closest('[data-cid]'); if (!b) return;
+        state.client = {id: +b.dataset.cid, name: b.dataset.name, phone: b.dataset.phone}; save();
+        $('#ms-client-results').innerHTML = ''; $('#ms-client-q').value = ''; renderClient();
+    });
+    $('#ms-client-new-toggle').addEventListener('click', () => { $('#ms-client-new').hidden = !$('#ms-client-new').hidden; });
+    $('#ms-cn-create').addEventListener('click', async () => {
+        const body = {first_name: $('#ms-cn-first').value.trim(), last_name: $('#ms-cn-last').value.trim(), phone: $('#ms-cn-phone').value.trim()};
+        if (!body.first_name || !body.last_name || !body.phone) return alert('Prénom, nom et téléphone sont requis.');
+        try{
+            const d = await (await fetch(URLS.clientCreate, {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body: JSON.stringify(body)})).json();
+            if (!d.success) return alert(d.error || 'Erreur');
+            state.client = {id: d.id, name: d.full_name, phone: d.phone}; save();
+            $('#ms-client-new').hidden = true; renderClient();
+            if (d.existing) alert(d.message);
+        }catch(e){ alert('Erreur de connexion.'); }
+    });
+
+    // ---------- step 3: payments ----------
+    function renderPays(){
+        $('#ms-pays').innerHTML = state.payments.map((p, i) => {
+            const m = METHODS.find(x => String(x.id) === String(p.method_id));
+            return `<div class="ms-pay">
+                <div class="ms-pay-row">
+                    <select class="ms-input" data-pm="${i}">${METHODS.map(x => `<option value="${x.id}" ${String(x.id) === String(p.method_id) ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+                    <button type="button" class="ms-x" data-pdel="${i}" aria-label="Supprimer">&times;</button>
+                </div>
+                <input class="ms-input" inputmode="decimal" placeholder="Montant (DH)" value="${esc(p.amount)}" data-pa="${i}" style="margin-top:8px;">
+                ${m && m.needs_ref ? `<input class="ms-input" placeholder="Référence (obligatoire)" value="${esc(p.reference)}" data-pr="${i}">` : ''}
+            </div>`;
+        }).join('');
+        refreshTotals();
+    }
+    $('#ms-pays').addEventListener('input', e => {
+        const a = e.target.getAttribute('data-pa'), r = e.target.getAttribute('data-pr');
+        if (a !== null){ state.payments[a].amount = e.target.value; save(); refreshTotals(); }
+        if (r !== null){ state.payments[r].reference = e.target.value; save(); }
+    });
+    $('#ms-pays').addEventListener('change', e => { const m = e.target.getAttribute('data-pm'); if (m !== null){ state.payments[m].method_id = e.target.value; save(); renderPays(); } });
+    $('#ms-pays').addEventListener('click', e => { const d = e.target.closest('[data-pdel]'); if (d){ state.payments.splice(+d.dataset.pdel, 1); save(); renderPays(); } });
+    function restAmount(){ const r = total() - paid(); return r > 0 ? r.toFixed(2) : ''; }
+    $('#ms-add-pay').addEventListener('click', () => {
+        const first = METHODS.find(m => !m.cod) || METHODS[0]; if (!first) return alert('Aucun mode de paiement configuré.');
+        state.payments.push({method_id: String(first.id), amount: restAmount(), reference: ''}); save(); renderPays();
+    });
+    $('#ms-add-cod').addEventListener('click', () => {
+        const cod = METHODS.find(m => m.cod); if (!cod) return;
+        state.payments.push({method_id: String(cod.id), amount: restAmount(), reference: ''}); save(); renderPays();
+    });
+
+    // ---------- step 4: photos (compressed client-side) ----------
+    function compress(file){
+        return new Promise(res => {
+            if (!/^image\//.test(file.type)) return res(file);
+            const url = URL.createObjectURL(file), img = new Image();
+            img.onload = () => {
+                let w = img.naturalWidth, h = img.naturalHeight; const max = 1600;
+                if (Math.max(w, h) <= max && file.size < 900000){ URL.revokeObjectURL(url); return res(file); }
+                const s = Math.min(1, max / Math.max(w, h)); w = Math.round(w * s); h = Math.round(h * s);
+                const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+                c.toBlob(b => { URL.revokeObjectURL(url); res(b ? new File([b], (file.name || 'photo').replace(/\.\w+$/, '') + '.jpg', {type:'image/jpeg'}) : file); }, 'image/jpeg', 0.82);
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); res(file); };
+            img.src = url;
+        });
+    }
+    const TYPE_OF = {photos_invoice:'invoice', photos_delivery:'delivery', photos_product:'product', photos_payment:'payment'};
+    function renderPhotos(){
+        $$('.ms-photo').forEach(card => {
+            const slot = card.dataset.slot, box = $('.ms-thumbs', card);
+            box.innerHTML = photos[slot].map((f, i) => `<div class="ms-thumb"><img src="${f._url}" alt=""><button type="button" data-slot="${slot}" data-i="${i}" aria-label="Retirer">&times;</button></div>`).join('')
+                + (existing[TYPE_OF[slot]] ? `<div class="ms-existing"><i class="fas fa-check"></i> ${existing[TYPE_OF[slot]]} photo(s) déjà envoyée(s)</div>` : '');
+        });
+    }
+    $$('.ms-photo input[type=file]').forEach(inp => inp.addEventListener('change', async () => {
+        const slot = inp.closest('.ms-photo').dataset.slot;
+        for (const f of Array.from(inp.files || [])){ const c = await compress(f); c._url = URL.createObjectURL(c); photos[slot].push(c); }
+        inp.value = ''; renderPhotos();
+    }));
+    document.addEventListener('click', e => {
+        const b = e.target.closest('.ms-thumb button'); if (!b) return;
+        photos[b.dataset.slot].splice(+b.dataset.i, 1); renderPhotos();
+    });
+
+    // ---------- validation per step ----------
+    function check(s){
+        const t = state.delivery.type;
+        if (s >= 1){
+            if (!state.items.length) return [1, 'Ajoutez au moins un article.'];
+            const bad = state.items.find(i => num(i.price) <= 0); if (bad) return [1, 'Saisissez le prix de ' + bad.reference + '.'];
+        }
+        if (s >= 2){
+            if (t === 'amana' && !state.delivery.tracking_number) return [2, 'Le code AMANA est obligatoire.'];
+            if (t === 'transporteur' && !state.delivery.carrier_id) return [2, 'Choisissez le transporteur.'];
+            if (t !== 'magasin' && !state.client) return [2, 'Le client est obligatoire pour cette livraison.'];
+        }
+        if (s >= 3){
+            if (paid() - total() > 0.009) return [3, 'Les paiements dépassent le total.'];
+            const noref = state.payments.find(p => { const m = METHODS.find(x => String(x.id) === String(p.method_id)); return m && m.needs_ref && num(p.amount) > 0 && !p.reference.trim(); });
+            if (noref) return [3, 'Une référence de paiement est obligatoire.'];
+        }
+        if (s >= 4){
+            if (!photos.photos_invoice.length && !existing.invoice) return [4, 'Ajoutez la photo de la facture manuscrite.'];
+            if ((t === 'amana' || t === 'transporteur') && !photos.photos_delivery.length && !existing.delivery) return [4, 'Ajoutez la photo du bordereau de livraison.'];
+        }
+        return null;
+    }
+
+    // ---------- summary ----------
+    function renderSummary(){
+        const t = total(), p = paid(), rest = t - p, d = state.delivery;
+        const DL = {magasin:'Magasin', amana:'AMANA', transporteur:'Transporteur', en_stock:'En stock'};
+        const warns = [];
+        state.items.forEach(i => { if (num(i.minimum_price) > 0 && num(i.price) < num(i.minimum_price)) warns.push(`${esc(i.reference)} vendu sous le prix minimum.`); });
+        if (rest > 0.009) warns.push(`Reste à payer : ${money(rest)} DH (vente partiellement payée).`);
+        if (!photos.photos_product.length && !existing.product) warns.push('Aucune photo des produits.');
+        $('#ms-summary').innerHTML =
+            (warns.length ? `<div class="ms-sum-warn">${warns.map(w => '• ' + w).join('<br>')}</div>` : '') +
+            `<div class="ms-card">
+                ${state.items.map(i => `<div class="ms-sum-row"><span>${esc(i.reference)}<br><span class="ms-muted">${esc(i.name)} · ${esc(i.weight)} g</span></span><strong>${money(num(i.price))}</strong></div>`).join('')}
+                <div class="ms-sum-row"><span><strong>Total</strong></span><strong>${money(t)} DH</strong></div>
+            </div>
+            <div class="ms-card">
+                <div class="ms-sum-row"><span>N° facture</span><span>${esc(state.ref) || '<span class="ms-muted">auto</span>'}</span></div>
+                <div class="ms-sum-row"><span>Client</span><span>${state.client ? esc(state.client.name) + ' · ' + esc(state.client.phone) : '<span class="ms-muted">aucun</span>'}</span></div>
+                <div class="ms-sum-row"><span>Livraison</span><span>${DL[d.type] || d.type}${d.tracking_number ? ' · ' + esc(d.tracking_number) : ''}</span></div>
+                ${state.payments.filter(x => num(x.amount) > 0).map(x => { const m = METHODS.find(y => String(y.id) === String(x.method_id)); return `<div class="ms-sum-row"><span>${esc(m ? m.name : '?')}</span><span>${money(num(x.amount))} DH</span></div>`; }).join('')}
+                <div class="ms-sum-row"><span>Reste</span><strong>${money(Math.max(rest, 0))} DH</strong></div>
+                <div class="ms-sum-row"><span>Photos</span><span>${Object.values(photos).reduce((a, x) => a + x.length, 0)} nouvelle(s)</span></div>
+            </div>`;
+    }
+
+    // ---------- navigation ----------
+    function go(n){
+        if (n > step){ const bad = check(n - 1); if (bad){ alert(bad[1]); if (bad[0] !== step) go(bad[0]); return; } }
+        step = Math.max(1, Math.min(5, n));
+        $$('.ms-step').forEach(s => s.hidden = +s.dataset.step !== step);
+        $$('.ms-stepdot').forEach(b => { const v = +b.dataset.go; b.classList.toggle('on', v === step); b.classList.toggle('done', v < step); });
+        $('#ms-prev').style.visibility = step === 1 ? 'hidden' : 'visible';
+        $('#ms-next').style.display = step === 5 ? 'none' : '';
+        if (step === 5) renderSummary();
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+    $('#ms-prev').addEventListener('click', () => go(step - 1));
+    $('#ms-next').addEventListener('click', () => go(step + 1));
+    $$('.ms-stepdot').forEach(b => b.addEventListener('click', () => go(+b.dataset.go)));
+
+    // ---------- submit ----------
+    $('#ms-submit').addEventListener('click', async () => {
+        const bad = check(4); if (bad){ alert(bad[1]); return go(bad[0]); }
+        const btn = $('#ms-submit'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Envoi…';
+        const fd = new FormData();
+        fd.append('payload', JSON.stringify({
+            existing_reference: EXISTING_REF, reference: state.ref.trim(),
+            items: state.items.map(i => ({product_id: i.id, selling_price: num(i.price)})),
+            delivery: {type: state.delivery.type, tracking_number: state.delivery.tracking_number, carrier_id: state.delivery.carrier_id || null},
+            client: state.client ? {id: state.client.id} : null,
+            payments: state.payments.filter(p => num(p.amount) > 0).map(p => ({method_id: +p.method_id, amount: num(p.amount), reference: p.reference || ''})),
+        }));
+        Object.entries(photos).forEach(([k, arr]) => arr.forEach(f => fd.append(k, f, f.name || 'photo.jpg')));
+        try{
+            const r = await fetch(URLS.submit, {method:'POST', credentials:'same-origin', headers:{'X-CSRFToken':CSRF}, body: fd});
+            const d = await r.json();
+            if (!d.ok){ alert(d.error || 'Erreur'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Confirmer et envoyer'; return; }
+            try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+            $$('.ms-step, .ms-steps, #ms-bar').forEach(el => el.hidden = true);
+            $('#ms-bar').style.display = 'none';
+            $('#ms-done-text').textContent = `${d.reference} · ${money(num(d.total))} DH envoyée pour validation.`;
+            $('#ms-done').hidden = false; window.scrollTo({top:0});
+        }catch(e){ alert('Erreur de connexion, réessayez.'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Confirmer et envoyer'; }
+    });
+
+    // ---------- camera scanner (native BarcodeDetector, Quagga fallback) ----------
+    const QUAGGA = 'https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js';
+    let stream = null, det = null, timer = null, active = false, target = 'item';
+    function loadScript(src){ return new Promise((res, rej) => { if (document.querySelector(`script[data-src="${src}"]`)) return res(); const s = document.createElement('script'); s.src = src; s.dataset.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+    async function openCam(t){
+        target = t;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return alert('Caméra non disponible, saisissez le code.');
+        $('#ms-cam').hidden = false; $('#ms-cam-status').textContent = 'Initialisation…';
+        try{ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080}}, audio:false}); }
+        catch(e){ closeCam(); return alert('Accès caméra refusé.'); }
+        const v = $('#ms-video'); v.srcObject = stream; try{ await v.play(); }catch(e){}
+        det = null;
+        if ('BarcodeDetector' in window){ try{ det = new window.BarcodeDetector(); }catch(e){ det = null; } }
+        if (!det){ try{ await loadScript(QUAGGA); }catch(e){} }
+        active = true; $('#ms-cam-status').textContent = 'Visez le code-barres'; loop();
+    }
+    function frame(){ const v = $('#ms-video'); if (!v.videoWidth) return null; const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0); return c; }
+    function quagga(src){ return new Promise(res => { if (!window.Quagga) return res(null); try{ window.Quagga.decodeSingle({src, numOfWorkers:0, locate:true, inputStream:{size:1600}, decoder:{readers:['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader','i2of5_reader','code_93_reader']}}, r => res(r && r.codeResult ? r.codeResult.code : null)); }catch(e){ res(null); } }); }
+    async function decode(){
+        if (det){ try{ const c = await det.detect($('#ms-video')); if (c && c.length) return c[0].rawValue; }catch(e){} return null; }
+        const f = frame(); return f ? await quagga(f.toDataURL('image/jpeg', 0.9)) : null;
+    }
+    async function loop(){ if (!active) return; let v = null; try{ v = await decode(); }catch(e){} if (v){ closeCam(); onCode(v); return; } timer = setTimeout(loop, det ? 150 : 700); }
+    function closeCam(){ active = false; clearTimeout(timer); if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } $('#ms-cam').hidden = true; }
+    function onCode(code){
+        try{ navigator.vibrate && navigator.vibrate(80); }catch(e){}
+        if (target === 'tracking'){ state.delivery.tracking_number = code.toUpperCase().replace(/\s+/g, ''); save(); renderDelivery(); }
+        else addByCode(code);
+    }
+    $$('[data-scan]').forEach(b => b.addEventListener('click', () => openCam(b.dataset.scan)));
+    $('#ms-cam-close').addEventListener('click', closeCam);
+
+    // ---------- init ----------
+    load();
+    $('#ms-ref').value = state.ref || '';
+    renderItems(); renderDelivery(); renderClient(); renderPays(); renderPhotos(); go(1);
+})();
+</script>
+{% endblock %}

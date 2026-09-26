@@ -3,6 +3,7 @@ URL routing for Sales app
 """
 from django.urls import path
 from . import views
+from . import mobile_sale
 
 app_name = 'sales'
 
@@ -54,6 +55,15 @@ urlpatterns = [
     path('payments/tracking/', views.payment_tracking, name='payment_tracking'),
 
     # Pending invoices (Brouillon - from Telegram)
+    # Mobile sale entry (seller on phone -> admin validation)
+    path('vente/', mobile_sale.mobile_sale, name='mobile_sale'),
+    path('vente/produit/', mobile_sale.mobile_sale_lookup, name='mobile_sale_lookup'),
+    path('vente/soumettre/', mobile_sale.mobile_sale_submit, name='mobile_sale_submit'),
+    path('vente/mes-ventes/', mobile_sale.mobile_sale_mine, name='mobile_sale_mine'),
+    path('vente/corriger/<str:reference>/', mobile_sale.mobile_sale, name='mobile_sale_edit'),
+    path('a-valider/', mobile_sale.mobile_sale_queue, name='mobile_sale_queue'),
+    path('a-valider/<str:reference>/', mobile_sale.mobile_sale_review, name='mobile_sale_review'),
+
     path('pending/', views.pending_invoices_list, name='pending_invoices'),
     path('pending/<str:reference>/complete/', views.pending_invoice_complete, name='pending_invoice_complete'),
     path('pending/<str:reference>/api/', views.pending_invoice_detail_api, name='pending_invoice_detail_api'),

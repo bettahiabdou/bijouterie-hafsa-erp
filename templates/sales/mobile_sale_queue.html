@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Ventes à valider - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Ventes à valider</span>
+{% endblock %}
+
+{% block content %}
+<h2 style="margin:0 0 14px;"><i class="fas fa-clipboard-check text-primary"></i> Ventes à valider <span class="text-muted" style="font-weight:400;">({{ rows|length }})</span></h2>
+<div class="card"><div class="card-body">
+    {% if rows %}
+    <div class="table-responsive"><table class="table">
+        <thead><tr><th>Facture</th><th>Vendeur</th><th>Envoyée</th><th class="text-right">Articles</th><th>Livraison</th><th class="text-right">Total</th><th class="text-right">Photos</th><th></th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+            <tr>
+                <td><strong>{{ r.inv.reference }}</strong></td>
+                <td>{{ r.inv.seller.get_full_name|default:r.inv.seller.username }}</td>
+                <td>{{ r.inv.submitted_at|date:"d/m H:i" }}</td>
+                <td class="text-right">{{ r.n_items }}</td>
+                <td>{{ r.delivery|capfirst }}</td>
+                <td class="text-right">{{ r.total }} DH</td>
+                <td class="text-right">{{ r.n_photos }}</td>
+                <td><a href="{% url 'sales:mobile_sale_review' r.inv.reference %}" class="btn btn-primary btn-sm">Vérifier</a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+    {% else %}
+    <p class="text-muted" style="text-align:center;padding:20px;">Aucune vente en attente de validation. ✓</p>
+    {% endif %}
+</div></div>
+{% endblock %}

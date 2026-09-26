@@ -5282,6 +5282,30 @@ def pending_invoice_complete_api(request, reference):
     """
     import json as _json
     from django.db import transaction
+
+    try:
+        data = _json.loads(request.body or '{}')
+    except (ValueError, TypeError):
+        return JsonResponse({'ok': False, 'errors': [{'code': 'bad_json', 'message': 'Corps JSON invalide'}]}, status=400)
+
+    invoice = SaleInvoice.objects.filter(reference=reference, is_deleted=False).first()
+    if not invoice:
+        return JsonResponse({'ok': False, 'errors': [{'code': 'not_found', 'message': f'Facture {reference} introuvable'}]}, status=404)
+
+    # Roll back everything if completion fails midway (early error returns
+    # inside the core would otherwise commit partial items/payments).
+    with transaction.atomic():
+        resp = _complete_draft(invoice, data, request.user)
+        if resp.status_code != 200:
+            transaction.set_rollback(True)
+    return resp
+
+
+def _complete_draft(invoice, data, user):
+    """Core of draft completion, shared by the JSON API and the mobile-sale
+    validation. Returns a JsonResponse (200 = ok). Callers must wrap it in
+    transaction.atomic() and roll back on non-200."""
+    from django.db import transaction
     from datetime import datetime as _dt
     from payments.models import ClientPayment
 
@@ -5291,14 +5315,6 @@ def pending_invoice_complete_api(request, reference):
             e.update(extra)
         return JsonResponse({'ok': False, 'errors': [e]}, status=http_status)
 
-    try:
-        data = _json.loads(request.body or '{}')
-    except (ValueError, TypeError):
-        return err(400, 'bad_json', 'Corps JSON invalide')
-
-    invoice = SaleInvoice.objects.filter(reference=reference, is_deleted=False).first()
-    if not invoice:
-        return err(404, 'not_found', f'Facture {reference} introuvable')
     if invoice.status != SaleInvoice.Status.DRAFT:
         return err(409, 'already_completed',
                    f'La facture {invoice.reference} a déjà été validée '
@@ -5415,7 +5431,7 @@ def pending_invoice_complete_api(request, reference):
                     reference=pref_pay, date=pay_date,
                     payment_type=ClientPayment.PaymentType.INVOICE,
                     client=invoice.client, amount=amount, payment_method=pm,
-                    sale_invoice=invoice, created_by=request.user,
+                    sale_invoice=invoice, created_by=user,
                 )
                 total_paid += amount
 
@@ -5468,7 +5484,7 @@ def pending_invoice_complete_api(request, reference):
                 if dtype == 'en_stock' and invoice.client:
                     from stock_storage.models import StockStorageAccount, StockStorageItem
                     acct, _ = StockStorageAccount.objects.get_or_create(
-                        client=invoice.client, defaults={'created_by': request.user})
+                        client=invoice.client, defaults={'created_by': user})
                     for inv_item in invoice.items.select_related('product'):
                         if inv_item.product:
                             StockStorageItem.objects.create(
@@ -5476,14 +5492,14 @@ def pending_invoice_complete_api(request, reference):
                                 product_reference=inv_item.product.reference,
                                 product_name=inv_item.product.name,
                                 product_weight=inv_item.product.gross_weight or 0,
-                                price=inv_item.total_amount or 0, created_by=request.user)
+                                price=inv_item.total_amount or 0, created_by=user)
                 for inv_item in invoice.items.all():
                     if inv_item.product:
                         inv_item.product.status = 'sold'
                         inv_item.product.save(update_fields=['status'])
 
             ActivityLog.objects.create(
-                user=request.user, action=ActivityLog.ActionType.UPDATE,
+                user=user, action=ActivityLog.ActionType.UPDATE,
                 model_name='SaleInvoice', object_id=str(invoice.id),
                 object_repr=str(invoice),
                 details={'action': 'completed_via_api', 'reference': invoice.reference})

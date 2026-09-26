@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Mes ventes - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Mes ventes</span>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;margin:0 auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;">
+        <h2 style="margin:0;font-size:1.25rem;">Mes ventes</h2>
+        <a href="{% url 'sales:mobile_sale' %}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Nouvelle vente</a>
+    </div>
+
+    {% if returned %}
+    <h3 class="mm-h" style="color:#b45309;">À corriger ({{ returned|length }})</h3>
+    {% for inv in returned %}
+    <div class="mm-card" style="border-left:4px solid #f59e0b;">
+        <div class="mm-top"><strong>{{ inv.reference }}</strong><span>{{ inv.submission.total }} DH</span></div>
+        <div class="mm-note"><i class="fas fa-comment"></i> {{ inv.review_note|default:"Renvoyée par l'administrateur." }}</div>
+        <a href="{% url 'sales:mobile_sale_edit' inv.reference %}" class="btn btn-primary btn-sm" style="margin-top:8px;"><i class="fas fa-pen"></i> Corriger et renvoyer</a>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <h3 class="mm-h">En attente de validation ({{ pending|length }})</h3>
+    {% for inv in pending %}
+    <div class="mm-card">
+        <div class="mm-top"><strong>{{ inv.reference }}</strong><span>{{ inv.submission.total }} DH</span></div>
+        <div class="mm-sub">Envoyée le {{ inv.submitted_at|date:"d/m/Y H:i" }} · {{ inv.submission.items|length }} article(s)</div>
+    </div>
+    {% empty %}
+    <p class="mm-empty">Aucune vente en attente.</p>
+    {% endfor %}
+
+    <h3 class="mm-h">Validées récemment</h3>
+    {% for inv in done %}
+    <div class="mm-card">
+        <div class="mm-top"><strong>{{ inv.reference }}</strong><span>{{ inv.total_amount|floatformat:2 }} DH</span></div>
+        <div class="mm-sub"><span class="badge badge-success">{{ inv.get_status_display }}</span> {{ inv.date|date:"d/m/Y" }}</div>
+    </div>
+    {% empty %}
+    <p class="mm-empty">Aucune vente validée pour l'instant.</p>
+    {% endfor %}
+</div>
+<style>
+    .mm-h { font-size:14px; text-transform:uppercase; letter-spacing:.3px; color:#6b7280; margin:18px 2px 8px; }
+    .mm-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:12px 14px; margin-bottom:10px; }
+    .mm-top { display:flex; justify-content:space-between; gap:8px; font-size:15px; }
+    .mm-sub { font-size:13px; color:#6b7280; margin-top:4px; }
+    .mm-note { font-size:14px; color:#92400e; margin-top:6px; }
+    .mm-empty { color:#9ca3af; text-align:center; padding:12px; }
+</style>
+{% endblock %}

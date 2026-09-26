@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}Vérifier {{ invoice.reference }} - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'sales:mobile_sale_queue' %}" class="breadcrumb-item">Ventes à valider</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">{{ invoice.reference }}</span>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+    <h2 style="margin:0;">{{ invoice.reference }}{% if sub.handwritten_ref %} <span class="text-muted" style="font-weight:400;font-size:15px;">→ deviendra {{ sub.handwritten_ref }}</span>{% endif %}</h2>
+    <span class="text-muted">Vendeur : <strong>{{ invoice.seller.get_full_name|default:invoice.seller.username }}</strong> · envoyée le {{ invoice.submitted_at|date:"d/m/Y H:i" }}</span>
+</div>
+
+{% if any_below_min or rest > 0 %}
+<div class="card mb-6" style="border-left:4px solid #f59e0b;"><div class="card-body" style="color:#92400e;">
+    {% if any_below_min %}<div><i class="fas fa-triangle-exclamation"></i> Au moins un article est vendu <strong>sous son prix minimum</strong>.</div>{% endif %}
+    {% if rest > 0 %}<div><i class="fas fa-circle-info"></i> Reste à payer : <strong>{{ rest|floatformat:2 }} DH</strong> (vente partiellement payée).</div>{% endif %}
+</div></div>
+{% endif %}
+
+<div class="rv-grid">
+    <div>
+        <div class="card mb-6"><div class="card-header"><h3 class="card-title">Articles</h3></div><div class="card-body">
+            {% for l in lines %}
+            <div class="rv-item">
+                {% if l.image %}<img src="{{ l.image }}" alt="">{% else %}<div class="rv-noimg"><i class="fas fa-gem"></i></div>{% endif %}
+                <div style="flex:1;min-width:0;">
+                    <strong>{{ l.p.reference|default:"(produit supprimé)" }}</strong>
+                    <div class="text-muted" style="font-size:13px;">{{ l.p.name }} · {{ l.p.metal_type.name|default:"-" }} · {{ l.p.gross_weight|floatformat:2 }} g · catalogue {{ l.p.selling_price|floatformat:2 }} DH</div>
+                    {% if l.below_min %}<div style="color:#b45309;font-size:12px;"><i class="fas fa-triangle-exclamation"></i> Minimum {{ l.p.minimum_price|floatformat:2 }} DH</div>{% endif %}
+                </div>
+                <strong style="white-space:nowrap;">{{ l.price|floatformat:2 }} DH</strong>
+            </div>
+            {% endfor %}
+            <div class="rv-total"><span>Total</span><strong>{{ total|floatformat:2 }} DH</strong></div>
+        </div></div>
+
+        <div class="card mb-6"><div class="card-header"><h3 class="card-title">Client, livraison, paiements</h3></div><div class="card-body">
+            <div class="rv-row"><span>Client</span><span>{% if client %}{{ client.full_name }} · {{ client.phone }}{% else %}<span class="text-muted">aucun</span>{% endif %}</span></div>
+            <div class="rv-row"><span>Livraison</span><span>{{ delivery.type|default:"magasin"|capfirst }}{% if carrier %} · {{ carrier.name }}{% endif %}{% if delivery.tracking_number %} · <strong>{{ delivery.tracking_number }}</strong>{% endif %}</span></div>
+            {% for p in payments %}
+            <div class="rv-row"><span>{{ p.method.name|default:"?" }}{% if p.reference %} <span class="text-muted">({{ p.reference }})</span>{% endif %}</span><span>{{ p.amount|floatformat:2 }} DH</span></div>
+            {% empty %}
+            <div class="rv-row"><span>Paiements</span><span class="text-muted">aucun</span></div>
+            {% endfor %}
+            <div class="rv-row"><span>Payé / reste</span><span>{{ paid|floatformat:2 }} / <strong>{{ rest|floatformat:2 }}</strong> DH</span></div>
+        </div></div>
+
+        <div class="card mb-6"><div class="card-body">
+            <form method="post" style="margin-bottom:12px;">{% csrf_token %}
+                <input type="hidden" name="action" value="validate">
+                <button type="submit" class="btn btn-success" style="width:100%;padding:14px;font-size:16px;" onclick="return confirm('Valider cette vente ? Les pièces passeront en Vendu.');"><i class="fas fa-check"></i> Valider la vente</button>
+            </form>
+            <form method="post">{% csrf_token %}
+                <input type="hidden" name="action" value="reject">
+                <label class="form-label" for="rv-note">Renvoyer au vendeur (motif)</label>
+                <textarea id="rv-note" name="note" class="form-input" rows="2" placeholder="Ex : le prix de la bague ne correspond pas à la facture"></textarea>
+                <button type="submit" class="btn btn-secondary" style="width:100%;margin-top:8px;"><i class="fas fa-rotate-left"></i> Renvoyer pour correction</button>
+            </form>
+        </div></div>
+    </div>
+
+    <div>
+        <div class="card"><div class="card-header"><h3 class="card-title">Photos ({{ photos|length }})</h3></div><div class="card-body">
+            {% regroup photos by get_photo_type_display as groups %}
+            {% for g in groups %}
+                <div class="text-muted" style="font-size:12px;text-transform:uppercase;margin:8px 0 6px;">{{ g.grouper }}</div>
+                <div class="rv-photos">{% for ph in g.list %}<a href="{{ ph.image.url }}" target="_blank"><img src="{{ ph.image.url }}" alt=""></a>{% endfor %}</div>
+            {% empty %}
+                <p class="text-muted">Aucune photo.</p>
+            {% endfor %}
+        </div></div>
+    </div>
+</div>
+
+<style>
+    .rv-grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    @media (max-width: 900px) { .rv-grid { grid-template-columns: 1fr; } }
+    .rv-item { display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid #f3f4f6; }
+    .rv-item img, .rv-noimg { width:52px; height:52px; border-radius:8px; object-fit:cover; background:#f7f7f5; display:flex; align-items:center; justify-content:center; color:#9ca3af; flex-shrink:0; }
+    .rv-total, .rv-row { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #f3f4f6; font-size:14px; }
+    .rv-total { border-bottom:none; font-size:16px; }
+    .rv-photos { display:flex; flex-wrap:wrap; gap:8px; }
+    .rv-photos img { width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid #e5e7eb; }
+</style>
+{% endblock %}

@@ -41,6 +41,27 @@ def _get_telegram_config():
     return token, chat_ids_str, enabled
 
 
+def notify_admin_sale_to_validate(invoice, review_url):
+    """Tell admins a seller submitted a phone sale waiting for validation."""
+    bot_token, chat_ids_str, enabled = _get_telegram_config()
+    if not enabled or not bot_token or not chat_ids_str:
+        return
+    sub = invoice.submission or {}
+    seller = invoice.seller.get_full_name() or invoice.seller.username if invoice.seller else '-'
+    text = (
+        f"🟡 Vente à valider — {invoice.reference}\n"
+        f"Vendeur : {seller}\n"
+        f"Articles : {len(sub.get('items') or [])} · Total : {sub.get('total', '0')} DH\n"
+        f"Livraison : {(sub.get('delivery') or {}).get('type', 'magasin')}\n"
+        f"👉 {review_url}"
+    )
+    for chat_id in [c.strip() for c in chat_ids_str.split(',') if c.strip()]:
+        try:
+            _send_text_message(bot_token, chat_id, text)
+        except Exception as e:
+            logger.error(f"Error sending to-validate notification to {chat_id}: {e}")
+
+
 def notify_admin_new_sale(invoice):
     """
     Send a Telegram notification to all admins about a new/completed sale.

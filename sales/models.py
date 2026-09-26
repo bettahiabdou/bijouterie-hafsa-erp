@@ -291,6 +291,17 @@ class SaleInvoice(models.Model):
         help_text=_('Marqué comme supprimé (soft delete)')
     )
 
+    # Mobile sale entry (seller fills everything on the phone -> admin validates).
+    # `submission` holds the completion payload (same shape as
+    # pending_invoice_complete_api); it is applied on validation.
+    submitted_at = models.DateTimeField(_('Soumis le'), null=True, blank=True)
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='submitted_sale_invoices', verbose_name=_('Soumis par'),
+    )
+    submission = models.JSONField(_('Saisie mobile'), null=True, blank=True)
+    review_note = models.TextField(_('Motif de renvoi'), blank=True)
+
     class Meta:
         verbose_name = _('Facture de vente')
         verbose_name_plural = _('Factures de vente')
@@ -863,6 +874,7 @@ class InvoicePhoto(models.Model):
         PRODUCT = 'product', _('Photo produit')
         INVOICE = 'invoice', _('Facture manuscrite')
         PAYMENT = 'payment', _('Preuve de paiement')
+        DELIVERY = 'delivery', _('Bordereau de livraison')
         OTHER = 'other', _('Autre')
 
     invoice = models.ForeignKey(
