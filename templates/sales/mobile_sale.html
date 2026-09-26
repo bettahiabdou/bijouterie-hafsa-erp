@@ -173,7 +173,10 @@
     .ms .ms-stepdot.on span, .ms .ms-stepdot.done span { background:var(--primary-600,#4f46e5); }
     .ms-card { background:#fff; border:1px solid var(--neutral-200,#e5e7eb); border-radius:14px; padding:14px; margin-bottom:12px; }
     .ms-label { display:block; font-size:13px; font-weight:600; margin:0 0 6px; color:var(--neutral-700,#374151); }
-    .ms-input { width:100%; padding:12px; font-size:16px; border:1px solid var(--neutral-300,#d1d5db); border-radius:10px; background:#fff; margin-bottom:8px; }
+    .ms .ms-input { width:100%; padding:12px; font-size:16px; border:1px solid var(--neutral-300,#d1d5db); border-radius:10px; background:#fff; color:#111827; caret-color:var(--primary-600,#b76e79); margin-bottom:8px; -webkit-appearance:none; appearance:none; }
+    .ms .ms-input:focus { outline:none; border-color:var(--primary-500,#b76e79); box-shadow:0 0 0 3px rgba(183,110,121,.18); }
+    .ms select.ms-input { background-image:linear-gradient(45deg,transparent 50%,#6b7280 50%),linear-gradient(135deg,#6b7280 50%,transparent 50%); background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%; background-size:5px 5px; background-repeat:no-repeat; padding-right:32px; }
+    .ms button, .ms label.btn { touch-action:manipulation; cursor:pointer; }
     .ms-row { display:flex; gap:8px; align-items:flex-start; }
     .ms-row .ms-input { flex:1 1 auto; width:auto; min-width:0; }
     .ms .ms-sq { flex:0 0 48px; width:48px; height:48px; padding:0; display:flex; align-items:center; justify-content:center; }
@@ -187,11 +190,13 @@
     .ms-hit-main { flex:1; min-width:0; font-size:13px; line-height:1.3; word-break:break-word; }
     .ms-hit-main span { color:var(--neutral-500,#6b7280); }
     .ms-hit-side { text-align:right; font-size:13px; font-weight:700; white-space:nowrap; }
-    .ms-hit-side em { font-style:normal; font-weight:600; font-size:11px; color:var(--primary-600,#4f46e5); }
+    .ms-hit-side em { display:inline-block; margin-top:4px; font-style:normal; font-weight:700; font-size:12px; color:#fff; background:var(--primary-600,#b76e79); border-radius:999px; padding:5px 12px; }
+    .ms .ms-hit:active { transform:scale(.98); }
+    .ms .ms-hit *, .ms .ms-res * { pointer-events:none; }
     .ms .ms-hit.in { border-color:var(--success-300,#86efac); background:#f0fdf4 !important; }
-    .ms .ms-hit.in em { color:var(--success-700,#15803d); }
+    .ms .ms-hit.in em { background:var(--success-600,#16a34a); }
     .ms .ms-hit.off { opacity:.55; }
-    .ms .ms-hit.off em { color:var(--error-600,#dc2626); }
+    .ms .ms-hit.off em { background:transparent; color:var(--error-600,#dc2626); padding:0; }
     .ms-empty { text-align:center; color:var(--neutral-400,#9ca3af); padding:18px; }
     .ms-item { display:flex; gap:10px; background:#fff; border:1px solid var(--neutral-200,#e5e7eb); border-radius:14px; padding:12px; margin-bottom:10px; }
     .ms-item img, .ms-noimg { width:64px; height:64px; border-radius:10px; object-fit:cover; flex-shrink:0; background:#f7f7f5; display:flex; align-items:center; justify-content:center; color:#9ca3af; }
@@ -251,6 +256,11 @@
         clientSearch: "{% url 'clients:api_search' %}",
         clientCreate: "{% url 'sales:quick_create_client' %}",
     };
+    // Surface any unexpected script error on screen instead of failing silently.
+    window.addEventListener('error', ev => {
+        const m = document.getElementById('ms-code-msg');
+        if (m){ m.textContent = 'Erreur : ' + (ev.message || 'inconnue') + '. Rechargez la page.'; m.className = 'ms-msg err'; m.hidden = false; }
+    });
     const CSRF = document.querySelector('#ms-csrf [name=csrfmiddlewaretoken]').value;
     const METHODS = {{ methods_json|safe }};
     const PREFILL = {{ prefill_json|safe }};
@@ -279,7 +289,15 @@
             existing = PREFILL.existing_photos || existing;
             return;
         }
-        try{ const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); if (s && s.items) state = Object.assign(state, s); }catch(e){}
+        try{
+            const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+            if (s && Array.isArray(s.items)){
+                state = Object.assign(state, s);
+                state.items = state.items.filter(i => i && i.id);
+                state.payments = (state.payments || []).filter(Boolean);
+                state.delivery = Object.assign({type:'magasin', tracking_number:'', carrier_id:''}, state.delivery || {});
+            }
+        }catch(e){}
     }
 
     // ---------- totals ----------
@@ -294,12 +312,12 @@
     }
 
     // ---------- step 1: items ----------
+    let lastResults = [], sTimer = null, sSeq = 0;   // live search state
     function msg(text, kind){ const m = $('#ms-code-msg'); m.textContent = text; m.className = 'ms-msg ' + kind; m.hidden = !text; }
     function renderItems(){
         const box = $('#ms-items');
         $('#ms-items-empty').hidden = state.items.length > 0;
         box.innerHTML = state.items.map((it, i) => {
-            const below = num(it.price) > 0 && num(it.minimum_price) > 0 && num(it.price) < num(it.minimum_price);
             return `<div class="ms-item">
                 ${it.image ? `<img src="${esc(it.image)}" alt="">` : `<div class="ms-noimg"><i class="fas fa-gem"></i></div>`}
                 <div class="ms-item-main">
@@ -309,29 +327,41 @@
                         <input class="ms-input" inputmode="decimal" placeholder="Prix de vente (DH)" value="${esc(it.price)}" data-price="${i}">
                         <button type="button" class="ms-cat" data-cat="${i}">= ${esc(it.selling_price)}</button>
                     </div>
-                    ${below ? `<div class="ms-warn"><i class="fas fa-triangle-exclamation"></i> Sous le prix minimum (${esc(it.minimum_price)} DH)</div>` : ''}
+                    <div class="ms-warn" ${belowMin(it) ? '' : 'hidden'}><i class="fas fa-triangle-exclamation"></i> Sous le prix minimum (${esc(it.minimum_price)} DH)</div>
                 </div>
                 <button type="button" class="ms-x" data-del="${i}" aria-label="Retirer">&times;</button>
             </div>`;
         }).join('');
         refreshTotals();
     }
+    // Price typing updates totals + the row's warning in place. Never re-render the
+    // list here: on iPhone the blur fires when tapping the next price field, and a
+    // re-render would destroy the field being tapped (no cursor, keyboard closes).
+    function belowMin(it){ return num(it.price) > 0 && num(it.minimum_price) > 0 && num(it.price) < num(it.minimum_price); }
     $('#ms-items').addEventListener('input', e => {
-        const i = e.target.getAttribute('data-price'); if (i === null) return;
-        state.items[i].price = e.target.value; save(); refreshTotals();
+        const i = e.target.getAttribute('data-price'); if (i === null || !state.items[i]) return;
+        const it = state.items[i]; it.price = e.target.value; save(); refreshTotals();
+        const w = e.target.closest('.ms-item').querySelector('.ms-warn');
+        w.hidden = !belowMin(it);
     });
-    $('#ms-items').addEventListener('change', e => { if (e.target.hasAttribute('data-price')) renderItems(); });
     $('#ms-items').addEventListener('click', e => {
         const c = e.target.closest('[data-cat]'); if (c){ const i = c.getAttribute('data-cat'); state.items[i].price = state.items[i].selling_price; save(); renderItems(); return; }
         const d = e.target.closest('[data-del]'); if (d){ state.items.splice(+d.getAttribute('data-del'), 1); save(); renderItems(); }
     });
-    function addProduct(p){
-        if (state.items.some(i => i.id === p.id)) return msg(p.reference + ' est déjà dans la vente.', 'err');
+    function addProduct(p, focusPrice){
+        if (!p) return;
+        if (state.items.some(i => i && i.id === p.id)) return msg(p.reference + ' est déjà dans la vente.', 'err');
         if (!p.available) return msg(p.reference + ' : ' + p.status_display + ', impossible de le vendre.', 'err');
+        // Cancel any pending search so it can't redraw the list after the add.
+        clearTimeout(sTimer); sSeq++; lastResults = [];
+        $('#ms-code').value = ''; $('#ms-results').innerHTML = '';
         state.items.push(Object.assign({}, p, {price:''})); save(); renderItems();
         msg('✓ ' + p.reference + ' ajouté. Saisissez son prix.', 'ok');
         try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
-        $('#ms-code').value = ''; $('#ms-results').innerHTML = '';
+        if (focusPrice){
+            const inp = $(`[data-price="${state.items.length - 1}"]`);
+            if (inp){ inp.focus(); inp.scrollIntoView({block:'center', behavior:'smooth'}); }
+        }
     }
     // Exact code (camera scan): add straight away.
     async function addByCode(code){
@@ -343,8 +373,6 @@
             addProduct(d.product);
         }catch(e){ msg('Erreur de connexion.', 'err'); }
     }
-    // Live search across all criteria.
-    let lastResults = [], sTimer = null, sSeq = 0;
     async function runSearch(q){
         q = (q || '').trim();
         if (q.length < 2){ $('#ms-results').innerHTML = ''; msg('', ''); return; }
@@ -375,9 +403,20 @@
         const avail = lastResults.filter(p => p.available);
         if (avail.length === 1) addProduct(avail[0]); else runSearch(e.target.value);
     });
-    $('#ms-results').addEventListener('click', e => {
-        const b = e.target.closest('[data-hit]'); if (b) addProduct(lastResults[+b.dataset.hit]);
-    });
+    // Keep the keyboard/focus where it is while tapping a result: otherwise iOS
+    // closes the keyboard mid-tap, the page jumps and the tap can be lost.
+    function keepFocus(box){ box.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); }); }
+    // Touch: act on touchend (a real tap, not a scroll) and cancel the synthetic
+    // click. Reliable on iPhone and lets us move the keyboard to the price field.
+    function onTap(box, sel, fn){
+        let s = null;
+        box.addEventListener('touchstart', e => { const t = e.touches[0]; s = {x:t.clientX, y:t.clientY, el:e.target.closest(sel)}; }, {passive:true});
+        box.addEventListener('touchmove', e => { const t = e.touches[0]; if (s && (Math.abs(t.clientX - s.x) > 10 || Math.abs(t.clientY - s.y) > 10)) s = null; }, {passive:true});
+        box.addEventListener('touchend', e => { const x = s; s = null; if (!x || !x.el) return; e.preventDefault(); fn(x.el); });
+        box.addEventListener('click', e => { const el = e.target.closest(sel); if (el){ e.preventDefault(); fn(el); } });
+        keepFocus(box);
+    }
+    onTap($('#ms-results'), '[data-hit]', b => addProduct(lastResults[+b.dataset.hit], true));
 
     // ---------- step 2: delivery + client ----------
     function renderDelivery(){
@@ -402,6 +441,13 @@
         if (has) $('#ms-client-chip').innerHTML = `<div class="ms-chip"><span><i class="fas fa-user"></i> <strong>${esc(state.client.name)}</strong> · ${esc(state.client.phone)}</span><button type="button" class="ms-link" id="ms-client-clear">Changer</button></div>`;
     }
     $('#ms-client-chip').addEventListener('click', e => { if (e.target.id === 'ms-client-clear'){ state.client = null; save(); renderClient(); } });
+    // After choosing/creating a client: close the keyboard and go back to the top
+    // of the step (it now fits on screen). Leaving the page scrolled past its new,
+    // shorter end makes the fixed Suivant bar untappable in WebKit.
+    function clientPicked(){
+        try{ document.activeElement.blur(); }catch(e){}
+        setTimeout(() => window.scrollTo(0, 0), 50);
+    }
     let qTimer = null;
     $('#ms-client-q').addEventListener('input', e => {
         clearTimeout(qTimer); const q = e.target.value.trim();
@@ -414,10 +460,10 @@
             }catch(err){}
         }, 250);
     });
-    $('#ms-client-results').addEventListener('click', e => {
-        const b = e.target.closest('[data-cid]'); if (!b) return;
+    onTap($('#ms-client-results'), '[data-cid]', b => {
         state.client = {id: +b.dataset.cid, name: b.dataset.name, phone: b.dataset.phone}; save();
         $('#ms-client-results').innerHTML = ''; $('#ms-client-q').value = ''; renderClient();
+        clientPicked();
     });
     $('#ms-client-new-toggle').addEventListener('click', () => { $('#ms-client-new').hidden = !$('#ms-client-new').hidden; });
     $('#ms-cn-create').addEventListener('click', async () => {
@@ -427,6 +473,7 @@
             const d = await (await fetch(URLS.clientCreate, {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body: JSON.stringify(body)})).json();
             if (!d.success) return alert(d.error || 'Erreur');
             state.client = {id: d.id, name: d.full_name, phone: d.phone}; save();
+            clientPicked();
             $('#ms-client-new').hidden = true; renderClient();
             if (d.existing) alert(d.message);
         }catch(e){ alert('Erreur de connexion.'); }
@@ -512,7 +559,7 @@
         }
         if (s >= 3){
             if (paid() - total() > 0.009) return [3, 'Les paiements dépassent le total.'];
-            const noref = state.payments.find(p => { const m = METHODS.find(x => String(x.id) === String(p.method_id)); return m && m.needs_ref && num(p.amount) > 0 && !p.reference.trim(); });
+            const noref = state.payments.find(p => { const m = METHODS.find(x => String(x.id) === String(p.method_id)); return m && m.needs_ref && num(p.amount) > 0 && !String(p.reference || '').trim(); });
             if (noref) return [3, 'Une référence de paiement est obligatoire.'];
         }
         if (s >= 4){
@@ -617,6 +664,16 @@
     }
     $$('[data-scan]').forEach(b => b.addEventListener('click', () => openCam(b.dataset.scan)));
     $('#ms-cam-close').addEventListener('click', closeCam);
+
+    // When content shrinks (results cleared, client form closed) WebKit can stay
+    // scrolled past the end of the page, which makes the fixed bottom bar
+    // untappable. Pull the scroll back inside the page whenever the height changes.
+    if ('ResizeObserver' in window){
+        new ResizeObserver(() => {
+            const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+            if (window.scrollY > max) window.scrollTo(0, max);
+        }).observe(document.querySelector('.ms'));
+    }
 
     // ---------- init ----------
     load();
