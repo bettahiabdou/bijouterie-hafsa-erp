@@ -252,5 +252,13 @@ LOGGING = {
 }
 
 # HTTPS/Proxy settings
-CSRF_TRUSTED_ORIGINS = ['https://hafsaerp.duckdns.org', 'https://89.167.27.57']
+CSRF_TRUSTED_ORIGINS = [
+    'https://hafsaerp.live', 'https://www.hafsaerp.live',
+    'http://hafsaerp.live', 'http://www.hafsaerp.live',
+    'https://hafsaerp.duckdns.org', 'https://89.167.27.57',
+]
+# Extra trusted origins can be added via env (comma-separated, full scheme+host).
+_extra_csrf = os.getenv('CSRF_TRUSTED_ORIGINS', '').strip()
+if _extra_csrf:
+    CSRF_TRUSTED_ORIGINS += [o.strip() for o in _extra_csrf.split(',') if o.strip()]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
