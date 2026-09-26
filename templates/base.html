@@ -544,6 +544,12 @@
                         <a href="{% url 'products:sold_list' %}" class="nav-link {% if request.resolver_match.url_name == 'sold_list' %}active{% endif %}">
                             <span class="nav-text">Produits Vendus</span>
                         </a>
+                        {% if request.user.role == 'admin' or request.user.is_superuser %}
+                        <a href="{% url 'products:trash' %}" class="nav-link {% if 'corbeille' in request.path %}active{% endif %}">
+                            <i class="fas fa-trash-can text-danger" style="margin-right: 6px;"></i>
+                            <span class="nav-text">Corbeille</span>
+                        </a>
+                        {% endif %}
                         <a href="{% url 'products:stock_count_list' %}" class="nav-link {% if 'stock-count' in request.path %}active{% endif %}">
                             <i class="fas fa-clipboard-check text-primary" style="margin-right: 6px;"></i>
                             <span class="nav-text">Contrôle d'inventaire</span>

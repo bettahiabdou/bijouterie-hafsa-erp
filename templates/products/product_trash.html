@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Corbeille produits - Bijouterie Hafsa ERP{% endblock %}
+
+{% block breadcrumb %}
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'products:list' %}" class="breadcrumb-item">Produits</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">Corbeille</span>
+{% endblock %}
+
+{% block content %}
+<form id="csrf-form" style="display:none;">{% csrf_token %}</form>
+
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+    <h2 style="margin:0;"><i class="fas fa-trash-can text-danger"></i> Corbeille produits <span class="text-muted" style="font-weight:400;">({{ total }})</span></h2>
+    <form method="get" style="display:flex;gap:6px;">
+        <input type="text" name="search" value="{{ search }}" placeholder="Rechercher..." class="form-input">
+        <button class="btn btn-secondary btn-sm" type="submit"><i class="fas fa-search"></i></button>
+    </form>
+</div>
+
+<p class="text-muted" style="font-size:13px;margin-bottom:14px;">Les produits supprimés sont conservés ici, invisibles partout ailleurs et non comptés dans le stock. Vous pouvez les <strong>restaurer</strong> en un clic.</p>
+
+<div class="card">
+    <div class="card-body">
+        {% if products %}
+        <div class="table-responsive"><table class="table">
+            <thead><tr><th>Référence</th><th>Nom</th><th>Métal</th><th class="text-right">Poids</th><th>Statut</th><th>Supprimé</th><th></th></tr></thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td><strong>{{ p.reference }}</strong></td>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.metal_type.name|default:'-' }}</td>
+                    <td class="text-right">{{ p.gross_weight|floatformat:2 }} g</td>
+                    <td><span class="badge badge-neutral">{{ p.get_status_display }}</span></td>
+                    <td style="font-size:12px;color:#6b7280;">{{ p.deleted_at|date:"d/m/Y H:i" }}{% if p.deleted_by %}<br>par {{ p.deleted_by.get_full_name|default:p.deleted_by.username }}{% endif %}</td>
+                    <td style="white-space:nowrap;">
+                        <form method="post" action="{% url 'products:restore' p.reference %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-rotate-left"></i> Restaurer</button>
+                        </form>
+                        <form method="post" action="{% url 'products:hard_delete' p.reference %}" style="display:inline;"
+                              onsubmit="return confirm('Supprimer DÉFINITIVEMENT {{ p.reference }} ? Cette action est irréversible.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-error btn-sm"><i class="fas fa-xmark"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table></div>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div style="display:flex;gap:12px;justify-content:center;align-items:center;margin-top:12px;font-size:13px;color:#6b7280;">
+            {% if page_obj.has_previous %}<a class="btn btn-ghost btn-sm" href="?search={{ search|urlencode }}&page={{ page_obj.previous_page_number }}">← Précédent</a>{% endif %}
+            <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a class="btn btn-ghost btn-sm" href="?search={{ search|urlencode }}&page={{ page_obj.next_page_number }}">Suivant →</a>{% endif %}
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="text-muted" style="text-align:center;padding:24px;">La corbeille est vide.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

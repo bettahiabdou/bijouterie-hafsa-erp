@@ -9,6 +9,12 @@ from django.core.validators import MinValueValidator
 from decimal import Decimal
 
 
+class ProductManager(models.Manager):
+    """Default manager: hides soft-deleted products from every normal query."""
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+
 class Product(models.Model):
     """
     Main product model for jewelry items
@@ -348,10 +354,22 @@ class Product(models.Model):
     # Notes
     notes = models.TextField(_('Notes'), blank=True)
 
+    # Soft delete (Corbeille): the piece is hidden everywhere but recoverable.
+    is_deleted = models.BooleanField(_('Supprimé'), default=False, db_index=True)
+    deleted_at = models.DateTimeField(_('Supprimé le'), null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='+', verbose_name=_('Supprimé par'),
+    )
+
+    objects = ProductManager()      # default: excludes soft-deleted
+    all_objects = models.Manager()  # includes soft-deleted (Corbeille, FK/history)
+
     class Meta:
         verbose_name = _('Produit')
         verbose_name_plural = _('Produits')
         ordering = ['-created_at']
+        base_manager_name = 'all_objects'
 
     def __str__(self):
         return f"{self.reference} - {self.name}"

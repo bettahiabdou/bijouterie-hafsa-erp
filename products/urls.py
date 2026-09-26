@@ -11,6 +11,9 @@ urlpatterns = [
     # Products
     path('', views.product_list, name='list'),
     path('sold/', views.sold_products, name='sold_list'),
+    path('corbeille/', views.product_trash, name='trash'),
+    path('corbeille/<str:reference>/restaurer/', views.product_restore, name='restore'),
+    path('corbeille/<str:reference>/supprimer-definitif/', views.product_hard_delete, name='hard_delete'),
     path('create/', views.product_create, name='create'),
     path('batch-create/', views.batch_product_create, name='batch_create'),
 

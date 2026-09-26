@@ -833,53 +833,100 @@ def product_edit(request, reference):
     return render(request, 'products/product_form.html', context)
 
 
+def _is_admin(user):
+    return bool(getattr(user, 'role', None) == 'admin' or user.is_superuser)
+
+
 @login_required(login_url='login')
 @require_http_methods(["GET", "POST"])
 def product_delete(request, reference):
-    """Delete a product"""
+    """Soft-delete a product (move to Corbeille). Admin only, recoverable."""
     product = get_object_or_404(Product, reference=reference)
 
-    if not request.user.is_staff:
-        messages.error(request, 'Vous n\'avez pas la permission de supprimer des produits.')
+    if not _is_admin(request.user):
+        messages.error(request, "Seul un administrateur peut supprimer un produit.")
         return redirect('products:detail', reference=reference)
 
-    # Check if product is sold - warn but still allow deletion
     if product.status == 'sold':
         messages.warning(request, 'Attention: Ce produit est marqué comme vendu.')
 
     if request.method == 'POST':
-        try:
-            product_name = product.name
-            product_ref = product.reference
+        from django.utils import timezone as _tz
+        product_name = product.name
+        product_ref = product.reference
+        product.is_deleted = True
+        product.deleted_at = _tz.now()
+        product.deleted_by = request.user
+        product.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+        ActivityLog.objects.create(
+            user=request.user, action=ActivityLog.ActionType.DELETE,
+            model_name='Product', object_id=str(product.id),
+            object_repr=product_ref, ip_address=get_client_ip(request),
+        )
+        messages.success(request, f'Produit "{product_name}" ({product_ref}) déplacé vers la corbeille.')
+        return redirect('products:list')
 
-            # Delete related images first
-            product.images.all().delete()
+    return render(request, 'products/product_delete.html', {'product': product})
 
-            # Delete the product
-            product.delete()
 
-            # Log activity
-            ActivityLog.objects.create(
-                user=request.user,
-                action=ActivityLog.ActionType.DELETE,
-                model_name='Product',
-                object_id=str(product.id),
-                object_repr=product_ref,
-                ip_address=get_client_ip(request)
-            )
+@login_required(login_url='login')
+def product_trash(request):
+    """Corbeille: soft-deleted products, with restore. Admin only."""
+    if not _is_admin(request.user):
+        messages.error(request, "Accès réservé aux administrateurs.")
+        return redirect('products:list')
+    q = (request.GET.get('search') or '').strip()
+    items = Product.all_objects.filter(is_deleted=True).select_related(
+        'category', 'metal_type', 'deleted_by').order_by('-deleted_at')
+    if q:
+        items = items.filter(Q(reference__icontains=q) | Q(name__icontains=q) | Q(barcode__icontains=q))
+    paginator = Paginator(items, 40)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    return render(request, 'products/product_trash.html', {
+        'page_obj': page_obj, 'products': page_obj.object_list,
+        'search': q, 'total': paginator.count,
+    })
 
-            messages.success(request, f'Produit "{product_name}" ({product_ref}) supprimé avec succès.')
-            return redirect('products:list')
 
-        except Exception as e:
-            messages.error(request, f'Erreur lors de la suppression: {str(e)}')
-            return redirect('products:detail', reference=reference)
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def product_restore(request, reference):
+    """Restore a soft-deleted product from the Corbeille. Admin only."""
+    if not _is_admin(request.user):
+        messages.error(request, "Accès réservé aux administrateurs.")
+        return redirect('products:list')
+    product = get_object_or_404(Product.all_objects, reference=reference, is_deleted=True)
+    product.is_deleted = False
+    product.deleted_at = None
+    product.deleted_by = None
+    product.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+    ActivityLog.objects.create(
+        user=request.user, action=ActivityLog.ActionType.UPDATE,
+        model_name='Product', object_id=str(product.id),
+        object_repr=f'Restauration {product.reference}', ip_address=get_client_ip(request),
+    )
+    messages.success(request, f'Produit {product.reference} restauré.')
+    return redirect('products:trash')
 
-    context = {
-        'product': product,
-    }
 
-    return render(request, 'products/product_delete.html', context)
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+def product_hard_delete(request, reference):
+    """Permanently delete a product already in the Corbeille. Admin only."""
+    if not _is_admin(request.user):
+        messages.error(request, "Accès réservé aux administrateurs.")
+        return redirect('products:list')
+    product = get_object_or_404(Product.all_objects, reference=reference, is_deleted=True)
+    ref = product.reference
+    product.images.all().delete()
+    product.delete()
+    ActivityLog.objects.create(
+        user=request.user, action=ActivityLog.ActionType.DELETE,
+        model_name='Product', object_id='',
+        object_repr=f'Suppression définitive {ref}', ip_address=get_client_ip(request),
+    )
+    messages.success(request, f'Produit {ref} supprimé définitivement.')
+    return redirect('products:trash')
 
 
 @login_required(login_url='login')
