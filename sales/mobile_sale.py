@@ -94,10 +94,14 @@ CASH_NAMES = {'espèces', 'especes', 'espèce', 'espece', 'cash'}
 
 
 def _needs_proof(m):
-    """A payment proof photo is required for every method except plain cash
-    and carrier cash-on-delivery (AMANA collects; its statement is the proof).
-    Mixed methods like "Achat or + espèces" still need a proof."""
-    return not m.collected_by_carrier and (m.name or '').strip().lower() not in CASH_NAMES
+    """A payment proof photo is required for every method except cash
+    ("Espèces"), old-gold purchase ("Achat or", incl. "Achat or + espèces")
+    and carrier cash-on-delivery (AMANA collects; its statement is the proof)."""
+    import re
+    name = (m.name or '').strip().lower()
+    if m.collected_by_carrier or name in CASH_NAMES:
+        return False
+    return not re.search(r"achat\s*(d['’]\s*)?or\b", name)
 
 
 def _bank_accounts():
